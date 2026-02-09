@@ -69,6 +69,7 @@ const naturezas = [
   { value: "fixo_variavel", label: "Fixo + Variável" },
 ];
 const impactos = [
+  { value: "receita", label: "Receita" },
   { value: "custo", label: "Custo" },
   { value: "despesa", label: "Despesa" },
   { value: "investimento", label: "Investimento" },
