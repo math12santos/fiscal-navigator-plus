@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,20 +39,18 @@ export default function SeedPlanDialog({
 
   const hasExistingData = accountsCount > 0 || costCentersCount > 0;
 
-  const handleOpen = async (isOpen: boolean) => {
-    if (isOpen) {
-      setConfirmCheck(false);
-      setConfirmText("");
-      setLoading(false);
+  useEffect(() => {
+    if (!open) return;
+    setConfirmCheck(false);
+    setConfirmText("");
+    setLoading(false);
 
-      if (!hasExistingData) {
-        // No accounts or cost centers — skip verification entirely
-        setStep("no-data");
-      } else {
-        // Has existing data — check for linked transactions
-        setStep("checking");
+    if (!hasExistingData) {
+      setStep("no-data");
+    } else {
+      setStep("checking");
+      (async () => {
         try {
-          // Add a timeout to prevent hanging
           const result = await Promise.race([
             checkLinkedTransactions(),
             new Promise<never>((_, reject) =>
@@ -62,12 +60,11 @@ export default function SeedPlanDialog({
           setStep(result.has_linked_transactions ? "has-transactions" : "safe-replace");
         } catch (e: any) {
           console.warn("Linked transactions check failed/timed out:", e.message);
-          setStep("safe-replace"); // fallback — assume safe
+          setStep("safe-replace");
         }
-      }
+      })();
     }
-    onOpenChange(isOpen);
-  };
+  }, [open]);
 
   const handleSeedFresh = async () => {
     setLoading(true);
@@ -96,7 +93,7 @@ export default function SeedPlanDialog({
   const canReplace = confirmCheck && confirmText === "SUBSTITUIR";
 
   return (
-    <AlertDialog open={open} onOpenChange={handleOpen}>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="sm:max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle>Gerar Plano Padrão</AlertDialogTitle>
