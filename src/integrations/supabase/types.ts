@@ -58,6 +58,118 @@ export type Database = {
           },
         ]
       }
+      cashflow_entries: {
+        Row: {
+          account_id: string | null
+          categoria: string | null
+          contract_id: string | null
+          contract_installment_id: string | null
+          cost_center_id: string | null
+          created_at: string
+          data_prevista: string
+          data_realizada: string | null
+          descricao: string
+          entity_id: string | null
+          id: string
+          notes: string | null
+          organization_id: string | null
+          source: string
+          status: string
+          tipo: string
+          updated_at: string
+          user_id: string
+          valor_previsto: number
+          valor_realizado: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          categoria?: string | null
+          contract_id?: string | null
+          contract_installment_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          data_prevista: string
+          data_realizada?: string | null
+          descricao: string
+          entity_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          source?: string
+          status?: string
+          tipo?: string
+          updated_at?: string
+          user_id: string
+          valor_previsto?: number
+          valor_realizado?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          categoria?: string | null
+          contract_id?: string | null
+          contract_installment_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          data_prevista?: string
+          data_realizada?: string | null
+          descricao?: string
+          entity_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          source?: string
+          status?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+          valor_previsto?: number
+          valor_realizado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashflow_entries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_contract_installment_id_fkey"
+            columns: ["contract_installment_id"]
+            isOneToOne: false
+            referencedRelation: "contract_installments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chart_of_accounts: {
         Row: {
           accounting_class: string
