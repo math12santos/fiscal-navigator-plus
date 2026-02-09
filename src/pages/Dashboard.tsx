@@ -1,11 +1,14 @@
 import { PageHeader } from "@/components/PageHeader";
 import { KPICard } from "@/components/KPICard";
 import { kpiData, monthlyRevenue, expenseByCategory } from "@/data/mockData";
-import { DollarSign, TrendingUp, Wallet, PiggyBank } from "lucide-react";
+import { DollarSign, TrendingUp, Wallet, PiggyBank, Building2, Plus } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend,
 } from "recharts";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -25,11 +28,37 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function Dashboard() {
+  const { currentOrg, organizations } = useOrganization();
+  const navigate = useNavigate();
+
+  if (organizations.length === 0) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader
+          title="Dashboard Financeiro"
+          description="Bem-vindo ao FinCore"
+        />
+        <div className="glass-card p-8 flex flex-col items-center gap-4 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Building2 className="h-7 w-7 text-primary" />
+          </div>
+          <h2 className="text-lg font-semibold">Cadastre sua primeira empresa</h2>
+          <p className="text-sm text-muted-foreground max-w-md">
+            Para começar a usar o FinCore, cadastre uma empresa. Você poderá gerenciar múltiplas empresas posteriormente.
+          </p>
+          <Button onClick={() => navigate("/nova-empresa")} className="mt-2">
+            <Plus size={16} className="mr-2" /> Cadastrar Empresa
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Dashboard Financeiro"
-        description="Visão consolidada da saúde financeira da empresa"
+        description={currentOrg ? `Visão consolidada — ${currentOrg.name}` : "Visão consolidada da saúde financeira"}
       />
 
       {/* KPIs */}

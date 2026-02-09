@@ -26,7 +26,18 @@ export default function OrgSelector({ collapsed }: OrgSelectorProps) {
   const { organizations, currentOrg, setCurrentOrg } = useOrganization();
   const navigate = useNavigate();
 
-  if (!currentOrg) return null;
+  if (!currentOrg) {
+    return (
+      <Button
+        variant="ghost"
+        className="w-full justify-start px-3 h-auto py-2 text-sm text-muted-foreground"
+        onClick={() => navigate("/nova-empresa")}
+      >
+        <Plus size={16} className="mr-2 shrink-0" />
+        {!collapsed && "Cadastrar Empresa"}
+      </Button>
+    );
+  }
 
   if (collapsed) {
     return (
