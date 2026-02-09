@@ -35,16 +35,6 @@ function ProtectedRoutes() {
 
   if (!user) return <Navigate to="/auth" replace />;
 
-  // No organizations → must create one
-  if (organizations.length === 0) {
-    return (
-      <Routes>
-        <Route path="/nova-empresa" element={<CreateOrganization />} />
-        <Route path="*" element={<Navigate to="/nova-empresa" replace />} />
-      </Routes>
-    );
-  }
-
   return (
     <AppLayout>
       <Routes>
