@@ -3,8 +3,19 @@ import { KPICard } from "@/components/KPICard";
 import { kpiData, monthlyRevenue, expenseByCategory } from "@/data/mockData";
 import { DollarSign, TrendingUp, Wallet, PiggyBank, Building2, Plus } from "lucide-react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  Legend,
 } from "recharts";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
@@ -34,17 +45,15 @@ export default function Dashboard() {
   if (organizations.length === 0) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <PageHeader
-          title="Dashboard Financeiro"
-          description="Bem-vindo ao FinCore"
-        />
+        <PageHeader title="Dashboard Financeiro" description="Bem-vindo ao FinCore" />
         <div className="glass-card p-8 flex flex-col items-center gap-4 text-center">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
             <Building2 className="h-7 w-7 text-primary" />
           </div>
           <h2 className="text-lg font-semibold">Cadastre sua primeira empresa</h2>
           <p className="text-sm text-muted-foreground max-w-md">
-            Para começar a usar o FinCore, cadastre uma empresa. Você poderá gerenciar múltiplas empresas posteriormente.
+            Para começar a usar o Colli FinCore, cadastre uma empresa. Você poderá gerenciar múltiplas empresas
+            posteriormente.
           </p>
           <Button onClick={() => navigate("/nova-empresa")} className="mt-2">
             <Plus size={16} className="mr-2" /> Cadastrar Empresa
@@ -102,7 +111,10 @@ export default function Dashboard() {
             <BarChart data={monthlyRevenue}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 16%)" />
               <XAxis dataKey="month" tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }} />
-              <YAxis tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }} tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
+              <YAxis
+                tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }}
+                tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
+              />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: 12, color: "hsl(215, 20%, 55%)" }} />
               <Bar dataKey="receita" name="Receita" fill="hsl(174, 72%, 50%)" radius={[4, 4, 0, 0]} />
@@ -159,7 +171,10 @@ export default function Dashboard() {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 16%)" />
             <XAxis dataKey="month" tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }} />
-            <YAxis tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }} tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
+            <YAxis
+              tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }}
+              tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
+            />
             <Tooltip content={<CustomTooltip />} />
             <Area
               type="monotone"
