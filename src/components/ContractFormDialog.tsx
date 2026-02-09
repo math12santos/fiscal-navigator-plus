@@ -459,6 +459,23 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
     });
   };
 
+  const handleValueChange = (changedId: string, newValue: number) => {
+    const others = installments.filter((i) => i.id !== changedId);
+    if (others.length === 0) {
+      update.mutate({ id: changedId, valor: contractValue });
+      return;
+    }
+    const remaining = Math.round((contractValue - newValue) * 100) / 100;
+    const perOther = Math.round((remaining / others.length) * 100) / 100;
+    const lastIdx = others.length - 1;
+    const adjustedLast = Math.round((remaining - perOther * lastIdx) * 100) / 100;
+
+    update.mutate({ id: changedId, valor: newValue });
+    others.forEach((inst, idx) => {
+      update.mutate({ id: inst.id, valor: idx === lastIdx ? adjustedLast : perOther });
+    });
+  };
+
   const handleGenerate = () => {
     if (!genStartDate || genQty < 1 || contractValue <= 0) return;
     const entrada = calcEntradaValor();
@@ -609,7 +626,7 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
                 min={0}
                 step={0.01}
                 value={inst.valor}
-                onChange={(e) => update.mutate({ id: inst.id, valor: Number(e.target.value) })}
+                onChange={(e) => handleValueChange(inst.id, Number(e.target.value))}
               />
               <Input
                 className="w-32 h-7 text-xs"
