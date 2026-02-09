@@ -11,9 +11,11 @@ import {
   Brain,
   ChevronLeft,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -29,6 +31,7 @@ const navItems = [
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const { signOut, user } = useAuth();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -76,10 +79,14 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
         {/* Footer */}
         {!collapsed && (
-          <div className="border-t border-border/50 p-4">
-            <div className="text-xs text-muted-foreground">
-              FinCore v1.0
-            </div>
+          <div className="border-t border-border/50 p-4 space-y-3">
+            <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
+            <button
+              onClick={signOut}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors w-full"
+            >
+              <LogOut size={14} /> Sair
+            </button>
           </div>
         )}
       </aside>
