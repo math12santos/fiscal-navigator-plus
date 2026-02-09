@@ -5,7 +5,7 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useContracts, Contract } from "@/hooks/useContracts";
 import { useMemo } from "react";
-import { addMonths, startOfMonth, endOfMonth, format, isBefore, isAfter } from "date-fns";
+import { addMonths, format, isBefore, isAfter } from "date-fns";
 
 export interface CashFlowEntry {
   id: string;
@@ -123,25 +123,81 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     enabled: !!user && !!orgId,
   });
 
-  // Contract projections (virtual)
+  // Contract projections (virtual) — recurrent contracts
   const { contracts } = useContracts();
 
+  // Installments for "unico" contracts — fetch all installments for active unique contracts
+  const uniqueContractIds = useMemo(
+    () => contracts.filter((c) => c.tipo_recorrencia === "unico" && c.status === "Ativo").map((c) => c.id),
+    [contracts]
+  );
+
+  const installmentsQuery = useQuery({
+    queryKey: ["cashflow_installments", orgId, uniqueContractIds],
+    queryFn: async () => {
+      if (uniqueContractIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("contract_installments" as any)
+        .select("*")
+        .in("contract_id", uniqueContractIds)
+        .order("data_vencimento", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as import("@/hooks/useContractInstallments").ContractInstallment[];
+    },
+    enabled: !!user && !!orgId && uniqueContractIds.length > 0,
+  });
+
   const projectedEntries = useMemo(() => {
-    if (!rangeFrom || !rangeTo || contracts.length === 0) return [];
-    const materializedContractKeys = new Set(
+    if (!rangeFrom || !rangeTo) return [];
+    const materializedKeys = new Set(
       (entriesQuery.data ?? [])
         .filter((e) => e.contract_id && e.source === "contrato")
-        .map((e) => `${e.contract_id}-${e.data_prevista?.substring(0, 7)}`)
+        .map((e) => `${e.contract_id}-${e.data_prevista}`)
     );
 
-    return contracts.flatMap((c) => {
+    // 1. Recurrent contract projections
+    const recurrentProjections = contracts.flatMap((c) => {
       const projections = generateProjectionsFromContract(c, rangeFrom, rangeTo);
-      // Exclude projections already materialized
       return projections.filter(
-        (p) => !materializedContractKeys.has(`${p.contract_id}-${p.data_prevista?.substring(0, 7)}`)
+        (p) => !materializedKeys.has(`${p.contract_id}-${p.data_prevista}`)
       );
     });
-  }, [contracts, rangeFrom, rangeTo, entriesQuery.data]);
+
+    // 2. Installment projections (for "unico" contracts)
+    const contractMap = new Map(contracts.map((c) => [c.id, c]));
+    const installmentProjections = (installmentsQuery.data ?? [])
+      .filter((inst) => {
+        const d = new Date(inst.data_vencimento);
+        return !isBefore(d, rangeFrom) && !isAfter(d, rangeTo) &&
+          !materializedKeys.has(`${inst.contract_id}-${inst.data_vencimento}`);
+      })
+      .map((inst) => {
+        const contract = contractMap.get(inst.contract_id);
+        const tipo = contract?.impacto_resultado === "receita" ? "entrada" : "saida";
+        return {
+          id: `proj-inst-${inst.id}`,
+          contract_id: inst.contract_id,
+          contract_installment_id: inst.id,
+          tipo,
+          categoria: contract?.natureza_financeira ?? null,
+          descricao: `${contract?.nome ?? "Contrato"} — ${inst.descricao}`,
+          valor_previsto: Number(inst.valor),
+          valor_realizado: null,
+          data_prevista: inst.data_vencimento,
+          data_realizada: null,
+          status: inst.status === "pago" ? "pago" : "previsto",
+          account_id: null,
+          cost_center_id: contract?.cost_center_id ?? null,
+          entity_id: contract?.entity_id ?? null,
+          notes: null,
+          source: "contrato",
+          created_at: inst.created_at,
+          updated_at: inst.created_at,
+        } as Omit<CashFlowEntry, "user_id" | "organization_id">;
+      });
+
+    return [...recurrentProjections, ...installmentProjections];
+  }, [contracts, rangeFrom, rangeTo, entriesQuery.data, installmentsQuery.data]);
 
   // Merge materialized + projected
   const allEntries = useMemo(() => {
