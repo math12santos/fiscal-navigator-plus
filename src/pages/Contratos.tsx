@@ -330,9 +330,15 @@ export default function Contratos() {
     if (filterTipo !== "all" && c.tipo !== filterTipo) return false;
     // Status filter using smart status
     if (filterStatus !== "all" && c.displayStatus !== filterStatus) return false;
-    // Date range filter on vencimento
-    if (dateFrom && new Date(c.vencimento) < dateFrom) return false;
-    if (dateTo && new Date(c.vencimento) > dateTo) return false;
+    // Date range filter: contract must be active during the selected period
+    if (dateFrom || dateTo) {
+      const contractStart = c.data_inicio ? new Date(c.data_inicio) : new Date(c.created_at);
+      const contractEnd = c.data_fim ? new Date(c.data_fim) : (c.prazo_indeterminado ? null : new Date(c.vencimento));
+      // A contract is visible if its active range overlaps the filter range
+      // overlap = contractStart <= dateTo AND (contractEnd >= dateFrom OR no end date)
+      if (dateTo && contractStart > dateTo) return false;
+      if (dateFrom && contractEnd && contractEnd < dateFrom) return false;
+    }
     return true;
   }), [contractsWithStatus, filterTipo, filterStatus, dateFrom, dateTo]);
 
