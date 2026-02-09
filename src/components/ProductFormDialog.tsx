@@ -17,7 +17,8 @@ interface Props {
   isLoading: boolean;
 }
 
-const UNITS = ["un","kg","g","l","ml","m","m²","m³","hr","pç","cx","pct","par","kit"];
+const PRODUCT_UNITS = ["un","kg","g","l","ml","m","m²","m³","pç","cx","pct","par","kit"];
+const SERVICE_UNITS = ["hr","dia","mês","projeto","visita","km","m²","un"];
 
 export default function ProductFormDialog({ open, onOpenChange, product, accounts, onSubmit, isLoading }: Props) {
   const [form, setForm] = useState<any>({});
@@ -52,7 +53,7 @@ export default function ProductFormDialog({ open, onOpenChange, product, account
             </div>
             <div>
               <Label>Tipo <span className="text-destructive">*</span></Label>
-              <Select value={form.type || "produto"} onValueChange={(v) => set("type", v)}>
+              <Select value={form.type || "produto"} onValueChange={(v) => { set("type", v); set("unit", v === "servico" ? "hr" : "un"); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="produto">Produto</SelectItem>
@@ -73,7 +74,7 @@ export default function ProductFormDialog({ open, onOpenChange, product, account
               <Select value={form.unit || "un"} onValueChange={(v) => set("unit", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  {(form.type === "servico" ? SERVICE_UNITS : PRODUCT_UNITS).map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
