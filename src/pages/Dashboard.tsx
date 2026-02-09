@@ -45,14 +45,14 @@ export default function Dashboard() {
   if (organizations.length === 0) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <PageHeader title="Dashboard Financeiro" description="Bem-vindo ao FinCore" />
+        <PageHeader title="Dashboard Financeiro" description="Bem-vindo ao Colli FinCore" />
         <div className="glass-card p-8 flex flex-col items-center gap-4 text-center">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
             <Building2 className="h-7 w-7 text-primary" />
           </div>
           <h2 className="text-lg font-semibold">Cadastre sua primeira empresa</h2>
           <p className="text-sm text-muted-foreground max-w-md">
-            Para começar a usar o Colli FinCore, cadastre uma empresa. Você poderá gerenciar múltiplas empresas
+            Para começar a usar o FinCore, cadastre uma empresa. Você poderá gerenciar múltiplas empresas
             posteriormente.
           </p>
           <Button onClick={() => navigate("/nova-empresa")} className="mt-2">
