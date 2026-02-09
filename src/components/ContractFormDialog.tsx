@@ -11,12 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useContractDocuments } from "@/hooks/useContractDocuments";
 import { useEntities } from "@/hooks/useEntities";
+import { useProducts } from "@/hooks/useProducts";
 import EntityFormDialog from "@/components/EntityFormDialog";
-import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus } from "lucide-react";
+import ProductFormDialog from "@/components/ProductFormDialog";
+import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus, PackagePlus } from "lucide-react";
 
 export interface ContractFormData {
   nome: string;
   entity_id: string;
+  product_id: string;
   tipo: string;
   valor: number;
   vencimento: string;
@@ -61,7 +64,7 @@ const RequiredLabel = ({ htmlFor, children }: { htmlFor?: string; children: Reac
   </Label>
 );
 
-const tipos = ["Fornecedor", "Locação", "Tecnologia", "Serviço", "Seguro", "Outro"];
+// tipos removed - now using products/services
 const statuses = ["Ativo", "Próximo ao vencimento", "Vencido", "Cancelado", "Pausado"];
 const recorrencias = [
   { value: "mensal", label: "Mensal" },
@@ -90,7 +93,7 @@ const impactos = [
 ];
 
 const defaultForm: ContractFormData = {
-  nome: "", entity_id: "", tipo: "Fornecedor", valor: 0, vencimento: "", status: "Ativo", notes: "",
+  nome: "", entity_id: "", product_id: "", tipo: "", valor: 0, vencimento: "", status: "Ativo", notes: "",
   tipo_recorrencia: "mensal", intervalo_personalizado: null, data_inicio: "", data_fim: "",
   prazo_indeterminado: false, valor_base: 0, dia_vencimento: null,
   tipo_reajuste: "manual", indice_reajuste: "", percentual_reajuste: null,
@@ -103,11 +106,15 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
   const [form, setForm] = useState<ContractFormData>({ ...defaultForm });
   const { costCenters } = useCostCenters();
   const { entities, create: createEntity } = useEntities();
+  const { products, create: createProduct } = useProducts();
   const [entityDialogOpen, setEntityDialogOpen] = useState(false);
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
   const isEditing = !!contractId;
 
   // Filter clients (cliente or ambos)
   const clients = entities.filter((e) => e.active && (e.type === "cliente" || e.type === "ambos"));
+  // Active products/services
+  const activeProducts = products.filter((p) => p.active);
 
   useEffect(() => {
     if (initialData) {
@@ -169,14 +176,30 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                   </Button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <RequiredLabel>Tipo</RequiredLabel>
-                  <Select value={form.tipo} onValueChange={(v) => set("tipo", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{tipos.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              <div className="space-y-2">
+                <RequiredLabel>Produto / Serviço</RequiredLabel>
+                <div className="flex items-center gap-2">
+                  <Select value={form.product_id || "none"} onValueChange={(v) => {
+                    const selected = activeProducts.find((p) => p.id === v);
+                    set("product_id", v === "none" ? "" : v);
+                    if (selected) set("tipo", selected.type === "servico" ? "Serviço" : "Produto");
+                  }}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Selecionar produto/serviço..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Selecionar...</SelectItem>
+                      {activeProducts.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.code} - {p.name} ({p.type === "servico" ? "Serviço" : "Produto"})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
+                  <Button type="button" variant="outline" size="icon" onClick={() => setProductDialogOpen(true)} title="Adicionar produto/serviço">
+                    <PackagePlus size={16} />
+                  </Button>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <RequiredLabel>Status</RequiredLabel>
                   <Select value={form.status} onValueChange={(v) => set("status", v)}>
@@ -363,6 +386,21 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
         });
       }}
       isLoading={createEntity.isPending}
+    />
+
+    {/* Product/Service creation dialog */}
+    <ProductFormDialog
+      open={productDialogOpen}
+      onOpenChange={setProductDialogOpen}
+      product={null}
+      products={products}
+      accounts={[]}
+      onSubmit={(data) => {
+        createProduct.mutate(data, {
+          onSuccess: () => setProductDialogOpen(false),
+        });
+      }}
+      isLoading={createProduct.isPending}
     />
     </>
   );

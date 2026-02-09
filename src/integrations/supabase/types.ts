@@ -268,6 +268,7 @@ export type Database = {
           percentual_reajuste: number | null
           periodicidade_reajuste: string | null
           prazo_indeterminado: boolean
+          product_id: string | null
           proximo_reajuste: string | null
           responsavel_interno: string | null
           sla_revisao_dias: number | null
@@ -302,6 +303,7 @@ export type Database = {
           percentual_reajuste?: number | null
           periodicidade_reajuste?: string | null
           prazo_indeterminado?: boolean
+          product_id?: string | null
           proximo_reajuste?: string | null
           responsavel_interno?: string | null
           sla_revisao_dias?: number | null
@@ -336,6 +338,7 @@ export type Database = {
           percentual_reajuste?: number | null
           periodicidade_reajuste?: string | null
           prazo_indeterminado?: boolean
+          product_id?: string | null
           proximo_reajuste?: string | null
           responsavel_interno?: string | null
           sla_revisao_dias?: number | null
@@ -370,6 +373,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
