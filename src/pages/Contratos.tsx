@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from "react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, startOfYear, endOfYear, differenceInDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
 import { useContracts, Contract } from "@/hooks/useContracts";
 import { useProducts } from "@/hooks/useProducts";
@@ -9,7 +10,7 @@ import ContractFormDialog, { ContractFormData } from "@/components/ContractFormD
 import { cn } from "@/lib/utils";
 import {
   FileText, AlertTriangle, CheckCircle, Plus, Pencil, Trash2, Loader2,
-  Cloud, X, CalendarIcon, Eye, Upload, TrendingUp, ChevronLeft,
+  Cloud, X, CalendarIcon, Eye, Upload, TrendingUp, ChevronLeft, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +35,36 @@ const recorrenciaLabel: Record<string, string> = {
   unico: "Único", mensal: "Mensal", bimestral: "Bimestral", trimestral: "Trimestral",
   semestral: "Semestral", anual: "Anual", personalizado: "Personalizado",
 };
+
+// Date cycle presets
+type DateCycle = "mensal" | "bimestral" | "trimestral" | "semestral" | "anual" | "personalizado";
+const dateCycleLabels: Record<DateCycle, string> = {
+  mensal: "Mensal", bimestral: "Bimestral", trimestral: "Trimestral",
+  semestral: "Semestral", anual: "Anual", personalizado: "Personalizado",
+};
+
+function getCycleDates(cycle: DateCycle): { from: Date; to: Date } | null {
+  if (cycle === "personalizado") return null;
+  const now = new Date();
+  const start = startOfMonth(now);
+  const monthsMap: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+  const months = monthsMap[cycle] ?? 1;
+  return { from: start, to: endOfMonth(addMonths(start, months - 1)) };
+}
+
+// Smart status classification
+function classifyContractStatus(c: Contract): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const venc = new Date(c.vencimento);
+  venc.setHours(0, 0, 0, 0);
+
+  if (c.status !== "Ativo") return c.status;
+  const daysUntil = differenceInDays(venc, today);
+  if (daysUntil < 0) return "Vencido";
+  if (daysUntil <= 30) return "Próx. Vencimento";
+  return "Ativo";
+}
 
 function contractToFormData(c: Contract): ContractFormData {
   return {
@@ -245,30 +276,55 @@ export default function Contratos() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewing, setViewing] = useState<Contract | null>(null);
 
-  const [filterTipo, setFilterTipo] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
-  const [dateTo, setDateTo] = useState<Date | undefined>();
+  // Filters
+  const [filterTipo, setFilterTipo] = useState("all"); // all | Produto | Serviço
+  const [filterStatus, setFilterStatus] = useState("all"); // all | Ativo | Vencido | Próx. Vencimento | Cancelado | Suspenso
+  const [dateCycle, setDateCycle] = useState<DateCycle>("mensal");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => getCycleDates("mensal")?.from);
+  const [dateTo, setDateTo] = useState<Date | undefined>(() => getCycleDates("mensal")?.to);
 
-  const tipos = useMemo(() => [...new Set(contracts.map((c) => c.tipo))], [contracts]);
-  const statuses = useMemo(() => [...new Set(contracts.map((c) => c.status))], [contracts]);
+  // When cycle changes, update dates
+  const handleCycleChange = (cycle: DateCycle) => {
+    setDateCycle(cycle);
+    const dates = getCycleDates(cycle);
+    if (dates) {
+      setDateFrom(dates.from);
+      setDateTo(dates.to);
+    }
+  };
 
-  const filtered = useMemo(() => contracts.filter((c) => {
+  // Derive smart statuses for each contract
+  const contractsWithStatus = useMemo(() =>
+    contracts.map((c) => ({ ...c, displayStatus: classifyContractStatus(c) })),
+    [contracts]
+  );
+
+  // All unique raw + smart statuses
+  const statusOptions = ["Ativo", "Vencido", "Próx. Vencimento", "Cancelado", "Suspenso"];
+
+  const filtered = useMemo(() => contractsWithStatus.filter((c) => {
+    // Type filter: Produto or Serviço
     if (filterTipo !== "all" && c.tipo !== filterTipo) return false;
-    if (filterStatus !== "all" && c.status !== filterStatus) return false;
+    // Status filter using smart status
+    if (filterStatus !== "all" && c.displayStatus !== filterStatus) return false;
+    // Date range filter on vencimento
     if (dateFrom && new Date(c.vencimento) < dateFrom) return false;
     if (dateTo && new Date(c.vencimento) > dateTo) return false;
     return true;
-  }), [contracts, filterTipo, filterStatus, dateFrom, dateTo]);
+  }), [contractsWithStatus, filterTipo, filterStatus, dateFrom, dateTo]);
 
-  const hasFilters = filterTipo !== "all" || filterStatus !== "all" || !!dateFrom || !!dateTo;
-  const clearFilters = () => { setFilterTipo("all"); setFilterStatus("all"); setDateFrom(undefined); setDateTo(undefined); };
+  const hasFilters = filterTipo !== "all" || filterStatus !== "all" || dateCycle !== "mensal";
+  const clearFilters = () => {
+    setFilterTipo("all");
+    setFilterStatus("all");
+    handleCycleChange("mensal");
+  };
 
-  const activeContracts = filtered.filter((c) => c.status === "Ativo");
-  const totalValue = filtered.reduce((sum, c) => sum + Number(c.valor), 0);
-  const nextExpiry = filtered.length
-    ? filtered.reduce((min, c) => (c.vencimento < min ? c.vencimento : min), filtered[0].vencimento)
-    : null;
+  // KPI calculations based on filtered data
+  const activeCount = filtered.filter((c) => c.displayStatus === "Ativo").length;
+  const overdueCount = filtered.filter((c) => c.displayStatus === "Vencido").length;
+  const nearExpiryCount = filtered.filter((c) => c.displayStatus === "Próx. Vencimento").length;
+  const totalReceivable = filtered.reduce((sum, c) => sum + Number(c.valor), 0);
 
   const handleSubmit = (data: ContractFormData) => {
     if (editing) {
@@ -311,6 +367,10 @@ export default function Contratos() {
     );
   }
 
+  const periodLabel = dateFrom && dateTo
+    ? `${format(dateFrom, "dd/MM/yy")} – ${format(dateTo, "dd/MM/yy")}`
+    : "";
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -318,63 +378,91 @@ export default function Contratos() {
         <Button onClick={openCreate} className="gap-2"><Plus size={16} /> Novo Contrato</Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="glass-card p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contratos Ativos</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{activeContracts.length}</p>
-        </div>
-        <div className="glass-card p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Valor Total Mensal</p>
-          <p className="text-2xl font-bold text-primary mt-1">{fmt(totalValue)}</p>
-        </div>
-        <div className="glass-card p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Próx. Vencimento</p>
-          <p className="text-2xl font-bold text-warning mt-1">
-            {nextExpiry ? new Date(nextExpiry).toLocaleDateString("pt-BR") : "—"}
-          </p>
-        </div>
-      </div>
-
       {/* Filters */}
       <div className="glass-card p-4 flex flex-wrap items-center gap-3">
         <Select value={filterTipo} onValueChange={setFilterTipo}>
-          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Produto/Serviço" /></SelectTrigger>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os produtos</SelectItem>
-            {tipos.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            <SelectItem value="Produto">Produto</SelectItem>
+            <SelectItem value="Serviço">Serviço</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os status</SelectItem>
-            {statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            {statusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className={cn("w-[150px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
-              <CalendarIcon className="mr-2 h-4 w-4" />{dateFrom ? format(dateFrom, "dd/MM/yyyy") : "De"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className={cn("w-[150px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
-              <CalendarIcon className="mr-2 h-4 w-4" />{dateTo ? format(dateTo, "dd/MM/yyyy") : "Até"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
+        <Select value={dateCycle} onValueChange={(v) => handleCycleChange(v as DateCycle)}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Período" /></SelectTrigger>
+          <SelectContent>
+            {(Object.keys(dateCycleLabels) as DateCycle[]).map((k) => (
+              <SelectItem key={k} value={k}>{dateCycleLabels[k]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {dateCycle === "personalizado" && (
+          <>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />{dateFrom ? format(dateFrom, "dd/MM/yyyy") : "De"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />{dateTo ? format(dateTo, "dd/MM/yyyy") : "Até"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1 text-muted-foreground"><X size={14} /> Limpar</Button>
         )}
-        <span className="ml-auto text-xs text-muted-foreground">{filtered.length} de {contracts.length} contratos</span>
+        <span className="ml-auto text-xs text-muted-foreground">
+          {filtered.length} de {contracts.length} contratos
+          {periodLabel && <span className="ml-2 text-primary">• {periodLabel}</span>}
+        </span>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={16} className="text-success" />
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ativos</p>
+          </div>
+          <p className="text-2xl font-bold text-foreground mt-1">{activeCount}</p>
+        </div>
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-destructive" />
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Vencidos</p>
+          </div>
+          <p className="text-2xl font-bold text-destructive mt-1">{overdueCount}</p>
+        </div>
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-2">
+            <Clock size={16} className="text-warning" />
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Próx. Vencimento</p>
+          </div>
+          <p className="text-2xl font-bold text-warning mt-1">{nearExpiryCount}</p>
+        </div>
+        <div className="glass-card p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Valor Total no Período</p>
+          <p className="text-2xl font-bold text-primary mt-1">{fmt(totalReceivable)}</p>
+        </div>
       </div>
 
       {/* Table */}
@@ -415,10 +503,16 @@ export default function Contratos() {
                   <td className="px-5 py-3.5">
                     <span className={cn(
                       "inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full",
-                      c.status === "Ativo" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                      c.displayStatus === "Ativo" ? "bg-success/10 text-success" :
+                      c.displayStatus === "Vencido" ? "bg-destructive/10 text-destructive" :
+                      c.displayStatus === "Próx. Vencimento" ? "bg-warning/10 text-warning" :
+                      "bg-muted/50 text-muted-foreground"
                     )}>
-                      {c.status === "Ativo" ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
-                      {c.status}
+                      {c.displayStatus === "Ativo" ? <CheckCircle size={12} /> :
+                       c.displayStatus === "Vencido" ? <AlertTriangle size={12} /> :
+                       c.displayStatus === "Próx. Vencimento" ? <Clock size={12} /> :
+                       <AlertTriangle size={12} />}
+                      {c.displayStatus}
                     </span>
                   </td>
                   <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
