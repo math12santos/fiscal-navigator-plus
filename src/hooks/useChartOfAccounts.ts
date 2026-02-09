@@ -120,6 +120,98 @@ export function useChartOfAccounts() {
     onError: (e: any) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
   });
 
+  const seedDefaultAccounts = async () => {
+    if (!user) throw new Error("Usuário não autenticado");
+
+    const uid = user.id;
+
+    // Level 1
+    const level1 = [
+      { code: "1", name: "Receitas", type: "receita", nature: "entrada", accounting_class: "resultado" },
+      { code: "2", name: "Custos dos Serviços", type: "custo", nature: "saida", accounting_class: "resultado" },
+      { code: "3", name: "Despesas", type: "despesa", nature: "saida", accounting_class: "resultado" },
+      { code: "4", name: "Investimentos", type: "investimento", nature: "saida", accounting_class: "ativo" },
+      { code: "5", name: "Transferências", type: "transferencia", nature: "neutro", accounting_class: "resultado" },
+    ];
+
+    const { data: l1Data, error: l1Err } = await supabase
+      .from("chart_of_accounts" as any)
+      .insert(level1.map((a) => ({ ...a, user_id: uid, level: 1, is_synthetic: true, is_system_default: true, active: true, parent_id: null, description: null, tags: null })))
+      .select();
+    if (l1Err) throw l1Err;
+    const l1 = l1Data as unknown as ChartAccount[];
+    const l1Map = Object.fromEntries(l1.map((a) => [a.code, a.id]));
+
+    // Level 2
+    const level2 = [
+      { code: "1.1", name: "Receitas Operacionais", type: "receita", nature: "entrada", accounting_class: "resultado", parentCode: "1" },
+      { code: "1.2", name: "Receitas Não Operacionais", type: "receita", nature: "entrada", accounting_class: "resultado", parentCode: "1" },
+      { code: "2.1", name: "Custos Diretos", type: "custo", nature: "saida", accounting_class: "resultado", parentCode: "2" },
+      { code: "3.1", name: "Despesas Administrativas", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3" },
+      { code: "3.2", name: "Despesas com Pessoal", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3" },
+      { code: "3.3", name: "Despesas Comerciais", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3" },
+      { code: "3.4", name: "Despesas Financeiras", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3" },
+      { code: "3.5", name: "Impostos e Tributos", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3" },
+      { code: "4.1", name: "Investimentos Operacionais", type: "investimento", nature: "saida", accounting_class: "ativo", parentCode: "4" },
+      { code: "5.1", name: "Transferências entre Contas", type: "transferencia", nature: "neutro", accounting_class: "resultado", parentCode: "5" },
+    ];
+
+    const { data: l2Data, error: l2Err } = await supabase
+      .from("chart_of_accounts" as any)
+      .insert(level2.map(({ parentCode, ...a }) => ({ ...a, user_id: uid, level: 2, is_synthetic: true, is_system_default: true, active: true, parent_id: l1Map[parentCode], description: null, tags: null })))
+      .select();
+    if (l2Err) throw l2Err;
+    const l2 = l2Data as unknown as ChartAccount[];
+    const l2Map = Object.fromEntries(l2.map((a) => [a.code, a.id]));
+
+    // Level 3
+    const level3 = [
+      { code: "1.1.01", name: "BPO Financeiro", type: "receita", nature: "entrada", accounting_class: "resultado", parentCode: "1.1" },
+      { code: "1.1.02", name: "Assessoria Contábil", type: "receita", nature: "entrada", accounting_class: "resultado", parentCode: "1.1" },
+      { code: "1.1.03", name: "Licitações e Pregões", type: "receita", nature: "entrada", accounting_class: "resultado", parentCode: "1.1" },
+      { code: "1.1.04", name: "Consultoria Avulsa", type: "receita", nature: "entrada", accounting_class: "resultado", parentCode: "1.1" },
+      { code: "1.2.01", name: "Receitas Financeiras (juros/aplicações)", type: "receita", nature: "entrada", accounting_class: "resultado", parentCode: "1.2" },
+      { code: "1.2.02", name: "Outras Receitas", type: "receita", nature: "entrada", accounting_class: "resultado", parentCode: "1.2" },
+      { code: "2.1.01", name: "Salários e Encargos Operacionais", type: "custo", nature: "saida", accounting_class: "resultado", parentCode: "2.1" },
+      { code: "2.1.02", name: "Ferramentas e Sistemas (SaaS)", type: "custo", nature: "saida", accounting_class: "resultado", parentCode: "2.1" },
+      { code: "2.1.03", name: "Subcontratação / Terceiros", type: "custo", nature: "saida", accounting_class: "resultado", parentCode: "2.1" },
+      { code: "2.1.04", name: "Certificados Digitais", type: "custo", nature: "saida", accounting_class: "resultado", parentCode: "2.1" },
+      { code: "3.1.01", name: "Aluguel e Condomínio", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.1" },
+      { code: "3.1.02", name: "Energia e Telecomunicações", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.1" },
+      { code: "3.1.03", name: "Material de Escritório", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.1" },
+      { code: "3.1.04", name: "Honorários Contábeis", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.1" },
+      { code: "3.1.05", name: "Honorários Jurídicos", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.1" },
+      { code: "3.1.06", name: "Seguros", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.1" },
+      { code: "3.2.01", name: "Folha Administrativa", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.2" },
+      { code: "3.2.02", name: "Benefícios (VR, VT, Plano)", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.2" },
+      { code: "3.2.03", name: "Treinamento e Capacitação", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.2" },
+      { code: "3.3.01", name: "Marketing e Publicidade", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.3" },
+      { code: "3.3.02", name: "Comissões Comerciais", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.3" },
+      { code: "3.3.03", name: "Eventos e Networking", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.3" },
+      { code: "3.4.01", name: "Juros e Multas", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.4" },
+      { code: "3.4.02", name: "Tarifas Bancárias", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.4" },
+      { code: "3.4.03", name: "IOF e Encargos", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.4" },
+      { code: "3.5.01", name: "ISS", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.5" },
+      { code: "3.5.02", name: "PIS/COFINS", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.5" },
+      { code: "3.5.03", name: "IRPJ/CSLL", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.5" },
+      { code: "3.5.04", name: "Simples Nacional (se aplicável)", type: "despesa", nature: "saida", accounting_class: "resultado", parentCode: "3.5" },
+      { code: "4.1.01", name: "Equipamentos e TI", type: "investimento", nature: "saida", accounting_class: "ativo", parentCode: "4.1" },
+      { code: "4.1.02", name: "Mobiliário", type: "investimento", nature: "saida", accounting_class: "ativo", parentCode: "4.1" },
+      { code: "4.1.03", name: "Software e Licenças Permanentes", type: "investimento", nature: "saida", accounting_class: "ativo", parentCode: "4.1" },
+      { code: "5.1.01", name: "Transferência Interna", type: "transferencia", nature: "neutro", accounting_class: "resultado", parentCode: "5.1" },
+      { code: "5.1.02", name: "Aportes de Sócios", type: "transferencia", nature: "neutro", accounting_class: "resultado", parentCode: "5.1" },
+      { code: "5.1.03", name: "Distribuição de Lucros", type: "transferencia", nature: "neutro", accounting_class: "resultado", parentCode: "5.1" },
+    ];
+
+    const { error: l3Err } = await supabase
+      .from("chart_of_accounts" as any)
+      .insert(level3.map(({ parentCode, ...a }) => ({ ...a, user_id: uid, level: 3, is_synthetic: false, is_system_default: true, active: true, parent_id: l2Map[parentCode], description: null, tags: null })));
+    if (l3Err) throw l3Err;
+
+    qc.invalidateQueries({ queryKey: ["chart_of_accounts"] });
+    toast({ title: "Plano de contas padrão criado com sucesso" });
+  };
+
   return {
     accounts: query.data ?? [],
     isLoading: query.isLoading,
@@ -127,5 +219,6 @@ export function useChartOfAccounts() {
     update,
     toggleActive,
     remove,
+    seedDefaultAccounts,
   };
 }
