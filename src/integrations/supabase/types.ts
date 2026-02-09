@@ -255,6 +255,7 @@ export type Database = {
           data_fim: string | null
           data_inicio: string | null
           dia_vencimento: number | null
+          entity_id: string | null
           external_ref: string | null
           id: string
           impacto_resultado: string | null
@@ -288,6 +289,7 @@ export type Database = {
           data_fim?: string | null
           data_inicio?: string | null
           dia_vencimento?: number | null
+          entity_id?: string | null
           external_ref?: string | null
           id?: string
           impacto_resultado?: string | null
@@ -321,6 +323,7 @@ export type Database = {
           data_fim?: string | null
           data_inicio?: string | null
           dia_vencimento?: number | null
+          entity_id?: string | null
           external_ref?: string | null
           id?: string
           impacto_resultado?: string | null
@@ -353,6 +356,13 @@ export type Database = {
             columns: ["cost_center_id"]
             isOneToOne: false
             referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
             referencedColumns: ["id"]
           },
           {

@@ -36,7 +36,7 @@ const recorrenciaLabel: Record<string, string> = {
 
 function contractToFormData(c: Contract): ContractFormData {
   return {
-    nome: c.nome, tipo: c.tipo, valor: Number(c.valor), vencimento: c.vencimento,
+    nome: c.nome, entity_id: (c as any).entity_id ?? "", tipo: c.tipo, valor: Number(c.valor), vencimento: c.vencimento,
     status: c.status, notes: c.notes ?? "",
     tipo_recorrencia: c.tipo_recorrencia ?? "mensal",
     intervalo_personalizado: c.intervalo_personalizado ?? null,
