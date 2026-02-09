@@ -13,6 +13,7 @@ import Conciliacao from "@/pages/Conciliacao";
 import Tarefas from "@/pages/Tarefas";
 import Integracoes from "@/pages/Integracoes";
 import IAFinanceira from "@/pages/IAFinanceira";
+import Configuracoes from "@/pages/Configuracoes";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -42,6 +43,7 @@ function ProtectedRoutes() {
         <Route path="/tarefas" element={<Tarefas />} />
         <Route path="/integracoes" element={<Integracoes />} />
         <Route path="/ia" element={<IAFinanceira />} />
+        <Route path="/configuracoes" element={<Configuracoes />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
