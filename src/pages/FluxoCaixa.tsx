@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
@@ -39,14 +40,43 @@ const statusConfig: Record<string, { icon: typeof Circle; class: string; label: 
   cancelado: { icon: Circle, class: "text-destructive", label: "Cancelado" },
 };
 
+type DateCycle = "mensal" | "bimestral" | "trimestral" | "semestral" | "anual";
+
+const cycleOptions: { value: DateCycle; label: string; months: number }[] = [
+  { value: "mensal", label: "Mensal", months: 1 },
+  { value: "bimestral", label: "Bimestral", months: 2 },
+  { value: "trimestral", label: "Trimestral", months: 3 },
+  { value: "semestral", label: "Semestral", months: 6 },
+  { value: "anual", label: "Anual", months: 12 },
+];
+
+function getCycleMonths(cycle: DateCycle): number {
+  return cycleOptions.find((c) => c.value === cycle)?.months ?? 1;
+}
+
+function getCycleLabel(cycle: DateCycle, ref: Date): string {
+  const months = getCycleMonths(cycle);
+  const from = startOfMonth(ref);
+  const to = endOfMonth(addMonths(from, months - 1));
+  if (months === 1) return format(from, "MMMM yyyy", { locale: ptBR });
+  return `${format(from, "MMM/yy", { locale: ptBR })} – ${format(to, "MMM/yy", { locale: ptBR })}`;
+}
+
 export default function FluxoCaixa() {
   const [refDate, setRefDate] = useState(new Date());
+  const [cycle, setCycle] = useState<DateCycle>("mensal");
+
+  const months = getCycleMonths(cycle);
   const rangeFrom = startOfMonth(refDate);
-  const rangeTo = endOfMonth(refDate);
+  const rangeTo = endOfMonth(addMonths(rangeFrom, months - 1));
 
   const { entries, totals, isLoading } = useCashFlow(rangeFrom, rangeTo);
 
-  const periodLabel = format(refDate, "MMMM yyyy", { locale: ptBR });
+  const periodLabel = getCycleLabel(cycle, refDate);
+
+  const navigatePeriod = (direction: 1 | -1) => {
+    setRefDate(direction === 1 ? addMonths(refDate, months) : subMonths(refDate, months));
+  };
 
   // Group by day for charts
   const chartData = useMemo(() => {
@@ -54,7 +84,7 @@ export default function FluxoCaixa() {
     let runningBalance = 0;
 
     for (const e of entries) {
-      const dia = format(new Date(e.data_prevista), "dd");
+      const dia = format(new Date(e.data_prevista), "dd/MM");
       if (!byDay[dia]) byDay[dia] = { dia, entradas: 0, saidas: 0, saldo: 0 };
       const val = Number(e.valor_realizado ?? e.valor_previsto);
       if (e.tipo === "entrada") {
@@ -75,12 +105,22 @@ export default function FluxoCaixa() {
       <PageHeader title="Fluxo de Caixa" description="Gestão do fluxo de caixa realizado e previsto" />
 
       {/* Period navigation */}
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setRefDate(subMonths(refDate, 1))}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Select value={cycle} onValueChange={(v) => setCycle(v as DateCycle)}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {cycleOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => navigatePeriod(-1)}>
           <ChevronLeft size={16} />
         </Button>
         <span className="text-sm font-medium min-w-[160px] text-center capitalize">{periodLabel}</span>
-        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setRefDate(addMonths(refDate, 1))}>
+        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => navigatePeriod(1)}>
           <ChevronRight size={16} />
         </Button>
         <Button variant="ghost" size="sm" onClick={() => setRefDate(new Date())}>Hoje</Button>
