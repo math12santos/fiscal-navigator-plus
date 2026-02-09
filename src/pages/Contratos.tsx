@@ -295,7 +295,6 @@ export default function Contratos() {
               onSuccess: () => {
                 setFormOpen(false);
                 setEditing(null);
-                // refresh viewing data
                 const updated = contracts.find((c) => c.id === viewing.id);
                 if (updated) setViewing({ ...updated, ...data } as any);
               },
@@ -303,6 +302,7 @@ export default function Contratos() {
           }}
           initialData={contractToFormData(viewing)}
           loading={update.isPending}
+          contractId={viewing.id}
         />
       </>
     );
@@ -438,6 +438,7 @@ export default function Contratos() {
         onSubmit={handleSubmit}
         initialData={editing ? contractToFormData(editing) : null}
         loading={create.isPending || update.isPending}
+        contractId={editing?.id ?? null}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

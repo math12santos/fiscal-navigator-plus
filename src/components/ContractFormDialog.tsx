@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useCostCenters } from "@/hooks/useCostCenters";
+import { useContractDocuments } from "@/hooks/useContractDocuments";
+import { Upload, FileText, Eye, Trash2, Loader2 } from "lucide-react";
 
 export interface ContractFormData {
   nome: string;
@@ -46,7 +49,14 @@ interface Props {
   onSubmit: (data: ContractFormData) => void;
   initialData?: ContractFormData | null;
   loading?: boolean;
+  contractId?: string | null;
 }
+
+const RequiredLabel = ({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) => (
+  <Label htmlFor={htmlFor}>
+    {children} <span className="text-destructive">*</span>
+  </Label>
+);
 
 const tipos = ["Fornecedor", "Locação", "Tecnologia", "Serviço", "Seguro", "Outro"];
 const statuses = ["Ativo", "Próximo ao vencimento", "Vencido", "Cancelado", "Pausado"];
@@ -86,9 +96,10 @@ const defaultForm: ContractFormData = {
   responsavel_interno: "", area_responsavel: "", sla_revisao_dias: null,
 };
 
-export default function ContractFormDialog({ open, onOpenChange, onSubmit, initialData, loading }: Props) {
+export default function ContractFormDialog({ open, onOpenChange, onSubmit, initialData, loading, contractId }: Props) {
   const [form, setForm] = useState<ContractFormData>({ ...defaultForm });
   const { costCenters } = useCostCenters();
+  const isEditing = !!contractId;
 
   useEffect(() => {
     if (initialData) {
@@ -106,6 +117,8 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
     onSubmit(form);
   };
 
+  const tabCount = isEditing ? 5 : 4;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -114,29 +127,30 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <Tabs defaultValue="basico" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4">
+            <TabsList className={`grid w-full mb-4`} style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
               <TabsTrigger value="basico">Básico</TabsTrigger>
               <TabsTrigger value="recorrencia">Recorrência</TabsTrigger>
               <TabsTrigger value="reajuste">Reajuste</TabsTrigger>
               <TabsTrigger value="governanca">Governança</TabsTrigger>
+              {isEditing && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
             </TabsList>
 
             {/* TAB: Básico */}
             <TabsContent value="basico" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="nome">Nome do contrato</Label>
+                <RequiredLabel htmlFor="nome">Nome do contrato</RequiredLabel>
                 <Input id="nome" value={form.nome} onChange={(e) => set("nome", e.target.value)} required maxLength={200} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Tipo</Label>
+                  <RequiredLabel>Tipo</RequiredLabel>
                   <Select value={form.tipo} onValueChange={(v) => set("tipo", v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{tipos.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Status</Label>
+                  <RequiredLabel>Status</RequiredLabel>
                   <Select value={form.status} onValueChange={(v) => set("status", v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -173,7 +187,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="vencimento">Vencimento (contrato)</Label>
+                  <RequiredLabel htmlFor="vencimento">Vencimento (contrato)</RequiredLabel>
                   <Input id="vencimento" type="date" value={form.vencimento} onChange={(e) => set("vencimento", e.target.value)} required />
                 </div>
               </div>
@@ -187,7 +201,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
             <TabsContent value="recorrencia" className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Tipo de recorrência</Label>
+                  <RequiredLabel>Tipo de recorrência</RequiredLabel>
                   <Select value={form.tipo_recorrencia} onValueChange={(v) => set("tipo_recorrencia", v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{recorrencias.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
@@ -211,7 +225,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                   <Input id="valor_base" type="number" min={0} step={0.01} value={form.valor_base} onChange={(e) => set("valor_base", Number(e.target.value))} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="valor">Valor mensal (R$)</Label>
+                  <RequiredLabel htmlFor="valor">Valor mensal (R$)</RequiredLabel>
                   <Input id="valor" type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} required />
                 </div>
               </div>
@@ -293,6 +307,13 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                 <Input id="sla_revisao_dias" type="number" min={0} value={form.sla_revisao_dias ?? ""} onChange={(e) => set("sla_revisao_dias", e.target.value ? Number(e.target.value) : null)} />
               </div>
             </TabsContent>
+
+            {/* TAB: Documentos (only when editing) */}
+            {isEditing && contractId && (
+              <TabsContent value="documentos" className="space-y-4">
+                <DocumentsTab contractId={contractId} />
+              </TabsContent>
+            )}
           </Tabs>
 
           <div className="flex justify-end gap-2 pt-4">
@@ -302,5 +323,67 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ==================== Documents Tab ====================
+function DocumentsTab({ contractId }: { contractId: string }) {
+  const { documents, isLoading, upload, remove } = useContractDocuments(contractId);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadType, setUploadType] = useState("contrato");
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) upload.mutate({ file, fileType: uploadType });
+    e.target.value = "";
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Anexe contratos assinados, NFs, aditivos e outros documentos.</p>
+        <div className="flex items-center gap-2">
+          <Select value={uploadType} onValueChange={setUploadType}>
+            <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contrato">Contrato</SelectItem>
+              <SelectItem value="aditivo">Aditivo</SelectItem>
+              <SelectItem value="nf">Nota Fiscal</SelectItem>
+              <SelectItem value="outro">Outro</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button type="button" size="sm" variant="outline" onClick={() => fileRef.current?.click()} className="gap-1">
+            <Upload size={14} /> Upload
+          </Button>
+          <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-4"><Loader2 className="animate-spin text-primary" size={20} /></div>
+      ) : documents.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">Nenhum documento anexado.</p>
+      ) : (
+        <div className="space-y-2">
+          {documents.map((d) => (
+            <div key={d.id} className="flex items-center justify-between p-2 rounded-md bg-secondary/30">
+              <div className="flex items-center gap-2">
+                <FileText size={14} className="text-primary" />
+                <span className="text-sm">{d.file_name}</span>
+                <Badge variant="outline" className="text-xs">{d.file_type} v{d.version}</Badge>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button type="button" variant="ghost" size="icon" asChild>
+                  <a href={d.file_url} target="_blank" rel="noopener"><Eye size={14} /></a>
+                </Button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => remove.mutate(d.id)} className="text-destructive">
+                  <Trash2 size={14} />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
