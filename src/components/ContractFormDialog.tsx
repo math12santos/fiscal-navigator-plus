@@ -113,8 +113,8 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const isEditing = !!contractId;
 
-  // Filter clients (cliente or ambos)
-  const clients = entities.filter((e) => e.active && (e.type === "cliente" || e.type === "ambos"));
+  // All active entities (clients, suppliers, both)
+  const availableEntities = entities.filter((e) => e.active);
   // Active products/services
   const activeProducts = products.filter((p) => p.active);
 
@@ -156,24 +156,24 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
             {/* TAB: Básico */}
             <TabsContent value="basico" className="space-y-4">
               <div className="space-y-2">
-                <RequiredLabel>Cliente</RequiredLabel>
+                <RequiredLabel>Contraparte (Cliente / Fornecedor)</RequiredLabel>
                 <div className="flex items-center gap-2">
                   <Select value={form.entity_id || "none"} onValueChange={(v) => {
-                    const selected = clients.find((c) => c.id === v);
+                    const selected = availableEntities.find((c) => c.id === v);
                     set("entity_id", v === "none" ? "" : v);
                     if (selected) set("nome", selected.name);
                   }}>
-                    <SelectTrigger className="flex-1"><SelectValue placeholder="Selecionar cliente..." /></SelectTrigger>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Selecionar entidade..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Selecionar...</SelectItem>
-                      {clients.map((c) => (
+                      {availableEntities.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.name}{c.document_number ? ` (${c.document_number})` : ""}
+                          {c.name}{c.document_number ? ` (${c.document_number})` : ""} — {c.type === "cliente" ? "Cliente" : c.type === "fornecedor" ? "Fornecedor" : "Ambos"}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" size="icon" onClick={() => setEntityDialogOpen(true)} title="Adicionar cliente">
+                  <Button type="button" variant="outline" size="icon" onClick={() => setEntityDialogOpen(true)} title="Adicionar entidade">
                     <UserPlus size={16} />
                   </Button>
                 </div>
