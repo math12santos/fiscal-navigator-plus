@@ -247,6 +247,60 @@ export type Database = {
           },
         ]
       }
+      contract_installments: {
+        Row: {
+          contract_id: string
+          created_at: string
+          data_vencimento: string
+          descricao: string
+          id: string
+          numero: number
+          organization_id: string | null
+          status: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          data_vencimento: string
+          descricao?: string
+          id?: string
+          numero?: number
+          organization_id?: string | null
+          status?: string
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          data_vencimento?: string
+          descricao?: string
+          id?: string
+          numero?: number
+          organization_id?: string | null
+          status?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_installments_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_installments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
           area_responsavel: string | null

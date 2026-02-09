@@ -10,11 +10,12 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useContractDocuments } from "@/hooks/useContractDocuments";
+import { useContractInstallments } from "@/hooks/useContractInstallments";
 import { useEntities } from "@/hooks/useEntities";
 import { useProducts } from "@/hooks/useProducts";
 import EntityFormDialog from "@/components/EntityFormDialog";
 import ProductFormDialog from "@/components/ProductFormDialog";
-import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus, PackagePlus } from "lucide-react";
+import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus, PackagePlus, Zap } from "lucide-react";
 
 export interface ContractFormData {
   nome: string;
@@ -67,6 +68,7 @@ const RequiredLabel = ({ htmlFor, children }: { htmlFor?: string; children: Reac
 // tipos removed - now using products/services
 const statuses = ["Ativo", "Próximo ao vencimento", "Vencido", "Cancelado", "Pausado"];
 const recorrencias = [
+  { value: "unico", label: "Único (sem recorrência)" },
   { value: "mensal", label: "Mensal" },
   { value: "bimestral", label: "Bimestral" },
   { value: "trimestral", label: "Trimestral" },
@@ -265,18 +267,20 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                   </div>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dia_vencimento">Dia de vencimento mensal (1-31)</Label>
-                <Input id="dia_vencimento" type="number" min={1} max={31} placeholder="Ex: 15" value={form.dia_vencimento ?? ""} onChange={(e) => set("dia_vencimento", e.target.value ? Number(e.target.value) : null)} />
-                <p className="text-xs text-muted-foreground">Dia fixo do mês em que a parcela vence</p>
-              </div>
+              {form.tipo_recorrencia !== "unico" && (
+                <div className="space-y-2">
+                  <Label htmlFor="dia_vencimento">Dia de vencimento mensal (1-31)</Label>
+                  <Input id="dia_vencimento" type="number" min={1} max={31} placeholder="Ex: 15" value={form.dia_vencimento ?? ""} onChange={(e) => set("dia_vencimento", e.target.value ? Number(e.target.value) : null)} />
+                  <p className="text-xs text-muted-foreground">Dia fixo do mês em que a parcela vence</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="valor_base">Valor base (R$)</Label>
+                  <Label htmlFor="valor_base">{form.tipo_recorrencia === "unico" ? "Valor total (R$)" : "Valor base (R$)"}</Label>
                   <Input id="valor_base" type="number" min={0} step={0.01} value={form.valor_base} onChange={(e) => set("valor_base", Number(e.target.value))} />
                 </div>
                 <div className="space-y-2">
-                  <RequiredLabel htmlFor="valor">Valor mensal (R$)</RequiredLabel>
+                  <RequiredLabel htmlFor="valor">{form.tipo_recorrencia === "unico" ? "Valor do contrato (R$)" : "Valor mensal (R$)"}</RequiredLabel>
                   <Input id="valor" type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} required />
                 </div>
               </div>
@@ -290,10 +294,22 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                   <Input id="data_fim" type="date" value={form.data_fim} onChange={(e) => set("data_fim", e.target.value)} disabled={form.prazo_indeterminado} />
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Switch checked={form.prazo_indeterminado} onCheckedChange={(v) => { set("prazo_indeterminado", v); if (v) set("data_fim", ""); }} />
-                <Label>Prazo indeterminado</Label>
-              </div>
+              {form.tipo_recorrencia !== "unico" && (
+                <div className="flex items-center gap-3">
+                  <Switch checked={form.prazo_indeterminado} onCheckedChange={(v) => { set("prazo_indeterminado", v); if (v) set("data_fim", ""); }} />
+                  <Label>Prazo indeterminado</Label>
+                </div>
+              )}
+
+              {/* Parcelas - only for "unico" contracts being edited */}
+              {form.tipo_recorrencia === "unico" && isEditing && contractId && (
+                <InstallmentsSection contractId={contractId} contractValue={form.valor} />
+              )}
+              {form.tipo_recorrencia === "unico" && !isEditing && (
+                <p className="text-sm text-muted-foreground border border-dashed border-border rounded-md p-3">
+                  💡 Salve o contrato primeiro para cadastrar as parcelas de pagamento.
+                </p>
+              )}
             </TabsContent>
 
             {/* TAB: Reajuste */}
@@ -403,6 +419,124 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
       isLoading={createProduct.isPending}
     />
     </>
+  );
+}
+
+// ==================== Installments Section ====================
+function InstallmentsSection({ contractId, contractValue }: { contractId: string; contractValue: number }) {
+  const { installments, isLoading, create, createMany, remove } = useContractInstallments(contractId);
+  const [showGenerator, setShowGenerator] = useState(false);
+  const [genQty, setGenQty] = useState(3);
+  const [genStartDate, setGenStartDate] = useState("");
+  const [genInterval, setGenInterval] = useState(30);
+
+  const totalParcelas = installments.reduce((sum, i) => sum + Number(i.valor), 0);
+  const diff = contractValue - totalParcelas;
+
+  const fmt = (v: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(v);
+
+  const handleAddOne = () => {
+    const nextNum = installments.length + 1;
+    create.mutate({
+      contract_id: contractId,
+      descricao: nextNum === 1 ? "Entrada" : `Parcela ${nextNum - 1}`,
+      numero: nextNum,
+      valor: 0,
+      data_vencimento: new Date().toISOString().split("T")[0],
+      status: "pendente",
+    });
+  };
+
+  const handleGenerate = () => {
+    if (!genStartDate || genQty < 1 || contractValue <= 0) return;
+    const valorParcela = Math.round((contractValue / genQty) * 100) / 100;
+    const parcelas = Array.from({ length: genQty }, (_, i) => {
+      const date = new Date(genStartDate);
+      date.setDate(date.getDate() + genInterval * i);
+      return {
+        contract_id: contractId,
+        descricao: i === 0 ? "Entrada" : `Parcela ${i}`,
+        numero: i + 1,
+        valor: valorParcela,
+        data_vencimento: date.toISOString().split("T")[0],
+        status: "pendente" as const,
+      };
+    });
+    createMany.mutate(parcelas, { onSuccess: () => setShowGenerator(false) });
+  };
+
+  return (
+    <div className="border border-border rounded-md p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold">Parcelas</h4>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowGenerator(!showGenerator)} className="gap-1">
+            <Zap size={14} /> Gerar
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={handleAddOne} className="gap-1">
+            <Plus size={14} /> Adicionar
+          </Button>
+        </div>
+      </div>
+
+      {showGenerator && (
+        <div className="bg-secondary/30 rounded-md p-3 space-y-3">
+          <p className="text-xs font-medium text-muted-foreground">Gerar parcelas automaticamente</p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Quantidade</Label>
+              <Input type="number" min={1} max={60} value={genQty} onChange={(e) => setGenQty(Number(e.target.value))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Data inicial</Label>
+              <Input type="date" value={genStartDate} onChange={(e) => setGenStartDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Intervalo (dias)</Label>
+              <Input type="number" min={1} value={genInterval} onChange={(e) => setGenInterval(Number(e.target.value))} />
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {genQty} x {fmt(contractValue / (genQty || 1))}
+            </p>
+            <Button type="button" size="sm" onClick={handleGenerate} disabled={createMany.isPending || !genStartDate}>
+              {createMany.isPending ? "Gerando..." : "Confirmar"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center py-2"><Loader2 className="animate-spin text-primary" size={18} /></div>
+      ) : installments.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-2">Nenhuma parcela cadastrada.</p>
+      ) : (
+        <div className="space-y-2 max-h-48 overflow-y-auto">
+          {installments.map((inst) => (
+            <div key={inst.id} className="flex items-center gap-2 text-sm">
+              <span className="w-24 truncate font-medium">{inst.descricao}</span>
+              <span className="w-24 text-right font-mono">{fmt(Number(inst.valor))}</span>
+              <span className="w-28 text-muted-foreground">{new Date(inst.data_vencimento).toLocaleDateString("pt-BR")}</span>
+              <Badge variant="outline" className="text-xs capitalize">{inst.status}</Badge>
+              <Button type="button" variant="ghost" size="icon" className="ml-auto h-7 w-7 text-destructive" onClick={() => remove.mutate(inst.id)}>
+                <Trash2 size={12} />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {installments.length > 0 && (
+        <div className="flex items-center justify-between text-sm border-t border-border pt-2">
+          <span className="text-muted-foreground">Total parcelas: <span className="font-mono font-medium text-foreground">{fmt(totalParcelas)}</span></span>
+          <span className={`font-mono text-xs ${Math.abs(diff) < 0.01 ? "text-success" : "text-warning"}`}>
+            {Math.abs(diff) < 0.01 ? "✓ Valores conferem" : `Diferença: ${fmt(diff)}`}
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
