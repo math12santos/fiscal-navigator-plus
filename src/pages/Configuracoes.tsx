@@ -45,8 +45,10 @@ export default function Configuracoes() {
   const { toast } = useToast();
 
   const handleSeedFresh = async () => {
-    if (accounts.length === 0) await seedDefaultAccounts();
-    if (costCenters.length === 0) await seedDefaultCenters();
+    await deleteAllAccounts();
+    await deleteAllCenters();
+    await seedDefaultAccounts();
+    await seedDefaultCenters();
   };
 
   const handleReplace = async () => {
