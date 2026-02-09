@@ -15,7 +15,30 @@ export interface Contract {
   external_ref: string | null;
   notes: string | null;
   created_at: string;
+  // 3.1 Recorrência
+  tipo_recorrencia: string;
+  intervalo_personalizado: number | null;
+  data_inicio: string | null;
+  data_fim: string | null;
+  prazo_indeterminado: boolean;
+  valor_base: number;
+  // 3.2 Reajustes
+  tipo_reajuste: string | null;
+  indice_reajuste: string | null;
+  percentual_reajuste: number | null;
+  periodicidade_reajuste: string | null;
+  proximo_reajuste: string | null;
+  // 3.6 Classificações
+  natureza_financeira: string | null;
+  impacto_resultado: string | null;
+  cost_center_id: string | null;
+  // 3.7 Governança
+  responsavel_interno: string | null;
+  area_responsavel: string | null;
+  sla_revisao_dias: number | null;
 }
+
+export type ContractInput = Omit<Contract, "id" | "source" | "external_ref" | "created_at">;
 
 export function useContracts() {
   const { user } = useAuth();
@@ -34,14 +57,19 @@ export function useContracts() {
       if (orgId) q = q.eq("organization_id", orgId);
       const { data, error } = await q;
       if (error) throw error;
-      return data as Contract[];
+      return data as unknown as Contract[];
     },
     enabled: !!user && !!orgId,
   });
 
   const create = useMutation({
-    mutationFn: async (c: Omit<Contract, "id" | "source" | "external_ref" | "created_at">) => {
-      const { error } = await supabase.from("contracts").insert({ ...c, user_id: user!.id, organization_id: orgId, source: "manual" });
+    mutationFn: async (c: ContractInput) => {
+      const { error } = await supabase.from("contracts").insert({
+        ...c,
+        user_id: user!.id,
+        organization_id: orgId,
+        source: "manual",
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -52,8 +80,8 @@ export function useContracts() {
   });
 
   const update = useMutation({
-    mutationFn: async ({ id, ...c }: { id: string } & Partial<Contract>) => {
-      const { error } = await supabase.from("contracts").update(c).eq("id", id);
+    mutationFn: async ({ id, ...c }: { id: string } & Partial<ContractInput>) => {
+      const { error } = await supabase.from("contracts").update(c as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

@@ -133,53 +133,225 @@ export type Database = {
           },
         ]
       }
+      contract_adjustments: {
+        Row: {
+          contract_id: string
+          created_at: string
+          data_reajuste: string
+          id: string
+          indice_aplicado: string | null
+          observacao: string | null
+          organization_id: string | null
+          percentual: number
+          tipo: string
+          user_id: string
+          valor_anterior: number
+          valor_novo: number
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          data_reajuste: string
+          id?: string
+          indice_aplicado?: string | null
+          observacao?: string | null
+          organization_id?: string | null
+          percentual: number
+          tipo: string
+          user_id: string
+          valor_anterior: number
+          valor_novo: number
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          data_reajuste?: string
+          id?: string
+          indice_aplicado?: string | null
+          observacao?: string | null
+          organization_id?: string | null
+          percentual?: number
+          tipo?: string
+          user_id?: string
+          valor_anterior?: number
+          valor_novo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_adjustments_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_adjustments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_documents: {
+        Row: {
+          contract_id: string
+          created_at: string
+          file_name: string
+          file_type: string
+          file_url: string
+          id: string
+          observacao: string | null
+          organization_id: string | null
+          user_id: string
+          version: number
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          file_name: string
+          file_type?: string
+          file_url: string
+          id?: string
+          observacao?: string | null
+          organization_id?: string | null
+          user_id: string
+          version?: number
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          file_name?: string
+          file_type?: string
+          file_url?: string
+          id?: string
+          observacao?: string | null
+          organization_id?: string | null
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_documents_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
+          area_responsavel: string | null
+          cost_center_id: string | null
           created_at: string
+          data_fim: string | null
+          data_inicio: string | null
           external_ref: string | null
           id: string
+          impacto_resultado: string | null
+          indice_reajuste: string | null
+          intervalo_personalizado: number | null
+          natureza_financeira: string | null
           nome: string
           notes: string | null
           organization_id: string | null
+          percentual_reajuste: number | null
+          periodicidade_reajuste: string | null
+          prazo_indeterminado: boolean
+          proximo_reajuste: string | null
+          responsavel_interno: string | null
+          sla_revisao_dias: number | null
           source: string
           status: string
           tipo: string
+          tipo_reajuste: string | null
+          tipo_recorrencia: string
           updated_at: string
           user_id: string
           valor: number
+          valor_base: number
           vencimento: string
         }
         Insert: {
+          area_responsavel?: string | null
+          cost_center_id?: string | null
           created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
           external_ref?: string | null
           id?: string
+          impacto_resultado?: string | null
+          indice_reajuste?: string | null
+          intervalo_personalizado?: number | null
+          natureza_financeira?: string | null
           nome: string
           notes?: string | null
           organization_id?: string | null
+          percentual_reajuste?: number | null
+          periodicidade_reajuste?: string | null
+          prazo_indeterminado?: boolean
+          proximo_reajuste?: string | null
+          responsavel_interno?: string | null
+          sla_revisao_dias?: number | null
           source?: string
           status?: string
           tipo: string
+          tipo_reajuste?: string | null
+          tipo_recorrencia?: string
           updated_at?: string
           user_id: string
           valor?: number
+          valor_base?: number
           vencimento: string
         }
         Update: {
+          area_responsavel?: string | null
+          cost_center_id?: string | null
           created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
           external_ref?: string | null
           id?: string
+          impacto_resultado?: string | null
+          indice_reajuste?: string | null
+          intervalo_personalizado?: number | null
+          natureza_financeira?: string | null
           nome?: string
           notes?: string | null
           organization_id?: string | null
+          percentual_reajuste?: number | null
+          periodicidade_reajuste?: string | null
+          prazo_indeterminado?: boolean
+          proximo_reajuste?: string | null
+          responsavel_interno?: string | null
+          sla_revisao_dias?: number | null
           source?: string
           status?: string
           tipo?: string
+          tipo_reajuste?: string | null
+          tipo_recorrencia?: string
           updated_at?: string
           user_id?: string
           valor?: number
+          valor_base?: number
           vencimento?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contracts_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contracts_organization_id_fkey"
             columns: ["organization_id"]
