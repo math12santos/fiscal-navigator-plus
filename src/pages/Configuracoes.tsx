@@ -297,7 +297,7 @@ export default function Configuracoes() {
               </Table>
             )}
           </div>
-          <ProductFormDialog open={productDialogOpen} onOpenChange={setProductDialogOpen} product={editingProduct} accounts={accounts} onSubmit={(data) => { if (editingProduct) { updateProduct.mutate(data, { onSuccess: () => setProductDialogOpen(false) }); } else { createProduct.mutate(data, { onSuccess: () => setProductDialogOpen(false) }); } }} isLoading={createProduct.isPending || updateProduct.isPending} />
+          <ProductFormDialog open={productDialogOpen} onOpenChange={setProductDialogOpen} product={editingProduct} products={products} accounts={accounts} onSubmit={(data) => { if (editingProduct) { updateProduct.mutate(data, { onSuccess: () => setProductDialogOpen(false) }); } else { createProduct.mutate(data, { onSuccess: () => setProductDialogOpen(false) }); } }} isLoading={createProduct.isPending || updateProduct.isPending} />
         </TabsContent>
       </Tabs>
     </div>

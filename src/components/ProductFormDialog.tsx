@@ -14,6 +14,7 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   product: Product | null;
+  products: Product[];
   accounts: ChartAccount[];
   onSubmit: (data: any) => void;
   isLoading: boolean;
@@ -22,22 +23,43 @@ interface Props {
 const PRODUCT_UNITS = ["un","kg","g","l","ml","m","m²","m³","pç","cx","pct","par","kit"];
 const SERVICE_UNITS = ["hr","dia","mês","projeto","visita","km","m²","un"];
 
-export default function ProductFormDialog({ open, onOpenChange, product, accounts, onSubmit, isLoading }: Props) {
+export default function ProductFormDialog({ open, onOpenChange, product, products, accounts, onSubmit, isLoading }: Props) {
   const [form, setForm] = useState<any>({});
   const [newGroup, setNewGroup] = useState("");
   const [showNewGroup, setShowNewGroup] = useState(false);
   const { groups, create: createGroup } = useFiscalGroups();
 
+  const generateNextCode = (type: string) => {
+    const prefix = type === "servico" ? "SERV" : "PROD";
+    const existing = products
+      .filter((p) => p.code.startsWith(prefix))
+      .map((p) => parseInt(p.code.replace(prefix, ""), 10))
+      .filter((n) => !isNaN(n));
+    const next = existing.length > 0 ? Math.max(...existing) + 1 : 1;
+    return `${prefix}${String(next).padStart(3, "0")}`;
+  };
+
   useEffect(() => {
     if (open) {
-      setForm(product ? { ...product } : { type: "produto", unit: "un", unit_price: 0, active: true });
+      if (product) {
+        setForm({ ...product });
+      } else {
+        const type = "produto";
+        setForm({ type, unit: "un", unit_price: 0, active: true, code: generateNextCode(type) });
+      }
+      setShowNewGroup(false);
+      setNewGroup("");
     }
   }, [open, product]);
 
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
 
+  const isDuplicateCode = form.code?.trim() && products.some(
+    (p) => p.code.toLowerCase() === form.code.trim().toLowerCase() && p.id !== product?.id
+  );
+
   const handleSubmit = () => {
-    if (!form.name?.trim() || !form.code?.trim()) return;
+    if (!form.name?.trim() || !form.code?.trim() || isDuplicateCode) return;
     onSubmit(product ? { ...form, id: product.id } : form);
   };
 
@@ -53,18 +75,19 @@ export default function ProductFormDialog({ open, onOpenChange, product, account
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Código <span className="text-destructive">*</span></Label>
-              <Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder={form.type === "servico" ? "SERV001" : "PROD001"} />
-            </div>
-            <div>
               <Label>Tipo <span className="text-destructive">*</span></Label>
-              <Select value={form.type || "produto"} onValueChange={(v) => { set("type", v); set("unit", v === "servico" ? "hr" : "un"); }}>
+              <Select value={form.type || "produto"} onValueChange={(v) => { set("type", v); set("unit", v === "servico" ? "hr" : "un"); if (!product) set("code", generateNextCode(v)); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="produto">Produto</SelectItem>
                   <SelectItem value="servico">Serviço</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label>Código <span className="text-destructive">*</span></Label>
+              <Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder={form.type === "servico" ? "SERV001" : "PROD001"} />
+              {isDuplicateCode && <p className="text-sm text-destructive mt-1">Código já existe</p>}
             </div>
           </div>
 
@@ -157,7 +180,7 @@ export default function ProductFormDialog({ open, onOpenChange, product, account
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={isLoading || !form.name?.trim() || !form.code?.trim()}>
+          <Button onClick={handleSubmit} disabled={isLoading || !form.name?.trim() || !form.code?.trim() || isDuplicateCode}>
             {isLoading ? "Salvando..." : "Salvar"}
           </Button>
         </DialogFooter>
