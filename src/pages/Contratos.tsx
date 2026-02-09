@@ -43,6 +43,7 @@ function contractToFormData(c: Contract): ContractFormData {
     data_inicio: c.data_inicio ?? "", data_fim: c.data_fim ?? "",
     prazo_indeterminado: c.prazo_indeterminado ?? false,
     valor_base: Number(c.valor_base ?? 0),
+    dia_vencimento: c.dia_vencimento ?? null,
     tipo_reajuste: c.tipo_reajuste ?? "manual",
     indice_reajuste: c.indice_reajuste ?? "",
     percentual_reajuste: c.percentual_reajuste ?? null,

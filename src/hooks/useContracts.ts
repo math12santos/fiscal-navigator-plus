@@ -22,6 +22,7 @@ export interface Contract {
   data_fim: string | null;
   prazo_indeterminado: boolean;
   valor_base: number;
+  dia_vencimento: number | null;
   // 3.2 Reajustes
   tipo_reajuste: string | null;
   indice_reajuste: string | null;
