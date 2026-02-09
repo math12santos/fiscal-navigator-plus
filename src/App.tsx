@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
 import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import FluxoCaixa from "@/pages/FluxoCaixa";
@@ -14,15 +15,17 @@ import Tarefas from "@/pages/Tarefas";
 import Integracoes from "@/pages/Integracoes";
 import IAFinanceira from "@/pages/IAFinanceira";
 import Configuracoes from "@/pages/Configuracoes";
+import CreateOrganization from "@/pages/CreateOrganization";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 function ProtectedRoutes() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { organizations, currentOrg, loading: orgLoading } = useOrganization();
 
-  if (loading) {
+  if (authLoading || orgLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
@@ -31,6 +34,16 @@ function ProtectedRoutes() {
   }
 
   if (!user) return <Navigate to="/auth" replace />;
+
+  // No organizations → must create one
+  if (organizations.length === 0) {
+    return (
+      <Routes>
+        <Route path="/nova-empresa" element={<CreateOrganization />} />
+        <Route path="*" element={<Navigate to="/nova-empresa" replace />} />
+      </Routes>
+    );
+  }
 
   return (
     <AppLayout>
@@ -44,6 +57,7 @@ function ProtectedRoutes() {
         <Route path="/integracoes" element={<Integracoes />} />
         <Route path="/ia" element={<IAFinanceira />} />
         <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/nova-empresa" element={<CreateOrganization />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
@@ -64,10 +78,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<AuthRoute />} />
-            <Route path="/*" element={<ProtectedRoutes />} />
-          </Routes>
+          <OrganizationProvider>
+            <Routes>
+              <Route path="/auth" element={<AuthRoute />} />
+              <Route path="/*" element={<ProtectedRoutes />} />
+            </Routes>
+          </OrganizationProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

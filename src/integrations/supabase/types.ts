@@ -23,6 +23,7 @@ export type Database = {
           id: string
           new_data: Json | null
           old_data: Json | null
+          organization_id: string | null
           user_id: string
         }
         Insert: {
@@ -33,6 +34,7 @@ export type Database = {
           id?: string
           new_data?: Json | null
           old_data?: Json | null
+          organization_id?: string | null
           user_id: string
         }
         Update: {
@@ -43,9 +45,18 @@ export type Database = {
           id?: string
           new_data?: Json | null
           old_data?: Json | null
+          organization_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       chart_of_accounts: {
         Row: {
@@ -60,6 +71,7 @@ export type Database = {
           level: number
           name: string
           nature: string
+          organization_id: string | null
           parent_id: string | null
           tags: string[] | null
           type: string
@@ -78,6 +90,7 @@ export type Database = {
           level?: number
           name: string
           nature?: string
+          organization_id?: string | null
           parent_id?: string | null
           tags?: string[] | null
           type: string
@@ -96,6 +109,7 @@ export type Database = {
           level?: number
           name?: string
           nature?: string
+          organization_id?: string | null
           parent_id?: string | null
           tags?: string[] | null
           type?: string
@@ -103,6 +117,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "chart_of_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "chart_of_accounts_parent_id_fkey"
             columns: ["parent_id"]
@@ -119,6 +140,7 @@ export type Database = {
           id: string
           nome: string
           notes: string | null
+          organization_id: string | null
           source: string
           status: string
           tipo: string
@@ -133,6 +155,7 @@ export type Database = {
           id?: string
           nome: string
           notes?: string | null
+          organization_id?: string | null
           source?: string
           status?: string
           tipo: string
@@ -147,6 +170,7 @@ export type Database = {
           id?: string
           nome?: string
           notes?: string | null
+          organization_id?: string | null
           source?: string
           status?: string
           tipo?: string
@@ -155,7 +179,15 @@ export type Database = {
           valor?: number
           vencimento?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contracts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cost_centers: {
         Row: {
@@ -166,6 +198,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          organization_id: string | null
           parent_id: string | null
           responsible: string | null
           updated_at: string
@@ -179,6 +212,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          organization_id?: string | null
           parent_id?: string | null
           responsible?: string | null
           updated_at?: string
@@ -192,12 +226,20 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          organization_id?: string | null
           parent_id?: string | null
           responsible?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cost_centers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cost_centers_parent_id_fkey"
             columns: ["parent_id"]
@@ -207,6 +249,71 @@ export type Database = {
           },
         ]
       }
+      organization_members: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          created_by: string
+          document_number: string
+          document_type: string
+          id: string
+          logo_url: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          document_number: string
+          document_type?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          document_number?: string
+          document_type?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       plan_migrations: {
         Row: {
           created_at: string
@@ -214,6 +321,7 @@ export type Database = {
           mapping_accounts: Json | null
           mapping_cost_centers: Json | null
           notes: string | null
+          organization_id: string | null
           status: string
           updated_at: string
           user_id: string
@@ -224,6 +332,7 @@ export type Database = {
           mapping_accounts?: Json | null
           mapping_cost_centers?: Json | null
           notes?: string | null
+          organization_id?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -234,11 +343,20 @@ export type Database = {
           mapping_accounts?: Json | null
           mapping_cost_centers?: Json | null
           notes?: string | null
+          organization_id?: string | null
           status?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "plan_migrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -270,6 +388,15 @@ export type Database = {
     }
     Functions: {
       check_linked_transactions: { Args: { p_user_id: string }; Returns: Json }
+      get_user_org_ids: { Args: { p_user_id: string }; Returns: string[] }
+      has_org_role: {
+        Args: { p_org_id: string; p_roles: string[]; p_user_id: string }
+        Returns: boolean
+      }
+      is_org_member: {
+        Args: { p_org_id: string; p_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

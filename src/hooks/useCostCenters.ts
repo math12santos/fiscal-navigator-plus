@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useAuditLog } from "./useAuditLog";
 
@@ -23,35 +24,39 @@ type UpdateInput = { id: string } & Partial<CreateInput>;
 
 export function useCostCenters() {
   const { user } = useAuth();
+  const { currentOrg } = useOrganization();
   const { toast } = useToast();
   const qc = useQueryClient();
   const { log } = useAuditLog();
+  const orgId = currentOrg?.id;
 
   const query = useQuery({
-    queryKey: ["cost_centers"],
+    queryKey: ["cost_centers", orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("cost_centers" as any)
         .select("*")
         .order("code", { ascending: true });
+      if (orgId) q = q.eq("organization_id", orgId);
+      const { data, error } = await q;
       if (error) throw error;
       return data as unknown as CostCenter[];
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId,
   });
 
   const create = useMutation({
     mutationFn: async (input: CreateInput) => {
       const { data, error } = await supabase
         .from("cost_centers" as any)
-        .insert({ ...input, user_id: user!.id })
+        .insert({ ...input, user_id: user!.id, organization_id: orgId })
         .select()
         .single();
       if (error) throw error;
       return data as unknown as CostCenter;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["cost_centers"] });
+      qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
       log({ entity_type: "cost_centers", entity_id: data.id, action: "INSERT", new_data: data as any });
       toast({ title: "Centro de custo criado" });
     },
@@ -70,7 +75,7 @@ export function useCostCenters() {
       return data as unknown as CostCenter;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["cost_centers"] });
+      qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
       log({ entity_type: "cost_centers", entity_id: data.id, action: "UPDATE", new_data: data as any });
       toast({ title: "Centro de custo atualizado" });
     },
@@ -89,7 +94,7 @@ export function useCostCenters() {
       return data as unknown as CostCenter;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["cost_centers"] });
+      qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
       log({
         entity_type: "cost_centers",
         entity_id: data.id,
@@ -108,7 +113,7 @@ export function useCostCenters() {
       return id;
     },
     onSuccess: (id) => {
-      qc.invalidateQueries({ queryKey: ["cost_centers"] });
+      qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
       log({ entity_type: "cost_centers", entity_id: id, action: "DELETE" });
       toast({ title: "Centro de custo removido" });
     },
@@ -116,23 +121,24 @@ export function useCostCenters() {
   });
 
   const deleteAll = async () => {
-    if (!user) throw new Error("Usuário não autenticado");
-    // Delete children first then parents
+    if (!user || !orgId) throw new Error("Usuário ou organização não definidos");
     const { error: childErr } = await supabase
       .from("cost_centers" as any)
       .delete()
+      .eq("organization_id", orgId)
       .not("parent_id", "is", null);
     if (childErr) throw childErr;
     const { error: parentErr } = await supabase
       .from("cost_centers" as any)
       .delete()
+      .eq("organization_id", orgId)
       .is("parent_id", null);
     if (parentErr) throw parentErr;
-    qc.invalidateQueries({ queryKey: ["cost_centers"] });
+    qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
   };
 
   const seedDefaultCenters = async () => {
-    if (!user) throw new Error("Usuário não autenticado");
+    if (!user || !orgId) throw new Error("Usuário ou organização não definidos");
 
     const uid = user.id;
 
@@ -147,7 +153,7 @@ export function useCostCenters() {
 
     const { data: l1Data, error: l1Err } = await supabase
       .from("cost_centers" as any)
-      .insert(level1.map((c) => ({ ...c, user_id: uid, parent_id: null, business_unit: "Matriz", responsible: null, description: null, active: true })))
+      .insert(level1.map((c) => ({ ...c, user_id: uid, organization_id: orgId, parent_id: null, business_unit: "Matriz", responsible: null, description: null, active: true })))
       .select();
     if (l1Err) throw l1Err;
     const l1 = l1Data as unknown as CostCenter[];
@@ -173,10 +179,10 @@ export function useCostCenters() {
 
     const { error: l2Err } = await supabase
       .from("cost_centers" as any)
-      .insert(level2.map(({ parentCode, ...c }) => ({ ...c, user_id: uid, parent_id: l1Map[parentCode], business_unit: "Matriz", responsible: null, description: null, active: true })));
+      .insert(level2.map(({ parentCode, ...c }) => ({ ...c, user_id: uid, organization_id: orgId, parent_id: l1Map[parentCode], business_unit: "Matriz", responsible: null, description: null, active: true })));
     if (l2Err) throw l2Err;
 
-    qc.invalidateQueries({ queryKey: ["cost_centers"] });
+    qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
     toast({ title: "Centros de custo padrão criados com sucesso" });
   };
 

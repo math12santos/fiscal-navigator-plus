@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 
 export interface Contract {
@@ -18,29 +19,33 @@ export interface Contract {
 
 export function useContracts() {
   const { user } = useAuth();
+  const { currentOrg } = useOrganization();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const orgId = currentOrg?.id;
 
   const query = useQuery({
-    queryKey: ["contracts"],
+    queryKey: ["contracts", orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("contracts")
         .select("*")
         .order("vencimento", { ascending: true });
+      if (orgId) q = q.eq("organization_id", orgId);
+      const { data, error } = await q;
       if (error) throw error;
       return data as Contract[];
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId,
   });
 
   const create = useMutation({
     mutationFn: async (c: Omit<Contract, "id" | "source" | "external_ref" | "created_at">) => {
-      const { error } = await supabase.from("contracts").insert({ ...c, user_id: user!.id, source: "manual" });
+      const { error } = await supabase.from("contracts").insert({ ...c, user_id: user!.id, organization_id: orgId, source: "manual" });
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["contracts"] });
+      qc.invalidateQueries({ queryKey: ["contracts", orgId] });
       toast({ title: "Contrato criado com sucesso" });
     },
     onError: (e: any) => toast({ title: "Erro ao criar", description: e.message, variant: "destructive" }),
@@ -52,7 +57,7 @@ export function useContracts() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["contracts"] });
+      qc.invalidateQueries({ queryKey: ["contracts", orgId] });
       toast({ title: "Contrato atualizado" });
     },
     onError: (e: any) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
@@ -64,7 +69,7 @@ export function useContracts() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["contracts"] });
+      qc.invalidateQueries({ queryKey: ["contracts", orgId] });
       toast({ title: "Contrato removido" });
     },
     onError: (e: any) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),

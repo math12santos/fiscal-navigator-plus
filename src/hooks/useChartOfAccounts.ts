@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useAuditLog } from "./useAuditLog";
 
@@ -28,35 +29,39 @@ type UpdateInput = { id: string } & Partial<CreateInput>;
 
 export function useChartOfAccounts() {
   const { user } = useAuth();
+  const { currentOrg } = useOrganization();
   const { toast } = useToast();
   const qc = useQueryClient();
   const { log } = useAuditLog();
+  const orgId = currentOrg?.id;
 
   const query = useQuery({
-    queryKey: ["chart_of_accounts"],
+    queryKey: ["chart_of_accounts", orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("chart_of_accounts" as any)
         .select("*")
         .order("code", { ascending: true });
+      if (orgId) q = q.eq("organization_id", orgId);
+      const { data, error } = await q;
       if (error) throw error;
       return data as unknown as ChartAccount[];
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId,
   });
 
   const create = useMutation({
     mutationFn: async (input: CreateInput) => {
       const { data, error } = await supabase
         .from("chart_of_accounts" as any)
-        .insert({ ...input, user_id: user!.id })
+        .insert({ ...input, user_id: user!.id, organization_id: orgId })
         .select()
         .single();
       if (error) throw error;
       return data as unknown as ChartAccount;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["chart_of_accounts"] });
+      qc.invalidateQueries({ queryKey: ["chart_of_accounts", orgId] });
       log({ entity_type: "chart_of_accounts", entity_id: data.id, action: "INSERT", new_data: data as any });
       toast({ title: "Conta criada com sucesso" });
     },
@@ -75,7 +80,7 @@ export function useChartOfAccounts() {
       return data as unknown as ChartAccount;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["chart_of_accounts"] });
+      qc.invalidateQueries({ queryKey: ["chart_of_accounts", orgId] });
       log({ entity_type: "chart_of_accounts", entity_id: data.id, action: "UPDATE", new_data: data as any });
       toast({ title: "Conta atualizada" });
     },
@@ -94,7 +99,7 @@ export function useChartOfAccounts() {
       return data as unknown as ChartAccount;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["chart_of_accounts"] });
+      qc.invalidateQueries({ queryKey: ["chart_of_accounts", orgId] });
       log({
         entity_type: "chart_of_accounts",
         entity_id: data.id,
@@ -113,7 +118,7 @@ export function useChartOfAccounts() {
       return id;
     },
     onSuccess: (id) => {
-      qc.invalidateQueries({ queryKey: ["chart_of_accounts"] });
+      qc.invalidateQueries({ queryKey: ["chart_of_accounts", orgId] });
       log({ entity_type: "chart_of_accounts", entity_id: id, action: "DELETE" });
       toast({ title: "Conta removida" });
     },
@@ -121,20 +126,20 @@ export function useChartOfAccounts() {
   });
 
   const deleteAll = async () => {
-    if (!user) throw new Error("Usuário não autenticado");
-    // Delete children first (level 3, 2, 1)
+    if (!user || !orgId) throw new Error("Usuário ou organização não definidos");
     for (const level of [3, 2, 1]) {
       const { error } = await supabase
         .from("chart_of_accounts" as any)
         .delete()
+        .eq("organization_id", orgId)
         .eq("level", level);
       if (error) throw error;
     }
-    qc.invalidateQueries({ queryKey: ["chart_of_accounts"] });
+    qc.invalidateQueries({ queryKey: ["chart_of_accounts", orgId] });
   };
 
   const seedDefaultAccounts = async () => {
-    if (!user) throw new Error("Usuário não autenticado");
+    if (!user || !orgId) throw new Error("Usuário ou organização não definidos");
 
     const uid = user.id;
 
@@ -149,7 +154,7 @@ export function useChartOfAccounts() {
 
     const { data: l1Data, error: l1Err } = await supabase
       .from("chart_of_accounts" as any)
-      .insert(level1.map((a) => ({ ...a, user_id: uid, level: 1, is_synthetic: true, is_system_default: true, active: true, parent_id: null, description: null, tags: null })))
+      .insert(level1.map((a) => ({ ...a, user_id: uid, organization_id: orgId, level: 1, is_synthetic: true, is_system_default: true, active: true, parent_id: null, description: null, tags: null })))
       .select();
     if (l1Err) throw l1Err;
     const l1 = l1Data as unknown as ChartAccount[];
@@ -171,7 +176,7 @@ export function useChartOfAccounts() {
 
     const { data: l2Data, error: l2Err } = await supabase
       .from("chart_of_accounts" as any)
-      .insert(level2.map(({ parentCode, ...a }) => ({ ...a, user_id: uid, level: 2, is_synthetic: true, is_system_default: true, active: true, parent_id: l1Map[parentCode], description: null, tags: null })))
+      .insert(level2.map(({ parentCode, ...a }) => ({ ...a, user_id: uid, organization_id: orgId, level: 2, is_synthetic: true, is_system_default: true, active: true, parent_id: l1Map[parentCode], description: null, tags: null })))
       .select();
     if (l2Err) throw l2Err;
     const l2 = l2Data as unknown as ChartAccount[];
@@ -218,10 +223,10 @@ export function useChartOfAccounts() {
 
     const { error: l3Err } = await supabase
       .from("chart_of_accounts" as any)
-      .insert(level3.map(({ parentCode, ...a }) => ({ ...a, user_id: uid, level: 3, is_synthetic: false, is_system_default: true, active: true, parent_id: l2Map[parentCode], description: null, tags: null })));
+      .insert(level3.map(({ parentCode, ...a }) => ({ ...a, user_id: uid, organization_id: orgId, level: 3, is_synthetic: false, is_system_default: true, active: true, parent_id: l2Map[parentCode], description: null, tags: null })));
     if (l3Err) throw l3Err;
 
-    qc.invalidateQueries({ queryKey: ["chart_of_accounts"] });
+    qc.invalidateQueries({ queryKey: ["chart_of_accounts", orgId] });
     toast({ title: "Plano de contas padrão criado com sucesso" });
   };
 
