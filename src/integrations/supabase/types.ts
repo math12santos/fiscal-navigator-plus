@@ -424,6 +424,107 @@ export type Database = {
           },
         ]
       }
+      entities: {
+        Row: {
+          active: boolean
+          address_city: string | null
+          address_complement: string | null
+          address_neighborhood: string | null
+          address_number: string | null
+          address_state: string | null
+          address_street: string | null
+          address_zip: string | null
+          bank_account: string | null
+          bank_agency: string | null
+          bank_name: string | null
+          bank_pix: string | null
+          contact_person: string | null
+          created_at: string
+          credit_limit: number | null
+          document_number: string | null
+          document_type: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          organization_id: string | null
+          payment_condition: string | null
+          phone: string | null
+          tags: string[] | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          address_city?: string | null
+          address_complement?: string | null
+          address_neighborhood?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
+          bank_account?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          bank_pix?: string | null
+          contact_person?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          document_number?: string | null
+          document_type?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          organization_id?: string | null
+          payment_condition?: string | null
+          phone?: string | null
+          tags?: string[] | null
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          address_city?: string | null
+          address_complement?: string | null
+          address_neighborhood?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
+          bank_account?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          bank_pix?: string | null
+          contact_person?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          document_number?: string | null
+          document_type?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string | null
+          payment_condition?: string | null
+          phone?: string | null
+          tags?: string[] | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -526,6 +627,78 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "plan_migrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          account_id: string | null
+          active: boolean
+          category: string | null
+          cest: string | null
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          ncm: string | null
+          organization_id: string | null
+          type: string
+          unit: string | null
+          unit_price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          active?: boolean
+          category?: string | null
+          cest?: string | null
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          ncm?: string | null
+          organization_id?: string | null
+          type?: string
+          unit?: string | null
+          unit_price?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          active?: boolean
+          category?: string | null
+          cest?: string | null
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          ncm?: string | null
+          organization_id?: string | null
+          type?: string
+          unit?: string | null
+          unit_price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
