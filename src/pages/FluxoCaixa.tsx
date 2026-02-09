@@ -10,12 +10,14 @@ import {
 } from "recharts";
 import {
   ArrowUpCircle, ArrowDownCircle, Wallet, ChevronLeft, ChevronRight,
-  Loader2, CheckCircle, Clock, Circle,
+  Loader2, CheckCircle, Clock, Circle, CalendarIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
 const fmt = (v: number) =>
@@ -40,7 +42,7 @@ const statusConfig: Record<string, { icon: typeof Circle; class: string; label: 
   cancelado: { icon: Circle, class: "text-destructive", label: "Cancelado" },
 };
 
-type DateCycle = "mensal" | "bimestral" | "trimestral" | "semestral" | "anual";
+type DateCycle = "mensal" | "bimestral" | "trimestral" | "semestral" | "anual" | "personalizado";
 
 const cycleOptions: { value: DateCycle; label: string; months: number }[] = [
   { value: "mensal", label: "Mensal", months: 1 },
@@ -48,13 +50,17 @@ const cycleOptions: { value: DateCycle; label: string; months: number }[] = [
   { value: "trimestral", label: "Trimestral", months: 3 },
   { value: "semestral", label: "Semestral", months: 6 },
   { value: "anual", label: "Anual", months: 12 },
+  { value: "personalizado", label: "Personalizado", months: 0 },
 ];
 
 function getCycleMonths(cycle: DateCycle): number {
   return cycleOptions.find((c) => c.value === cycle)?.months ?? 1;
 }
 
-function getCycleLabel(cycle: DateCycle, ref: Date): string {
+function getCycleLabel(cycle: DateCycle, ref: Date, customFrom?: Date, customTo?: Date): string {
+  if (cycle === "personalizado" && customFrom && customTo) {
+    return `${format(customFrom, "dd/MM/yy", { locale: ptBR })} – ${format(customTo, "dd/MM/yy", { locale: ptBR })}`;
+  }
   const months = getCycleMonths(cycle);
   const from = startOfMonth(ref);
   const to = endOfMonth(addMonths(from, months - 1));
@@ -65,14 +71,17 @@ function getCycleLabel(cycle: DateCycle, ref: Date): string {
 export default function FluxoCaixa() {
   const [refDate, setRefDate] = useState(new Date());
   const [cycle, setCycle] = useState<DateCycle>("mensal");
+  const [customFrom, setCustomFrom] = useState<Date | undefined>(startOfMonth(new Date()));
+  const [customTo, setCustomTo] = useState<Date | undefined>(endOfMonth(new Date()));
 
+  const isCustom = cycle === "personalizado";
   const months = getCycleMonths(cycle);
-  const rangeFrom = startOfMonth(refDate);
-  const rangeTo = endOfMonth(addMonths(rangeFrom, months - 1));
+  const rangeFrom = isCustom ? (customFrom ?? startOfMonth(new Date())) : startOfMonth(refDate);
+  const rangeTo = isCustom ? (customTo ?? endOfMonth(new Date())) : endOfMonth(addMonths(startOfMonth(refDate), months - 1));
 
   const { entries, totals, isLoading } = useCashFlow(rangeFrom, rangeTo);
 
-  const periodLabel = getCycleLabel(cycle, refDate);
+  const periodLabel = getCycleLabel(cycle, refDate, customFrom, customTo);
 
   const navigatePeriod = (direction: 1 | -1) => {
     setRefDate(direction === 1 ? addMonths(refDate, months) : subMonths(refDate, months));
@@ -107,7 +116,7 @@ export default function FluxoCaixa() {
       {/* Period navigation */}
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={cycle} onValueChange={(v) => setCycle(v as DateCycle)}>
-          <SelectTrigger className="w-[140px] h-9">
+          <SelectTrigger className="w-[160px] h-9">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -116,14 +125,44 @@ export default function FluxoCaixa() {
             ))}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => navigatePeriod(-1)}>
-          <ChevronLeft size={16} />
-        </Button>
-        <span className="text-sm font-medium min-w-[160px] text-center capitalize">{periodLabel}</span>
-        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => navigatePeriod(1)}>
-          <ChevronRight size={16} />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => setRefDate(new Date())}>Hoje</Button>
+        {isCustom ? (
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-1.5">
+                  <CalendarIcon size={14} />
+                  {customFrom ? format(customFrom, "dd/MM/yyyy") : "Início"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customFrom} onSelect={setCustomFrom} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+            <span className="text-sm text-muted-foreground">até</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-1.5">
+                  <CalendarIcon size={14} />
+                  {customTo ? format(customTo, "dd/MM/yyyy") : "Fim"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customTo} onSelect={setCustomTo} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+        ) : (
+          <>
+            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => navigatePeriod(-1)}>
+              <ChevronLeft size={16} />
+            </Button>
+            <span className="text-sm font-medium min-w-[160px] text-center capitalize">{periodLabel}</span>
+            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => navigatePeriod(1)}>
+              <ChevronRight size={16} />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setRefDate(new Date())}>Hoje</Button>
+          </>
+        )}
       </div>
 
       {/* KPIs */}
