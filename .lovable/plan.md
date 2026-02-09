@@ -1,199 +1,89 @@
 
 
-# Modulo de Configuracoes Financeiras -- Plano Final Revisado
+# Seed Data: Plano de Contas + Centros de Custo Padrao
 
-## Contexto
+## Objetivo
 
-Este modulo cria a fundacao de classificacao financeira (Plano de Contas e Centros de Custo) que sera referenciada pelos modulos de Contratos, Fluxo de Caixa e Planejamento. O plano incorpora as sugestoes do usuario para aderencia ao canvas original, incluindo campos contabeis minimos e audit log opcional.
-
----
-
-## Escopo: Fase 1 (Fundacao) + Fase 1.1 (Audit Log Opcional)
-
-**Incluido nesta implementacao:**
-- Plano de Contas hierarquico (4 niveis) com campos contabeis (natureza, classe contabil, transferencia)
-- Centros de Custo hierarquicos com unidade de negocio e responsavel
-- Pagina de Configuracoes com CRUD completo
-- Navegacao atualizada
-- (Fase 1.1) Audit log minimo para rastreabilidade
+Inserir dados iniciais (seed) na base do usuario autenticado, contemplando o **Plano de Contas** (ja aprovado anteriormente) e os **Centros de Custo** padrao para uma empresa de Assessoria em BPO Financeiro, Contabilidade e Licitacoes.
 
 ---
 
-## 1. Banco de Dados
+## Centros de Custo Propostos
 
-### 1.1 Tabela `chart_of_accounts`
+A estrutura reflete as areas operacionais tipicas desse tipo de empresa, usando hierarquia pai/filho:
 
-| Coluna | Tipo | Default | Descricao |
-|--------|------|---------|-----------|
-| id | uuid PK | gen_random_uuid() | Identificador |
-| user_id | uuid | -- | Dono do registro |
-| code | text | -- | Codigo unico (ex: "3.1.01") |
-| name | text | -- | Nome da conta |
-| type | text | -- | receita, custo, despesa, investimento, transferencia |
-| nature | text | 'neutro' | entrada, saida, neutro |
-| accounting_class | text | 'resultado' | ativo, passivo, pl, resultado |
-| level | integer | 1 | Nivel hierarquico (1-4) |
-| parent_id | uuid (nullable) | null | Conta pai |
-| description | text (nullable) | null | Descricao detalhada |
-| tags | text[] (nullable) | null | Tags (fixo, variavel, etc.) |
-| is_synthetic | boolean | false | Conta sintetica (nao recebe lancamentos) |
-| is_system_default | boolean | false | Conta padrao do sistema (nao deletavel) |
-| active | boolean | true | Status |
-| created_at | timestamptz | now() | Criacao |
-| updated_at | timestamptz | now() | Atualizacao |
+```text
+CC-01       Diretoria / Administracao Geral
+CC-01.01      Financeiro Interno
+CC-01.02      Juridico
+CC-01.03      TI e Infraestrutura
 
-**Constraints:**
-- UNIQUE em (user_id, code)
-- CHECK em `type`: receita, custo, despesa, investimento, transferencia
-- CHECK em `nature`: entrada, saida, neutro
-- CHECK em `accounting_class`: ativo, passivo, pl, resultado
-- CHECK em `level`: 1-4
+CC-02       Operacoes BPO Financeiro
+CC-02.01      Contas a Pagar
+CC-02.02      Contas a Receber
+CC-02.03      Conciliacao Bancaria
+CC-02.04      Faturamento
 
-**Seguranca:** RLS com auth.uid() = user_id para SELECT, INSERT, UPDATE, DELETE
-**Trigger:** update_updated_at_column
+CC-03       Operacoes Contabilidade
+CC-03.01      Escrituracao Fiscal
+CC-03.02      Obrigacoes Acessorias
+CC-03.03      Folha de Pagamento
 
-### 1.2 Tabela `cost_centers`
+CC-04       Operacoes Licitacoes
+CC-04.01      Prospecao e Editais
+CC-04.02      Elaboracao de Propostas
+CC-04.03      Acompanhamento de Pregoes
 
-| Coluna | Tipo | Default | Descricao |
-|--------|------|---------|-----------|
-| id | uuid PK | gen_random_uuid() | Identificador |
-| user_id | uuid | -- | Dono do registro |
-| code | text | -- | Codigo unico (ex: "CC-001") |
-| name | text | -- | Nome |
-| parent_id | uuid (nullable) | null | Centro de custo pai |
-| business_unit | text (nullable) | null | Unidade de negocio |
-| responsible | text (nullable) | null | Responsavel |
-| description | text (nullable) | null | Descricao |
-| active | boolean | true | Status |
-| created_at | timestamptz | now() | Criacao |
-| updated_at | timestamptz | now() | Atualizacao |
+CC-05       Comercial e Marketing
+CC-05.01      Vendas e Relacionamento
+CC-05.02      Marketing Digital
 
-**Constraints:** UNIQUE em (user_id, code)
-**Seguranca:** RLS com auth.uid() = user_id para SELECT, INSERT, UPDATE, DELETE
-**Trigger:** update_updated_at_column
+CC-06       Recursos Humanos
+```
 
-### 1.3 Tabela `audit_log` (Fase 1.1)
-
-| Coluna | Tipo | Default | Descricao |
-|--------|------|---------|-----------|
-| id | uuid PK | gen_random_uuid() | Identificador |
-| user_id | uuid | -- | Usuario que executou a acao |
-| entity_type | text | -- | chart_of_accounts ou cost_centers |
-| entity_id | uuid | -- | Registro afetado |
-| action | text | -- | INSERT, UPDATE, DELETE, ACTIVATE, DEACTIVATE |
-| old_data | jsonb (nullable) | null | Snapshot anterior |
-| new_data | jsonb (nullable) | null | Snapshot novo |
-| created_at | timestamptz | now() | Data/hora |
-
-**Seguranca:** RLS com auth.uid() = user_id (somente SELECT)
-**Implementacao:** Via hooks no frontend na Fase 1.1. Migracao para triggers de banco na Fase 3.
+Todos os centros terao `active = true` e `is_system_default` nao se aplica a esta tabela (campo inexistente), porem serao identificaveis pelo padrao de codigo.
 
 ---
 
-## 2. Frontend -- Arquivos Novos e Alterados
+## Implementacao Tecnica
 
-### Novos arquivos
+### Metodo
 
-| Arquivo | Descricao |
-|---------|-----------|
-| `src/pages/Configuracoes.tsx` | Pagina com 2 abas: Plano de Contas e Centros de Custo |
-| `src/hooks/useChartOfAccounts.ts` | Hook CRUD para plano de contas (padrao useContracts) |
-| `src/hooks/useCostCenters.ts` | Hook CRUD para centros de custo (padrao useContracts) |
-| `src/hooks/useAuditLog.ts` | Hook para registrar e consultar logs (Fase 1.1) |
-| `src/components/ChartOfAccountsFormDialog.tsx` | Dialog de criar/editar conta com campos: code, name, type, nature, accounting_class, parent_id, level, is_synthetic, tags, description |
-| `src/components/CostCenterFormDialog.tsx` | Dialog de criar/editar centro de custo |
-| `src/components/AccountTreeView.tsx` | Componente de arvore hierarquica com expand/collapse |
+Adicionar um botao **"Gerar Plano Padrao"** na pagina de Configuracoes que:
+
+1. Verifica se o usuario ja possui contas/centros cadastrados
+2. Se vazio, insere o plano de contas completo (conforme plano anterior aprovado) e os centros de custo acima
+3. Se ja houver dados, exibe confirmacao antes de prosseguir (para evitar duplicatas)
+4. A insercao respeita a hierarquia: primeiro nivel 1, depois nivel 2 referenciando os pais, depois nivel 3
 
 ### Arquivos alterados
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/components/AppLayout.tsx` | Adicionar item "Configuracoes" com icone Settings no menu lateral |
-| `src/App.tsx` | Adicionar rota `/configuracoes` apontando para Configuracoes.tsx |
+| `src/pages/Configuracoes.tsx` | Adicionar botao "Gerar Plano Padrao" no topo da pagina |
+| `src/hooks/useChartOfAccounts.ts` | Adicionar funcao `seedDefaultAccounts` com os ~40 registros do plano de contas |
+| `src/hooks/useCostCenters.ts` | Adicionar funcao `seedDefaultCenters` com os ~17 registros de centros de custo |
 
----
+### Detalhes dos centros de custo
 
-## 3. Regras de Negocio
+Cada registro tera:
+- `code`: conforme arvore acima (CC-01, CC-01.01, etc.)
+- `name`: nome descritivo
+- `parent_id`: referencia ao centro pai (null para nivel 1)
+- `business_unit`: "Matriz" para todos (usuario pode alterar depois)
+- `responsible`: null (usuario preenche conforme sua equipe)
+- `description`: null
+- `active`: true
 
-- **Codigo unico por usuario**: validacao no banco (UNIQUE constraint) + feedback visual no frontend
-- **Contas sinteticas** (is_synthetic=true): nao recebem lancamentos e ficam ocultas de selecoes em formularios financeiros
-- **Contas padrao** (is_system_default=true): nao podem ser excluidas, apenas desativadas
-- **Inativacao**: nao remove dados, apenas oculta de novas selecoes
-- **Hierarquia**: limitada a 4 niveis, com validacao contra loops
-- **CHECK constraints**: validam valores permitidos para type, nature e accounting_class no banco
-- **Audit log** (Fase 1.1): registra alteracoes estruturais via hooks
+### Fluxo do usuario
 
----
+1. Acessa /configuracoes
+2. Clica em "Gerar Plano Padrao"
+3. Dialog de confirmacao aparece informando que serao criados X contas e Y centros de custo
+4. Ao confirmar, os dados sao inseridos em lote
+5. A arvore de contas e a tabela de centros de custo sao atualizadas automaticamente
 
-## 4. Interface do Usuario
+### Protecao contra duplicatas
 
-### Aba Plano de Contas
-- Visualizacao em arvore com indentacao por nivel e expand/collapse
-- Filtros: por type (incluindo transferencia) e busca por nome/codigo
-- Badges visuais para: type, nature, accounting_class, sintetica
-- Toggle ativar/desativar
-- Botoes: Criar Conta, Editar, Desativar
-
-### Aba Centros de Custo
-- Listagem em tabela
-- Filtro por unidade de negocio e busca por nome/codigo
-- Toggle ativar/desativar
-- Botoes: Criar Centro, Editar, Desativar
-
----
-
-## 5. Sequencia de Implementacao
-
-1. Criar tabelas `chart_of_accounts`, `cost_centers` e `audit_log` via migracao SQL (com RLS, constraints e triggers)
-2. Criar hooks `useChartOfAccounts`, `useCostCenters` e `useAuditLog`
-3. Criar componentes de formulario (ChartOfAccountsFormDialog, CostCenterFormDialog)
-4. Criar componente AccountTreeView
-5. Criar pagina Configuracoes.tsx com as duas abas
-6. Atualizar AppLayout.tsx (menu) e App.tsx (rota)
-7. Testar CRUD completo e validacoes
-
----
-
-## 6. Decisoes Tecnicas
-
-- **CHECK constraints vs CREATE TYPE (enum)**: CHECK constraints por flexibilidade -- adicionar valores futuros requer apenas ALTER constraint.
-- **Audit log via hooks vs triggers**: Hooks no frontend na Fase 1.1 por simplicidade. Triggers de banco na Fase 3.
-- **Hierarquia via parent_id**: Abordagem simples e suficiente para 4 niveis.
-
----
-
-## 7. Roadmap de Fases Futuras
-
-### Fase 2 -- Evolucao do Modulo de Contratos
-- Adicionar campos `account_id` e `cost_center_id` na tabela `contracts` (FK para as novas tabelas)
-- Recorrencia financeira: campos de frequencia (mensal, bimestral, trimestral, anual, personalizado), data inicio/fim
-- Tabela `contract_entries`: lancamentos previstos gerados automaticamente a partir da recorrencia
-- Tabela `contract_adjustments`: historico de reajustes (IPCA, IGPM, manual)
-- Tabela `contract_events_log`: registro de eventos do contrato (criacao, renovacao, distrato, reajuste)
-- Alertas de vencimento e renovacao automatica
-
-### Fase 3 -- Integracao com Fluxo de Caixa e Auditoria Robusta
-- Vinculacao de lancamentos previstos (contract_entries) com realizados no fluxo de caixa
-- Visualizacao previsto vs. realizado com variancia
-- Dashboard de impacto dos contratos no fluxo de caixa
-- Migracao do audit_log de hooks para triggers de banco (mais robusto e inviolavel)
-- Expansao do audit_log para cobrir contratos e lancamentos financeiros
-
-### Fase 4 -- Mapeamento De/Para com ERPs (Secao 4 do documento)
-- Tabela de mapeamento entre plano de contas interno e plano de contas do ERP/sistema contabil
-- Importacao e sincronizacao de classificacoes externas
-- Suporte a multiplos sistemas simultaneos
-
-### Fase 5 -- Governanca e Relatorios (Secoes 6 e 7 do documento)
-- Fechamento de periodo contabil (bloquear edicoes em periodos fechados)
-- KPIs financeiros: peso de custo por centro, concentracao por tipo, indice de cobertura
-- Relatorios gerenciais: DRE simplificado, visao por centro de custo
-- Exportacao PDF/Excel
-- Painel para investidores com indicadores de governanca
-
-### Fase 6 -- Inteligencia e IA Financeira
-- Sugestoes automaticas de classificacao contabil baseadas no historico
-- Deteccao de anomalias em lancamentos
-- Projecoes financeiras com base em contratos e tendencias
-- Integracao com o modulo de IA Financeira existente
+A funcao verifica se ja existem registros do usuario antes de inserir. Se existirem, oferece a opcao de pular a insercao ou substituir (com confirmacao extra).
 
