@@ -5,13 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit2, Power } from "lucide-react";
+import { Plus, Search, Edit2, Power, Wand2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import AccountTreeView from "@/components/AccountTreeView";
 import ChartOfAccountsFormDialog from "@/components/ChartOfAccountsFormDialog";
 import CostCenterFormDialog from "@/components/CostCenterFormDialog";
 import { useChartOfAccounts, ChartAccount } from "@/hooks/useChartOfAccounts";
 import { useCostCenters, CostCenter } from "@/hooks/useCostCenters";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const ACCOUNT_TYPES = [
   { value: "__all__", label: "Todos os tipos" },
@@ -24,18 +26,38 @@ const ACCOUNT_TYPES = [
 
 export default function Configuracoes() {
   // Chart of Accounts
-  const { accounts, isLoading: loadingAccounts, create: createAccount, update: updateAccount, toggleActive: toggleAccountActive } = useChartOfAccounts();
+  const { accounts, isLoading: loadingAccounts, create: createAccount, update: updateAccount, toggleActive: toggleAccountActive, seedDefaultAccounts } = useChartOfAccounts();
   const [accountSearch, setAccountSearch] = useState("");
   const [accountTypeFilter, setAccountTypeFilter] = useState("__all__");
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<ChartAccount | null>(null);
 
   // Cost Centers
-  const { costCenters, isLoading: loadingCenters, create: createCenter, update: updateCenter, toggleActive: toggleCenterActive } = useCostCenters();
+  const { costCenters, isLoading: loadingCenters, create: createCenter, update: updateCenter, toggleActive: toggleCenterActive, seedDefaultCenters } = useCostCenters();
   const [centerSearch, setCenterSearch] = useState("");
   const [centerUnitFilter, setCenterUnitFilter] = useState("__all__");
   const [centerDialogOpen, setCenterDialogOpen] = useState(false);
   const [editingCenter, setEditingCenter] = useState<CostCenter | null>(null);
+
+  // Seed
+  const [seedDialogOpen, setSeedDialogOpen] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const { toast } = useToast();
+
+  const hasExistingData = accounts.length > 0 || costCenters.length > 0;
+
+  const handleSeed = async () => {
+    setSeeding(true);
+    try {
+      if (accounts.length === 0) await seedDefaultAccounts();
+      if (costCenters.length === 0) await seedDefaultCenters();
+      setSeedDialogOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro ao gerar plano padrão", description: e.message, variant: "destructive" });
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   // Filter accounts
   const filteredAccounts = accounts.filter((a) => {
@@ -54,7 +76,46 @@ export default function Configuracoes() {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <PageHeader title="Configurações" description="Plano de Contas e Centros de Custo" />
+      <div className="flex items-center gap-3">
+        <PageHeader title="Configurações" description="Plano de Contas e Centros de Custo" />
+        <Button
+          variant="outline"
+          className="ml-auto"
+          onClick={() => setSeedDialogOpen(true)}
+          disabled={seeding}
+        >
+          <Wand2 size={16} /> Gerar Plano Padrão
+        </Button>
+      </div>
+
+      <AlertDialog open={seedDialogOpen} onOpenChange={setSeedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Gerar Plano Padrão</AlertDialogTitle>
+            <AlertDialogDescription>
+              {hasExistingData ? (
+                <>
+                  Você já possui {accounts.length > 0 ? `${accounts.length} contas` : ""}{accounts.length > 0 && costCenters.length > 0 ? " e " : ""}{costCenters.length > 0 ? `${costCenters.length} centros de custo` : ""} cadastrados.
+                  {accounts.length === 0 && " Serão criadas ~40 contas do plano padrão."}
+                  {costCenters.length === 0 && " Serão criados ~17 centros de custo padrão."}
+                  {accounts.length > 0 && costCenters.length > 0 && " Nenhum dado será inserido pois ambos já possuem registros."}
+                </>
+              ) : (
+                "Serão criadas aproximadamente 40 contas contábeis e 17 centros de custo padrão para uma empresa de Assessoria em BPO Financeiro, Contabilidade e Licitações."
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSeed}
+              disabled={seeding || (accounts.length > 0 && costCenters.length > 0)}
+            >
+              {seeding ? "Gerando..." : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Tabs defaultValue="accounts" className="space-y-4">
         <TabsList>

@@ -115,6 +115,55 @@ export function useCostCenters() {
     onError: (e: any) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
   });
 
+  const seedDefaultCenters = async () => {
+    if (!user) throw new Error("Usuário não autenticado");
+
+    const uid = user.id;
+
+    const level1 = [
+      { code: "CC-01", name: "Diretoria / Administração Geral" },
+      { code: "CC-02", name: "Operações BPO Financeiro" },
+      { code: "CC-03", name: "Operações Contabilidade" },
+      { code: "CC-04", name: "Operações Licitações" },
+      { code: "CC-05", name: "Comercial e Marketing" },
+      { code: "CC-06", name: "Recursos Humanos" },
+    ];
+
+    const { data: l1Data, error: l1Err } = await supabase
+      .from("cost_centers" as any)
+      .insert(level1.map((c) => ({ ...c, user_id: uid, parent_id: null, business_unit: "Matriz", responsible: null, description: null, active: true })))
+      .select();
+    if (l1Err) throw l1Err;
+    const l1 = l1Data as unknown as CostCenter[];
+    const l1Map = Object.fromEntries(l1.map((c) => [c.code, c.id]));
+
+    const level2 = [
+      { code: "CC-01.01", name: "Financeiro Interno", parentCode: "CC-01" },
+      { code: "CC-01.02", name: "Jurídico", parentCode: "CC-01" },
+      { code: "CC-01.03", name: "TI e Infraestrutura", parentCode: "CC-01" },
+      { code: "CC-02.01", name: "Contas a Pagar", parentCode: "CC-02" },
+      { code: "CC-02.02", name: "Contas a Receber", parentCode: "CC-02" },
+      { code: "CC-02.03", name: "Conciliação Bancária", parentCode: "CC-02" },
+      { code: "CC-02.04", name: "Faturamento", parentCode: "CC-02" },
+      { code: "CC-03.01", name: "Escrituração Fiscal", parentCode: "CC-03" },
+      { code: "CC-03.02", name: "Obrigações Acessórias", parentCode: "CC-03" },
+      { code: "CC-03.03", name: "Folha de Pagamento", parentCode: "CC-03" },
+      { code: "CC-04.01", name: "Prospecção e Editais", parentCode: "CC-04" },
+      { code: "CC-04.02", name: "Elaboração de Propostas", parentCode: "CC-04" },
+      { code: "CC-04.03", name: "Acompanhamento de Pregões", parentCode: "CC-04" },
+      { code: "CC-05.01", name: "Vendas e Relacionamento", parentCode: "CC-05" },
+      { code: "CC-05.02", name: "Marketing Digital", parentCode: "CC-05" },
+    ];
+
+    const { error: l2Err } = await supabase
+      .from("cost_centers" as any)
+      .insert(level2.map(({ parentCode, ...c }) => ({ ...c, user_id: uid, parent_id: l1Map[parentCode], business_unit: "Matriz", responsible: null, description: null, active: true })));
+    if (l2Err) throw l2Err;
+
+    qc.invalidateQueries({ queryKey: ["cost_centers"] });
+    toast({ title: "Centros de custo padrão criados com sucesso" });
+  };
+
   return {
     costCenters: query.data ?? [],
     isLoading: query.isLoading,
@@ -122,5 +171,6 @@ export function useCostCenters() {
     update,
     toggleActive,
     remove,
+    seedDefaultCenters,
   };
 }
