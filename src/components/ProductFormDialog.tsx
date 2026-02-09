@@ -49,7 +49,7 @@ export default function ProductFormDialog({ open, onOpenChange, product, account
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Código <span className="text-destructive">*</span></Label>
-              <Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder="PROD001" />
+              <Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder={form.type === "servico" ? "SERV001" : "PROD001"} />
             </div>
             <div>
               <Label>Tipo <span className="text-destructive">*</span></Label>
