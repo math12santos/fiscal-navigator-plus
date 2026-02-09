@@ -10,10 +10,13 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useContractDocuments } from "@/hooks/useContractDocuments";
-import { Upload, FileText, Eye, Trash2, Loader2 } from "lucide-react";
+import { useEntities } from "@/hooks/useEntities";
+import EntityFormDialog from "@/components/EntityFormDialog";
+import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus } from "lucide-react";
 
 export interface ContractFormData {
   nome: string;
+  entity_id: string;
   tipo: string;
   valor: number;
   vencimento: string;
@@ -87,7 +90,7 @@ const impactos = [
 ];
 
 const defaultForm: ContractFormData = {
-  nome: "", tipo: "Fornecedor", valor: 0, vencimento: "", status: "Ativo", notes: "",
+  nome: "", entity_id: "", tipo: "Fornecedor", valor: 0, vencimento: "", status: "Ativo", notes: "",
   tipo_recorrencia: "mensal", intervalo_personalizado: null, data_inicio: "", data_fim: "",
   prazo_indeterminado: false, valor_base: 0, dia_vencimento: null,
   tipo_reajuste: "manual", indice_reajuste: "", percentual_reajuste: null,
@@ -99,7 +102,12 @@ const defaultForm: ContractFormData = {
 export default function ContractFormDialog({ open, onOpenChange, onSubmit, initialData, loading, contractId }: Props) {
   const [form, setForm] = useState<ContractFormData>({ ...defaultForm });
   const { costCenters } = useCostCenters();
+  const { entities, create: createEntity } = useEntities();
+  const [entityDialogOpen, setEntityDialogOpen] = useState(false);
   const isEditing = !!contractId;
+
+  // Filter clients (cliente or ambos)
+  const clients = entities.filter((e) => e.active && (e.type === "cliente" || e.type === "ambos"));
 
   useEffect(() => {
     if (initialData) {
@@ -120,6 +128,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
   const tabCount = isEditing ? 5 : 4;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -138,8 +147,27 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
             {/* TAB: Básico */}
             <TabsContent value="basico" className="space-y-4">
               <div className="space-y-2">
-                <RequiredLabel htmlFor="nome">Nome do contrato</RequiredLabel>
-                <Input id="nome" value={form.nome} onChange={(e) => set("nome", e.target.value)} required maxLength={200} />
+                <RequiredLabel>Cliente</RequiredLabel>
+                <div className="flex items-center gap-2">
+                  <Select value={form.entity_id || "none"} onValueChange={(v) => {
+                    const selected = clients.find((c) => c.id === v);
+                    set("entity_id", v === "none" ? "" : v);
+                    if (selected) set("nome", selected.name);
+                  }}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Selecionar cliente..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Selecionar...</SelectItem>
+                      {clients.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}{c.document_number ? ` (${c.document_number})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" size="icon" onClick={() => setEntityDialogOpen(true)} title="Adicionar cliente">
+                    <UserPlus size={16} />
+                  </Button>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -323,6 +351,20 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Entity creation dialog */}
+    <EntityFormDialog
+      open={entityDialogOpen}
+      onOpenChange={setEntityDialogOpen}
+      entity={null}
+      onSubmit={(data) => {
+        createEntity.mutate({ ...data, type: data.type || "cliente" }, {
+          onSuccess: () => setEntityDialogOpen(false),
+        });
+      }}
+      isLoading={createEntity.isPending}
+    />
+    </>
   );
 }
 
