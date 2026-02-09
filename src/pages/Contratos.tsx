@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
 import { useContracts, Contract } from "@/hooks/useContracts";
+import { useProducts } from "@/hooks/useProducts";
 import { useContractAdjustments } from "@/hooks/useContractAdjustments";
 import { useContractDocuments } from "@/hooks/useContractDocuments";
 import ContractFormDialog, { ContractFormData } from "@/components/ContractFormDialog";
@@ -36,7 +37,7 @@ const recorrenciaLabel: Record<string, string> = {
 
 function contractToFormData(c: Contract): ContractFormData {
   return {
-    nome: c.nome, entity_id: (c as any).entity_id ?? "", tipo: c.tipo, valor: Number(c.valor), vencimento: c.vencimento,
+    nome: c.nome, entity_id: (c as any).entity_id ?? "", product_id: (c as any).product_id ?? "", tipo: c.tipo, valor: Number(c.valor), vencimento: c.vencimento,
     status: c.status, notes: c.notes ?? "",
     tipo_recorrencia: c.tipo_recorrencia ?? "mensal",
     intervalo_personalizado: c.intervalo_personalizado ?? null,
@@ -237,6 +238,8 @@ function ContractDetail({ contract, onBack, onEdit }: { contract: Contract; onBa
 // ==================== CONTRACT LIST (main) ====================
 export default function Contratos() {
   const { contracts, isLoading, create, update, remove } = useContracts();
+  const { products } = useProducts();
+  const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -335,9 +338,9 @@ export default function Contratos() {
       {/* Filters */}
       <div className="glass-card p-4 flex flex-wrap items-center gap-3">
         <Select value={filterTipo} onValueChange={setFilterTipo}>
-          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Produto/Serviço" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os tipos</SelectItem>
+            <SelectItem value="all">Todos os produtos</SelectItem>
             {tipos.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -390,7 +393,7 @@ export default function Contratos() {
             <thead>
               <tr className="border-b border-border/50">
                 <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Contrato</th>
-                <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Tipo</th>
+                <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Produto/Serviço</th>
                 <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Recorrência</th>
                 <th className="text-right px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Valor Mensal</th>
                 <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Vencimento</th>
@@ -405,7 +408,7 @@ export default function Contratos() {
                     <FileText size={16} className="text-primary" />
                     <span className="font-medium text-foreground">{c.nome}</span>
                   </td>
-                  <td className="px-5 py-3.5 text-muted-foreground">{c.tipo}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground">{productMap.get((c as any).product_id)?.name ?? c.tipo}</td>
                   <td className="px-5 py-3.5 text-muted-foreground">{recorrenciaLabel[c.tipo_recorrencia] ?? c.tipo_recorrencia}</td>
                   <td className="px-5 py-3.5 text-right font-mono text-foreground">{fmt(Number(c.valor))}</td>
                   <td className="px-5 py-3.5 text-muted-foreground">{new Date(c.vencimento).toLocaleDateString("pt-BR")}</td>

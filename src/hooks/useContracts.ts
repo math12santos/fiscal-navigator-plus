@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 export interface Contract {
   id: string;
   entity_id: string | null;
+  product_id: string | null;
   nome: string;
   tipo: string;
   valor: number;
