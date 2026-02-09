@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from "react";
-import { format, startOfMonth, endOfMonth, addMonths, startOfYear, endOfYear, differenceInDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, startOfYear, endOfYear, differenceInDays, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
 import { useContracts, Contract } from "@/hooks/useContracts";
@@ -10,7 +10,7 @@ import ContractFormDialog, { ContractFormData } from "@/components/ContractFormD
 import { cn } from "@/lib/utils";
 import {
   FileText, AlertTriangle, CheckCircle, Plus, Pencil, Trash2, Loader2,
-  Cloud, X, CalendarIcon, Eye, Upload, TrendingUp, ChevronLeft, Clock,
+  Cloud, X, CalendarIcon, Eye, Upload, TrendingUp, ChevronLeft, ChevronRight, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,13 +43,21 @@ const dateCycleLabels: Record<DateCycle, string> = {
   semestral: "Semestral", anual: "Anual", personalizado: "Personalizado",
 };
 
-function getCycleDates(cycle: DateCycle): { from: Date; to: Date } | null {
+function getCycleDates(cycle: DateCycle, ref: Date = new Date()): { from: Date; to: Date } | null {
   if (cycle === "personalizado" || cycle === "todos") return null;
-  const now = new Date();
-  const start = startOfMonth(now);
+  const start = startOfMonth(ref);
   const monthsMap: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
   const months = monthsMap[cycle] ?? 1;
   return { from: start, to: endOfMonth(addMonths(start, months - 1)) };
+}
+
+function getCycleLabel(cycle: DateCycle, ref: Date): string {
+  const monthsMap: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+  const months = monthsMap[cycle] ?? 1;
+  const from = startOfMonth(ref);
+  const to = endOfMonth(addMonths(from, months - 1));
+  if (months === 1) return format(from, "MMMM yyyy", { locale: ptBR });
+  return `${format(from, "MMM/yy", { locale: ptBR })} – ${format(to, "MMM/yy", { locale: ptBR })}`;
 }
 
 // Smart status classification
@@ -283,14 +291,29 @@ export default function Contratos() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
+  const [referenceDate, setReferenceDate] = useState<Date>(new Date());
+
   // When cycle changes, update dates
   const handleCycleChange = (cycle: DateCycle) => {
     setDateCycle(cycle);
-    const dates = getCycleDates(cycle);
-    if (dates) {
-      setDateFrom(dates.from);
-      setDateTo(dates.to);
+    if (cycle === "todos") {
+      setDateFrom(undefined);
+      setDateTo(undefined);
+    } else if (cycle === "personalizado") {
+      // keep current from/to
+    } else {
+      const dates = getCycleDates(cycle, referenceDate);
+      if (dates) { setDateFrom(dates.from); setDateTo(dates.to); }
     }
+  };
+
+  const navigatePeriod = (direction: 1 | -1) => {
+    const monthsMap: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+    const months = monthsMap[dateCycle] ?? 1;
+    const newRef = direction === 1 ? addMonths(referenceDate, months) : subMonths(referenceDate, months);
+    setReferenceDate(newRef);
+    const dates = getCycleDates(dateCycle, newRef);
+    if (dates) { setDateFrom(dates.from); setDateTo(dates.to); }
   };
 
   // Derive smart statuses for each contract
@@ -403,6 +426,19 @@ export default function Contratos() {
             ))}
           </SelectContent>
         </Select>
+        {dateCycle !== "todos" && dateCycle !== "personalizado" && (
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => navigatePeriod(-1)}>
+              <ChevronLeft size={16} />
+            </Button>
+            <span className="text-sm font-medium min-w-[140px] text-center capitalize">
+              {getCycleLabel(dateCycle, referenceDate)}
+            </span>
+            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => navigatePeriod(1)}>
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+        )}
         {dateCycle === "personalizado" && (
           <>
             <Popover>
