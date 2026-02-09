@@ -9,6 +9,7 @@ import {
   CheckSquare,
   Plug,
   Brain,
+  Settings,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -26,6 +27,7 @@ const navItems = [
   { path: "/tarefas", label: "Tarefas", icon: CheckSquare },
   { path: "/integracoes", label: "Integrações", icon: Plug },
   { path: "/ia", label: "IA Financeira", icon: Brain },
+  { path: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {

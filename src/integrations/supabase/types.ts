@@ -14,6 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chart_of_accounts: {
+        Row: {
+          accounting_class: string
+          active: boolean
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_synthetic: boolean
+          is_system_default: boolean
+          level: number
+          name: string
+          nature: string
+          parent_id: string | null
+          tags: string[] | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accounting_class?: string
+          active?: boolean
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_synthetic?: boolean
+          is_system_default?: boolean
+          level?: number
+          name: string
+          nature?: string
+          parent_id?: string | null
+          tags?: string[] | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accounting_class?: string
+          active?: boolean
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_synthetic?: boolean
+          is_system_default?: boolean
+          level?: number
+          name?: string
+          nature?: string
+          parent_id?: string | null
+          tags?: string[] | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chart_of_accounts_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
           created_at: string
@@ -58,6 +156,56 @@ export type Database = {
           vencimento?: string
         }
         Relationships: []
+      }
+      cost_centers: {
+        Row: {
+          active: boolean
+          business_unit: string | null
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          responsible: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          business_unit?: string | null
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          responsible?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          business_unit?: string | null
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          responsible?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_centers_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
