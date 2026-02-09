@@ -120,6 +120,19 @@ export function useChartOfAccounts() {
     onError: (e: any) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
   });
 
+  const deleteAll = async () => {
+    if (!user) throw new Error("Usuário não autenticado");
+    // Delete children first (level 3, 2, 1)
+    for (const level of [3, 2, 1]) {
+      const { error } = await supabase
+        .from("chart_of_accounts" as any)
+        .delete()
+        .eq("level", level);
+      if (error) throw error;
+    }
+    qc.invalidateQueries({ queryKey: ["chart_of_accounts"] });
+  };
+
   const seedDefaultAccounts = async () => {
     if (!user) throw new Error("Usuário não autenticado");
 
@@ -219,6 +232,7 @@ export function useChartOfAccounts() {
     update,
     toggleActive,
     remove,
+    deleteAll,
     seedDefaultAccounts,
   };
 }

@@ -115,6 +115,22 @@ export function useCostCenters() {
     onError: (e: any) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
   });
 
+  const deleteAll = async () => {
+    if (!user) throw new Error("Usuário não autenticado");
+    // Delete children first then parents
+    const { error: childErr } = await supabase
+      .from("cost_centers" as any)
+      .delete()
+      .not("parent_id", "is", null);
+    if (childErr) throw childErr;
+    const { error: parentErr } = await supabase
+      .from("cost_centers" as any)
+      .delete()
+      .is("parent_id", null);
+    if (parentErr) throw parentErr;
+    qc.invalidateQueries({ queryKey: ["cost_centers"] });
+  };
+
   const seedDefaultCenters = async () => {
     if (!user) throw new Error("Usuário não autenticado");
 
@@ -171,6 +187,7 @@ export function useCostCenters() {
     update,
     toggleActive,
     remove,
+    deleteAll,
     seedDefaultCenters,
   };
 }

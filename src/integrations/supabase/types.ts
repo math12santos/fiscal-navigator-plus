@@ -207,6 +207,39 @@ export type Database = {
           },
         ]
       }
+      plan_migrations: {
+        Row: {
+          created_at: string
+          id: string
+          mapping_accounts: Json | null
+          mapping_cost_centers: Json | null
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mapping_accounts?: Json | null
+          mapping_cost_centers?: Json | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mapping_accounts?: Json | null
+          mapping_cost_centers?: Json | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -236,7 +269,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_linked_transactions: { Args: { p_user_id: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
