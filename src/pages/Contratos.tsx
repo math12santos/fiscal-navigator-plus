@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from "react";
-import { format, startOfMonth, endOfMonth, addMonths, startOfYear, endOfYear, differenceInDays, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, startOfYear, endOfYear, differenceInDays, differenceInMonths, subMonths, max, min } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
 import { useContracts, Contract } from "@/hooks/useContracts";
@@ -58,6 +58,37 @@ function getCycleLabel(cycle: DateCycle, ref: Date): string {
   const to = endOfMonth(addMonths(from, months - 1));
   if (months === 1) return format(from, "MMMM yyyy", { locale: ptBR });
   return `${format(from, "MMM/yy", { locale: ptBR })} – ${format(to, "MMM/yy", { locale: ptBR })}`;
+}
+/**
+ * Calculate the projected financial value of a contract within a date range.
+ * For recurring contracts, multiplies the monthly value by the number of months
+ * the contract is active within the period.
+ * For unique (one-time) contracts, returns the contract value if active in range.
+ */
+function getProjectedValue(c: Contract, from?: Date, to?: Date): number {
+  const valor = Number(c.valor);
+  if (!from || !to) return valor; // no period filter = show face value
+
+  const contractStart = c.data_inicio ? new Date(c.data_inicio) : new Date(c.created_at);
+  const contractEnd = c.data_fim ? new Date(c.data_fim) : (c.prazo_indeterminado ? null : new Date(c.vencimento));
+
+  // Effective overlap period
+  const effectiveStart = max([contractStart, from]);
+  const effectiveEnd = contractEnd ? min([contractEnd, to]) : to;
+
+  if (effectiveStart > effectiveEnd) return 0;
+
+  if (c.tipo_recorrencia === "unico") return valor;
+
+  // For recurring contracts, calculate how many months fall within the overlap
+  const recurrenceMonths: Record<string, number> = {
+    mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12,
+  };
+  const interval = recurrenceMonths[c.tipo_recorrencia] ?? 1;
+  const totalMonthsInRange = differenceInMonths(endOfMonth(effectiveEnd), startOfMonth(effectiveStart)) + 1;
+  const occurrences = Math.max(1, Math.floor(totalMonthsInRange / interval));
+
+  return valor * occurrences;
 }
 
 // Smart status classification
@@ -353,7 +384,7 @@ export default function Contratos() {
   const activeCount = filtered.filter((c) => c.displayStatus === "Ativo").length;
   const overdueCount = filtered.filter((c) => c.displayStatus === "Vencido").length;
   const nearExpiryCount = filtered.filter((c) => c.displayStatus === "Próx. Vencimento").length;
-  const totalReceivable = filtered.reduce((sum, c) => sum + Number(c.valor), 0);
+  const totalReceivable = filtered.reduce((sum, c) => sum + getProjectedValue(c, dateFrom, dateTo), 0);
 
   const handleSubmit = (data: ContractFormData) => {
     if (editing) {
