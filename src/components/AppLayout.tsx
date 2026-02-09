@@ -17,6 +17,7 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import OrgSelector from "@/components/OrgSelector";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -55,6 +56,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           >
             {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
+        </div>
+
+        {/* Org Selector */}
+        <div className="border-b border-border/50 p-2">
+          <OrgSelector collapsed={collapsed} />
         </div>
 
         {/* Nav */}
