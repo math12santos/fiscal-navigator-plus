@@ -3,7 +3,15 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import AppLayout from "@/components/AppLayout";
+import Dashboard from "@/pages/Dashboard";
+import FluxoCaixa from "@/pages/FluxoCaixa";
+import Contratos from "@/pages/Contratos";
+import Planejamento from "@/pages/Planejamento";
+import Conciliacao from "@/pages/Conciliacao";
+import Tarefas from "@/pages/Tarefas";
+import Integracoes from "@/pages/Integracoes";
+import IAFinanceira from "@/pages/IAFinanceira";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -14,11 +22,19 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppLayout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/fluxo-caixa" element={<FluxoCaixa />} />
+            <Route path="/contratos" element={<Contratos />} />
+            <Route path="/planejamento" element={<Planejamento />} />
+            <Route path="/conciliacao" element={<Conciliacao />} />
+            <Route path="/tarefas" element={<Tarefas />} />
+            <Route path="/integracoes" element={<Integracoes />} />
+            <Route path="/ia" element={<IAFinanceira />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AppLayout>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

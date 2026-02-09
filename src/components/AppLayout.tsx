@@ -1,0 +1,93 @@
+import { ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
+import {
+  LayoutDashboard,
+  ArrowLeftRight,
+  FileText,
+  Target,
+  Building2,
+  CheckSquare,
+  Plug,
+  Brain,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+
+const navItems = [
+  { path: "/", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/fluxo-caixa", label: "Fluxo de Caixa", icon: ArrowLeftRight },
+  { path: "/contratos", label: "Contratos", icon: FileText },
+  { path: "/planejamento", label: "Planejamento", icon: Target },
+  { path: "/conciliacao", label: "Conciliação", icon: Building2 },
+  { path: "/tarefas", label: "Tarefas", icon: CheckSquare },
+  { path: "/integracoes", label: "Integrações", icon: Plug },
+  { path: "/ia", label: "IA Financeira", icon: Brain },
+];
+
+export default function AppLayout({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "flex flex-col border-r border-border/50 bg-sidebar transition-all duration-300",
+          collapsed ? "w-16" : "w-60"
+        )}
+      >
+        {/* Logo */}
+        <div className="flex h-16 items-center justify-between border-b border-border/50 px-4">
+          {!collapsed && (
+            <span className="text-lg font-bold gradient-text tracking-tight">FinCore</span>
+          )}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+          >
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "bg-primary/10 text-primary glow-primary"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <item.icon size={18} className={isActive ? "text-primary" : ""} />
+                {!collapsed && <span>{item.label}</span>}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Footer */}
+        {!collapsed && (
+          <div className="border-t border-border/50 p-4">
+            <div className="text-xs text-muted-foreground">
+              FinCore v1.0
+            </div>
+          </div>
+        )}
+      </aside>
+
+      {/* Main */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="p-6 lg:p-8">{children}</div>
+      </main>
+    </div>
+  );
+}
