@@ -48,7 +48,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         {/* Logo */}
         <div className="flex h-16 items-center justify-between border-b border-border/50 px-4">
           {!collapsed && (
-            <span className="text-lg font-bold gradient-text tracking-tight">FinCore</span>
+            <span className="text-lg font-bold gradient-text tracking-tight">Colli FinCore</span>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
