@@ -128,12 +128,21 @@ export function useChartOfAccounts() {
   const deleteAll = async () => {
     if (!user || !orgId) throw new Error("Usuário ou organização não definidos");
     for (const level of [3, 2, 1]) {
-      const { error } = await supabase
+      // Delete by org_id
+      const { error: e1 } = await supabase
         .from("chart_of_accounts" as any)
         .delete()
         .eq("organization_id", orgId)
         .eq("level", level);
-      if (error) throw error;
+      if (e1) throw e1;
+      // Also clean orphaned records (null org_id) for this user
+      const { error: e2 } = await supabase
+        .from("chart_of_accounts" as any)
+        .delete()
+        .eq("user_id", user.id)
+        .is("organization_id", null)
+        .eq("level", level);
+      if (e2) throw e2;
     }
     qc.invalidateQueries({ queryKey: ["chart_of_accounts", orgId] });
   };
