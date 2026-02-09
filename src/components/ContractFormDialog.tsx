@@ -424,17 +424,28 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
 
 // ==================== Installments Section ====================
 function InstallmentsSection({ contractId, contractValue }: { contractId: string; contractValue: number }) {
-  const { installments, isLoading, create, createMany, remove } = useContractInstallments(contractId);
+  const { installments, isLoading, create, createMany, remove, update } = useContractInstallments(contractId);
   const [showGenerator, setShowGenerator] = useState(false);
   const [genQty, setGenQty] = useState(3);
   const [genStartDate, setGenStartDate] = useState("");
   const [genInterval, setGenInterval] = useState(30);
+  const [hasEntrada, setHasEntrada] = useState(true);
+  const [entradaMode, setEntradaMode] = useState<"percentual" | "valor">("percentual");
+  const [entradaPercentual, setEntradaPercentual] = useState(30);
+  const [entradaValor, setEntradaValor] = useState(0);
+  const [entradaDate, setEntradaDate] = useState("");
 
   const totalParcelas = installments.reduce((sum, i) => sum + Number(i.valor), 0);
   const diff = contractValue - totalParcelas;
 
   const fmt = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(v);
+
+  const calcEntradaValor = () => {
+    if (!hasEntrada) return 0;
+    if (entradaMode === "percentual") return Math.round((contractValue * entradaPercentual) / 100 * 100) / 100;
+    return entradaValor;
+  };
 
   const handleAddOne = () => {
     const nextNum = installments.length + 1;
@@ -450,19 +461,49 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
 
   const handleGenerate = () => {
     if (!genStartDate || genQty < 1 || contractValue <= 0) return;
-    const valorParcela = Math.round((contractValue / genQty) * 100) / 100;
-    const parcelas = Array.from({ length: genQty }, (_, i) => {
+    const entrada = calcEntradaValor();
+    const restante = contractValue - entrada;
+    const numParcelas = hasEntrada ? genQty : genQty;
+    const valorParcela = Math.round((restante / numParcelas) * 100) / 100;
+
+    const parcelas: Array<{
+      contract_id: string; descricao: string; numero: number;
+      valor: number; data_vencimento: string; status: string;
+    }> = [];
+
+    let idx = 0;
+    if (hasEntrada) {
+      parcelas.push({
+        contract_id: contractId,
+        descricao: "Entrada",
+        numero: 1,
+        valor: entrada,
+        data_vencimento: entradaDate || genStartDate,
+        status: "pendente",
+      });
+      idx = 1;
+    }
+
+    for (let i = 0; i < numParcelas; i++) {
       const date = new Date(genStartDate);
       date.setDate(date.getDate() + genInterval * i);
-      return {
+      parcelas.push({
         contract_id: contractId,
-        descricao: i === 0 ? "Entrada" : `Parcela ${i}`,
-        numero: i + 1,
+        descricao: `Parcela ${i + 1}`,
+        numero: idx + i + 1,
         valor: valorParcela,
         data_vencimento: date.toISOString().split("T")[0],
-        status: "pendente" as const,
-      };
-    });
+        status: "pendente",
+      });
+    }
+
+    // Adjust rounding on last parcela
+    const totalGerado = parcelas.reduce((s, p) => s + p.valor, 0);
+    const roundDiff = Math.round((contractValue - totalGerado) * 100) / 100;
+    if (Math.abs(roundDiff) > 0 && parcelas.length > 0) {
+      parcelas[parcelas.length - 1].valor = Math.round((parcelas[parcelas.length - 1].valor + roundDiff) * 100) / 100;
+    }
+
     createMany.mutate(parcelas, { onSuccess: () => setShowGenerator(false) });
   };
 
@@ -483,23 +524,64 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
       {showGenerator && (
         <div className="bg-secondary/30 rounded-md p-3 space-y-3">
           <p className="text-xs font-medium text-muted-foreground">Gerar parcelas automaticamente</p>
+
+          {/* Entrada toggle */}
+          <div className="flex items-center gap-3">
+            <Switch checked={hasEntrada} onCheckedChange={setHasEntrada} />
+            <Label className="text-sm">Incluir entrada</Label>
+          </div>
+
+          {hasEntrada && (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Modo</Label>
+                <Select value={entradaMode} onValueChange={(v) => setEntradaMode(v as "percentual" | "valor")}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentual">% do total</SelectItem>
+                    <SelectItem value="valor">Valor fixo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{entradaMode === "percentual" ? "Percentual (%)" : "Valor (R$)"}</Label>
+                {entradaMode === "percentual" ? (
+                  <Input type="number" min={1} max={99} value={entradaPercentual} onChange={(e) => setEntradaPercentual(Number(e.target.value))} className="h-8 text-xs" />
+                ) : (
+                  <Input type="number" min={0} step={0.01} value={entradaValor} onChange={(e) => setEntradaValor(Number(e.target.value))} className="h-8 text-xs" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Data da entrada</Label>
+                <Input type="date" value={entradaDate} onChange={(e) => setEntradaDate(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div className="col-span-3 text-xs text-muted-foreground">
+                Entrada: <span className="font-mono font-medium text-foreground">{fmt(calcEntradaValor())}</span>
+                {" · "}Restante: <span className="font-mono font-medium text-foreground">{fmt(contractValue - calcEntradaValor())}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Parcelas config */}
           <div className="grid grid-cols-3 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs">Quantidade</Label>
-              <Input type="number" min={1} max={60} value={genQty} onChange={(e) => setGenQty(Number(e.target.value))} />
+              <Label className="text-xs">Nº parcelas</Label>
+              <Input type="number" min={1} max={60} value={genQty} onChange={(e) => setGenQty(Number(e.target.value))} className="h-8 text-xs" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Data inicial</Label>
-              <Input type="date" value={genStartDate} onChange={(e) => setGenStartDate(e.target.value)} />
+              <Label className="text-xs">Data 1ª parcela</Label>
+              <Input type="date" value={genStartDate} onChange={(e) => setGenStartDate(e.target.value)} className="h-8 text-xs" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Intervalo (dias)</Label>
-              <Input type="number" min={1} value={genInterval} onChange={(e) => setGenInterval(Number(e.target.value))} />
+              <Input type="number" min={1} value={genInterval} onChange={(e) => setGenInterval(Number(e.target.value))} className="h-8 text-xs" />
             </div>
           </div>
+
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
-              {genQty} x {fmt(contractValue / (genQty || 1))}
+              {hasEntrada && <>Entrada {fmt(calcEntradaValor())} + </>}
+              {genQty} x {fmt((contractValue - calcEntradaValor()) / (genQty || 1))}
             </p>
             <Button type="button" size="sm" onClick={handleGenerate} disabled={createMany.isPending || !genStartDate}>
               {createMany.isPending ? "Gerando..." : "Confirmar"}
@@ -516,9 +598,25 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
         <div className="space-y-2 max-h-48 overflow-y-auto">
           {installments.map((inst) => (
             <div key={inst.id} className="flex items-center gap-2 text-sm">
-              <span className="w-24 truncate font-medium">{inst.descricao}</span>
-              <span className="w-24 text-right font-mono">{fmt(Number(inst.valor))}</span>
-              <span className="w-28 text-muted-foreground">{new Date(inst.data_vencimento).toLocaleDateString("pt-BR")}</span>
+              <Input
+                className="w-28 h-7 text-xs"
+                value={inst.descricao}
+                onChange={(e) => update.mutate({ id: inst.id, descricao: e.target.value })}
+              />
+              <Input
+                className="w-24 h-7 text-xs text-right font-mono"
+                type="number"
+                min={0}
+                step={0.01}
+                value={inst.valor}
+                onChange={(e) => update.mutate({ id: inst.id, valor: Number(e.target.value) })}
+              />
+              <Input
+                className="w-32 h-7 text-xs"
+                type="date"
+                value={inst.data_vencimento}
+                onChange={(e) => update.mutate({ id: inst.id, data_vencimento: e.target.value })}
+              />
               <Badge variant="outline" className="text-xs capitalize">{inst.status}</Badge>
               <Button type="button" variant="ghost" size="icon" className="ml-auto h-7 w-7 text-destructive" onClick={() => remove.mutate(inst.id)}>
                 <Trash2 size={12} />
