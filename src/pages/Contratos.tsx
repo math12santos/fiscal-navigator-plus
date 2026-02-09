@@ -37,14 +37,14 @@ const recorrenciaLabel: Record<string, string> = {
 };
 
 // Date cycle presets
-type DateCycle = "mensal" | "bimestral" | "trimestral" | "semestral" | "anual" | "personalizado";
+type DateCycle = "todos" | "mensal" | "bimestral" | "trimestral" | "semestral" | "anual" | "personalizado";
 const dateCycleLabels: Record<DateCycle, string> = {
-  mensal: "Mensal", bimestral: "Bimestral", trimestral: "Trimestral",
+  todos: "Todos", mensal: "Mensal", bimestral: "Bimestral", trimestral: "Trimestral",
   semestral: "Semestral", anual: "Anual", personalizado: "Personalizado",
 };
 
 function getCycleDates(cycle: DateCycle): { from: Date; to: Date } | null {
-  if (cycle === "personalizado") return null;
+  if (cycle === "personalizado" || cycle === "todos") return null;
   const now = new Date();
   const start = startOfMonth(now);
   const monthsMap: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
@@ -279,9 +279,9 @@ export default function Contratos() {
   // Filters
   const [filterTipo, setFilterTipo] = useState("all"); // all | Produto | Serviço
   const [filterStatus, setFilterStatus] = useState("all"); // all | Ativo | Vencido | Próx. Vencimento | Cancelado | Suspenso
-  const [dateCycle, setDateCycle] = useState<DateCycle>("mensal");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => getCycleDates("mensal")?.from);
-  const [dateTo, setDateTo] = useState<Date | undefined>(() => getCycleDates("mensal")?.to);
+  const [dateCycle, setDateCycle] = useState<DateCycle>("todos");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   // When cycle changes, update dates
   const handleCycleChange = (cycle: DateCycle) => {
@@ -313,11 +313,11 @@ export default function Contratos() {
     return true;
   }), [contractsWithStatus, filterTipo, filterStatus, dateFrom, dateTo]);
 
-  const hasFilters = filterTipo !== "all" || filterStatus !== "all" || dateCycle !== "mensal";
+  const hasFilters = filterTipo !== "all" || filterStatus !== "all" || dateCycle !== "todos";
   const clearFilters = () => {
     setFilterTipo("all");
     setFilterStatus("all");
-    handleCycleChange("mensal");
+    handleCycleChange("todos");
   };
 
   // KPI calculations based on filtered data
