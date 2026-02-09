@@ -23,6 +23,7 @@ export interface ContractFormData {
   data_fim: string;
   prazo_indeterminado: boolean;
   valor_base: number;
+  dia_vencimento: number | null;
   // 3.2 Reajustes
   tipo_reajuste: string;
   indice_reajuste: string;
@@ -78,7 +79,7 @@ const impactos = [
 const defaultForm: ContractFormData = {
   nome: "", tipo: "Fornecedor", valor: 0, vencimento: "", status: "Ativo", notes: "",
   tipo_recorrencia: "mensal", intervalo_personalizado: null, data_inicio: "", data_fim: "",
-  prazo_indeterminado: false, valor_base: 0,
+  prazo_indeterminado: false, valor_base: 0, dia_vencimento: null,
   tipo_reajuste: "manual", indice_reajuste: "", percentual_reajuste: null,
   periodicidade_reajuste: "anual", proximo_reajuste: "",
   natureza_financeira: "fixo", impacto_resultado: "custo", cost_center_id: "",
@@ -172,7 +173,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="vencimento">Vencimento</Label>
+                  <Label htmlFor="vencimento">Vencimento (contrato)</Label>
                   <Input id="vencimento" type="date" value={form.vencimento} onChange={(e) => set("vencimento", e.target.value)} required />
                 </div>
               </div>
@@ -198,6 +199,11 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                     <Input type="number" min={1} value={form.intervalo_personalizado ?? ""} onChange={(e) => set("intervalo_personalizado", e.target.value ? Number(e.target.value) : null)} />
                   </div>
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dia_vencimento">Dia de vencimento mensal (1-31)</Label>
+                <Input id="dia_vencimento" type="number" min={1} max={31} placeholder="Ex: 15" value={form.dia_vencimento ?? ""} onChange={(e) => set("dia_vencimento", e.target.value ? Number(e.target.value) : null)} />
+                <p className="text-xs text-muted-foreground">Dia fixo do mês em que a parcela vence</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

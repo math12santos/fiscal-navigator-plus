@@ -254,6 +254,7 @@ export type Database = {
           created_at: string
           data_fim: string | null
           data_inicio: string | null
+          dia_vencimento: number | null
           external_ref: string | null
           id: string
           impacto_resultado: string | null
@@ -286,6 +287,7 @@ export type Database = {
           created_at?: string
           data_fim?: string | null
           data_inicio?: string | null
+          dia_vencimento?: number | null
           external_ref?: string | null
           id?: string
           impacto_resultado?: string | null
@@ -318,6 +320,7 @@ export type Database = {
           created_at?: string
           data_fim?: string | null
           data_inicio?: string | null
+          dia_vencimento?: number | null
           external_ref?: string | null
           id?: string
           impacto_resultado?: string | null
