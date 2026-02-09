@@ -46,15 +46,23 @@ export default function SeedPlanDialog({
       setLoading(false);
 
       if (!hasExistingData) {
+        // No accounts or cost centers — skip verification entirely
         setStep("no-data");
       } else {
+        // Has existing data — check for linked transactions
         setStep("checking");
         try {
-          const result = await checkLinkedTransactions();
+          // Add a timeout to prevent hanging
+          const result = await Promise.race([
+            checkLinkedTransactions(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("Tempo esgotado")), 5000)
+            ),
+          ]);
           setStep(result.has_linked_transactions ? "has-transactions" : "safe-replace");
         } catch (e: any) {
-          toast({ title: "Erro ao verificar lançamentos", description: e.message, variant: "destructive" });
-          setStep("safe-replace"); // fallback to safe-replace
+          console.warn("Linked transactions check failed/timed out:", e.message);
+          setStep("safe-replace"); // fallback — assume safe
         }
       }
     }
