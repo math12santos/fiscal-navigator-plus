@@ -31,7 +31,7 @@ const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
 
 const recorrenciaLabel: Record<string, string> = {
-  mensal: "Mensal", bimestral: "Bimestral", trimestral: "Trimestral",
+  unico: "Único", mensal: "Mensal", bimestral: "Bimestral", trimestral: "Trimestral",
   semestral: "Semestral", anual: "Anual", personalizado: "Personalizado",
 };
 
