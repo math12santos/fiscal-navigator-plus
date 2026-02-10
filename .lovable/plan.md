@@ -1,9 +1,9 @@
 
 # Módulo de Planejamento Financeiro
 
-## Status: Fase 1 (MVP Core) — EM ANDAMENTO
+## Status: Fase 2 + Fase 3 (Passivos) — IMPLEMENTADO
 
-## Fase 1 — Implementado
+## Fase 1 — MVP Core ✅
 
 ### Banco de Dados
 - [x] `budget_versions` — versões de orçamento com status (draft/approved/archived)
@@ -13,7 +13,7 @@
 - [x] RLS policies em todas as tabelas
 
 ### Hooks
-- [x] `useBudget.ts` — CRUD de versões e linhas de orçamento
+- [x] `useBudget.ts` + `useBudgetLines` — CRUD de versões e linhas de orçamento
 - [x] `usePlanningScenarios.ts` — CRUD de cenários + seed padrão
 - [x] `usePlanningConfig.ts` — upsert de configurações de liquidez
 
@@ -27,14 +27,37 @@
 ### Filtro de Horizonte Temporal
 - [x] 3m, 6m, 12m, 24m, Personalizado com seletor de datas
 
-## Fase 2 — Planejamento Avançado (Pendente)
-- [ ] Overrides por conta/centro (ajuste fino no cenário)
-- [ ] Projeções automáticas baseadas em histórico + contratos
-- [ ] Modo híbrido (automático com overrides)
-- [ ] Relatórios exportáveis (PDF/Excel)
+## Fase 2 — Planejamento Avançado ✅
 
-## Fase 3 — Governança (Pendente)
+### Banco de Dados
+- [x] `scenario_overrides` — overrides por conta/centro de custo por cenário
+
+### Hooks
+- [x] `useScenarioOverrides.ts` — CRUD de overrides por cenário
+
+### Funcionalidades
+- [x] Overrides por conta/centro (ajuste fino no cenário) — dialog com tabela + formulário inline
+- [x] Projeções automáticas baseadas em histórico + contratos ativos (via useCashFlow híbrido)
+- [x] Modo híbrido (fluxo de caixa real + contratos recorrentes como base de projeção)
+- [ ] Relatórios exportáveis (PDF/Excel) — pendente integração de lib de export
+
+## Fase 3 — Governança (Parcial)
+
+### Banco de Dados
+- [x] `liabilities` — passivos com tipo, probabilidade, stress e vínculos
+
+### Hooks
+- [x] `useLiabilities.ts` — CRUD + totais computados (dívidas, contingências, provisões, stress)
+
+### Interface
+- [x] **Passivos** (nova aba) — KPIs, filtro por tipo, tabela CRUD completa com dialog de edição
+  - Tipos: Dívida, Contingência, Provisão
+  - Status: Ativo, Negociação, Judicial, Quitado
+  - Probabilidade (contingências): Provável, Possível, Remota
+  - Impacto de stress (% adicional sob cenário adverso)
+  - Vínculos com entidade, contrato e centro de custo
+
+### Pendente (Fase 3)
 - [ ] Gestão de Patrimônio + depreciação gerencial
 - [ ] Gestão de Ativos Financeiros + rendimentos
-- [ ] Gestão de Passivos + probabilidade + stress
 - [ ] Investor Pack (templates + geração versionada)

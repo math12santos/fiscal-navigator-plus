@@ -873,6 +873,104 @@ export type Database = {
           },
         ]
       }
+      liabilities: {
+        Row: {
+          contract_id: string | null
+          cost_center_id: string | null
+          created_at: string
+          data_inicio: string | null
+          data_vencimento: string | null
+          descricao: string | null
+          entity_id: string | null
+          id: string
+          impacto_stress: number | null
+          name: string
+          notes: string | null
+          organization_id: string | null
+          probabilidade: string | null
+          status: string
+          taxa_juros: number | null
+          tipo: string
+          updated_at: string
+          user_id: string
+          valor_atualizado: number
+          valor_original: number
+        }
+        Insert: {
+          contract_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          data_inicio?: string | null
+          data_vencimento?: string | null
+          descricao?: string | null
+          entity_id?: string | null
+          id?: string
+          impacto_stress?: number | null
+          name: string
+          notes?: string | null
+          organization_id?: string | null
+          probabilidade?: string | null
+          status?: string
+          taxa_juros?: number | null
+          tipo?: string
+          updated_at?: string
+          user_id: string
+          valor_atualizado?: number
+          valor_original?: number
+        }
+        Update: {
+          contract_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          data_inicio?: string | null
+          data_vencimento?: string | null
+          descricao?: string | null
+          entity_id?: string | null
+          id?: string
+          impacto_stress?: number | null
+          name?: string
+          notes?: string | null
+          organization_id?: string | null
+          probabilidade?: string | null
+          status?: string
+          taxa_juros?: number | null
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+          valor_atualizado?: number
+          valor_original?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liabilities_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liabilities_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liabilities_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liabilities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -1171,6 +1269,77 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      scenario_overrides: {
+        Row: {
+          account_id: string | null
+          cost_center_id: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          organization_id: string | null
+          override_type: string
+          scenario_id: string
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          account_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          override_type?: string
+          scenario_id: string
+          updated_at?: string
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          account_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          override_type?: string
+          scenario_id?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenario_overrides_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scenario_overrides_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scenario_overrides_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scenario_overrides_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "planning_scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
