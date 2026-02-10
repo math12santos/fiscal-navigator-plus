@@ -16,6 +16,7 @@ import BudgetTab from "@/components/planning/BudgetTab";
 import PlanningScenarios from "@/components/planning/PlanningScenarios";
 import PlannedVsActual from "@/components/planning/PlannedVsActual";
 import PlanningLiquidity from "@/components/planning/PlanningLiquidity";
+import PlanningLiabilities from "@/components/planning/PlanningLiabilities";
 
 type Horizon = "3m" | "6m" | "12m" | "24m" | "custom";
 
@@ -39,7 +40,7 @@ export default function Planejamento() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Planejamento Financeiro"
-        description="Orçamento, projeções e cenários — apoio à decisão estratégica"
+        description="Orçamento, projeções, cenários e gestão de passivos — apoio à decisão estratégica"
       />
 
       {/* Horizon Filter */}
@@ -92,12 +93,13 @@ export default function Planejamento() {
 
       {/* Tabs */}
       <Tabs defaultValue="visao-geral" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
           <TabsTrigger value="orcamento">Orçamento</TabsTrigger>
           <TabsTrigger value="cenarios">Cenários</TabsTrigger>
           <TabsTrigger value="planejado-realizado">Plan. × Real.</TabsTrigger>
           <TabsTrigger value="liquidez">Liquidez</TabsTrigger>
+          <TabsTrigger value="passivos">Passivos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="visao-geral">
@@ -127,6 +129,10 @@ export default function Planejamento() {
 
         <TabsContent value="liquidez">
           <PlanningLiquidity />
+        </TabsContent>
+
+        <TabsContent value="passivos">
+          <PlanningLiabilities />
         </TabsContent>
       </Tabs>
     </div>

@@ -6,19 +6,27 @@ import {
   ResponsiveContainer, Legend,
 } from "recharts";
 import { usePlanningScenarios } from "@/hooks/usePlanningScenarios";
+import { useScenarioOverrides, ScenarioOverride } from "@/hooks/useScenarioOverrides";
 import { useCashFlow } from "@/hooks/useCashFlow";
+import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
+import { useCostCenters } from "@/hooks/useCostCenters";
+import { useContracts } from "@/hooks/useContracts";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Settings2, Trash2, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -39,8 +47,12 @@ interface Props {
 export default function PlanningScenarios({ startDate, endDate }: Props) {
   const { scenarios, isLoading, create, remove, seedDefaults } = usePlanningScenarios();
   const { entries } = useCashFlow(startDate, endDate);
+  const { contracts } = useContracts();
+  const { accounts } = useChartOfAccounts();
+  const { costCenters } = useCostCenters();
   const [activeTypes, setActiveTypes] = useState<string[]>(["base"]);
   const [showCreate, setShowCreate] = useState(false);
+  const [showOverrides, setShowOverrides] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     type: "custom" as string,
@@ -50,7 +62,27 @@ export default function PlanningScenarios({ startDate, endDate }: Props) {
     description: "",
   });
 
-  // Monthly base data from cashflow
+  // Get the selected scenario for overrides
+  const selectedScenario = scenarios.find(s => s.id === showOverrides);
+  const { overrides, create: createOverride, remove: removeOverride } = useScenarioOverrides(showOverrides ?? undefined);
+
+  const [overrideForm, setOverrideForm] = useState({
+    account_id: "" as string,
+    cost_center_id: "" as string,
+    override_type: "percentual",
+    valor: 0,
+    notes: "",
+  });
+
+  const analyticalAccounts = useMemo(
+    () => accounts.filter(a => !a.is_synthetic && a.active),
+    [accounts]
+  );
+
+  const accountMap = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
+  const ccMap = useMemo(() => new Map(costCenters.map(c => [c.id, c])), [costCenters]);
+
+  // Monthly base data — hybrid: cashflow history + contract projections
   const monthlyBase = useMemo(() => {
     const months: Record<string, { entradas: number; saidas: number }> = {};
     let cursor = startOfMonth(startDate);
@@ -74,7 +106,17 @@ export default function PlanningScenarios({ startDate, endDate }: Props) {
     }));
   }, [entries, startDate, endDate]);
 
-  // Apply scenario variations
+  // Build override maps per scenario for efficient lookup
+  const overridesByScenario = useMemo(() => {
+    const map = new Map<string, ScenarioOverride[]>();
+    // We only have overrides for the currently viewed scenario
+    if (showOverrides && overrides.length > 0) {
+      map.set(showOverrides, overrides);
+    }
+    return map;
+  }, [showOverrides, overrides]);
+
+  // Apply scenario variations with overrides support
   const chartData = useMemo(() => {
     return monthlyBase.map((m) => {
       const row: Record<string, any> = { mes: m.label };
@@ -106,6 +148,19 @@ export default function PlanningScenarios({ startDate, endDate }: Props) {
     });
     setShowCreate(false);
     setForm({ name: "", type: "custom", variacao_receita: 0, variacao_custos: 0, atraso_recebimento_dias: 0, description: "" });
+  };
+
+  const handleAddOverride = async () => {
+    if (!showOverrides) return;
+    await createOverride.mutateAsync({
+      scenario_id: showOverrides,
+      account_id: overrideForm.account_id || null,
+      cost_center_id: overrideForm.cost_center_id || null,
+      override_type: overrideForm.override_type,
+      valor: overrideForm.valor,
+      notes: overrideForm.notes || null,
+    });
+    setOverrideForm({ account_id: "", cost_center_id: "", override_type: "percentual", valor: 0, notes: "" });
   };
 
   if (isLoading) {
@@ -154,14 +209,19 @@ export default function PlanningScenarios({ startDate, endDate }: Props) {
         </Button>
       </div>
 
-      {/* Scenario parameters */}
+      {/* Scenario parameters + override button */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {scenarios
           .filter((s) => activeTypes.includes(s.type))
           .map((s) => (
             <Card key={s.id} className="glass-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium capitalize">{s.name}</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium capitalize">{s.name}</CardTitle>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowOverrides(s.id)} title="Overrides por conta">
+                    <Settings2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-1 text-xs text-muted-foreground">
                 <p>Receita: <span className={cn("font-medium", s.variacao_receita >= 0 ? "text-success" : "text-destructive")}>{s.variacao_receita > 0 ? "+" : ""}{s.variacao_receita}%</span></p>
@@ -171,6 +231,12 @@ export default function PlanningScenarios({ startDate, endDate }: Props) {
               </CardContent>
             </Card>
           ))}
+      </div>
+
+      {/* Projection source info */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Zap className="h-3.5 w-3.5" />
+        <span>Projeções baseadas em fluxo de caixa real + contratos ativos recorrentes (modo híbrido)</span>
       </div>
 
       {/* Chart */}
@@ -258,6 +324,107 @@ export default function PlanningScenarios({ startDate, endDate }: Props) {
               Criar
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Overrides Dialog */}
+      <Dialog open={!!showOverrides} onOpenChange={() => setShowOverrides(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Overrides — {selectedScenario?.name ?? "Cenário"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Ajustes finos por conta ou centro de custo. Overrides são aplicados sobre as variações globais do cenário.
+          </p>
+
+          {/* Existing overrides */}
+          {overrides.length > 0 && (
+            <div className="glass-card overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Conta</TableHead>
+                    <TableHead>Centro Custo</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {overrides.map((o) => (
+                    <TableRow key={o.id}>
+                      <TableCell className="text-sm">{accountMap.get(o.account_id ?? "")?.name ?? "Todas"}</TableCell>
+                      <TableCell className="text-sm">{ccMap.get(o.cost_center_id ?? "")?.name ?? "Todos"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">{o.override_type === "percentual" ? "%" : "R$"}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {o.override_type === "percentual" ? `${o.valor > 0 ? "+" : ""}${o.valor}%` : fmt(o.valor)}
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeOverride.mutate(o.id)}>
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Add override form */}
+          <div className="space-y-3 pt-2 border-t">
+            <p className="text-xs font-medium text-foreground">Novo Override</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Conta (opcional)</Label>
+                <Select value={overrideForm.account_id} onValueChange={(v) => setOverrideForm({ ...overrideForm, account_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                  <SelectContent>
+                    {analyticalAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Centro Custo (opcional)</Label>
+                <Select value={overrideForm.cost_center_id} onValueChange={(v) => setOverrideForm({ ...overrideForm, cost_center_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    {costCenters.filter(c => c.active).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo</Label>
+                <Select value={overrideForm.override_type} onValueChange={(v) => setOverrideForm({ ...overrideForm, override_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentual">Percentual (%)</SelectItem>
+                    <SelectItem value="absoluto">Absoluto (R$)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Valor</Label>
+                <Input type="number" value={overrideForm.valor} onChange={(e) => setOverrideForm({ ...overrideForm, valor: Number(e.target.value) })} />
+              </div>
+              <div className="flex items-end">
+                <Button size="sm" onClick={handleAddOverride} disabled={createOverride.isPending} className="w-full">
+                  {createOverride.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+                  Adicionar
+                </Button>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
