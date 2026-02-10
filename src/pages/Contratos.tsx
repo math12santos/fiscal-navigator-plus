@@ -384,7 +384,12 @@ export default function Contratos() {
   const activeCount = filtered.filter((c) => c.displayStatus === "Ativo").length;
   const overdueCount = filtered.filter((c) => c.displayStatus === "Vencido").length;
   const nearExpiryCount = filtered.filter((c) => c.displayStatus === "Próx. Vencimento").length;
-  const totalReceivable = filtered.reduce((sum, c) => sum + getProjectedValue(c, dateFrom, dateTo), 0);
+  const totalReceita = filtered
+    .filter((c) => c.impacto_resultado === "receita")
+    .reduce((sum, c) => sum + getProjectedValue(c, dateFrom, dateTo), 0);
+  const totalGasto = filtered
+    .filter((c) => c.impacto_resultado && ["custo", "despesa"].includes(c.impacto_resultado))
+    .reduce((sum, c) => sum + getProjectedValue(c, dateFrom, dateTo), 0);
 
   const handleSubmit = (data: ContractFormData) => {
     if (editing) {
@@ -510,7 +515,7 @@ export default function Contratos() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="glass-card p-5">
           <div className="flex items-center gap-2">
             <CheckCircle size={16} className="text-success" />
@@ -533,8 +538,18 @@ export default function Contratos() {
           <p className="text-2xl font-bold text-warning mt-1">{nearExpiryCount}</p>
         </div>
         <div className="glass-card p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Valor Total no Período</p>
-          <p className="text-2xl font-bold text-primary mt-1">{fmt(totalReceivable)}</p>
+          <div className="flex items-center gap-2">
+            <TrendingUp size={16} className="text-success" />
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Receita no Período</p>
+          </div>
+          <p className="text-2xl font-bold text-success mt-1">{fmt(totalReceita)}</p>
+        </div>
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={16} className="text-destructive rotate-180" />
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Gastos no Período</p>
+          </div>
+          <p className="text-2xl font-bold text-destructive mt-1">{fmt(totalGasto)}</p>
         </div>
       </div>
 
