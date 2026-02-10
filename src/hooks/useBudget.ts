@@ -58,20 +58,8 @@ export function useBudget() {
     enabled: !!user && !!orgId,
   });
 
-  const linesQuery = (versionId: string) =>
-    useQuery({
-      queryKey: ["budget_lines", orgId, versionId],
-      queryFn: async () => {
-        const { data, error } = await supabase
-          .from("budget_lines" as any)
-          .select("*")
-          .eq("budget_version_id", versionId)
-          .order("month", { ascending: true });
-        if (error) throw error;
-        return (data ?? []) as unknown as BudgetLine[];
-      },
-      enabled: !!user && !!orgId && !!versionId,
-    });
+  // Removed: linesQuery was a hook-returning function (violates Rules of Hooks).
+  // Use the standalone useBudgetLines hook instead.
 
   const createVersion = useMutation({
     mutationFn: async (input: BudgetVersionInput) => {
@@ -183,7 +171,6 @@ export function useBudget() {
   return {
     versions: versionsQuery.data ?? [],
     isLoadingVersions: versionsQuery.isLoading,
-    linesQuery,
     createVersion,
     updateVersion,
     deleteVersion,
@@ -192,4 +179,25 @@ export function useBudget() {
     deleteLine,
     upsertLines,
   };
+}
+
+/** Standalone hook for budget lines — safe to call at top level */
+export function useBudgetLines(versionId: string | null) {
+  const { user } = useAuth();
+  const { currentOrg } = useOrganization();
+  const orgId = currentOrg?.id;
+
+  return useQuery({
+    queryKey: ["budget_lines", orgId, versionId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("budget_lines" as any)
+        .select("*")
+        .eq("budget_version_id", versionId!)
+        .order("month", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as BudgetLine[];
+    },
+    enabled: !!user && !!orgId && !!versionId,
+  });
 }
