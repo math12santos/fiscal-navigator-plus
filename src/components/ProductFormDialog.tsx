@@ -22,6 +22,7 @@ interface Props {
 
 const PRODUCT_UNITS = ["un","kg","g","l","ml","m","m²","m³","pç","cx","pct","par","kit"];
 const SERVICE_UNITS = ["hr","dia","mês","projeto","visita","km","m²","un"];
+const IMOBILIZADO_UNITS = ["un","pç","kit","m²","m³"];
 
 export default function ProductFormDialog({ open, onOpenChange, product, products, accounts, onSubmit, isLoading }: Props) {
   const [form, setForm] = useState<any>({});
@@ -30,7 +31,7 @@ export default function ProductFormDialog({ open, onOpenChange, product, product
   const { groups, create: createGroup } = useFiscalGroups();
 
   const generateNextCode = (type: string) => {
-    const prefix = type === "servico" ? "SERV" : "PROD";
+    const prefix = type === "servico" ? "SERV" : type === "imobilizado" ? "IMOB" : "PROD";
     const existing = products
       .filter((p) => p.code.startsWith(prefix))
       .map((p) => parseInt(p.code.replace(prefix, ""), 10))
@@ -81,6 +82,7 @@ export default function ProductFormDialog({ open, onOpenChange, product, product
                 <SelectContent>
                   <SelectItem value="produto">Produto</SelectItem>
                   <SelectItem value="servico">Serviço</SelectItem>
+                  <SelectItem value="imobilizado">Ativo Imobilizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -102,7 +104,7 @@ export default function ProductFormDialog({ open, onOpenChange, product, product
               <Select value={form.unit || "un"} onValueChange={(v) => set("unit", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(form.type === "servico" ? SERVICE_UNITS : PRODUCT_UNITS).map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  {(form.type === "servico" ? SERVICE_UNITS : form.type === "imobilizado" ? IMOBILIZADO_UNITS : PRODUCT_UNITS).map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
