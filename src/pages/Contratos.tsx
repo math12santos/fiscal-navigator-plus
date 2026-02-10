@@ -391,6 +391,9 @@ export default function Contratos() {
   const totalGasto = filtered
     .filter((c) => c.impacto_resultado && ["custo", "despesa"].includes(c.impacto_resultado))
     .reduce((sum, c) => sum + getProjectedValue(c, dateFrom, dateTo), 0);
+  const totalInvestimento = filtered
+    .filter((c) => c.impacto_resultado && ["investimento", "ativo_imobilizado"].includes(c.impacto_resultado))
+    .reduce((sum, c) => sum + getProjectedValue(c, dateFrom, dateTo), 0);
 
   const handleSubmit = (data: ContractFormData) => {
     if (editing) {
@@ -452,6 +455,7 @@ export default function Contratos() {
             <SelectItem value="all">Todos os tipos</SelectItem>
             <SelectItem value="Produto">Produto</SelectItem>
             <SelectItem value="Serviço">Serviço</SelectItem>
+            <SelectItem value="Imobilizado">Imobilizado</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -516,7 +520,7 @@ export default function Contratos() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
         <div className="glass-card p-5">
           <div className="flex items-center gap-2">
             <CheckCircle size={16} className="text-success" />
@@ -552,6 +556,13 @@ export default function Contratos() {
           </div>
           <p className="text-2xl font-bold text-destructive mt-1">{fmt(totalGasto)}</p>
         </div>
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={16} className="text-primary" />
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Investimentos</p>
+          </div>
+          <p className="text-2xl font-bold text-primary mt-1">{fmt(totalInvestimento)}</p>
+        </div>
       </div>
 
       {/* Tabbed Table */}
@@ -560,10 +571,12 @@ export default function Contratos() {
           <TabsTrigger value="todos">Todos ({filtered.length})</TabsTrigger>
           <TabsTrigger value="gastos">Gastos ({filtered.filter(c => c.impacto_resultado && ["custo", "despesa"].includes(c.impacto_resultado)).length})</TabsTrigger>
           <TabsTrigger value="receita">Receita ({filtered.filter(c => c.impacto_resultado === "receita").length})</TabsTrigger>
+          <TabsTrigger value="investimentos">Investimentos ({filtered.filter(c => c.impacto_resultado && ["investimento", "ativo_imobilizado"].includes(c.impacto_resultado)).length})</TabsTrigger>
         </TabsList>
-        {(["todos", "gastos", "receita"] as const).map((tab) => {
+        {(["todos", "gastos", "receita", "investimentos"] as const).map((tab) => {
           const tabData = tab === "todos" ? filtered
             : tab === "gastos" ? filtered.filter(c => c.impacto_resultado && ["custo", "despesa"].includes(c.impacto_resultado))
+            : tab === "investimentos" ? filtered.filter(c => c.impacto_resultado && ["investimento", "ativo_imobilizado"].includes(c.impacto_resultado))
             : filtered.filter(c => c.impacto_resultado === "receita");
           return (
             <TabsContent key={tab} value={tab}>

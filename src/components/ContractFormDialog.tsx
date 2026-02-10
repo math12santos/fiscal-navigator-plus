@@ -15,7 +15,7 @@ import { useEntities } from "@/hooks/useEntities";
 import { useProducts } from "@/hooks/useProducts";
 import EntityFormDialog from "@/components/EntityFormDialog";
 import ProductFormDialog from "@/components/ProductFormDialog";
-import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus, PackagePlus, Zap } from "lucide-react";
+import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus, PackagePlus, Zap, CheckCircle2 } from "lucide-react";
 
 export interface ContractFormData {
   nome: string;
@@ -92,6 +92,7 @@ const impactos = [
   { value: "custo", label: "Custo" },
   { value: "despesa", label: "Despesa" },
   { value: "investimento", label: "Investimento" },
+  { value: "ativo_imobilizado", label: "Ativo Imobilizado" },
 ];
 
 const defaultForm: ContractFormData = {
@@ -184,14 +185,14 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                   <Select value={form.product_id || "none"} onValueChange={(v) => {
                     const selected = activeProducts.find((p) => p.id === v);
                     set("product_id", v === "none" ? "" : v);
-                    if (selected) set("tipo", selected.type === "servico" ? "Serviço" : "Produto");
+                    if (selected) set("tipo", selected.type === "servico" ? "Serviço" : selected.type === "imobilizado" ? "Imobilizado" : "Produto");
                   }}>
                     <SelectTrigger className="flex-1"><SelectValue placeholder="Selecionar produto/serviço..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Selecionar...</SelectItem>
                       {activeProducts.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.code} - {p.name} ({p.type === "servico" ? "Serviço" : "Produto"})
+                          {p.code} - {p.name} ({p.type === "servico" ? "Serviço" : p.type === "imobilizado" ? "Imobilizado" : "Produto"})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -570,7 +571,7 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Data da entrada</Label>
-                <Input type="date" value={entradaDate} onChange={(e) => setEntradaDate(e.target.value)} className="h-8 text-xs" />
+                <Input type="date" min="2000-01-01" max="2099-12-31" value={entradaDate} onChange={(e) => setEntradaDate(e.target.value)} className="h-8 text-xs" />
               </div>
               <div className="col-span-3 text-xs text-muted-foreground">
                 Entrada: <span className="font-mono font-medium text-foreground">{fmt(calcEntradaValor())}</span>
@@ -587,7 +588,7 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Data 1ª parcela</Label>
-              <Input type="date" value={genStartDate} onChange={(e) => setGenStartDate(e.target.value)} className="h-8 text-xs" />
+              <Input type="date" min="2000-01-01" max="2099-12-31" value={genStartDate} onChange={(e) => setGenStartDate(e.target.value)} className="h-8 text-xs" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Intervalo (dias)</Label>
@@ -631,10 +632,55 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
               <Input
                 className="w-32 h-7 text-xs"
                 type="date"
+                min="2000-01-01"
+                max="2099-12-31"
                 value={inst.data_vencimento}
-                onChange={(e) => update.mutate({ id: inst.id, data_vencimento: e.target.value })}
+                onBlur={(e) => {
+                  const val = e.target.value;
+                  if (val && val.length === 10) {
+                    const year = parseInt(val.split("-")[0], 10);
+                    if (year < 2000 || year > 2099) return; // ignore invalid years
+                    update.mutate({ id: inst.id, data_vencimento: val });
+                  }
+                }}
+                onChange={(e) => {
+                  // Only update on valid complete dates
+                  const val = e.target.value;
+                  if (val && val.length === 10) {
+                    const year = parseInt(val.split("-")[0], 10);
+                    if (year >= 2000 && year <= 2099) {
+                      update.mutate({ id: inst.id, data_vencimento: val });
+                    }
+                  }
+                }}
               />
-              <Badge variant="outline" className="text-xs capitalize">{inst.status}</Badge>
+              <Badge variant="outline" className={`text-xs capitalize ${inst.status === "pago" || inst.status === "recebido" ? "bg-success/10 text-success border-success/30" : ""}`}>
+                {inst.status}
+              </Badge>
+              {inst.status === "pendente" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1 text-success hover:text-success"
+                  onClick={() => update.mutate({ id: inst.id, status: "pago" })}
+                  title="Confirmar pagamento"
+                >
+                  <CheckCircle2 size={12} /> Pagar
+                </Button>
+              )}
+              {(inst.status === "pago" || inst.status === "recebido") && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1 text-muted-foreground"
+                  onClick={() => update.mutate({ id: inst.id, status: "pendente" })}
+                  title="Reverter para pendente"
+                >
+                  Reverter
+                </Button>
+              )}
               <Button type="button" variant="ghost" size="icon" className="ml-auto h-7 w-7 text-destructive" onClick={() => remove.mutate(inst.id)}>
                 <Trash2 size={12} />
               </Button>
