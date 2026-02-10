@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useContractDocuments } from "@/hooks/useContractDocuments";
 import { useContractInstallments } from "@/hooks/useContractInstallments";
@@ -23,10 +24,10 @@ export interface ContractFormData {
   product_id: string;
   tipo: string;
   valor: number;
-  vencimento: string;
+  vencimento: string; // used as "Fim do contrato"
   status: string;
   notes: string;
-  // 3.1 Recorrência
+  // Recorrência
   tipo_recorrencia: string;
   intervalo_personalizado: number | null;
   data_inicio: string;
@@ -34,20 +35,22 @@ export interface ContractFormData {
   prazo_indeterminado: boolean;
   valor_base: number;
   dia_vencimento: number | null;
-  // 3.2 Reajustes
+  // Reajustes
   tipo_reajuste: string;
   indice_reajuste: string;
   percentual_reajuste: number | null;
   periodicidade_reajuste: string;
   proximo_reajuste: string;
-  // 3.6 Classificações
+  // Classificações
   natureza_financeira: string;
   impacto_resultado: string;
   cost_center_id: string;
-  // 3.7 Governança
+  // Governança
   responsavel_interno: string;
   area_responsavel: string;
   sla_revisao_dias: number | null;
+  // Finalidade (fornecedor)
+  finalidade: string;
 }
 
 interface Props {
@@ -65,7 +68,6 @@ const RequiredLabel = ({ htmlFor, children }: { htmlFor?: string; children: Reac
   </Label>
 );
 
-// tipos removed - now using products/services
 const statuses = ["Ativo", "Próximo ao vencimento", "Vencido", "Cancelado", "Pausado"];
 const recorrencias = [
   { value: "unico", label: "Único (sem recorrência)" },
@@ -87,13 +89,6 @@ const naturezas = [
   { value: "variavel", label: "Variável" },
   { value: "fixo_variavel", label: "Fixo + Variável" },
 ];
-const impactos = [
-  { value: "receita", label: "Receita" },
-  { value: "custo", label: "Custo" },
-  { value: "despesa", label: "Despesa" },
-  { value: "investimento", label: "Investimento" },
-  { value: "ativo_imobilizado", label: "Ativo Imobilizado" },
-];
 
 const defaultForm: ContractFormData = {
   nome: "", entity_id: "", product_id: "", tipo: "", valor: 0, vencimento: "", status: "Ativo", notes: "",
@@ -103,7 +98,14 @@ const defaultForm: ContractFormData = {
   periodicidade_reajuste: "anual", proximo_reajuste: "",
   natureza_financeira: "fixo", impacto_resultado: "custo", cost_center_id: "",
   responsavel_interno: "", area_responsavel: "", sla_revisao_dias: null,
+  finalidade: "",
 };
+
+/**
+ * Derive the entity "role" for display: cliente, fornecedor, or investimento.
+ * This drives the dynamic form behavior.
+ */
+type ContractRole = "cliente" | "fornecedor" | "investimento" | "";
 
 export default function ContractFormDialog({ open, onOpenChange, onSubmit, initialData, loading, contractId }: Props) {
   const [form, setForm] = useState<ContractFormData>({ ...defaultForm });
@@ -114,10 +116,34 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const isEditing = !!contractId;
 
-  // All active entities (clients, suppliers, both)
   const availableEntities = entities.filter((e) => e.active);
-  // Active products/services
   const activeProducts = products.filter((p) => p.active);
+
+  // Determine the "role" of this contract based on the selected entity
+  const selectedEntity = useMemo(
+    () => availableEntities.find((e) => e.id === form.entity_id),
+    [availableEntities, form.entity_id]
+  );
+
+  const contractRole: ContractRole = useMemo(() => {
+    if (!selectedEntity) return "";
+    if (selectedEntity.type === "cliente") return "cliente";
+    if (selectedEntity.type === "fornecedor") return "fornecedor";
+    if (selectedEntity.type === "ambos") {
+      // If entity is "ambos", check impacto_resultado to determine role
+      if (form.impacto_resultado === "receita") return "cliente";
+      return "fornecedor";
+    }
+    return "";
+  }, [selectedEntity, form.impacto_resultado]);
+
+  // Selected product for context
+  const selectedProduct = useMemo(
+    () => activeProducts.find((p) => p.id === form.product_id),
+    [activeProducts, form.product_id]
+  );
+
+  const isInvestimento = form.impacto_resultado === "investimento" || form.impacto_resultado === "ativo_imobilizado";
 
   useEffect(() => {
     if (initialData) {
@@ -130,10 +156,82 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
   const set = <K extends keyof ContractFormData>(key: K, value: ContractFormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  // Auto-classify based on entity type
+  const handleEntityChange = (entityId: string) => {
+    const entity = availableEntities.find((e) => e.id === entityId);
+    set("entity_id", entityId);
+    if (entity) {
+      set("nome", entity.name);
+      if (entity.type === "cliente") {
+        set("impacto_resultado", "receita");
+      } else if (entity.type === "fornecedor") {
+        set("impacto_resultado", "custo");
+      }
+    }
+  };
+
+  // Auto-set tipo from product
+  const handleProductChange = (productId: string) => {
+    const product = activeProducts.find((p) => p.id === productId);
+    set("product_id", productId);
+    if (product) {
+      set("tipo", product.type === "servico" ? "Serviço" : product.type === "imobilizado" ? "Imobilizado" : "Produto");
+      if (product.type === "imobilizado") {
+        set("impacto_resultado", "ativo_imobilizado");
+      }
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(form);
+    // Ensure vencimento (fim do contrato) is set — fallback to data_fim
+    const submittedForm = { ...form };
+    if (!submittedForm.vencimento && submittedForm.data_fim) {
+      submittedForm.vencimento = submittedForm.data_fim;
+    }
+    onSubmit(submittedForm);
   };
+
+  // Build searchable options
+  const entityOptions = useMemo(() =>
+    availableEntities.map((e) => ({
+      value: e.id,
+      label: e.name,
+      sublabel: `${e.document_number || "Sem documento"} — ${e.type === "cliente" ? "Cliente" : e.type === "fornecedor" ? "Fornecedor" : "Ambos"}`,
+    })),
+    [availableEntities]
+  );
+
+  const productOptions = useMemo(() =>
+    activeProducts.map((p) => ({
+      value: p.id,
+      label: `${p.code} - ${p.name}`,
+      sublabel: p.type === "servico" ? "Serviço" : p.type === "imobilizado" ? "Imobilizado" : "Produto",
+    })),
+    [activeProducts]
+  );
+
+  // Dynamic impacto options based on entity type
+  const impactoOptions = useMemo(() => {
+    if (contractRole === "cliente") {
+      return [{ value: "receita", label: "Receita" }];
+    }
+    if (contractRole === "fornecedor") {
+      return [
+        { value: "custo", label: "Custo" },
+        { value: "despesa", label: "Despesa" },
+        { value: "investimento", label: "Investimento" },
+        { value: "ativo_imobilizado", label: "Ativo Imobilizado" },
+      ];
+    }
+    return [
+      { value: "receita", label: "Receita" },
+      { value: "custo", label: "Custo" },
+      { value: "despesa", label: "Despesa" },
+      { value: "investimento", label: "Investimento" },
+      { value: "ativo_imobilizado", label: "Ativo Imobilizado" },
+    ];
+  }, [contractRole]);
 
   const tabCount = isEditing ? 5 : 4;
 
@@ -146,7 +244,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <Tabs defaultValue="basico" className="w-full">
-            <TabsList className={`grid w-full mb-4`} style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
+            <TabsList className="grid w-full mb-4" style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
               <TabsTrigger value="basico">Básico</TabsTrigger>
               <TabsTrigger value="recorrencia">Recorrência</TabsTrigger>
               <TabsTrigger value="reajuste">Reajuste</TabsTrigger>
@@ -156,52 +254,74 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
 
             {/* TAB: Básico */}
             <TabsContent value="basico" className="space-y-4">
+              {/* Contraparte with search */}
               <div className="space-y-2">
                 <RequiredLabel>Contraparte (Cliente / Fornecedor)</RequiredLabel>
                 <div className="flex items-center gap-2">
-                  <Select value={form.entity_id || "none"} onValueChange={(v) => {
-                    const selected = availableEntities.find((c) => c.id === v);
-                    set("entity_id", v === "none" ? "" : v);
-                    if (selected) set("nome", selected.name);
-                  }}>
-                    <SelectTrigger className="flex-1"><SelectValue placeholder="Selecionar entidade..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Selecionar...</SelectItem>
-                      {availableEntities.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}{c.document_number ? ` (${c.document_number})` : ""} — {c.type === "cliente" ? "Cliente" : c.type === "fornecedor" ? "Fornecedor" : "Ambos"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex-1">
+                    <SearchableSelect
+                      options={entityOptions}
+                      value={form.entity_id}
+                      onValueChange={handleEntityChange}
+                      placeholder="Buscar contraparte..."
+                      searchPlaceholder="Digitar nome ou documento..."
+                    />
+                  </div>
                   <Button type="button" variant="outline" size="icon" onClick={() => setEntityDialogOpen(true)} title="Adicionar entidade">
                     <UserPlus size={16} />
                   </Button>
                 </div>
+                {contractRole && (
+                  <p className="text-xs text-muted-foreground">
+                    Tipo: <Badge variant="outline" className="text-xs ml-1">
+                      {contractRole === "cliente" ? "Cliente → Receita" : contractRole === "fornecedor" ? "Fornecedor → Passivo" : ""}
+                    </Badge>
+                  </p>
+                )}
               </div>
+
+              {/* Produto/Serviço with search */}
               <div className="space-y-2">
                 <RequiredLabel>Produto / Serviço</RequiredLabel>
                 <div className="flex items-center gap-2">
-                  <Select value={form.product_id || "none"} onValueChange={(v) => {
-                    const selected = activeProducts.find((p) => p.id === v);
-                    set("product_id", v === "none" ? "" : v);
-                    if (selected) set("tipo", selected.type === "servico" ? "Serviço" : selected.type === "imobilizado" ? "Imobilizado" : "Produto");
-                  }}>
-                    <SelectTrigger className="flex-1"><SelectValue placeholder="Selecionar produto/serviço..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Selecionar...</SelectItem>
-                      {activeProducts.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.code} - {p.name} ({p.type === "servico" ? "Serviço" : p.type === "imobilizado" ? "Imobilizado" : "Produto"})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex-1">
+                    <SearchableSelect
+                      options={productOptions}
+                      value={form.product_id}
+                      onValueChange={handleProductChange}
+                      placeholder="Buscar produto/serviço..."
+                      searchPlaceholder="Digitar código ou nome..."
+                    />
+                  </div>
                   <Button type="button" variant="outline" size="icon" onClick={() => setProductDialogOpen(true)} title="Adicionar produto/serviço">
                     <PackagePlus size={16} />
                   </Button>
                 </div>
+                {selectedProduct?.type === "imobilizado" && (
+                  <p className="text-xs text-muted-foreground">
+                    Ativo Imobilizado
+                    {(selectedProduct as any).vida_util_fiscal_anos && ` • Depreciação fiscal: ${(selectedProduct as any).vida_util_fiscal_anos} anos`}
+                    {(selectedProduct as any).vida_util_economica_anos && ` • Econômica: ${(selectedProduct as any).vida_util_economica_anos} anos`}
+                  </p>
+                )}
               </div>
+
+              {/* Finalidade — only for supplier contracts */}
+              {contractRole === "fornecedor" && (
+                <div className="space-y-2">
+                  <Label>Finalidade</Label>
+                  <Select value={form.finalidade || "none"} onValueChange={(v) => set("finalidade", v === "none" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Selecionar...</SelectItem>
+                      <SelectItem value="revenda">Revenda</SelectItem>
+                      <SelectItem value="uso_proprio">Uso Próprio</SelectItem>
+                      <SelectItem value="ambos">Ambos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <RequiredLabel>Status</RequiredLabel>
@@ -210,7 +330,15 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                     <SelectContent>{statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Impacto no resultado</Label>
+                  <Select value={form.impacto_resultado} onValueChange={(v) => set("impacto_resultado", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{impactoOptions.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Natureza financeira</Label>
@@ -219,15 +347,6 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                     <SelectContent>{naturezas.map((n) => <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Impacto no resultado</Label>
-                  <Select value={form.impacto_resultado} onValueChange={(v) => set("impacto_resultado", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{impactos.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Centro de custo</Label>
                   <Select value={form.cost_center_id || "none"} onValueChange={(v) => set("cost_center_id", v === "none" ? "" : v)}>
@@ -240,11 +359,36 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Simplified dates: Início + Fim do Contrato */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <RequiredLabel htmlFor="vencimento">Vencimento (contrato)</RequiredLabel>
-                  <Input id="vencimento" type="date" value={form.vencimento} onChange={(e) => set("vencimento", e.target.value)} required />
+                  <RequiredLabel htmlFor="data_inicio">Data de início</RequiredLabel>
+                  <Input id="data_inicio" type="date" value={form.data_inicio} onChange={(e) => set("data_inicio", e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <RequiredLabel htmlFor="vencimento">Fim do contrato</RequiredLabel>
+                  <Input
+                    id="vencimento"
+                    type="date"
+                    value={form.vencimento}
+                    onChange={(e) => {
+                      set("vencimento", e.target.value);
+                      set("data_fim", e.target.value);
+                    }}
+                    disabled={form.prazo_indeterminado}
+                    required={!form.prazo_indeterminado}
+                  />
                 </div>
               </div>
+              {form.tipo_recorrencia !== "unico" && (
+                <div className="flex items-center gap-3">
+                  <Switch checked={form.prazo_indeterminado} onCheckedChange={(v) => { set("prazo_indeterminado", v); if (v) { set("data_fim", ""); set("vencimento", ""); } }} />
+                  <Label>Prazo indeterminado</Label>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="notes">Observações</Label>
                 <Textarea id="notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} maxLength={1000} rows={2} />
@@ -272,7 +416,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                 <div className="space-y-2">
                   <Label htmlFor="dia_vencimento">Dia de vencimento mensal (1-31)</Label>
                   <Input id="dia_vencimento" type="number" min={1} max={31} placeholder="Ex: 15" value={form.dia_vencimento ?? ""} onChange={(e) => set("dia_vencimento", e.target.value ? Number(e.target.value) : null)} />
-                  <p className="text-xs text-muted-foreground">Dia fixo do mês em que a parcela vence</p>
+                  <p className="text-xs text-muted-foreground">Dia fixo do mês em que a parcela/mensalidade vence</p>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
@@ -285,22 +429,6 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                   <Input id="valor" type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} required />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="data_inicio">Data de início</Label>
-                  <Input id="data_inicio" type="date" value={form.data_inicio} onChange={(e) => set("data_inicio", e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="data_fim">Data de término</Label>
-                  <Input id="data_fim" type="date" value={form.data_fim} onChange={(e) => set("data_fim", e.target.value)} disabled={form.prazo_indeterminado} />
-                </div>
-              </div>
-              {form.tipo_recorrencia !== "unico" && (
-                <div className="flex items-center gap-3">
-                  <Switch checked={form.prazo_indeterminado} onCheckedChange={(v) => { set("prazo_indeterminado", v); if (v) set("data_fim", ""); }} />
-                  <Label>Prazo indeterminado</Label>
-                </div>
-              )}
 
               {/* Parcelas - only for "unico" contracts being edited */}
               {form.tipo_recorrencia === "unico" && isEditing && contractId && (
@@ -481,7 +609,7 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
     if (!genStartDate || genQty < 1 || contractValue <= 0) return;
     const entrada = calcEntradaValor();
     const restante = contractValue - entrada;
-    const numParcelas = hasEntrada ? genQty : genQty;
+    const numParcelas = genQty;
     const valorParcela = Math.round((restante / numParcelas) * 100) / 100;
 
     const parcelas: Array<{
@@ -543,7 +671,6 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
         <div className="bg-secondary/30 rounded-md p-3 space-y-3">
           <p className="text-xs font-medium text-muted-foreground">Gerar parcelas automaticamente</p>
 
-          {/* Entrada toggle */}
           <div className="flex items-center gap-3">
             <Switch checked={hasEntrada} onCheckedChange={setHasEntrada} />
             <Label className="text-sm">Incluir entrada</Label>
@@ -580,7 +707,6 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
             </div>
           )}
 
-          {/* Parcelas config */}
           <div className="grid grid-cols-3 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Nº parcelas</Label>
@@ -639,12 +765,11 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
                   const val = e.target.value;
                   if (val && val.length === 10) {
                     const year = parseInt(val.split("-")[0], 10);
-                    if (year < 2000 || year > 2099) return; // ignore invalid years
+                    if (year < 2000 || year > 2099) return;
                     update.mutate({ id: inst.id, data_vencimento: val });
                   }
                 }}
                 onChange={(e) => {
-                  // Only update on valid complete dates
                   const val = e.target.value;
                   if (val && val.length === 10) {
                     const year = parseInt(val.split("-")[0], 10);
@@ -751,9 +876,7 @@ function DocumentsTab({ contractId }: { contractId: string }) {
                 <Button type="button" variant="ghost" size="icon" asChild>
                   <a href={d.file_url} target="_blank" rel="noopener"><Eye size={14} /></a>
                 </Button>
-                <Button type="button" variant="ghost" size="icon" onClick={() => remove.mutate(d.id)} className="text-destructive">
-                  <Trash2 size={14} />
-                </Button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => remove.mutate(d.id)} className="text-destructive"><Trash2 size={14} /></Button>
               </div>
             </div>
           ))}
