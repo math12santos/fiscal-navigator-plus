@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { format, startOfMonth, endOfMonth, addMonths, startOfYear, endOfYear, differenceInDays, differenceInMonths, subMonths, max, min } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
@@ -27,6 +27,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -553,69 +554,85 @@ export default function Contratos() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="glass-card overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <FileText size={40} className="mx-auto mb-3 opacity-40" />
-            <p>{contracts.length === 0 ? "Nenhum contrato cadastrado." : "Nenhum contrato encontrado com os filtros aplicados."}</p>
-            {contracts.length === 0 && <Button variant="outline" className="mt-4" onClick={openCreate}>Cadastrar primeiro contrato</Button>}
-            {hasFilters && <Button variant="outline" className="mt-4" onClick={clearFilters}>Limpar filtros</Button>}
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border/50">
-                <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Contrato</th>
-                <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Produto/Serviço</th>
-                <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Recorrência</th>
-                <th className="text-right px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Valor Mensal</th>
-                <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Vencimento</th>
-                <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
-                <th className="text-right px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => (
-                <tr key={c.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => setViewing(c)}>
-                  <td className="px-5 py-3.5 flex items-center gap-2">
-                    <FileText size={16} className="text-primary" />
-                    <span className="font-medium text-foreground">{c.nome}</span>
-                  </td>
-                  <td className="px-5 py-3.5 text-muted-foreground">{productMap.get((c as any).product_id)?.name ?? c.tipo}</td>
-                  <td className="px-5 py-3.5 text-muted-foreground">{recorrenciaLabel[c.tipo_recorrencia] ?? c.tipo_recorrencia}</td>
-                  <td className="px-5 py-3.5 text-right font-mono text-foreground">{fmt(Number(c.valor))}</td>
-                  <td className="px-5 py-3.5 text-muted-foreground">{new Date(c.vencimento).toLocaleDateString("pt-BR")}</td>
-                  <td className="px-5 py-3.5">
-                    <span className={cn(
-                      "inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full",
-                      c.displayStatus === "Ativo" ? "bg-success/10 text-success" :
-                      c.displayStatus === "Vencido" ? "bg-destructive/10 text-destructive" :
-                      c.displayStatus === "Próx. Vencimento" ? "bg-warning/10 text-warning" :
-                      "bg-muted/50 text-muted-foreground"
-                    )}>
-                      {c.displayStatus === "Ativo" ? <CheckCircle size={12} /> :
-                       c.displayStatus === "Vencido" ? <AlertTriangle size={12} /> :
-                       c.displayStatus === "Próx. Vencimento" ? <Clock size={12} /> :
-                       <AlertTriangle size={12} />}
-                      {c.displayStatus}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => setViewing(c)}><Eye size={14} /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil size={14} /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(c.id)} className="text-destructive hover:text-destructive"><Trash2 size={14} /></Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Tabbed Table */}
+      <Tabs defaultValue="todos" className="space-y-0">
+        <TabsList className="mb-4">
+          <TabsTrigger value="todos">Todos ({filtered.length})</TabsTrigger>
+          <TabsTrigger value="gastos">Gastos ({filtered.filter(c => c.impacto_resultado && ["custo", "despesa"].includes(c.impacto_resultado)).length})</TabsTrigger>
+          <TabsTrigger value="receita">Receita ({filtered.filter(c => c.impacto_resultado === "receita").length})</TabsTrigger>
+        </TabsList>
+        {(["todos", "gastos", "receita"] as const).map((tab) => {
+          const tabData = tab === "todos" ? filtered
+            : tab === "gastos" ? filtered.filter(c => c.impacto_resultado && ["custo", "despesa"].includes(c.impacto_resultado))
+            : filtered.filter(c => c.impacto_resultado === "receita");
+          return (
+            <TabsContent key={tab} value={tab}>
+              <div className="glass-card overflow-hidden">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>
+                ) : tabData.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FileText size={40} className="mx-auto mb-3 opacity-40" />
+                    <p>{contracts.length === 0 ? "Nenhum contrato cadastrado." : "Nenhum contrato encontrado."}</p>
+                    {contracts.length === 0 && <Button variant="outline" className="mt-4" onClick={openCreate}>Cadastrar primeiro contrato</Button>}
+                    {hasFilters && <Button variant="outline" className="mt-4" onClick={clearFilters}>Limpar filtros</Button>}
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border/50">
+                        <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Contrato</th>
+                        <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Produto/Serviço</th>
+                        <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Recorrência</th>
+                        <th className="text-right px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Valor Mensal</th>
+                        <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Vencimento</th>
+                        <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
+                        <th className="text-right px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tabData.map((c) => (
+                        <tr key={c.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => setViewing(c)}>
+                          <td className="px-5 py-3.5 flex items-center gap-2">
+                            <FileText size={16} className="text-primary" />
+                            <span className="font-medium text-foreground">{c.nome}</span>
+                          </td>
+                          <td className="px-5 py-3.5 text-muted-foreground">{productMap.get((c as any).product_id)?.name ?? c.tipo}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground">{recorrenciaLabel[c.tipo_recorrencia] ?? c.tipo_recorrencia}</td>
+                          <td className="px-5 py-3.5 text-right font-mono text-foreground">{fmt(Number(c.valor))}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground">{new Date(c.vencimento).toLocaleDateString("pt-BR")}</td>
+                          <td className="px-5 py-3.5">
+                            <span className={cn(
+                              "inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full",
+                              c.displayStatus === "Ativo" ? "bg-success/10 text-success" :
+                              c.displayStatus === "Vencido" ? "bg-destructive/10 text-destructive" :
+                              c.displayStatus === "Próx. Vencimento" ? "bg-warning/10 text-warning" :
+                              "bg-muted/50 text-muted-foreground"
+                            )}>
+                              {c.displayStatus === "Ativo" ? <CheckCircle size={12} /> :
+                               c.displayStatus === "Vencido" ? <AlertTriangle size={12} /> :
+                               c.displayStatus === "Próx. Vencimento" ? <Clock size={12} /> :
+                               <AlertTriangle size={12} />}
+                              {c.displayStatus}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => setViewing(c)}><Eye size={14} /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil size={14} /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteId(c.id)} className="text-destructive hover:text-destructive"><Trash2 size={14} /></Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </TabsContent>
+          );
+        })}
+      </Tabs>
 
       <ContractFormDialog
         open={formOpen}
