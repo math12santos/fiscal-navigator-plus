@@ -547,6 +547,7 @@ export type Database = {
           dia_vencimento: number | null
           entity_id: string | null
           external_ref: string | null
+          finalidade: string | null
           id: string
           impacto_resultado: string | null
           indice_reajuste: string | null
@@ -582,6 +583,7 @@ export type Database = {
           dia_vencimento?: number | null
           entity_id?: string | null
           external_ref?: string | null
+          finalidade?: string | null
           id?: string
           impacto_resultado?: string | null
           indice_reajuste?: string | null
@@ -617,6 +619,7 @@ export type Database = {
           dia_vencimento?: number | null
           entity_id?: string | null
           external_ref?: string | null
+          finalidade?: string | null
           id?: string
           impacto_resultado?: string | null
           indice_reajuste?: string | null
@@ -1192,6 +1195,8 @@ export type Database = {
           unit_price: number
           updated_at: string
           user_id: string
+          vida_util_economica_anos: number | null
+          vida_util_fiscal_anos: number | null
         }
         Insert: {
           account_id?: string | null
@@ -1210,6 +1215,8 @@ export type Database = {
           unit_price?: number
           updated_at?: string
           user_id: string
+          vida_util_economica_anos?: number | null
+          vida_util_fiscal_anos?: number | null
         }
         Update: {
           account_id?: string | null
@@ -1228,6 +1235,8 @@ export type Database = {
           unit_price?: number
           updated_at?: string
           user_id?: string
+          vida_util_economica_anos?: number | null
+          vida_util_fiscal_anos?: number | null
         }
         Relationships: [
           {

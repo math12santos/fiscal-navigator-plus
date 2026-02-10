@@ -161,6 +161,39 @@ export default function ProductFormDialog({ open, onOpenChange, product, product
           </div>
           )}
 
+          {/* Depreciation fields for imobilizado */}
+          {form.type === "imobilizado" && (
+            <div className="border border-border rounded-md p-3 space-y-3">
+              <p className="text-sm font-medium text-foreground">Depreciação</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Vida útil fiscal (anos)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    placeholder="Ex: 10"
+                    value={form.vida_util_fiscal_anos ?? ""}
+                    onChange={(e) => set("vida_util_fiscal_anos", e.target.value ? Number(e.target.value) : null)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Conforme tabela da Receita Federal</p>
+                </div>
+                <div>
+                  <Label>Vida útil econômica (anos)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    placeholder="Ex: 15"
+                    value={form.vida_util_economica_anos ?? ""}
+                    onChange={(e) => set("vida_util_economica_anos", e.target.value ? Number(e.target.value) : null)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Estimativa real de utilização</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <Label>Conta Contábil</Label>
             <Select value={form.account_id || "__none__"} onValueChange={(v) => set("account_id", v === "__none__" ? null : v)}>

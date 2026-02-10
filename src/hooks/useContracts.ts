@@ -39,6 +39,8 @@ export interface Contract {
   responsavel_interno: string | null;
   area_responsavel: string | null;
   sla_revisao_dias: number | null;
+  // Finalidade (fornecedor)
+  finalidade: string | null;
 }
 
 export type ContractInput = Omit<Contract, "id" | "source" | "external_ref" | "created_at">;
