@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format, addMonths, startOfMonth, isAfter } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useBudget, BudgetLine } from "@/hooks/useBudget";
+import { useBudget, useBudgetLines, BudgetLine } from "@/hooks/useBudget";
 import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,8 @@ interface Props {
 }
 
 export default function BudgetTab({ startDate, endDate, selectedVersionId, onSelectVersion }: Props) {
-  const { versions, isLoadingVersions, linesQuery, createVersion, deleteVersion, createLine, deleteLine } = useBudget();
+  const { versions, isLoadingVersions, createVersion, deleteVersion, createLine, deleteLine } = useBudget();
+  const budgetLinesQuery = useBudgetLines(selectedVersionId);
   const { accounts } = useChartOfAccounts();
   const { costCenters } = useCostCenters();
 
@@ -46,8 +47,7 @@ export default function BudgetTab({ startDate, endDate, selectedVersionId, onSel
     valor_orcado: 0,
   });
 
-  const budgetLinesData = selectedVersionId ? linesQuery(selectedVersionId) : null;
-  const lines = (budgetLinesData?.data ?? []) as BudgetLine[];
+  const lines = (budgetLinesQuery.data ?? []) as BudgetLine[];
 
   const analyticalAccounts = useMemo(
     () => accounts.filter((a) => !a.is_synthetic && a.active),
@@ -156,7 +156,7 @@ export default function BudgetTab({ startDate, endDate, selectedVersionId, onSel
             </Button>
           </div>
 
-          {budgetLinesData?.isLoading ? (
+          {budgetLinesQuery.isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>

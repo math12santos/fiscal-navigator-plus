@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, Legend, ReferenceLine,
 } from "recharts";
 import { useCashFlow } from "@/hooks/useCashFlow";
-import { useBudget, BudgetLine } from "@/hooks/useBudget";
+import { useBudget, useBudgetLines, BudgetLine } from "@/hooks/useBudget";
 import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,10 +24,10 @@ interface Props {
 
 export default function PlannedVsActual({ startDate, endDate, budgetVersionId }: Props) {
   const { entries } = useCashFlow(startDate, endDate);
-  const { linesQuery } = useBudget();
+  const budgetLinesQuery = useBudgetLines(budgetVersionId);
   const { accounts } = useChartOfAccounts();
 
-  const budgetLines = budgetVersionId ? linesQuery(budgetVersionId).data ?? [] : [];
+  const budgetLines = (budgetLinesQuery.data ?? []) as BudgetLine[];
 
   const accountMap = useMemo(
     () => new Map(accounts.map((a) => [a.id, a])),
