@@ -1,86 +1,134 @@
+import { useState, useMemo } from "react";
+import { addMonths, startOfMonth, endOfMonth, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
-import { scenarioData } from "@/data/mockData";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
-} from "recharts";
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import PlanningOverview from "@/components/planning/PlanningOverview";
+import BudgetTab from "@/components/planning/BudgetTab";
+import PlanningScenarios from "@/components/planning/PlanningScenarios";
+import PlannedVsActual from "@/components/planning/PlannedVsActual";
+import PlanningLiquidity from "@/components/planning/PlanningLiquidity";
 
-const fmt = (v: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
-
-const merged = scenarioData.realista.map((r, i) => ({
-  mes: r.mes,
-  otimista: scenarioData.otimista[i].valor,
-  realista: r.valor,
-  conservador: scenarioData.conservador[i].valor,
-}));
+type Horizon = "3m" | "6m" | "12m" | "24m" | "custom";
 
 export default function Planejamento() {
-  const [active, setActive] = useState<"otimista" | "realista" | "conservador">("realista");
+  const [horizon, setHorizon] = useState<Horizon>("12m");
+  const [customFrom, setCustomFrom] = useState<Date | undefined>();
+  const [customTo, setCustomTo] = useState<Date | undefined>();
+  const [budgetVersionId, setBudgetVersionId] = useState<string | null>(null);
+
+  const { startDate, endDate } = useMemo(() => {
+    const now = startOfMonth(new Date());
+    if (horizon === "custom" && customFrom && customTo) {
+      return { startDate: startOfMonth(customFrom), endDate: endOfMonth(customTo) };
+    }
+    const monthsMap: Record<string, number> = { "3m": 3, "6m": 6, "12m": 12, "24m": 24 };
+    const m = monthsMap[horizon] ?? 12;
+    return { startDate: now, endDate: endOfMonth(addMonths(now, m - 1)) };
+  }, [horizon, customFrom, customTo]);
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Planejamento Financeiro" description="Análise de cenários e apoio à decisão estratégica" />
+      <PageHeader
+        title="Planejamento Financeiro"
+        description="Orçamento, projeções e cenários — apoio à decisão estratégica"
+      />
 
-      {/* Scenario selector */}
-      <div className="flex gap-2">
-        {(["otimista", "realista", "conservador"] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setActive(s)}
-            className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all",
-              active === s ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            )}
-          >
-            {s}
-          </button>
-        ))}
+      {/* Horizon Filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={horizon} onValueChange={(v) => setHorizon(v as Horizon)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Horizonte" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="3m">3 meses</SelectItem>
+            <SelectItem value="6m">6 meses</SelectItem>
+            <SelectItem value="12m">12 meses</SelectItem>
+            <SelectItem value="24m">24 meses</SelectItem>
+            <SelectItem value="custom">Personalizado</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {horizon === "custom" && (
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("gap-1", !customFrom && "text-muted-foreground")}>
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                  {customFrom ? format(customFrom, "MMM/yy", { locale: ptBR }) : "Início"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customFrom} onSelect={setCustomFrom} />
+              </PopoverContent>
+            </Popover>
+            <span className="text-xs text-muted-foreground">a</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("gap-1", !customTo && "text-muted-foreground")}>
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                  {customTo ? format(customTo, "MMM/yy", { locale: ptBR }) : "Fim"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customTo} onSelect={setCustomTo} />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
+
+        <span className="text-xs text-muted-foreground ml-auto">
+          {format(startDate, "MMM/yyyy", { locale: ptBR })} — {format(endDate, "MMM/yyyy", { locale: ptBR })}
+        </span>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="glass-card p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Receita Projetada (6m)</p>
-          <p className="text-xl font-bold text-foreground mt-1">
-            {fmt(scenarioData[active].reduce((a, b) => a + b.valor, 0))}
-          </p>
-        </div>
-        <div className="glass-card p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Média Mensal</p>
-          <p className="text-xl font-bold text-primary mt-1">
-            {fmt(scenarioData[active].reduce((a, b) => a + b.valor, 0) / 6)}
-          </p>
-        </div>
-        <div className="glass-card p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Crescimento Esperado</p>
-          <p className={cn(
-            "text-xl font-bold mt-1",
-            active === "otimista" ? "text-success" : active === "conservador" ? "text-warning" : "text-primary"
-          )}>
-            {active === "otimista" ? "+35.9%" : active === "conservador" ? "+4.0%" : "+12.4%"}
-          </p>
-        </div>
-      </div>
+      {/* Tabs */}
+      <Tabs defaultValue="visao-geral" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
+          <TabsTrigger value="orcamento">Orçamento</TabsTrigger>
+          <TabsTrigger value="cenarios">Cenários</TabsTrigger>
+          <TabsTrigger value="planejado-realizado">Plan. × Real.</TabsTrigger>
+          <TabsTrigger value="liquidez">Liquidez</TabsTrigger>
+        </TabsList>
 
-      {/* Chart */}
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Comparação de Cenários</h3>
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={merged}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 16%)" />
-            <XAxis dataKey="mes" tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }} />
-            <YAxis tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }} tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
-            <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(222, 44%, 8%)", border: "1px solid hsl(222, 30%, 16%)", borderRadius: 8, fontSize: 12 }} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Line type="monotone" dataKey="otimista" name="Otimista" stroke="hsl(152, 60%, 45%)" strokeWidth={active === "otimista" ? 3 : 1} strokeDasharray={active === "otimista" ? "0" : "5 5"} dot={false} />
-            <Line type="monotone" dataKey="realista" name="Realista" stroke="hsl(174, 72%, 50%)" strokeWidth={active === "realista" ? 3 : 1} strokeDasharray={active === "realista" ? "0" : "5 5"} dot={false} />
-            <Line type="monotone" dataKey="conservador" name="Conservador" stroke="hsl(38, 92%, 55%)" strokeWidth={active === "conservador" ? 3 : 1} strokeDasharray={active === "conservador" ? "0" : "5 5"} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+        <TabsContent value="visao-geral">
+          <PlanningOverview startDate={startDate} endDate={endDate} />
+        </TabsContent>
+
+        <TabsContent value="orcamento">
+          <BudgetTab
+            startDate={startDate}
+            endDate={endDate}
+            selectedVersionId={budgetVersionId}
+            onSelectVersion={setBudgetVersionId}
+          />
+        </TabsContent>
+
+        <TabsContent value="cenarios">
+          <PlanningScenarios startDate={startDate} endDate={endDate} />
+        </TabsContent>
+
+        <TabsContent value="planejado-realizado">
+          <PlannedVsActual
+            startDate={startDate}
+            endDate={endDate}
+            budgetVersionId={budgetVersionId}
+          />
+        </TabsContent>
+
+        <TabsContent value="liquidez">
+          <PlanningLiquidity />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

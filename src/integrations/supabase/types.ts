@@ -58,6 +58,130 @@ export type Database = {
           },
         ]
       }
+      budget_lines: {
+        Row: {
+          account_id: string | null
+          budget_version_id: string
+          cost_center_id: string | null
+          created_at: string
+          id: string
+          month: string
+          natureza: string
+          notes: string | null
+          organization_id: string | null
+          tipo: string
+          updated_at: string
+          user_id: string
+          valor_orcado: number
+        }
+        Insert: {
+          account_id?: string | null
+          budget_version_id: string
+          cost_center_id?: string | null
+          created_at?: string
+          id?: string
+          month: string
+          natureza?: string
+          notes?: string | null
+          organization_id?: string | null
+          tipo?: string
+          updated_at?: string
+          user_id: string
+          valor_orcado?: number
+        }
+        Update: {
+          account_id?: string | null
+          budget_version_id?: string
+          cost_center_id?: string | null
+          created_at?: string
+          id?: string
+          month?: string
+          natureza?: string
+          notes?: string | null
+          organization_id?: string | null
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+          valor_orcado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_lines_budget_version_id_fkey"
+            columns: ["budget_version_id"]
+            isOneToOne: false
+            referencedRelation: "budget_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_lines_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_lines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_versions: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string
+          id: string
+          name: string
+          organization_id: string | null
+          start_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date: string
+          id?: string
+          name: string
+          organization_id?: string | null
+          start_date: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          id?: string
+          name?: string
+          organization_id?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cashflow_entries: {
         Row: {
           account_id: string | null
@@ -851,6 +975,100 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "plan_migrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planning_config: {
+        Row: {
+          colchao_liquidez: number | null
+          created_at: string
+          id: string
+          organization_id: string | null
+          runway_alerta_meses: number | null
+          saldo_minimo: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          colchao_liquidez?: number | null
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          runway_alerta_meses?: number | null
+          saldo_minimo?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          colchao_liquidez?: number | null
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          runway_alerta_meses?: number | null
+          saldo_minimo?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planning_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planning_scenarios: {
+        Row: {
+          atraso_recebimento_dias: number | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string | null
+          type: string
+          updated_at: string
+          user_id: string
+          variacao_custos: number | null
+          variacao_receita: number | null
+        }
+        Insert: {
+          atraso_recebimento_dias?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id?: string | null
+          type?: string
+          updated_at?: string
+          user_id: string
+          variacao_custos?: number | null
+          variacao_receita?: number | null
+        }
+        Update: {
+          atraso_recebimento_dias?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+          variacao_custos?: number | null
+          variacao_receita?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planning_scenarios_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
