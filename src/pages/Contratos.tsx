@@ -128,6 +128,9 @@ function contractToFormData(c: Contract): ContractFormData {
     area_responsavel: c.area_responsavel ?? "",
     sla_revisao_dias: c.sla_revisao_dias ?? null,
     finalidade: c.finalidade ?? "",
+    operacao: c.operacao ?? "",
+    subtipo_operacao: c.subtipo_operacao ?? "",
+    rendimento_mensal_esperado: c.rendimento_mensal_esperado ?? null,
   };
 }
 

@@ -17,7 +17,7 @@ export interface Contract {
   external_ref: string | null;
   notes: string | null;
   created_at: string;
-  // 3.1 Recorrência
+  // Recorrência / Condições de pagamento
   tipo_recorrencia: string;
   intervalo_personalizado: number | null;
   data_inicio: string | null;
@@ -25,22 +25,26 @@ export interface Contract {
   prazo_indeterminado: boolean;
   valor_base: number;
   dia_vencimento: number | null;
-  // 3.2 Reajustes
+  // Reajustes
   tipo_reajuste: string | null;
   indice_reajuste: string | null;
   percentual_reajuste: number | null;
   periodicidade_reajuste: string | null;
   proximo_reajuste: string | null;
-  // 3.6 Classificações
+  // Classificações
   natureza_financeira: string | null;
   impacto_resultado: string | null;
   cost_center_id: string | null;
-  // 3.7 Governança
+  // Governança
   responsavel_interno: string | null;
   area_responsavel: string | null;
   sla_revisao_dias: number | null;
   // Finalidade (fornecedor)
   finalidade: string | null;
+  // New wizard fields
+  operacao: string | null;
+  subtipo_operacao: string | null;
+  rendimento_mensal_esperado: number | null;
 }
 
 export type ContractInput = Omit<Contract, "id" | "source" | "external_ref" | "created_at">;

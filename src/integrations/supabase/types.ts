@@ -555,16 +555,19 @@ export type Database = {
           natureza_financeira: string | null
           nome: string
           notes: string | null
+          operacao: string | null
           organization_id: string | null
           percentual_reajuste: number | null
           periodicidade_reajuste: string | null
           prazo_indeterminado: boolean
           product_id: string | null
           proximo_reajuste: string | null
+          rendimento_mensal_esperado: number | null
           responsavel_interno: string | null
           sla_revisao_dias: number | null
           source: string
           status: string
+          subtipo_operacao: string | null
           tipo: string
           tipo_reajuste: string | null
           tipo_recorrencia: string
@@ -591,16 +594,19 @@ export type Database = {
           natureza_financeira?: string | null
           nome: string
           notes?: string | null
+          operacao?: string | null
           organization_id?: string | null
           percentual_reajuste?: number | null
           periodicidade_reajuste?: string | null
           prazo_indeterminado?: boolean
           product_id?: string | null
           proximo_reajuste?: string | null
+          rendimento_mensal_esperado?: number | null
           responsavel_interno?: string | null
           sla_revisao_dias?: number | null
           source?: string
           status?: string
+          subtipo_operacao?: string | null
           tipo: string
           tipo_reajuste?: string | null
           tipo_recorrencia?: string
@@ -627,16 +633,19 @@ export type Database = {
           natureza_financeira?: string | null
           nome?: string
           notes?: string | null
+          operacao?: string | null
           organization_id?: string | null
           percentual_reajuste?: number | null
           periodicidade_reajuste?: string | null
           prazo_indeterminado?: boolean
           product_id?: string | null
           proximo_reajuste?: string | null
+          rendimento_mensal_esperado?: number | null
           responsavel_interno?: string | null
           sla_revisao_dias?: number | null
           source?: string
           status?: string
+          subtipo_operacao?: string | null
           tipo?: string
           tipo_reajuste?: string | null
           tipo_recorrencia?: string
