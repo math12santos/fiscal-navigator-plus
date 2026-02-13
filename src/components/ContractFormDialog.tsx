@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -16,7 +15,7 @@ import { useEntities } from "@/hooks/useEntities";
 import { useProducts } from "@/hooks/useProducts";
 import EntityFormDialog from "@/components/EntityFormDialog";
 import ProductFormDialog from "@/components/ProductFormDialog";
-import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus, PackagePlus, Zap, CheckCircle2 } from "lucide-react";
+import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus, PackagePlus, Zap, CheckCircle2, ArrowRight, ArrowLeft, ShoppingCart, Store } from "lucide-react";
 
 export interface ContractFormData {
   nome: string;
@@ -24,10 +23,9 @@ export interface ContractFormData {
   product_id: string;
   tipo: string;
   valor: number;
-  vencimento: string; // used as "Fim do contrato"
+  vencimento: string;
   status: string;
   notes: string;
-  // Recorrência
   tipo_recorrencia: string;
   intervalo_personalizado: number | null;
   data_inicio: string;
@@ -35,22 +33,21 @@ export interface ContractFormData {
   prazo_indeterminado: boolean;
   valor_base: number;
   dia_vencimento: number | null;
-  // Reajustes
   tipo_reajuste: string;
   indice_reajuste: string;
   percentual_reajuste: number | null;
   periodicidade_reajuste: string;
   proximo_reajuste: string;
-  // Classificações
   natureza_financeira: string;
   impacto_resultado: string;
   cost_center_id: string;
-  // Governança
   responsavel_interno: string;
   area_responsavel: string;
   sla_revisao_dias: number | null;
-  // Finalidade (fornecedor)
   finalidade: string;
+  operacao: string;
+  subtipo_operacao: string;
+  rendimento_mensal_esperado: number | null;
 }
 
 interface Props {
@@ -69,26 +66,6 @@ const RequiredLabel = ({ htmlFor, children }: { htmlFor?: string; children: Reac
 );
 
 const statuses = ["Ativo", "Próximo ao vencimento", "Vencido", "Cancelado", "Pausado"];
-const recorrencias = [
-  { value: "unico", label: "Único (sem recorrência)" },
-  { value: "mensal", label: "Mensal" },
-  { value: "bimestral", label: "Bimestral" },
-  { value: "trimestral", label: "Trimestral" },
-  { value: "semestral", label: "Semestral" },
-  { value: "anual", label: "Anual" },
-  { value: "personalizado", label: "Personalizado" },
-];
-const tiposReajuste = [
-  { value: "manual", label: "Manual" },
-  { value: "indice", label: "Índice" },
-  { value: "percentual_fixo", label: "Percentual fixo" },
-];
-const indices = ["IPCA", "IGPM", "INPC"];
-const naturezas = [
-  { value: "fixo", label: "Fixo" },
-  { value: "variavel", label: "Variável" },
-  { value: "fixo_variavel", label: "Fixo + Variável" },
-];
 
 const defaultForm: ContractFormData = {
   nome: "", entity_id: "", product_id: "", tipo: "", valor: 0, vencimento: "", status: "Ativo", notes: "",
@@ -98,17 +75,24 @@ const defaultForm: ContractFormData = {
   periodicidade_reajuste: "anual", proximo_reajuste: "",
   natureza_financeira: "fixo", impacto_resultado: "custo", cost_center_id: "",
   responsavel_interno: "", area_responsavel: "", sla_revisao_dias: null,
-  finalidade: "",
+  finalidade: "", operacao: "", subtipo_operacao: "", rendimento_mensal_esperado: null,
 };
 
-/**
- * Derive the entity "role" for display: cliente, fornecedor, or investimento.
- * This drives the dynamic form behavior.
- */
-type ContractRole = "cliente" | "fornecedor" | "investimento" | "";
+// Subtipo options by operacao
+const subtiposCompra = [
+  { value: "investimento", label: "Investimento" },
+  { value: "material_uso_consumo", label: "Material de uso e consumo" },
+  { value: "mercadoria", label: "Mercadoria" },
+];
+const subtiposVenda = [
+  { value: "servicos", label: "Serviços" },
+  { value: "mercadoria", label: "Mercadoria" },
+  { value: "venda_ativo", label: "Venda de ativo" },
+];
 
 export default function ContractFormDialog({ open, onOpenChange, onSubmit, initialData, loading, contractId }: Props) {
   const [form, setForm] = useState<ContractFormData>({ ...defaultForm });
+  const [step, setStep] = useState(1); // 1 = contraparte+operação, 2 = condições de pagamento, 3 = detalhes finais
   const { costCenters } = useCostCenters();
   const { entities, create: createEntity } = useEntities();
   const { products, create: createProduct } = useProducts();
@@ -119,72 +103,61 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
   const availableEntities = entities.filter((e) => e.active);
   const activeProducts = products.filter((p) => p.active);
 
-  // Determine the "role" of this contract based on the selected entity
   const selectedEntity = useMemo(
     () => availableEntities.find((e) => e.id === form.entity_id),
     [availableEntities, form.entity_id]
   );
 
-  const contractRole: ContractRole = useMemo(() => {
-    if (!selectedEntity) return "";
-    if (selectedEntity.type === "cliente") return "cliente";
-    if (selectedEntity.type === "fornecedor") return "fornecedor";
-    if (selectedEntity.type === "ambos") {
-      // If entity is "ambos", check impacto_resultado to determine role
-      if (form.impacto_resultado === "receita") return "cliente";
-      return "fornecedor";
-    }
-    return "";
-  }, [selectedEntity, form.impacto_resultado]);
-
-  // Selected product for context
   const selectedProduct = useMemo(
     () => activeProducts.find((p) => p.id === form.product_id),
     [activeProducts, form.product_id]
   );
 
-  const isInvestimento = form.impacto_resultado === "investimento" || form.impacto_resultado === "ativo_imobilizado";
-
   useEffect(() => {
     if (initialData) {
       setForm(initialData);
+      setStep(isEditing ? 2 : 1);
     } else {
       setForm({ ...defaultForm });
+      setStep(1);
     }
   }, [initialData, open]);
 
   const set = <K extends keyof ContractFormData>(key: K, value: ContractFormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  // Auto-classify based on entity type
+  // Auto-classify based on entity + operacao
   const handleEntityChange = (entityId: string) => {
     const entity = availableEntities.find((e) => e.id === entityId);
     set("entity_id", entityId);
     if (entity) {
       set("nome", entity.name);
-      if (entity.type === "cliente") {
-        set("impacto_resultado", "receita");
-      } else if (entity.type === "fornecedor") {
-        set("impacto_resultado", "custo");
-      }
     }
   };
 
-  // Auto-set tipo from product
   const handleProductChange = (productId: string) => {
     const product = activeProducts.find((p) => p.id === productId);
     set("product_id", productId);
     if (product) {
       set("tipo", product.type === "servico" ? "Serviço" : product.type === "imobilizado" ? "Imobilizado" : "Produto");
-      if (product.type === "imobilizado") {
-        set("impacto_resultado", "ativo_imobilizado");
-      }
     }
   };
 
+  // Derive impacto_resultado from operacao + subtipo
+  useEffect(() => {
+    if (form.operacao === "compra") {
+      if (form.subtipo_operacao === "investimento") {
+        set("impacto_resultado", "investimento");
+      } else {
+        set("impacto_resultado", "custo");
+      }
+    } else if (form.operacao === "venda") {
+      set("impacto_resultado", "receita");
+    }
+  }, [form.operacao, form.subtipo_operacao]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Ensure vencimento (fim do contrato) is set — fallback to data_fim
     const submittedForm = { ...form };
     if (!submittedForm.vencimento && submittedForm.data_fim) {
       submittedForm.vencimento = submittedForm.data_fim;
@@ -211,52 +184,55 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
     [activeProducts]
   );
 
-  // Dynamic impacto options based on entity type
-  const impactoOptions = useMemo(() => {
-    if (contractRole === "cliente") {
-      return [{ value: "receita", label: "Receita" }];
-    }
-    if (contractRole === "fornecedor") {
-      return [
-        { value: "custo", label: "Custo" },
-        { value: "despesa", label: "Despesa" },
-        { value: "investimento", label: "Investimento" },
-        { value: "ativo_imobilizado", label: "Ativo Imobilizado" },
-      ];
-    }
-    return [
-      { value: "receita", label: "Receita" },
-      { value: "custo", label: "Custo" },
-      { value: "despesa", label: "Despesa" },
-      { value: "investimento", label: "Investimento" },
-      { value: "ativo_imobilizado", label: "Ativo Imobilizado" },
-    ];
-  }, [contractRole]);
+  // Determine if investimento subtipo needs further classification
+  const isInvestimento = form.operacao === "compra" && form.subtipo_operacao === "investimento";
+  const isMercadoriaCompra = form.operacao === "compra" && form.subtipo_operacao === "mercadoria";
+  const isMaterialUsoConsumo = form.operacao === "compra" && form.subtipo_operacao === "material_uso_consumo";
+  const isServicoCompra = form.operacao === "compra" && form.subtipo_operacao === "material_uso_consumo" && form.tipo === "Serviço";
+  const isServicoRecorrenteCompra = form.operacao === "compra" && (form.subtipo_operacao === "material_uso_consumo");
+  const isVendaServicos = form.operacao === "venda" && form.subtipo_operacao === "servicos";
+  const isVendaMercadoria = form.operacao === "venda" && form.subtipo_operacao === "mercadoria";
+  const isVendaAtivo = form.operacao === "venda" && form.subtipo_operacao === "venda_ativo";
 
-  const tabCount = isEditing ? 5 : 4;
+  // Investment sub-type state
+  const [investimentoTipo, setInvestimentoTipo] = useState<"financeiro" | "maquinas">("financeiro");
+
+  // Venda servicos sub-type 
+  const [vendaServicoTipo, setVendaServicoTipo] = useState<"unico" | "mensalidade">("mensalidade");
+
+  // Can advance from step 1?
+  const canAdvanceStep1 = form.entity_id && form.operacao && form.subtipo_operacao;
+
+  // Can advance from step 2?
+  const canAdvanceStep2 = form.valor > 0 || form.valor_base > 0 || (form.rendimento_mensal_esperado && form.rendimento_mensal_esperado > 0);
 
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData ? "Editar Contrato" : "Novo Contrato"}</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar Contrato" : "Novo Contrato"}</DialogTitle>
+          <DialogDescription className="text-xs">
+            {step === 1 && "Etapa 1 de 3 — Contraparte e tipo de operação"}
+            {step === 2 && "Etapa 2 de 3 — Condições de pagamento"}
+            {step === 3 && "Etapa 3 de 3 — Detalhes e governança"}
+          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <Tabs defaultValue="basico" className="w-full">
-            <TabsList className="grid w-full mb-4" style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
-              <TabsTrigger value="basico">Básico</TabsTrigger>
-              <TabsTrigger value="recorrencia">Recorrência</TabsTrigger>
-              <TabsTrigger value="reajuste">Reajuste</TabsTrigger>
-              <TabsTrigger value="governanca">Governança</TabsTrigger>
-              {isEditing && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
-            </TabsList>
 
-            {/* TAB: Básico */}
-            <TabsContent value="basico" className="space-y-4">
-              {/* Contraparte with search */}
+        {/* Progress bar */}
+        <div className="flex gap-1 mb-2">
+          {[1, 2, 3].map((s) => (
+            <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${s <= step ? "bg-primary" : "bg-muted"}`} />
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {/* ==================== STEP 1: Contraparte + Operação ==================== */}
+          {step === 1 && (
+            <div className="space-y-5 animate-fade-in">
+              {/* Contraparte */}
               <div className="space-y-2">
-                <RequiredLabel>Contraparte (Cliente / Fornecedor)</RequiredLabel>
+                <RequiredLabel>Contraparte</RequiredLabel>
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
                     <SearchableSelect
@@ -271,18 +247,92 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                     <UserPlus size={16} />
                   </Button>
                 </div>
-                {contractRole && (
-                  <p className="text-xs text-muted-foreground">
-                    Tipo: <Badge variant="outline" className="text-xs ml-1">
-                      {contractRole === "cliente" ? "Cliente → Receita" : contractRole === "fornecedor" ? "Fornecedor → Passivo" : ""}
-                    </Badge>
-                  </p>
-                )}
               </div>
 
-              {/* Produto/Serviço with search */}
+              {/* Operação: Compra ou Venda */}
               <div className="space-y-2">
-                <RequiredLabel>Produto / Serviço</RequiredLabel>
+                <RequiredLabel>Tipo de operação</RequiredLabel>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { set("operacao", "compra"); set("subtipo_operacao", ""); }}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+                      form.operacao === "compra" 
+                        ? "border-primary bg-primary/5 text-primary" 
+                        : "border-border hover:border-primary/50 text-muted-foreground"
+                    }`}
+                  >
+                    <ShoppingCart size={24} />
+                    <span className="font-medium text-sm">Compra</span>
+                    <span className="text-xs text-center">Aquisição de bens, serviços ou investimentos</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { set("operacao", "venda"); set("subtipo_operacao", ""); }}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+                      form.operacao === "venda" 
+                        ? "border-primary bg-primary/5 text-primary" 
+                        : "border-border hover:border-primary/50 text-muted-foreground"
+                    }`}
+                  >
+                    <Store size={24} />
+                    <span className="font-medium text-sm">Venda</span>
+                    <span className="text-xs text-center">Receita com serviços, mercadorias ou ativos</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Subtipo */}
+              {form.operacao && (
+                <div className="space-y-2 animate-fade-in">
+                  <RequiredLabel>Classificação</RequiredLabel>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(form.operacao === "compra" ? subtiposCompra : subtiposVenda).map((s) => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        onClick={() => set("subtipo_operacao", s.value)}
+                        className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                          form.subtipo_operacao === s.value 
+                            ? "border-primary bg-primary/5 text-primary" 
+                            : "border-border hover:border-primary/50 text-muted-foreground"
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Nome do contrato */}
+              {form.entity_id && (
+                <div className="space-y-2">
+                  <Label htmlFor="nome">Nome do contrato</Label>
+                  <Input id="nome" value={form.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Nome descritivo do contrato" />
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <Button type="button" disabled={!canAdvanceStep1} onClick={() => setStep(2)} className="gap-1">
+                  Próximo <ArrowRight size={16} />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== STEP 2: Condições de Pagamento ==================== */}
+          {step === 2 && (
+            <div className="space-y-5 animate-fade-in">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                <Badge variant="outline">{form.operacao === "compra" ? "Compra" : "Venda"}</Badge>
+                <Badge variant="outline">{(form.operacao === "compra" ? subtiposCompra : subtiposVenda).find(s => s.value === form.subtipo_operacao)?.label}</Badge>
+                {selectedEntity && <Badge variant="secondary">{selectedEntity.name}</Badge>}
+              </div>
+
+              {/* Produto/Serviço */}
+              <div className="space-y-2">
+                <Label>Produto / Serviço</Label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
                     <SearchableSelect
@@ -306,45 +356,234 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                 )}
               </div>
 
-              {/* Finalidade — only for supplier contracts */}
-              {contractRole === "fornecedor" && (
-                <div className="space-y-2">
-                  <Label>Finalidade</Label>
-                  <Select value={form.finalidade || "none"} onValueChange={(v) => set("finalidade", v === "none" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Selecionar...</SelectItem>
-                      <SelectItem value="revenda">Revenda</SelectItem>
-                      <SelectItem value="uso_proprio">Uso Próprio</SelectItem>
-                      <SelectItem value="ambos">Ambos</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {/* ===== COMPRA / INVESTIMENTO ===== */}
+              {isInvestimento && (
+                <div className="space-y-4 border border-border rounded-lg p-4">
+                  <Label className="text-sm font-semibold">Tipo de investimento</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setInvestimentoTipo("financeiro")}
+                      className={`p-3 rounded-lg border-2 text-sm transition-all ${investimentoTipo === "financeiro" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}
+                    >
+                      Investimento financeiro
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInvestimentoTipo("maquinas")}
+                      className={`p-3 rounded-lg border-2 text-sm transition-all ${investimentoTipo === "maquinas" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}
+                    >
+                      Máquinas e equipamentos
+                    </button>
+                  </div>
+
+                  {investimentoTipo === "financeiro" && (
+                    <div className="grid grid-cols-2 gap-4 animate-fade-in">
+                      <div className="space-y-2">
+                        <RequiredLabel>Valor total do investimento (R$)</RequiredLabel>
+                        <Input type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} />
+                      </div>
+                      <div className="space-y-2">
+                        <RequiredLabel>Rendimento mensal esperado (R$)</RequiredLabel>
+                        <Input type="number" min={0} step={0.01} value={form.rendimento_mensal_esperado ?? 0} onChange={(e) => set("rendimento_mensal_esperado", Number(e.target.value))} />
+                      </div>
+                    </div>
+                  )}
+
+                  {investimentoTipo === "maquinas" && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <RequiredLabel>Valor total (R$)</RequiredLabel>
+                          <Input type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                        💡 Os prazos de depreciação contábil e econômica devem ser cadastrados no produto/ativo correspondente.
+                        {selectedProduct?.type === "imobilizado" && (
+                          <span className="block mt-1 text-foreground">
+                            Depreciação fiscal: {(selectedProduct as any).vida_util_fiscal_anos ?? "não definida"} anos
+                            {" · "}Econômica: {(selectedProduct as any).vida_util_economica_anos ?? "não definida"} anos
+                          </span>
+                        )}
+                      </p>
+                      {/* Entrada + parcelas for equipment purchase */}
+                      <InstallmentConfigSection form={form} set={set} contractId={contractId} isEditing={isEditing} />
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <RequiredLabel>Status</RequiredLabel>
-                  <Select value={form.status} onValueChange={(v) => set("status", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                  </Select>
+              {/* ===== COMPRA / MERCADORIA ===== */}
+              {isMercadoriaCompra && (
+                <div className="space-y-4 border border-border rounded-lg p-4">
+                  <div className="space-y-2">
+                    <Label>Finalidade</Label>
+                    <Select value={form.finalidade || "none"} onValueChange={(v) => set("finalidade", v === "none" ? "" : v)}>
+                      <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Selecionar...</SelectItem>
+                        <SelectItem value="revenda">Revenda</SelectItem>
+                        <SelectItem value="uso_proprio">Uso Próprio</SelectItem>
+                        <SelectItem value="ambos">Ambos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <RequiredLabel>Valor total (R$)</RequiredLabel>
+                    <Input type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} />
+                  </div>
+                  <InstallmentConfigSection form={form} set={set} contractId={contractId} isEditing={isEditing} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Impacto no resultado</Label>
-                  <Select value={form.impacto_resultado} onValueChange={(v) => set("impacto_resultado", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{impactoOptions.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-                  </Select>
+              )}
+
+              {/* ===== COMPRA / MATERIAL USO E CONSUMO (serviços recorrentes etc.) ===== */}
+              {isMaterialUsoConsumo && (
+                <div className="space-y-4 border border-border rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground">Serviço ou material recorrente — cadastre dia de pagamento e valor mensal.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <RequiredLabel>Valor mensal (R$)</RequiredLabel>
+                      <Input type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} />
+                    </div>
+                    <div className="space-y-2">
+                      <RequiredLabel>Dia de pagamento (1-31)</RequiredLabel>
+                      <Input type="number" min={1} max={31} value={form.dia_vencimento ?? ""} onChange={(e) => set("dia_vencimento", e.target.value ? Number(e.target.value) : null)} placeholder="Ex: 10" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <RequiredLabel>Data de início</RequiredLabel>
+                      <Input type="date" value={form.data_inicio} onChange={(e) => set("data_inicio", e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Fim do contrato</Label>
+                      <Input type="date" value={form.vencimento} onChange={(e) => { set("vencimento", e.target.value); set("data_fim", e.target.value); }} disabled={form.prazo_indeterminado} />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Switch checked={form.prazo_indeterminado} onCheckedChange={(v) => { set("prazo_indeterminado", v); if (v) { set("data_fim", ""); set("vencimento", ""); } }} />
+                    <Label className="text-sm">Prazo indeterminado</Label>
+                  </div>
                 </div>
+              )}
+
+              {/* ===== VENDA / SERVIÇOS ===== */}
+              {isVendaServicos && (
+                <div className="space-y-4 border border-border rounded-lg p-4">
+                  <div className="space-y-2">
+                    <RequiredLabel>Valor total do contrato (R$)</RequiredLabel>
+                    <Input type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Tipo do contrato</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setVendaServicoTipo("unico"); set("tipo_recorrencia", "unico"); }}
+                        className={`p-3 rounded-lg border-2 text-sm transition-all ${vendaServicoTipo === "unico" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}
+                      >
+                        Contrato único
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setVendaServicoTipo("mensalidade"); set("tipo_recorrencia", "mensal"); }}
+                        className={`p-3 rounded-lg border-2 text-sm transition-all ${vendaServicoTipo === "mensalidade" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}
+                      >
+                        Com mensalidade
+                      </button>
+                    </div>
+                  </div>
+
+                  {vendaServicoTipo === "unico" && (
+                    <div className="animate-fade-in">
+                      <InstallmentConfigSection form={form} set={set} contractId={contractId} isEditing={isEditing} />
+                    </div>
+                  )}
+
+                  {vendaServicoTipo === "mensalidade" && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <RequiredLabel>Valor da mensalidade (R$)</RequiredLabel>
+                          <Input type="number" min={0} step={0.01} value={form.valor_base} onChange={(e) => set("valor_base", Number(e.target.value))} />
+                        </div>
+                        <div className="space-y-2">
+                          <RequiredLabel>Dia de vencimento mensal (1-31)</RequiredLabel>
+                          <Input type="number" min={1} max={31} value={form.dia_vencimento ?? ""} onChange={(e) => set("dia_vencimento", e.target.value ? Number(e.target.value) : null)} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <RequiredLabel>Data de início</RequiredLabel>
+                          <Input type="date" value={form.data_inicio} onChange={(e) => set("data_inicio", e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Fim do contrato</Label>
+                          <Input type="date" value={form.vencimento} onChange={(e) => { set("vencimento", e.target.value); set("data_fim", e.target.value); }} disabled={form.prazo_indeterminado} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Switch checked={form.prazo_indeterminado} onCheckedChange={(v) => { set("prazo_indeterminado", v); if (v) { set("data_fim", ""); set("vencimento", ""); } }} />
+                        <Label className="text-sm">Prazo indeterminado</Label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ===== VENDA / MERCADORIA ou VENDA DE ATIVO ===== */}
+              {(isVendaMercadoria || isVendaAtivo) && (
+                <div className="space-y-4 border border-border rounded-lg p-4">
+                  <div className="space-y-2">
+                    <RequiredLabel>Valor total (R$)</RequiredLabel>
+                    <Input type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} />
+                  </div>
+                  <InstallmentConfigSection form={form} set={set} contractId={contractId} isEditing={isEditing} />
+                </div>
+              )}
+
+              {/* Dates for non-recurring sections that don't have dates yet */}
+              {(isInvestimento && investimentoTipo === "financeiro") && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <RequiredLabel>Data de início</RequiredLabel>
+                    <Input type="date" value={form.data_inicio} onChange={(e) => set("data_inicio", e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fim do contrato</Label>
+                    <Input type="date" value={form.vencimento} onChange={(e) => { set("vencimento", e.target.value); set("data_fim", e.target.value); }} disabled={form.prazo_indeterminado} />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between pt-2">
+                <Button type="button" variant="outline" onClick={() => setStep(1)} className="gap-1">
+                  <ArrowLeft size={16} /> Voltar
+                </Button>
+                <Button type="button" onClick={() => setStep(3)} className="gap-1">
+                  Próximo <ArrowRight size={16} />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== STEP 3: Detalhes finais ==================== */}
+          {step === 3 && (
+            <div className="space-y-5 animate-fade-in">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                <Badge variant="outline">{form.operacao === "compra" ? "Compra" : "Venda"}</Badge>
+                <Badge variant="outline">{(form.operacao === "compra" ? subtiposCompra : subtiposVenda).find(s => s.value === form.subtipo_operacao)?.label}</Badge>
+                {selectedEntity && <Badge variant="secondary">{selectedEntity.name}</Badge>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Natureza financeira</Label>
-                  <Select value={form.natureza_financeira} onValueChange={(v) => set("natureza_financeira", v)}>
+                  <Label>Status</Label>
+                  <Select value={form.status} onValueChange={(v) => set("status", v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{naturezas.map((n) => <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>)}</SelectContent>
+                    <SelectContent>{statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
@@ -361,161 +600,37 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                 </div>
               </div>
 
-              {/* Simplified dates: Início + Fim do Contrato */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <RequiredLabel htmlFor="data_inicio">Data de início</RequiredLabel>
-                  <Input id="data_inicio" type="date" value={form.data_inicio} onChange={(e) => set("data_inicio", e.target.value)} required />
+                  <Label>Responsável interno</Label>
+                  <Input value={form.responsavel_interno} onChange={(e) => set("responsavel_interno", e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <RequiredLabel htmlFor="vencimento">Fim do contrato</RequiredLabel>
-                  <Input
-                    id="vencimento"
-                    type="date"
-                    value={form.vencimento}
-                    onChange={(e) => {
-                      set("vencimento", e.target.value);
-                      set("data_fim", e.target.value);
-                    }}
-                    disabled={form.prazo_indeterminado}
-                    required={!form.prazo_indeterminado}
-                  />
-                </div>
-              </div>
-              {form.tipo_recorrencia !== "unico" && (
-                <div className="flex items-center gap-3">
-                  <Switch checked={form.prazo_indeterminado} onCheckedChange={(v) => { set("prazo_indeterminado", v); if (v) { set("data_fim", ""); set("vencimento", ""); } }} />
-                  <Label>Prazo indeterminado</Label>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Observações</Label>
-                <Textarea id="notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} maxLength={1000} rows={2} />
-              </div>
-            </TabsContent>
-
-            {/* TAB: Recorrência */}
-            <TabsContent value="recorrencia" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <RequiredLabel>Tipo de recorrência</RequiredLabel>
-                  <Select value={form.tipo_recorrencia} onValueChange={(v) => set("tipo_recorrencia", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{recorrencias.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                {form.tipo_recorrencia === "personalizado" && (
-                  <div className="space-y-2">
-                    <Label>Intervalo (meses)</Label>
-                    <Input type="number" min={1} value={form.intervalo_personalizado ?? ""} onChange={(e) => set("intervalo_personalizado", e.target.value ? Number(e.target.value) : null)} />
-                  </div>
-                )}
-              </div>
-              {form.tipo_recorrencia !== "unico" && (
-                <div className="space-y-2">
-                  <Label htmlFor="dia_vencimento">Dia de vencimento mensal (1-31)</Label>
-                  <Input id="dia_vencimento" type="number" min={1} max={31} placeholder="Ex: 15" value={form.dia_vencimento ?? ""} onChange={(e) => set("dia_vencimento", e.target.value ? Number(e.target.value) : null)} />
-                  <p className="text-xs text-muted-foreground">Dia fixo do mês em que a parcela/mensalidade vence</p>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="valor_base">{form.tipo_recorrencia === "unico" ? "Valor total (R$)" : "Valor base (R$)"}</Label>
-                  <Input id="valor_base" type="number" min={0} step={0.01} value={form.valor_base} onChange={(e) => set("valor_base", Number(e.target.value))} />
-                </div>
-                <div className="space-y-2">
-                  <RequiredLabel htmlFor="valor">{form.tipo_recorrencia === "unico" ? "Valor do contrato (R$)" : "Valor mensal (R$)"}</RequiredLabel>
-                  <Input id="valor" type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} required />
+                  <Label>Área responsável</Label>
+                  <Input value={form.area_responsavel} onChange={(e) => set("area_responsavel", e.target.value)} />
                 </div>
               </div>
 
-              {/* Parcelas - only for "unico" contracts being edited */}
-              {form.tipo_recorrencia === "unico" && isEditing && contractId && (
-                <InstallmentsSection contractId={contractId} contractValue={form.valor} />
-              )}
-              {form.tipo_recorrencia === "unico" && !isEditing && (
-                <p className="text-sm text-muted-foreground border border-dashed border-border rounded-md p-3">
-                  💡 Salve o contrato primeiro para cadastrar as parcelas de pagamento.
-                </p>
-              )}
-            </TabsContent>
-
-            {/* TAB: Reajuste */}
-            <TabsContent value="reajuste" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tipo de reajuste</Label>
-                  <Select value={form.tipo_reajuste} onValueChange={(v) => set("tipo_reajuste", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{tiposReajuste.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                {form.tipo_reajuste === "indice" && (
-                  <div className="space-y-2">
-                    <Label>Índice</Label>
-                    <Select value={form.indice_reajuste} onValueChange={(v) => set("indice_reajuste", v)}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                      <SelectContent>{indices.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {form.tipo_reajuste === "percentual_fixo" && (
-                  <div className="space-y-2">
-                    <Label>Percentual (%)</Label>
-                    <Input type="number" min={0} step={0.01} value={form.percentual_reajuste ?? ""} onChange={(e) => set("percentual_reajuste", e.target.value ? Number(e.target.value) : null)} />
-                  </div>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Periodicidade</Label>
-                  <Select value={form.periodicidade_reajuste} onValueChange={(v) => set("periodicidade_reajuste", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="anual">Anual</SelectItem>
-                      <SelectItem value="semestral">Semestral</SelectItem>
-                      <SelectItem value="personalizada">Personalizada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="proximo_reajuste">Próximo reajuste</Label>
-                  <Input id="proximo_reajuste" type="date" value={form.proximo_reajuste} onChange={(e) => set("proximo_reajuste", e.target.value)} />
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* TAB: Governança */}
-            <TabsContent value="governanca" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="responsavel_interno">Responsável interno</Label>
-                  <Input id="responsavel_interno" value={form.responsavel_interno} onChange={(e) => set("responsavel_interno", e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="area_responsavel">Área responsável</Label>
-                  <Input id="area_responsavel" value={form.area_responsavel} onChange={(e) => set("area_responsavel", e.target.value)} />
-                </div>
-              </div>
               <div className="space-y-2">
-                <Label htmlFor="sla_revisao_dias">SLA de revisão (dias)</Label>
-                <Input id="sla_revisao_dias" type="number" min={0} value={form.sla_revisao_dias ?? ""} onChange={(e) => set("sla_revisao_dias", e.target.value ? Number(e.target.value) : null)} />
+                <Label>Observações</Label>
+                <Textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} maxLength={1000} rows={2} />
               </div>
-            </TabsContent>
 
-            {/* TAB: Documentos (only when editing) */}
-            {isEditing && contractId && (
-              <TabsContent value="documentos" className="space-y-4">
+              {/* Documents section for editing */}
+              {isEditing && contractId && (
                 <DocumentsTab contractId={contractId} />
-              </TabsContent>
-            )}
-          </Tabs>
+              )}
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Button>
-          </div>
+              <div className="flex justify-between pt-2">
+                <Button type="button" variant="outline" onClick={() => setStep(2)} className="gap-1">
+                  <ArrowLeft size={16} /> Voltar
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Salvando..." : "Salvar contrato"}
+                </Button>
+              </div>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>
@@ -548,6 +663,39 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
       isLoading={createProduct.isPending}
     />
     </>
+  );
+}
+
+// ==================== Installment Config Section (entrada + parcelas) ====================
+function InstallmentConfigSection({ form, set, contractId, isEditing }: {
+  form: ContractFormData;
+  set: <K extends keyof ContractFormData>(key: K, value: ContractFormData[K]) => void;
+  contractId?: string | null;
+  isEditing: boolean;
+}) {
+  // Dates for non-recurring
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <RequiredLabel>Data de início</RequiredLabel>
+          <Input type="date" value={form.data_inicio} onChange={(e) => set("data_inicio", e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Fim do contrato</Label>
+          <Input type="date" value={form.vencimento} onChange={(e) => { set("vencimento", e.target.value); set("data_fim", e.target.value); }} />
+        </div>
+      </div>
+
+      {/* Parcelas */}
+      {isEditing && contractId ? (
+        <InstallmentsSection contractId={contractId} contractValue={form.valor} />
+      ) : (
+        <p className="text-sm text-muted-foreground border border-dashed border-border rounded-md p-3">
+          💡 Salve o contrato primeiro para cadastrar entrada e parcelas de pagamento.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -598,7 +746,6 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
     const perOther = Math.round((remaining / others.length) * 100) / 100;
     const lastIdx = others.length - 1;
     const adjustedLast = Math.round((remaining - perOther * lastIdx) * 100) / 100;
-
     update.mutate({ id: changedId, valor: newValue });
     others.forEach((inst, idx) => {
       update.mutate({ id: inst.id, valor: idx === lastIdx ? adjustedLast : perOther });
@@ -643,7 +790,6 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
       });
     }
 
-    // Adjust rounding on last parcela
     const totalGerado = parcelas.reduce((s, p) => s + p.valor, 0);
     const roundDiff = Math.round((contractValue - totalGerado) * 100) / 100;
     if (Math.abs(roundDiff) > 0 && parcelas.length > 0) {
@@ -670,7 +816,6 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
       {showGenerator && (
         <div className="bg-secondary/30 rounded-md p-3 space-y-3">
           <p className="text-xs font-medium text-muted-foreground">Gerar parcelas automaticamente</p>
-
           <div className="flex items-center gap-3">
             <Switch checked={hasEntrada} onCheckedChange={setHasEntrada} />
             <Label className="text-sm">Incluir entrada</Label>
@@ -742,40 +887,14 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
         <div className="space-y-2 max-h-48 overflow-y-auto">
           {installments.map((inst) => (
             <div key={inst.id} className="flex items-center gap-2 text-sm">
-              <Input
-                className="w-28 h-7 text-xs"
-                value={inst.descricao}
-                onChange={(e) => update.mutate({ id: inst.id, descricao: e.target.value })}
-              />
-              <Input
-                className="w-24 h-7 text-xs text-right font-mono"
-                type="number"
-                min={0}
-                step={0.01}
-                value={inst.valor}
-                onChange={(e) => handleValueChange(inst.id, Number(e.target.value))}
-              />
-              <Input
-                className="w-32 h-7 text-xs"
-                type="date"
-                min="2000-01-01"
-                max="2099-12-31"
-                value={inst.data_vencimento}
-                onBlur={(e) => {
-                  const val = e.target.value;
-                  if (val && val.length === 10) {
-                    const year = parseInt(val.split("-")[0], 10);
-                    if (year < 2000 || year > 2099) return;
-                    update.mutate({ id: inst.id, data_vencimento: val });
-                  }
-                }}
+              <Input className="w-28 h-7 text-xs" value={inst.descricao} onChange={(e) => update.mutate({ id: inst.id, descricao: e.target.value })} />
+              <Input className="w-24 h-7 text-xs text-right font-mono" type="number" min={0} step={0.01} value={inst.valor} onChange={(e) => handleValueChange(inst.id, Number(e.target.value))} />
+              <Input className="w-32 h-7 text-xs" type="date" min="2000-01-01" max="2099-12-31" value={inst.data_vencimento}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val && val.length === 10) {
                     const year = parseInt(val.split("-")[0], 10);
-                    if (year >= 2000 && year <= 2099) {
-                      update.mutate({ id: inst.id, data_vencimento: val });
-                    }
+                    if (year >= 2000 && year <= 2099) update.mutate({ id: inst.id, data_vencimento: val });
                   }
                 }}
               />
@@ -783,26 +902,12 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
                 {inst.status}
               </Badge>
               {inst.status === "pendente" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs gap-1 text-success hover:text-success"
-                  onClick={() => update.mutate({ id: inst.id, status: "pago" })}
-                  title="Confirmar pagamento"
-                >
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1 text-success hover:text-success" onClick={() => update.mutate({ id: inst.id, status: "pago" })}>
                   <CheckCircle2 size={12} /> Pagar
                 </Button>
               )}
               {(inst.status === "pago" || inst.status === "recebido") && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs gap-1 text-muted-foreground"
-                  onClick={() => update.mutate({ id: inst.id, status: "pendente" })}
-                  title="Reverter para pendente"
-                >
+                <Button type="button" variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground" onClick={() => update.mutate({ id: inst.id, status: "pendente" })}>
                   Reverter
                 </Button>
               )}
@@ -839,9 +944,9 @@ function DocumentsTab({ contractId }: { contractId: string }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 border border-border rounded-lg p-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Anexe contratos assinados, NFs, aditivos e outros documentos.</p>
+        <h4 className="text-sm font-semibold">Documentos</h4>
         <div className="flex items-center gap-2">
           <Select value={uploadType} onValueChange={setUploadType}>
             <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
