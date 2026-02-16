@@ -66,6 +66,40 @@ export default function ChartOfAccountsFormDialog({ open, onOpenChange, account,
     (a) => a.active && a.level < 4 && a.id !== account?.id
   );
 
+  const suggestCode = (parentId: string | null, level: number) => {
+    if (!parentId) {
+      // Root level: find next available top-level code
+      const rootCodes = accounts
+        .filter((a) => a.level === 1)
+        .map((a) => parseInt(a.code))
+        .filter((n) => !isNaN(n));
+      const next = rootCodes.length > 0 ? Math.max(...rootCodes) + 1 : 1;
+      return String(next);
+    }
+    const parent = accounts.find((a) => a.id === parentId);
+    if (!parent) return "";
+    // Find existing children of this parent
+    const siblings = accounts.filter((a) => a.parent_id === parentId);
+    const siblingSuffixes = siblings
+      .map((a) => {
+        const parts = a.code.split(".");
+        const last = parts[parts.length - 1];
+        return parseInt(last);
+      })
+      .filter((n) => !isNaN(n));
+    const nextSuffix = siblingSuffixes.length > 0 ? Math.max(...siblingSuffixes) + 1 : 1;
+    const suffix = level >= 3 ? String(nextSuffix).padStart(2, "0") : String(nextSuffix);
+    return `${parent.code}.${suffix}`;
+  };
+
+  const handleParentChange = (parentId: string | null) => {
+    const newLevel = parentId
+      ? Math.min((accounts.find((a) => a.id === parentId)?.level ?? 0) + 1, 4)
+      : 1;
+    const suggestedCode = suggestCode(parentId, newLevel);
+    setForm((f) => ({ ...f, parent_id: parentId, level: newLevel, code: suggestedCode }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const payload = {
@@ -149,7 +183,7 @@ export default function ChartOfAccountsFormDialog({ open, onOpenChange, account,
 
           <div className="space-y-2">
             <Label>Conta Pai</Label>
-            <Select value={form.parent_id ?? "__none__"} onValueChange={(v) => setForm({ ...form, parent_id: v === "__none__" ? null : v })}>
+            <Select value={form.parent_id ?? "__none__"} onValueChange={(v) => handleParentChange(v === "__none__" ? null : v)}>
               <SelectTrigger><SelectValue placeholder="Nenhuma (raiz)" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Nenhuma (raiz)</SelectItem>
