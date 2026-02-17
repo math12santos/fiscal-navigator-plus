@@ -15,7 +15,7 @@ import { useEntities } from "@/hooks/useEntities";
 import { useProducts } from "@/hooks/useProducts";
 import EntityFormDialog from "@/components/EntityFormDialog";
 import ProductFormDialog from "@/components/ProductFormDialog";
-import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus, PackagePlus, Zap, CheckCircle2, ArrowRight, ArrowLeft, ShoppingCart, Store } from "lucide-react";
+import { Upload, FileText, Eye, Trash2, Loader2, Plus, UserPlus, PackagePlus, Zap, CheckCircle2, ArrowRight, ArrowLeft, ShoppingCart, Store, Landmark } from "lucide-react";
 
 export interface ContractFormData {
   nome: string;
@@ -78,17 +78,167 @@ const defaultForm: ContractFormData = {
   finalidade: "", operacao: "", subtipo_operacao: "", rendimento_mensal_esperado: null,
 };
 
-// Subtipo options by operacao
-const subtiposCompra = [
-  { value: "investimento", label: "Investimento" },
-  { value: "material_uso_consumo", label: "Material de uso e consumo" },
-  { value: "mercadoria", label: "Mercadoria" },
-];
-const subtiposVenda = [
-  { value: "servicos", label: "Serviços" },
-  { value: "mercadoria", label: "Mercadoria" },
-  { value: "venda_ativo", label: "Venda de ativo" },
-];
+// Classification tree
+type SubtipoOption = { value: string; label: string };
+type ClassificacaoNode = {
+  label: string;
+  subtipos?: SubtipoOption[];
+  subcategorias?: Record<string, { label: string; subtipos: SubtipoOption[] }>;
+};
+
+const classificacaoTree: Record<string, {
+  label: string;
+  sublabel: string;
+  icon: typeof ShoppingCart;
+  classificacoes: Record<string, ClassificacaoNode>;
+}> = {
+  compra: {
+    label: "Compra",
+    sublabel: "Operacional",
+    icon: ShoppingCart,
+    classificacoes: {
+      mercadoria: {
+        label: "Mercadoria",
+        subtipos: [
+          { value: "revenda", label: "Revenda" },
+          { value: "insumo_produtivo", label: "Insumo produtivo" },
+          { value: "material_indireto", label: "Material indireto" },
+        ],
+      },
+      servicos: {
+        label: "Serviços",
+        subtipos: [
+          { value: "servicos_recorrentes", label: "Serviços recorrentes" },
+          { value: "servicos_pontuais", label: "Serviços pontuais" },
+          { value: "servicos_tecnicos", label: "Serviços técnicos / especializados" },
+          { value: "terceirizacao", label: "Terceirização / outsourcing" },
+        ],
+      },
+      material_uso_consumo: {
+        label: "Material de Uso e Consumo",
+        subtipos: [
+          { value: "administrativo", label: "Administrativo" },
+          { value: "operacional", label: "Operacional" },
+          { value: "manutencao", label: "Manutenção" },
+        ],
+      },
+    },
+  },
+  venda: {
+    label: "Venda",
+    sublabel: "Operacional",
+    icon: Store,
+    classificacoes: {
+      servicos: {
+        label: "Serviços",
+        subtipos: [
+          { value: "servicos_recorrentes", label: "Serviços recorrentes" },
+          { value: "servicos_pontuais", label: "Serviços pontuais" },
+          { value: "servicos_contrato", label: "Serviços por contrato / projeto" },
+        ],
+      },
+      mercadoria: {
+        label: "Mercadoria",
+        subtipos: [
+          { value: "revenda", label: "Revenda" },
+          { value: "producao_propria", label: "Produção própria" },
+          { value: "kits", label: "Kits / soluções integradas" },
+        ],
+      },
+    },
+  },
+  patrimonio: {
+    label: "Patrimônio",
+    sublabel: "Não Operacional",
+    icon: Landmark,
+    classificacoes: {
+      investimento: {
+        label: "Investimento",
+        subcategorias: {
+          aporte_capital: {
+            label: "Aporte de capital",
+            subtipos: [
+              { value: "equity", label: "Equity" },
+              { value: "afac", label: "AFAC" },
+              { value: "capital_social", label: "Capital social" },
+            ],
+          },
+          mutuo: {
+            label: "Mútuo",
+            subtipos: [
+              { value: "mutuo_simples", label: "Mútuo simples" },
+              { value: "mutuo_conversivel", label: "Mútuo conversível" },
+            ],
+          },
+          participacao_resultado: {
+            label: "Participação em Resultado",
+            subtipos: [
+              { value: "joint_venture", label: "Joint Venture" },
+              { value: "scp", label: "SCP" },
+              { value: "parceria_operacional", label: "Parceria operacional com participação" },
+            ],
+          },
+          investimento_financeiro: {
+            label: "Investimento Financeiro",
+            subtipos: [
+              { value: "renda_fixa", label: "Renda fixa" },
+              { value: "renda_variavel", label: "Renda variável" },
+              { value: "investimento_estruturado", label: "Investimento estruturado" },
+            ],
+          },
+        },
+      },
+      venda_ativo: {
+        label: "Venda de Ativo",
+        subcategorias: {
+          ativo_imobilizado: {
+            label: "Ativo Imobilizado",
+            subtipos: [
+              { value: "maquinas_equipamentos", label: "Máquinas e equipamentos" },
+              { value: "veiculos", label: "Veículos" },
+              { value: "moveis_instalacoes", label: "Móveis e instalações" },
+            ],
+          },
+          ativo_intangivel: {
+            label: "Ativo Intangível",
+            subtipos: [
+              { value: "software", label: "Software" },
+              { value: "marca", label: "Marca" },
+              { value: "direitos_licencas", label: "Direitos / licenças" },
+            ],
+          },
+          participacoes_societarias: {
+            label: "Participações Societárias",
+            subtipos: [
+              { value: "quotas", label: "Quotas" },
+              { value: "acoes", label: "Ações" },
+            ],
+          },
+        },
+      },
+    },
+  },
+};
+
+// Helper to get classification label for badges
+const getClassificacaoLabel = (operacao: string, subtipo: string): string => {
+  const tree = classificacaoTree[operacao];
+  if (!tree) return "";
+  return tree.classificacoes[subtipo]?.label || "";
+};
+
+const getFinalidadeLabel = (operacao: string, subtipo: string, finalidade: string, categoriaPatrimonio?: string): string => {
+  const node = classificacaoTree[operacao]?.classificacoes[subtipo];
+  if (!node) return "";
+  if (node.subtipos) {
+    return node.subtipos.find(s => s.value === finalidade)?.label || "";
+  }
+  if (node.subcategorias && categoriaPatrimonio) {
+    const sub = node.subcategorias[categoriaPatrimonio];
+    return sub?.subtipos.find(s => s.value === finalidade)?.label || "";
+  }
+  return "";
+};
 
 export default function ContractFormDialog({ open, onOpenChange, onSubmit, initialData, loading, contractId }: Props) {
   const [form, setForm] = useState<ContractFormData>({ ...defaultForm });
@@ -146,13 +296,15 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
   // Derive impacto_resultado from operacao + subtipo
   useEffect(() => {
     if (form.operacao === "compra") {
+      set("impacto_resultado", "custo");
+    } else if (form.operacao === "venda") {
+      set("impacto_resultado", "receita");
+    } else if (form.operacao === "patrimonio") {
       if (form.subtipo_operacao === "investimento") {
         set("impacto_resultado", "investimento");
       } else {
-        set("impacto_resultado", "custo");
+        set("impacto_resultado", "receita");
       }
-    } else if (form.operacao === "venda") {
-      set("impacto_resultado", "receita");
     }
   }, [form.operacao, form.subtipo_operacao]);
 
@@ -184,24 +336,49 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
     [activeProducts]
   );
 
-  // Determine if investimento subtipo needs further classification
-  const isInvestimento = form.operacao === "compra" && form.subtipo_operacao === "investimento";
-  const isMercadoriaCompra = form.operacao === "compra" && form.subtipo_operacao === "mercadoria";
-  const isMaterialUsoConsumo = form.operacao === "compra" && form.subtipo_operacao === "material_uso_consumo";
-  const isServicoCompra = form.operacao === "compra" && form.subtipo_operacao === "material_uso_consumo" && form.tipo === "Serviço";
-  const isServicoRecorrenteCompra = form.operacao === "compra" && (form.subtipo_operacao === "material_uso_consumo");
-  const isVendaServicos = form.operacao === "venda" && form.subtipo_operacao === "servicos";
-  const isVendaMercadoria = form.operacao === "venda" && form.subtipo_operacao === "mercadoria";
-  const isVendaAtivo = form.operacao === "venda" && form.subtipo_operacao === "venda_ativo";
+  // Patrimônio intermediate category state
+  const [categoriaPatrimonio, setCategoriaPatrimonio] = useState("");
 
-  // Investment sub-type state
+  // Determine flags for step 2 conditional rendering
+  const isCompra = form.operacao === "compra";
+  const isVenda = form.operacao === "venda";
+  const isPatrimonio = form.operacao === "patrimonio";
+  const isMercadoriaCompra = isCompra && form.subtipo_operacao === "mercadoria";
+  const isServicosCompra = isCompra && form.subtipo_operacao === "servicos";
+  const isMaterialUsoConsumo = isCompra && form.subtipo_operacao === "material_uso_consumo";
+  const isVendaServicos = isVenda && form.subtipo_operacao === "servicos";
+  const isVendaMercadoria = isVenda && form.subtipo_operacao === "mercadoria";
+  const isInvestimento = isPatrimonio && form.subtipo_operacao === "investimento";
+  const isVendaAtivo = isPatrimonio && form.subtipo_operacao === "venda_ativo";
+  const isInvestimentoFinanceiro = isInvestimento && categoriaPatrimonio === "investimento_financeiro";
+
+  // Investment sub-type state (derived from categoriaPatrimonio for patrimônio, or manual for legacy)
   const [investimentoTipo, setInvestimentoTipo] = useState<"financeiro" | "maquinas">("financeiro");
+
+  // Sync investimentoTipo from categoriaPatrimonio
+  useEffect(() => {
+    if (isInvestimento) {
+      if (categoriaPatrimonio === "investimento_financeiro") {
+        setInvestimentoTipo("financeiro");
+      } else if (categoriaPatrimonio) {
+        setInvestimentoTipo("maquinas");
+      }
+    }
+  }, [isInvestimento, categoriaPatrimonio]);
 
   // Venda servicos sub-type 
   const [vendaServicoTipo, setVendaServicoTipo] = useState<"unico" | "mensalidade">("mensalidade");
 
+  // Current tree node helpers
+  const currentOperacaoNode = form.operacao ? classificacaoTree[form.operacao] : null;
+  const currentClassificacaoNode = currentOperacaoNode && form.subtipo_operacao 
+    ? currentOperacaoNode.classificacoes[form.subtipo_operacao] 
+    : null;
+  const hasSubcategorias = currentClassificacaoNode && "subcategorias" in currentClassificacaoNode && currentClassificacaoNode.subcategorias;
+  const hasDirectSubtipos = currentClassificacaoNode && "subtipos" in currentClassificacaoNode && currentClassificacaoNode.subtipos;
+
   // Can advance from step 1?
-  const canAdvanceStep1 = form.entity_id && form.operacao && form.subtipo_operacao;
+  const canAdvanceStep1 = form.entity_id && form.operacao && form.subtipo_operacao && form.finalidade;
 
   // Can advance from step 2?
   const canAdvanceStep2 = form.valor > 0 || form.valor_base > 0 || (form.rendimento_mensal_esperado && form.rendimento_mensal_esperado > 0);
@@ -249,52 +426,126 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                 </div>
               </div>
 
-              {/* Operação: Compra ou Venda */}
+              {/* Operação: Compra / Venda / Patrimônio */}
               <div className="space-y-2">
                 <RequiredLabel>Tipo de operação</RequiredLabel>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => { set("operacao", "compra"); set("subtipo_operacao", ""); }}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                      form.operacao === "compra" 
-                        ? "border-primary bg-primary/5 text-primary" 
-                        : "border-border hover:border-primary/50 text-muted-foreground"
-                    }`}
-                  >
-                    <ShoppingCart size={24} />
-                    <span className="font-medium text-sm">Compra</span>
-                    <span className="text-xs text-center">Aquisição de bens, serviços ou investimentos</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { set("operacao", "venda"); set("subtipo_operacao", ""); }}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                      form.operacao === "venda" 
-                        ? "border-primary bg-primary/5 text-primary" 
-                        : "border-border hover:border-primary/50 text-muted-foreground"
-                    }`}
-                  >
-                    <Store size={24} />
-                    <span className="font-medium text-sm">Venda</span>
-                    <span className="text-xs text-center">Receita com serviços, mercadorias ou ativos</span>
-                  </button>
+                <div className="grid grid-cols-3 gap-3">
+                  {Object.entries(classificacaoTree).map(([key, node]) => {
+                    const Icon = node.icon;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          set("operacao", key);
+                          set("subtipo_operacao", "");
+                          set("finalidade", "");
+                          setCategoriaPatrimonio("");
+                        }}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+                          form.operacao === key
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/50 text-muted-foreground"
+                        }`}
+                      >
+                        <Icon size={24} />
+                        <span className="font-medium text-sm">{node.label}</span>
+                        <span className="text-xs text-center">{node.sublabel}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Subtipo */}
-              {form.operacao && (
+              {/* Classificação (level 2) */}
+              {currentOperacaoNode && (
                 <div className="space-y-2 animate-fade-in">
                   <RequiredLabel>Classificação</RequiredLabel>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(form.operacao === "compra" ? subtiposCompra : subtiposVenda).map((s) => (
+                  <div className={`grid gap-2 ${Object.keys(currentOperacaoNode.classificacoes).length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                    {Object.entries(currentOperacaoNode.classificacoes).map(([key, node]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          set("subtipo_operacao", key);
+                          set("finalidade", "");
+                          setCategoriaPatrimonio("");
+                        }}
+                        className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                          form.subtipo_operacao === key
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/50 text-muted-foreground"
+                        }`}
+                      >
+                        {node.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Subcategoria for Patrimônio (level 3 intermediate) */}
+              {hasSubcategorias && (
+                <div className="space-y-2 animate-fade-in">
+                  <RequiredLabel>Categoria</RequiredLabel>
+                  <div className={`grid gap-2 ${Object.keys(currentClassificacaoNode.subcategorias!).length <= 3 ? `grid-cols-${Object.keys(currentClassificacaoNode.subcategorias!).length}` : "grid-cols-2"}`}>
+                    {Object.entries(currentClassificacaoNode.subcategorias!).map(([key, sub]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setCategoriaPatrimonio(key);
+                          set("finalidade", "");
+                        }}
+                        className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                          categoriaPatrimonio === key
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/50 text-muted-foreground"
+                        }`}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Subtipo final (leaf level) - direct subtipos */}
+              {hasDirectSubtipos && (
+                <div className="space-y-2 animate-fade-in">
+                  <RequiredLabel>Subtipo</RequiredLabel>
+                  <div className={`grid gap-2 ${currentClassificacaoNode.subtipos!.length <= 3 ? `grid-cols-${currentClassificacaoNode.subtipos!.length}` : "grid-cols-2"}`}>
+                    {currentClassificacaoNode.subtipos!.map((s) => (
                       <button
                         key={s.value}
                         type="button"
-                        onClick={() => set("subtipo_operacao", s.value)}
+                        onClick={() => set("finalidade", s.value)}
                         className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                          form.subtipo_operacao === s.value 
-                            ? "border-primary bg-primary/5 text-primary" 
+                          form.finalidade === s.value
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/50 text-muted-foreground"
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Subtipo final (leaf level) - from subcategorias */}
+              {hasSubcategorias && categoriaPatrimonio && currentClassificacaoNode.subcategorias![categoriaPatrimonio] && (
+                <div className="space-y-2 animate-fade-in">
+                  <RequiredLabel>Subtipo</RequiredLabel>
+                  <div className={`grid gap-2 ${currentClassificacaoNode.subcategorias![categoriaPatrimonio].subtipos.length <= 3 ? `grid-cols-${currentClassificacaoNode.subcategorias![categoriaPatrimonio].subtipos.length}` : "grid-cols-2"}`}>
+                    {currentClassificacaoNode.subcategorias![categoriaPatrimonio].subtipos.map((s) => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        onClick={() => set("finalidade", s.value)}
+                        className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                          form.finalidade === s.value
+                            ? "border-primary bg-primary/5 text-primary"
                             : "border-border hover:border-primary/50 text-muted-foreground"
                         }`}
                       >
@@ -324,9 +575,10 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
           {/* ==================== STEP 2: Condições de Pagamento ==================== */}
           {step === 2 && (
             <div className="space-y-5 animate-fade-in">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                <Badge variant="outline">{form.operacao === "compra" ? "Compra" : "Venda"}</Badge>
-                <Badge variant="outline">{(form.operacao === "compra" ? subtiposCompra : subtiposVenda).find(s => s.value === form.subtipo_operacao)?.label}</Badge>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2 flex-wrap">
+                <Badge variant="outline">{classificacaoTree[form.operacao]?.label || form.operacao}</Badge>
+                <Badge variant="outline">{getClassificacaoLabel(form.operacao, form.subtipo_operacao)}</Badge>
+                {form.finalidade && <Badge variant="outline">{getFinalidadeLabel(form.operacao, form.subtipo_operacao, form.finalidade, categoriaPatrimonio)}</Badge>}
                 {selectedEntity && <Badge variant="secondary">{selectedEntity.name}</Badge>}
               </div>
 
@@ -359,25 +611,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
               {/* ===== COMPRA / INVESTIMENTO ===== */}
               {isInvestimento && (
                 <div className="space-y-4 border border-border rounded-lg p-4">
-                  <Label className="text-sm font-semibold">Tipo de investimento</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setInvestimentoTipo("financeiro")}
-                      className={`p-3 rounded-lg border-2 text-sm transition-all ${investimentoTipo === "financeiro" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}
-                    >
-                      Investimento financeiro
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInvestimentoTipo("maquinas")}
-                      className={`p-3 rounded-lg border-2 text-sm transition-all ${investimentoTipo === "maquinas" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}
-                    >
-                      Máquinas e equipamentos
-                    </button>
-                  </div>
-
-                  {investimentoTipo === "financeiro" && (
+                  {isInvestimentoFinanceiro ? (
                     <div className="grid grid-cols-2 gap-4 animate-fade-in">
                       <div className="space-y-2">
                         <RequiredLabel>Valor total do investimento (R$)</RequiredLabel>
@@ -388,9 +622,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                         <Input type="number" min={0} step={0.01} value={form.rendimento_mensal_esperado ?? 0} onChange={(e) => set("rendimento_mensal_esperado", Number(e.target.value))} />
                       </div>
                     </div>
-                  )}
-
-                  {investimentoTipo === "maquinas" && (
+                  ) : (
                     <div className="space-y-4 animate-fade-in">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -398,16 +630,6 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
                           <Input type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} />
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                        💡 Os prazos de depreciação contábil e econômica devem ser cadastrados no produto/ativo correspondente.
-                        {selectedProduct?.type === "imobilizado" && (
-                          <span className="block mt-1 text-foreground">
-                            Depreciação fiscal: {(selectedProduct as any).vida_util_fiscal_anos ?? "não definida"} anos
-                            {" · "}Econômica: {(selectedProduct as any).vida_util_economica_anos ?? "não definida"} anos
-                          </span>
-                        )}
-                      </p>
-                      {/* Entrada + parcelas for equipment purchase */}
                       <InstallmentConfigSection form={form} set={set} contractId={contractId} isEditing={isEditing} />
                     </div>
                   )}
@@ -418,22 +640,41 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
               {isMercadoriaCompra && (
                 <div className="space-y-4 border border-border rounded-lg p-4">
                   <div className="space-y-2">
-                    <Label>Finalidade</Label>
-                    <Select value={form.finalidade || "none"} onValueChange={(v) => set("finalidade", v === "none" ? "" : v)}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Selecionar...</SelectItem>
-                        <SelectItem value="revenda">Revenda</SelectItem>
-                        <SelectItem value="uso_proprio">Uso Próprio</SelectItem>
-                        <SelectItem value="ambos">Ambos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
                     <RequiredLabel>Valor total (R$)</RequiredLabel>
                     <Input type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} />
                   </div>
                   <InstallmentConfigSection form={form} set={set} contractId={contractId} isEditing={isEditing} />
+                </div>
+              )}
+
+              {/* ===== COMPRA / SERVIÇOS ===== */}
+              {isServicosCompra && (
+                <div className="space-y-4 border border-border rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground">Serviço contratado — cadastre valor e condições de pagamento.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <RequiredLabel>Valor mensal (R$)</RequiredLabel>
+                      <Input type="number" min={0} step={0.01} value={form.valor} onChange={(e) => set("valor", Number(e.target.value))} />
+                    </div>
+                    <div className="space-y-2">
+                      <RequiredLabel>Dia de pagamento (1-31)</RequiredLabel>
+                      <Input type="number" min={1} max={31} value={form.dia_vencimento ?? ""} onChange={(e) => set("dia_vencimento", e.target.value ? Number(e.target.value) : null)} placeholder="Ex: 10" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <RequiredLabel>Data de início</RequiredLabel>
+                      <Input type="date" value={form.data_inicio} onChange={(e) => set("data_inicio", e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Fim do contrato</Label>
+                      <Input type="date" value={form.vencimento} onChange={(e) => { set("vencimento", e.target.value); set("data_fim", e.target.value); }} disabled={form.prazo_indeterminado} />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Switch checked={form.prazo_indeterminado} onCheckedChange={(v) => { set("prazo_indeterminado", v); if (v) { set("data_fim", ""); set("vencimento", ""); } }} />
+                    <Label className="text-sm">Prazo indeterminado</Label>
+                  </div>
                 </div>
               )}
 
@@ -545,7 +786,7 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
               )}
 
               {/* Dates for non-recurring sections that don't have dates yet */}
-              {(isInvestimento && investimentoTipo === "financeiro") && (
+              {isInvestimentoFinanceiro && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <RequiredLabel>Data de início</RequiredLabel>
@@ -572,9 +813,10 @@ export default function ContractFormDialog({ open, onOpenChange, onSubmit, initi
           {/* ==================== STEP 3: Detalhes finais ==================== */}
           {step === 3 && (
             <div className="space-y-5 animate-fade-in">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                <Badge variant="outline">{form.operacao === "compra" ? "Compra" : "Venda"}</Badge>
-                <Badge variant="outline">{(form.operacao === "compra" ? subtiposCompra : subtiposVenda).find(s => s.value === form.subtipo_operacao)?.label}</Badge>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2 flex-wrap">
+                <Badge variant="outline">{classificacaoTree[form.operacao]?.label || form.operacao}</Badge>
+                <Badge variant="outline">{getClassificacaoLabel(form.operacao, form.subtipo_operacao)}</Badge>
+                {form.finalidade && <Badge variant="outline">{getFinalidadeLabel(form.operacao, form.subtipo_operacao, form.finalidade, categoriaPatrimonio)}</Badge>}
                 {selectedEntity && <Badge variant="secondary">{selectedEntity.name}</Badge>}
               </div>
 
