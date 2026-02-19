@@ -17,6 +17,7 @@ import PlanningScenarios from "@/components/planning/PlanningScenarios";
 import PlannedVsActual from "@/components/planning/PlannedVsActual";
 import PlanningLiquidity from "@/components/planning/PlanningLiquidity";
 import PlanningLiabilities from "@/components/planning/PlanningLiabilities";
+import PlanningCommercial from "@/components/planning/PlanningCommercial";
 
 type Horizon = "3m" | "6m" | "12m" | "24m" | "custom";
 
@@ -93,13 +94,14 @@ export default function Planejamento() {
 
       {/* Tabs */}
       <Tabs defaultValue="visao-geral" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
           <TabsTrigger value="orcamento">Orçamento</TabsTrigger>
           <TabsTrigger value="cenarios">Cenários</TabsTrigger>
           <TabsTrigger value="planejado-realizado">Plan. × Real.</TabsTrigger>
           <TabsTrigger value="liquidez">Liquidez</TabsTrigger>
           <TabsTrigger value="passivos">Passivos</TabsTrigger>
+          <TabsTrigger value="comercial">Comercial</TabsTrigger>
         </TabsList>
 
         <TabsContent value="visao-geral">
@@ -133,6 +135,10 @@ export default function Planejamento() {
 
         <TabsContent value="passivos">
           <PlanningLiabilities />
+        </TabsContent>
+
+        <TabsContent value="comercial">
+          <PlanningCommercial startDate={startDate} endDate={endDate} />
         </TabsContent>
       </Tabs>
     </div>

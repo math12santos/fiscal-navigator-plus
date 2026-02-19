@@ -369,6 +369,281 @@ export type Database = {
           },
         ]
       }
+      commercial_budget_lines: {
+        Row: {
+          beneficios: number | null
+          category: string
+          created_at: string
+          description: string
+          encargos_pct: number | null
+          id: string
+          notes: string | null
+          organization_id: string | null
+          plan_id: string
+          quantidade: number | null
+          subcategory: string | null
+          updated_at: string
+          user_id: string
+          valor_mensal: number
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          beneficios?: number | null
+          category?: string
+          created_at?: string
+          description: string
+          encargos_pct?: number | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          plan_id: string
+          quantidade?: number | null
+          subcategory?: string | null
+          updated_at?: string
+          user_id: string
+          valor_mensal?: number
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Update: {
+          beneficios?: number | null
+          category?: string
+          created_at?: string
+          description?: string
+          encargos_pct?: number | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          plan_id?: string
+          quantidade?: number | null
+          subcategory?: string | null
+          updated_at?: string
+          user_id?: string
+          valor_mensal?: number
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_budget_lines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_budget_lines_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commercial_channels: {
+        Row: {
+          ciclo_medio_dias: number | null
+          comissao_pct: number | null
+          conv_lead_oportunidade: number | null
+          conv_oportunidade_proposta: number | null
+          conv_proposta_fechamento: number | null
+          cpa_estimado: number | null
+          cpl_estimado: number | null
+          created_at: string
+          duracao_media_meses: number | null
+          id: string
+          is_custom: boolean
+          leads_projetados: number | null
+          mrr: number | null
+          name: string
+          orcamento_alocado: number
+          organization_id: string | null
+          plan_id: string
+          ticket_medio: number | null
+          tipo_contrato: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ciclo_medio_dias?: number | null
+          comissao_pct?: number | null
+          conv_lead_oportunidade?: number | null
+          conv_oportunidade_proposta?: number | null
+          conv_proposta_fechamento?: number | null
+          cpa_estimado?: number | null
+          cpl_estimado?: number | null
+          created_at?: string
+          duracao_media_meses?: number | null
+          id?: string
+          is_custom?: boolean
+          leads_projetados?: number | null
+          mrr?: number | null
+          name: string
+          orcamento_alocado?: number
+          organization_id?: string | null
+          plan_id: string
+          ticket_medio?: number | null
+          tipo_contrato?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ciclo_medio_dias?: number | null
+          comissao_pct?: number | null
+          conv_lead_oportunidade?: number | null
+          conv_oportunidade_proposta?: number | null
+          conv_proposta_fechamento?: number | null
+          cpa_estimado?: number | null
+          cpl_estimado?: number | null
+          created_at?: string
+          duracao_media_meses?: number | null
+          id?: string
+          is_custom?: boolean
+          leads_projetados?: number | null
+          mrr?: number | null
+          name?: string
+          orcamento_alocado?: number
+          organization_id?: string | null
+          plan_id?: string
+          ticket_medio?: number | null
+          tipo_contrato?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_channels_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_channels_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commercial_plans: {
+        Row: {
+          budget_approved: number
+          budget_requested: number | null
+          created_at: string
+          id: string
+          mode: string
+          name: string
+          notes: string | null
+          organization_id: string | null
+          period_months: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_approved?: number
+          budget_requested?: number | null
+          created_at?: string
+          id?: string
+          mode?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string | null
+          period_months?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_approved?: number
+          budget_requested?: number | null
+          created_at?: string
+          id?: string
+          mode?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string | null
+          period_months?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_plans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commercial_scenarios: {
+        Row: {
+          ajuste_ciclo: number | null
+          ajuste_conversao: number | null
+          ajuste_cpl: number | null
+          ajuste_ticket: number | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string | null
+          plan_id: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ajuste_ciclo?: number | null
+          ajuste_conversao?: number | null
+          ajuste_cpl?: number | null
+          ajuste_ticket?: number | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id?: string | null
+          plan_id: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ajuste_ciclo?: number | null
+          ajuste_conversao?: number | null
+          ajuste_cpl?: number | null
+          ajuste_ticket?: number | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string | null
+          plan_id?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_scenarios_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_scenarios_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_adjustments: {
         Row: {
           contract_id: string

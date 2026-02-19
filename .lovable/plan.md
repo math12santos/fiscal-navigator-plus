@@ -61,3 +61,26 @@
 - [ ] Gestão de Patrimônio + depreciação gerencial
 - [ ] Gestão de Ativos Financeiros + rendimentos
 - [ ] Investor Pack (templates + geração versionada)
+
+## Fase 4 — Planejamento Comercial ✅
+
+### Banco de Dados
+- [x] `commercial_plans` — planos com modo top-down/bottom-up, período e orçamento
+- [x] `commercial_budget_lines` — linhas orçamentárias (fixos, variáveis, mídia)
+- [x] `commercial_channels` — canais de venda com funil de conversão
+- [x] `commercial_scenarios` — cenários comerciais (conservador/realista/agressivo)
+- [x] RLS policies em todas as tabelas
+
+### Hooks
+- [x] `useCommercialPlanning.ts` — CRUD de planos, linhas, canais e cenários + projeções
+
+### Interface (7ª aba "Comercial")
+- [x] Seletor de modo (Top-down / Bottom-up)
+- [x] KPIs executivos: Orçamento, Comprometido, Runway Comercial, Receita, ROI, Payback
+- [x] Linhas orçamentárias: Equipe (com encargos), Software, Comissões, Mídia
+- [x] Funil de vendas por canal: Leads, conversões, ticket médio, ciclo, tipo contrato
+- [x] Canais pré-definidos (Google Ads, Meta, LinkedIn, Indicação, Orgânico) + custom
+- [x] Tabela executiva de projeção por canal com ROI/Payback individuais
+- [x] Simulador de cenários com gráfico comparativo
+- [x] Alertas automáticos: orçamento excedido, funil vazio, ROI negativo, payback > período
+- [x] Trava orçamentária com pop-up de aprovação
