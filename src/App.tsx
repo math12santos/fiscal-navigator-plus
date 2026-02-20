@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import FluxoCaixa from "@/pages/FluxoCaixa";
@@ -19,14 +20,34 @@ import CreateOrganization from "@/pages/CreateOrganization";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 import Backoffice from "@/pages/Backoffice";
+import EnvironmentSelector from "@/pages/EnvironmentSelector";
 
 const queryClient = new QueryClient();
+
+function MasterGate() {
+  const { user, loading: authLoading } = useAuth();
+  const { isMaster, loading: roleLoading } = useUserRole();
+
+  if (authLoading || roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/auth" replace />;
+  if (!isMaster) return <Navigate to="/app" replace />;
+
+  return <EnvironmentSelector />;
+}
 
 function ProtectedRoutes() {
   const { user, loading: authLoading } = useAuth();
   const { organizations, currentOrg, loading: orgLoading } = useOrganization();
+  const { isMaster, loading: roleLoading } = useUserRole();
 
-  if (authLoading || orgLoading) {
+  if (authLoading || orgLoading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
@@ -58,9 +79,25 @@ function ProtectedRoutes() {
 
 function AuthRoute() {
   const { user, loading } = useAuth();
-  if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  const { isMaster, loading: roleLoading } = useUserRole();
+  if (loading || roleLoading) return null;
+  if (user && isMaster) return <Navigate to="/selecionar-ambiente" replace />;
+  if (user) return <Navigate to="/app" replace />;
   return <Auth />;
+}
+function RootRedirect() {
+  const { user, loading } = useAuth();
+  const { isMaster, loading: roleLoading } = useUserRole();
+  if (loading || roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/auth" replace />;
+  if (isMaster) return <Navigate to="/selecionar-ambiente" replace />;
+  return <Navigate to="/app" replace />;
 }
 
 const App = () => (
@@ -73,7 +110,9 @@ const App = () => (
           <OrganizationProvider>
             <Routes>
               <Route path="/auth" element={<AuthRoute />} />
-              <Route path="/*" element={<ProtectedRoutes />} />
+              <Route path="/selecionar-ambiente" element={<MasterGate />} />
+              <Route path="/app/*" element={<ProtectedRoutes />} />
+              <Route path="/*" element={<RootRedirect />} />
             </Routes>
           </OrganizationProvider>
         </AuthProvider>

@@ -31,7 +31,7 @@ export default function OrgSelector({ collapsed }: OrgSelectorProps) {
       <Button
         variant="ghost"
         className="w-full justify-start px-3 h-auto py-2 text-sm text-muted-foreground"
-        onClick={() => navigate("/nova-empresa")}
+        onClick={() => navigate("/app/nova-empresa")}
       >
         <Plus size={16} className="mr-2 shrink-0" />
         {!collapsed && "Cadastrar Empresa"}
@@ -62,7 +62,7 @@ export default function OrgSelector({ collapsed }: OrgSelectorProps) {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => navigate("/nova-empresa")}>
+          <DropdownMenuItem onClick={() => navigate("/app/nova-empresa")}>
             <Plus size={14} className="mr-2" /> Nova Empresa
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -103,7 +103,7 @@ export default function OrgSelector({ collapsed }: OrgSelectorProps) {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate("/nova-empresa")}>
+        <DropdownMenuItem onClick={() => navigate("/app/nova-empresa")}>
           <Plus size={14} className="mr-2" /> Nova Empresa
         </DropdownMenuItem>
       </DropdownMenuContent>

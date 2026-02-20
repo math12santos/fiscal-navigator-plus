@@ -95,7 +95,7 @@ export default function Backoffice() {
   }
 
   if (!user || !isMaster) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   return (
