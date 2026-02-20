@@ -32,6 +32,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   AlertTriangle, BarChart3, DollarSign, Percent, Clock, Target,
   Plus, Trash2, Sparkles, TrendingUp, Wallet, ArrowUpDown, Calculator,
+  CalendarDays,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -75,9 +76,10 @@ export default function PlanningCommercial({ startDate, endDate }: Props) {
   const budgetTotals = useMemo(() => {
     const fixos = lines.filter((l) => l.category === "fixo").reduce((s, l) => s + Number(l.valor_total), 0);
     const variaveis = lines.filter((l) => l.category === "variavel").reduce((s, l) => s + Number(l.valor_total), 0);
-    const midia = channels.reduce((s, c) => s + Number(c.orcamento_alocado), 0);
-    const total = fixos + variaveis + midia;
-    return { fixos, variaveis, midia, total };
+    const feiras = lines.filter((l) => l.category === "feira").reduce((s, l) => s + Number(l.valor_total), 0);
+    const midia = channels.filter((c) => c.channel_type !== "feira").reduce((s, c) => s + Number(c.orcamento_alocado), 0);
+    const total = fixos + variaveis + feiras + midia;
+    return { fixos, variaveis, feiras, midia, total };
   }, [lines, channels]);
 
   const projections = useMemo(() => {
@@ -148,12 +150,13 @@ export default function PlanningCommercial({ startDate, endDate }: Props) {
     });
   };
 
-  const handleAddChannel = () => {
+  const handleAddChannel = (channelType: string = "digital") => {
     if (!selectedPlanId) return;
     createChannel.mutate({
       plan_id: selectedPlanId,
-      name: "Novo Canal",
+      name: channelType === "feira" ? "Nova Feira/Evento" : "Novo Canal",
       is_custom: true,
+      channel_type: channelType,
     });
   };
 
@@ -325,10 +328,33 @@ export default function PlanningCommercial({ startDate, endDate }: Props) {
                   />
                 </div>
 
+                {/* Feiras e Eventos */}
+                <div className="glass-card p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4" /> D) Feiras e Eventos
+                    </h4>
+                    <span className="text-xs text-muted-foreground font-mono">{fmt(budgetTotals.feiras)}</span>
+                  </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-muted-foreground">Investimentos em feiras, congressos e eventos</p>
+                    <Button variant="ghost" size="sm" onClick={() => handleAddBudgetLine("feira", "evento")} className="h-7 text-xs gap-1">
+                      <Plus className="h-3 w-3" /> Adicionar
+                    </Button>
+                  </div>
+                  <BudgetLineTable
+                    lines={lines.filter((l) => l.category === "feira")}
+                    columns={["Evento", "Valor Mensal (R$)", "Total Período"]}
+                    period={plan.period_months}
+                    onUpdate={updateLine.mutate}
+                    onDelete={deleteLine.mutate}
+                  />
+                </div>
+
                 {/* Media */}
                 <div className="glass-card p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold">C) Mídia, Publicidade e Propaganda</h4>
+                    <h4 className="text-sm font-semibold">E) Mídia, Publicidade e Propaganda</h4>
                     <span className="text-xs text-muted-foreground font-mono">{fmt(budgetTotals.midia)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">Configuração de orçamento por canal feita na aba "Funil & Canais".</p>
@@ -342,7 +368,7 @@ export default function PlanningCommercial({ startDate, endDate }: Props) {
                       {budgetExceeded ? "EXCEDIDO" : "DENTRO DO LIMITE"}
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
                     <div>
                       <p className="text-xs text-muted-foreground">Custos Fixos</p>
                       <p className="text-sm font-semibold font-mono">{fmt(budgetTotals.fixos)}</p>
@@ -350,6 +376,10 @@ export default function PlanningCommercial({ startDate, endDate }: Props) {
                     <div>
                       <p className="text-xs text-muted-foreground">Custos Variáveis</p>
                       <p className="text-sm font-semibold font-mono">{fmt(budgetTotals.variaveis)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Feiras e Eventos</p>
+                      <p className="text-sm font-semibold font-mono">{fmt(budgetTotals.feiras)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Mídia / Publicidade</p>
@@ -383,33 +413,65 @@ export default function PlanningCommercial({ startDate, endDate }: Props) {
             {/* ─── FUNNEL & CHANNELS TAB ─── */}
             <TabsContent value="funil">
               <div className="space-y-4">
+                {/* Digital Channels */}
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-semibold">Canais de Venda & Funil de Conversão</h4>
                   <div className="flex gap-2">
-                    {channels.length === 0 && (
+                    {channels.filter(c => c.channel_type !== "feira").length === 0 && (
                       <Button variant="outline" size="sm" onClick={() => seedChannels.mutate()} className="gap-1 text-xs">
                         <Sparkles className="h-3.5 w-3.5" /> Canais Padrão
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={handleAddChannel} className="gap-1 text-xs">
+                    <Button variant="outline" size="sm" onClick={() => handleAddChannel("digital")} className="gap-1 text-xs">
                       <Plus className="h-3.5 w-3.5" /> Canal Customizado
                     </Button>
                   </div>
                 </div>
 
-                {channels.length === 0 ? (
+                {channels.filter(c => c.channel_type !== "feira").length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
                     Sem dados de funil, o sistema não pode projetar receita. Adicione canais para começar.
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {channels.map((ch) => (
+                    {channels.filter(c => c.channel_type !== "feira").map((ch) => (
                       <ChannelCard
                         key={ch.id}
                         channel={ch}
                         period={plan.period_months}
                         onUpdate={updateChannel.mutate}
                         onDelete={deleteChannel.mutate}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <Separator className="my-6" />
+
+                {/* Feiras e Eventos */}
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" /> Feiras e Eventos
+                  </h4>
+                  <Button variant="outline" size="sm" onClick={() => handleAddChannel("feira")} className="gap-1 text-xs">
+                    <Plus className="h-3.5 w-3.5" /> Nova Feira / Evento
+                  </Button>
+                </div>
+
+                {channels.filter(c => c.channel_type === "feira").length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Nenhuma feira ou evento cadastrado. Adicione para registrar leads gerados.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {channels.filter(c => c.channel_type === "feira").map((ch) => (
+                      <ChannelCard
+                        key={ch.id}
+                        channel={ch}
+                        period={plan.period_months}
+                        onUpdate={updateChannel.mutate}
+                        onDelete={deleteChannel.mutate}
+                        isFeira
                       />
                     ))}
                   </div>
@@ -741,9 +803,10 @@ interface ChannelCardProps {
   period: number;
   onUpdate: (data: any) => void;
   onDelete: (id: string) => void;
+  isFeira?: boolean;
 }
 
-function ChannelCard({ channel, period, onUpdate, onDelete }: ChannelCardProps) {
+function ChannelCard({ channel, period, onUpdate, onDelete, isFeira }: ChannelCardProps) {
   const handleChange = (field: string, value: any) => {
     onUpdate({ id: channel.id, [field]: value });
   };
@@ -758,6 +821,7 @@ function ChannelCard({ channel, period, onUpdate, onDelete }: ChannelCardProps) 
             onChange={(v) => handleChange("name", v)}
           />
           {channel.is_custom && <Badge variant="outline" className="text-[10px]">Custom</Badge>}
+          {isFeira && <Badge variant="secondary" className="text-[10px]">Feira/Evento</Badge>}
         </div>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(channel.id)}>
           <Trash2 className="h-3 w-3 text-muted-foreground" />
@@ -769,10 +833,12 @@ function ChannelCard({ channel, period, onUpdate, onDelete }: ChannelCardProps) 
           <Label className="text-[10px] text-muted-foreground">Orçamento Alocado (R$)</Label>
           <DebouncedInput className="h-7 text-xs" type="number" value={channel.orcamento_alocado} onChange={(v) => handleChange("orcamento_alocado", Number(v))} />
         </div>
-        <div>
-          <Label className="text-[10px] text-muted-foreground">CPL Estimado (R$/lead)</Label>
-          <DebouncedInput className="h-7 text-xs" type="number" value={channel.cpl_estimado} onChange={(v) => handleChange("cpl_estimado", Number(v))} />
-        </div>
+        {!isFeira && (
+          <div>
+            <Label className="text-[10px] text-muted-foreground">CPL Estimado (R$/lead)</Label>
+            <DebouncedInput className="h-7 text-xs" type="number" value={channel.cpl_estimado} onChange={(v) => handleChange("cpl_estimado", Number(v))} />
+          </div>
+        )}
         <div>
           <Label className="text-[10px] text-muted-foreground">Leads Projetados</Label>
           <DebouncedInput className="h-7 text-xs" type="number" value={channel.leads_projetados} onChange={(v) => handleChange("leads_projetados", Number(v))} />
@@ -828,8 +894,27 @@ function ChannelCard({ channel, period, onUpdate, onDelete }: ChannelCardProps) 
           </>
         )}
         <div>
-          <Label className="text-[10px] text-muted-foreground">Comissão (%)</Label>
-          <DebouncedInput className="h-7 text-xs" type="number" value={channel.comissao_pct} onChange={(v) => handleChange("comissao_pct", Number(v))} />
+          <Label className="text-[10px] text-muted-foreground">Tipo de Comissão</Label>
+          <Select value={channel.comissao_tipo ?? "percentual"} onValueChange={(v) => handleChange("comissao_tipo", v)}>
+            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="percentual">% sobre receita</SelectItem>
+              <SelectItem value="fixo">Valor fixo por venda</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          {(channel.comissao_tipo ?? "percentual") === "percentual" ? (
+            <>
+              <Label className="text-[10px] text-muted-foreground">Comissão (%)</Label>
+              <DebouncedInput className="h-7 text-xs" type="number" value={channel.comissao_pct} onChange={(v) => handleChange("comissao_pct", Number(v))} />
+            </>
+          ) : (
+            <>
+              <Label className="text-[10px] text-muted-foreground">Comissão (R$/venda)</Label>
+              <DebouncedInput className="h-7 text-xs" type="number" value={channel.comissao_valor_fixo ?? 0} onChange={(v) => handleChange("comissao_valor_fixo", Number(v))} />
+            </>
+          )}
         </div>
       </div>
     </div>
