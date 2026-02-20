@@ -84,3 +84,37 @@
 - [x] Simulador de cenários com gráfico comparativo
 - [x] Alertas automáticos: orçamento excedido, funil vazio, ROI negativo, payback > período
 - [x] Trava orçamentária com pop-up de aprovação
+
+---
+
+# Módulo Backoffice Administrativo
+
+## Status: Implementado ✅
+
+### Banco de Dados
+- [x] `user_roles` — roles globais (master/admin/user) com enum `app_role`
+- [x] `user_permissions` — permissões por módulo/aba/organização
+- [x] `organizations.status` — campo de status (ativa/suspensa/onboarding)
+- [x] `organizations.plano` — campo de plano (básico/profissional/enterprise)
+- [x] `profiles.cargo` — campo de cargo do usuário
+- [x] `profiles.active` — campo de status ativo/inativo
+- [x] RLS: Masters podem ver todas as orgs, profiles, membros e roles
+
+### Hooks
+- [x] `useBackoffice.ts` — queries e mutations para todo o backoffice
+
+### Interface
+- [x] Layout separado com tema claro corporativo (`BackofficeLayout.tsx`)
+- [x] Guard de acesso: apenas usuários com role `master` acessam `/backoffice/*`
+- [x] **Listagem de Empresas** — cards/lista com filtros (nome, CNPJ, status, plano)
+- [x] **Tela Interna** com 7 abas:
+  1. Resumo — KPIs, informações da empresa
+  2. Usuários — tabela com nome, cargo, role, status, ações
+  3. Permissões & Granularidade — Camada A (módulos), Camada B (escopos), Ações Sensíveis
+  4. Módulos — visão geral dos módulos ativos com contagem de usuários
+  5. Auditoria — logs filtráveis por ação e busca
+  6. Integrações — placeholder
+  7. Plano & Cobrança — seletor de plano + placeholder cobrança
+- [x] Clonagem de permissões entre usuários
+- [x] Módulos placeholder: Departamento Pessoal, Documentos da Empresa
+- [x] Usuário master: m.santos@colliservice.com.br
