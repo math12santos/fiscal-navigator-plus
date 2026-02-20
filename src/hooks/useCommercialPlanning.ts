@@ -58,6 +58,9 @@ export interface CommercialChannel {
   mrr: number;
   duracao_media_meses: number;
   comissao_pct: number;
+  comissao_tipo: string;
+  comissao_valor_fixo: number;
+  channel_type: string;
   created_at: string;
   updated_at: string;
 }
@@ -100,7 +103,9 @@ export function computeChannelProjections(
     receita = vendas * ticket;
   }
 
-  const comissao = receita * (ch.comissao_pct / 100);
+  const comissao = ch.comissao_tipo === "fixo"
+    ? (ch.comissao_valor_fixo ?? 0) * vendas
+    : receita * (ch.comissao_pct / 100);
   const custoTotal = ch.orcamento_alocado;
   const roi = custoTotal > 0 ? ((receita - custoTotal) / custoTotal) * 100 : 0;
   const burnMensal = custoTotal / periodMonths;
@@ -226,10 +231,20 @@ export function useCommercialBudgetLines(planId: string | null) {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onMutate: async (variables) => {
+      await qc.cancelQueries({ queryKey: ["commercial_budget_lines", orgId, planId] });
+      const prev = qc.getQueryData<CommercialBudgetLine[]>(["commercial_budget_lines", orgId, planId]);
+      qc.setQueryData<CommercialBudgetLine[]>(["commercial_budget_lines", orgId, planId], (old) =>
+        (old ?? []).map((l) => l.id === variables.id ? { ...l, ...variables } : l)
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["commercial_budget_lines", orgId, planId], ctx.prev);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["commercial_budget_lines", orgId, planId] });
     },
-    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
   const deleteLine = useMutation({
@@ -294,10 +309,20 @@ export function useCommercialChannels(planId: string | null) {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onMutate: async (variables) => {
+      await qc.cancelQueries({ queryKey: ["commercial_channels", orgId, planId] });
+      const prev = qc.getQueryData<CommercialChannel[]>(["commercial_channels", orgId, planId]);
+      qc.setQueryData<CommercialChannel[]>(["commercial_channels", orgId, planId], (old) =>
+        (old ?? []).map((c) => c.id === variables.id ? { ...c, ...variables } : c)
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["commercial_channels", orgId, planId], ctx.prev);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["commercial_channels", orgId, planId] });
     },
-    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
   const deleteChannel = useMutation({

@@ -443,8 +443,11 @@ export type Database = {
       }
       commercial_channels: {
         Row: {
+          channel_type: string
           ciclo_medio_dias: number | null
           comissao_pct: number | null
+          comissao_tipo: string
+          comissao_valor_fixo: number | null
           conv_lead_oportunidade: number | null
           conv_oportunidade_proposta: number | null
           conv_proposta_fechamento: number | null
@@ -466,8 +469,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          channel_type?: string
           ciclo_medio_dias?: number | null
           comissao_pct?: number | null
+          comissao_tipo?: string
+          comissao_valor_fixo?: number | null
           conv_lead_oportunidade?: number | null
           conv_oportunidade_proposta?: number | null
           conv_proposta_fechamento?: number | null
@@ -489,8 +495,11 @@ export type Database = {
           user_id: string
         }
         Update: {
+          channel_type?: string
           ciclo_medio_dias?: number | null
           comissao_pct?: number | null
+          comissao_tipo?: string
+          comissao_valor_fixo?: number | null
           conv_lead_oportunidade?: number | null
           conv_oportunidade_proposta?: number | null
           conv_proposta_fechamento?: number | null
