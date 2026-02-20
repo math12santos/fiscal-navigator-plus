@@ -176,7 +176,7 @@ export default function BackofficeCompany() {
 
   if (!org) {
     return (
-      <div className="text-center py-16 text-[hsl(215_16%_47%)]">
+      <div className="text-center py-16 text-muted-foreground">
         <p>Empresa não encontrada</p>
         <Button variant="outline" onClick={() => navigate("/backoffice")} className="mt-4">Voltar</Button>
       </div>
@@ -204,13 +204,13 @@ export default function BackofficeCompany() {
             <Building2 size={18} className="text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-[hsl(222_47%_11%)]">{org.name}</h1>
-            <p className="text-xs text-[hsl(215_16%_47%)] font-mono">{org.document_number}</p>
+            <h1 className="text-xl font-bold text-foreground">{org.name}</h1>
+            <p className="text-xs text-muted-foreground font-mono">{org.document_number}</p>
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <Select value={org.status} onValueChange={handleUpdateOrgStatus}>
-            <SelectTrigger className="w-32 h-8 text-xs bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+            <SelectTrigger className="w-32 h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -224,7 +224,7 @@ export default function BackofficeCompany() {
 
       {/* Tabs */}
       <Tabs defaultValue="resumo" className="space-y-4">
-        <TabsList className="bg-[hsl(0_0%_100%)] border border-[hsl(220_13%_90%)]">
+        <TabsList>
           <TabsTrigger value="resumo">Resumo</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="permissoes">Permissões</TabsTrigger>
@@ -242,13 +242,13 @@ export default function BackofficeCompany() {
             <SummaryCard icon={CreditCard} label="Plano" value={org.plano} />
             <SummaryCard icon={Activity} label="Última Atividade" value={format(new Date(org.updated_at), "dd/MM/yy")} />
           </div>
-          <Card className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
-            <CardHeader><CardTitle className="text-sm text-[hsl(222_47%_11%)]">Informações da Empresa</CardTitle></CardHeader>
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Informações da Empresa</CardTitle></CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2 text-sm">
-              <div><span className="text-[hsl(215_16%_47%)]">Nome:</span> <span className="text-[hsl(222_47%_11%)] font-medium ml-1">{org.name}</span></div>
-              <div><span className="text-[hsl(215_16%_47%)]">Documento:</span> <span className="font-mono ml-1 text-[hsl(222_47%_11%)]">{org.document_type} {org.document_number}</span></div>
-              <div><span className="text-[hsl(215_16%_47%)]">Criada em:</span> <span className="ml-1 text-[hsl(222_47%_11%)]">{format(new Date(org.created_at), "dd/MM/yyyy", { locale: ptBR })}</span></div>
-              <div><span className="text-[hsl(215_16%_47%)]">Status:</span> <Badge variant="outline" className="ml-1 capitalize">{org.status}</Badge></div>
+              <div><span className="text-muted-foreground">Nome:</span> <span className="text-foreground font-medium ml-1">{org.name}</span></div>
+              <div><span className="text-muted-foreground">Documento:</span> <span className="font-mono ml-1 text-foreground">{org.document_type} {org.document_number}</span></div>
+              <div><span className="text-muted-foreground">Criada em:</span> <span className="ml-1 text-foreground">{format(new Date(org.created_at), "dd/MM/yyyy", { locale: ptBR })}</span></div>
+              <div><span className="text-muted-foreground">Status:</span> <Badge variant="outline" className="ml-1 capitalize">{org.status}</Badge></div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -257,38 +257,36 @@ export default function BackofficeCompany() {
         <TabsContent value="usuarios" className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(215_16%_47%)]" size={16} />
-              <Input placeholder="Buscar usuário..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="pl-9 bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)] text-[hsl(222_47%_11%)]" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+              <Input placeholder="Buscar usuário..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="pl-9" />
             </div>
             <Button onClick={() => setCloneDialogOpen(true)} variant="outline" size="sm">
               <Copy size={14} className="mr-1" /> Clonar Permissões
             </Button>
           </div>
-          <div className="bg-[hsl(0_0%_100%)] border border-[hsl(220_13%_90%)] rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             {loadingMembers ? (
-              <div className="text-center py-8 text-[hsl(215_16%_47%)]">Carregando...</div>
+              <div className="text-center py-8 text-muted-foreground">Carregando...</div>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[hsl(220_13%_90%)]">
-                    <TableHead className="text-[hsl(215_16%_47%)]">Nome</TableHead>
-                    <TableHead className="text-[hsl(215_16%_47%)]">Cargo</TableHead>
-                    <TableHead className="text-[hsl(215_16%_47%)]">Role</TableHead>
-                    <TableHead className="text-[hsl(215_16%_47%)]">Status</TableHead>
-                    <TableHead className="text-[hsl(215_16%_47%)] w-32">Ações</TableHead>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Cargo</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-32">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredMembers.map((m: any) => {
                     const profile = profileMap[m.user_id];
                     return (
-                      <TableRow key={m.id} className="border-[hsl(220_13%_90%)]">
+                      <TableRow key={m.id}>
                         <TableCell>
-                          <div>
-                            <span className="font-medium text-[hsl(222_47%_11%)]">{profile?.full_name || "Sem nome"}</span>
-                          </div>
+                          <span className="font-medium text-foreground">{profile?.full_name || "Sem nome"}</span>
                         </TableCell>
-                        <TableCell className="text-[hsl(215_16%_47%)]">{profile?.cargo || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{profile?.cargo || "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="capitalize">{m.role}</Badge>
                         </TableCell>
@@ -326,7 +324,7 @@ export default function BackofficeCompany() {
         <TabsContent value="permissoes" className="space-y-4">
           <div className="flex items-center gap-3">
             <Select value={selectedUserId || ""} onValueChange={setSelectedUserId}>
-              <SelectTrigger className="w-64 bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)] text-[hsl(222_47%_11%)]">
+              <SelectTrigger className="w-64">
                 <SelectValue placeholder="Selecione um usuário" />
               </SelectTrigger>
               <SelectContent>
@@ -342,15 +340,15 @@ export default function BackofficeCompany() {
           {selectedUserId ? (
             <div className="space-y-6">
               {/* Camada A — Módulos */}
-              <Card className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm text-[hsl(222_47%_11%)]">Camada A — Acesso ao Módulo</CardTitle>
+                  <CardTitle className="text-sm">Camada A — Acesso ao Módulo</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {MODULES.map((mod) => (
-                    <div key={mod.key} className="flex items-center justify-between py-2 border-b border-[hsl(220_13%_90%)] last:border-0">
+                    <div key={mod.key} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-[hsl(222_47%_11%)]">{mod.label}</span>
+                        <span className="text-sm text-foreground">{mod.label}</span>
                         {mod.placeholder && <Badge variant="outline" className="text-[10px]">Em breve</Badge>}
                       </div>
                       <Switch
@@ -364,14 +362,14 @@ export default function BackofficeCompany() {
               </Card>
 
               {/* Camada B — Escopos */}
-              <Card className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm text-[hsl(222_47%_11%)]">Camada B — Granularidade de Visualização</CardTitle>
+                  <CardTitle className="text-sm">Camada B — Granularidade de Visualização</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {SCOPES.map((scope) => (
-                    <div key={scope.key} className="flex items-center justify-between py-2 border-b border-[hsl(220_13%_90%)] last:border-0">
-                      <span className="text-sm text-[hsl(222_47%_11%)]">{scope.label}</span>
+                    <div key={scope.key} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <span className="text-sm text-foreground">{scope.label}</span>
                       <Switch
                         checked={permMap[`scope:${scope.key}`] ?? false}
                         onCheckedChange={() => handleToggleModule(selectedUserId, `scope`, permMap[`scope:${scope.key}`] ?? false)}
@@ -382,14 +380,14 @@ export default function BackofficeCompany() {
               </Card>
 
               {/* Ações Sensíveis */}
-              <Card className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm text-[hsl(222_47%_11%)]">Controle de Ações Sensíveis</CardTitle>
+                  <CardTitle className="text-sm">Controle de Ações Sensíveis</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {SENSITIVE_ACTIONS.map((action) => (
-                    <div key={action.key} className="flex items-center justify-between py-2 border-b border-[hsl(220_13%_90%)] last:border-0">
-                      <span className="text-sm text-[hsl(222_47%_11%)]">{action.label}</span>
+                    <div key={action.key} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <span className="text-sm text-foreground">{action.label}</span>
                       <Switch
                         checked={permMap[`action:${action.key}`] ?? false}
                         onCheckedChange={() => handleToggleModule(selectedUserId, `action`, permMap[`action:${action.key}`] ?? false)}
@@ -400,7 +398,7 @@ export default function BackofficeCompany() {
               </Card>
             </div>
           ) : (
-            <div className="text-center py-12 text-[hsl(215_16%_47%)]">
+            <div className="text-center py-12 text-muted-foreground">
               Selecione um usuário para gerenciar suas permissões.
             </div>
           )}
@@ -408,20 +406,20 @@ export default function BackofficeCompany() {
 
         {/* ===== MÓDULOS ===== */}
         <TabsContent value="modulos" className="space-y-4">
-          <Card className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-sm text-[hsl(222_47%_11%)]">Módulos Disponíveis</CardTitle>
+              <CardTitle className="text-sm">Módulos Disponíveis</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
                 {MODULES.map((mod) => {
                   const activeUsers = permissions.filter((p: any) => p.module === mod.key && p.allowed).length;
                   return (
-                    <div key={mod.key} className="flex items-center justify-between p-3 border border-[hsl(220_13%_90%)] rounded-lg">
+                    <div key={mod.key} className="flex items-center justify-between p-3 border border-border rounded-lg">
                       <div>
-                        <span className="text-sm font-medium text-[hsl(222_47%_11%)]">{mod.label}</span>
+                        <span className="text-sm font-medium text-foreground">{mod.label}</span>
                         {mod.placeholder && <Badge variant="outline" className="ml-2 text-[10px]">Placeholder</Badge>}
-                        <p className="text-xs text-[hsl(215_16%_47%)]">{activeUsers} usuário(s) com acesso</p>
+                        <p className="text-xs text-muted-foreground">{activeUsers} usuário(s) com acesso</p>
                       </div>
                       <Badge variant={activeUsers > 0 ? "default" : "secondary"}>
                         {activeUsers > 0 ? "Ativo" : "Inativo"}
@@ -438,11 +436,11 @@ export default function BackofficeCompany() {
         <TabsContent value="auditoria" className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(215_16%_47%)]" size={16} />
-              <Input placeholder="Buscar nos logs..." value={auditSearch} onChange={(e) => setAuditSearch(e.target.value)} className="pl-9 bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)] text-[hsl(222_47%_11%)]" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+              <Input placeholder="Buscar nos logs..." value={auditSearch} onChange={(e) => setAuditSearch(e.target.value)} className="pl-9" />
             </div>
             <Select value={auditActionFilter} onValueChange={setAuditActionFilter}>
-              <SelectTrigger className="w-40 bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+              <SelectTrigger className="w-40">
                 <SelectValue placeholder="Tipo de ação" />
               </SelectTrigger>
               <SelectContent>
@@ -453,30 +451,30 @@ export default function BackofficeCompany() {
               </SelectContent>
             </Select>
           </div>
-          <div className="bg-[hsl(0_0%_100%)] border border-[hsl(220_13%_90%)] rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="border-[hsl(220_13%_90%)]">
-                  <TableHead className="text-[hsl(215_16%_47%)]">Data</TableHead>
-                  <TableHead className="text-[hsl(215_16%_47%)]">Ação</TableHead>
-                  <TableHead className="text-[hsl(215_16%_47%)]">Entidade</TableHead>
-                  <TableHead className="text-[hsl(215_16%_47%)]">Usuário</TableHead>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Ação</TableHead>
+                  <TableHead>Entidade</TableHead>
+                  <TableHead>Usuário</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredAudit.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-[hsl(215_16%_47%)]">Nenhum log encontrado</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhum log encontrado</TableCell></TableRow>
                 ) : (
                   filteredAudit.slice(0, 50).map((log: any) => (
-                    <TableRow key={log.id} className="border-[hsl(220_13%_90%)]">
-                      <TableCell className="text-xs text-[hsl(215_16%_47%)]">
+                    <TableRow key={log.id}>
+                      <TableCell className="text-xs text-muted-foreground">
                         {format(new Date(log.created_at), "dd/MM/yy HH:mm")}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">{log.action}</Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-[hsl(222_47%_11%)]">{log.entity_type}</TableCell>
-                      <TableCell className="text-xs text-[hsl(215_16%_47%)] font-mono">{log.user_id.substring(0, 8)}...</TableCell>
+                      <TableCell className="text-sm text-foreground">{log.entity_type}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-mono">{log.user_id.substring(0, 8)}...</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -487,9 +485,9 @@ export default function BackofficeCompany() {
 
         {/* ===== INTEGRAÇÕES ===== */}
         <TabsContent value="integracoes" className="space-y-4">
-          <Card className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
-            <CardContent className="py-12 text-center text-[hsl(215_16%_47%)]">
-              <Plug size={32} className="mx-auto mb-3 text-[hsl(215_16%_47%)]" />
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              <Plug size={32} className="mx-auto mb-3 text-muted-foreground" />
               <p className="text-sm">Gerenciamento de integrações bancárias e APIs externas.</p>
               <p className="text-xs mt-1">Em desenvolvimento — será habilitado em breve.</p>
             </CardContent>
@@ -498,8 +496,8 @@ export default function BackofficeCompany() {
 
         {/* ===== PLANO & COBRANÇA ===== */}
         <TabsContent value="plano" className="space-y-4">
-          <Card className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
-            <CardHeader><CardTitle className="text-sm text-[hsl(222_47%_11%)]">Plano Atual</CardTitle></CardHeader>
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Plano Atual</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4">
                 <Badge className="text-sm capitalize px-3 py-1">{org.plano}</Badge>
@@ -510,7 +508,7 @@ export default function BackofficeCompany() {
                     toast({ title: `Plano alterado para ${v}` });
                   }}
                 >
-                  <SelectTrigger className="w-40 bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+                  <SelectTrigger className="w-40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -520,8 +518,8 @@ export default function BackofficeCompany() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="border-t border-[hsl(220_13%_90%)] pt-4">
-                <p className="text-sm text-[hsl(215_16%_47%)]">
+              <div className="border-t border-border pt-4">
+                <p className="text-sm text-muted-foreground">
                   Sistema de cobrança será integrado em versão futura.
                 </p>
               </div>
@@ -532,15 +530,15 @@ export default function BackofficeCompany() {
 
       {/* Clone Dialog */}
       <Dialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen}>
-        <DialogContent className="bg-[hsl(0_0%_100%)]">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-[hsl(222_47%_11%)]">Clonar Permissões</DialogTitle>
+            <DialogTitle>Clonar Permissões</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label className="text-[hsl(215_16%_47%)]">Copiar de:</Label>
+              <Label className="text-muted-foreground">Copiar de:</Label>
               <Select value={cloneSourceId} onValueChange={setCloneSourceId}>
-                <SelectTrigger className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+                <SelectTrigger>
                   <SelectValue placeholder="Selecione o usuário fonte" />
                 </SelectTrigger>
                 <SelectContent>
@@ -553,9 +551,9 @@ export default function BackofficeCompany() {
               </Select>
             </div>
             <div>
-              <Label className="text-[hsl(215_16%_47%)]">Aplicar em:</Label>
+              <Label className="text-muted-foreground">Aplicar em:</Label>
               <Select value={cloneTargetId} onValueChange={setCloneTargetId}>
-                <SelectTrigger className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+                <SelectTrigger>
                   <SelectValue placeholder="Selecione o usuário destino" />
                 </SelectTrigger>
                 <SelectContent>
@@ -580,14 +578,14 @@ export default function BackofficeCompany() {
 
 function SummaryCard({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <Card className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)]">
+    <Card>
       <CardContent className="p-4 flex items-center gap-3">
         <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
           <Icon size={16} className="text-primary" />
         </div>
         <div>
-          <p className="text-xs text-[hsl(215_16%_47%)]">{label}</p>
-          <p className="text-lg font-bold text-[hsl(222_47%_11%)] capitalize">{value}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-lg font-bold text-foreground capitalize">{value}</p>
         </div>
       </CardContent>
     </Card>
