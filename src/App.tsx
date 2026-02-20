@@ -98,7 +98,22 @@ function BackofficeRoutes() {
 
 function AuthRoute() {
   const { user, loading } = useAuth();
+  const [isMaster, setIsMaster] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user) { setIsMaster(null); return; }
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "master")
+      .maybeSingle()
+      .then(({ data }) => setIsMaster(!!data));
+  }, [user]);
+
   if (loading) return null;
+  if (user && isMaster === null) return null; // still checking role
+  if (user && isMaster) return <Navigate to="/backoffice" replace />;
   if (user) return <Navigate to="/" replace />;
   return <Auth />;
 }
