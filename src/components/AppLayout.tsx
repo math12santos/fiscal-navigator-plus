@@ -13,10 +13,12 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import OrgSelector from "@/components/OrgSelector";
 
 const navItems = [
@@ -35,6 +37,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const { signOut, user } = useAuth();
+  const { isMaster } = useUserRole();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -83,6 +86,20 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          {isMaster && (
+            <Link
+              to="/backoffice"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 mt-2 border-t border-border/30 pt-3",
+                location.pathname === "/backoffice"
+                  ? "bg-warning/10 text-warning"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              )}
+            >
+              <ShieldCheck size={18} className={location.pathname === "/backoffice" ? "text-warning" : ""} />
+              {!collapsed && <span>Backoffice</span>}
+            </Link>
+          )}
         </nav>
 
         {/* Footer */}

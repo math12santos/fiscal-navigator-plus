@@ -18,6 +18,7 @@ import Configuracoes from "@/pages/Configuracoes";
 import CreateOrganization from "@/pages/CreateOrganization";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
+import Backoffice from "@/pages/Backoffice";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ function ProtectedRoutes() {
         <Route path="/ia" element={<IAFinanceira />} />
         <Route path="/configuracoes" element={<Configuracoes />} />
         <Route path="/nova-empresa" element={<CreateOrganization />} />
+        <Route path="/backoffice" element={<Backoffice />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
