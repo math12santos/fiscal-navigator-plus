@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, lazy, Suspense } from "react";
 import {
   useCommercialPlanning,
   useCommercialBudgetLines,
@@ -13,6 +13,7 @@ import { useBudget } from "@/hooks/useBudget";
 import { KPICard } from "@/components/KPICard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DebouncedInput } from "@/components/ui/debounced-input";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -30,12 +31,14 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   AlertTriangle, BarChart3, DollarSign, Percent, Clock, Target,
-  Plus, Trash2, Sparkles, TrendingUp, Wallet, ArrowUpDown,
+  Plus, Trash2, Sparkles, TrendingUp, Wallet, ArrowUpDown, Calculator,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from "recharts";
+
+const TicketSimulator = lazy(() => import("@/components/planning/TicketSimulator"));
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -243,11 +246,14 @@ export default function PlanningCommercial({ startDate, endDate }: Props) {
 
           {/* Inner Tabs */}
           <Tabs defaultValue="orcamento" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="orcamento">Orçamento</TabsTrigger>
               <TabsTrigger value="funil">Funil & Canais</TabsTrigger>
               <TabsTrigger value="projecao">Projeção</TabsTrigger>
               <TabsTrigger value="cenarios">Cenários</TabsTrigger>
+              <TabsTrigger value="simulador" className="gap-1">
+                <Calculator className="h-3 w-3" /> Simulador
+              </TabsTrigger>
             </TabsList>
 
             {/* ─── BUDGET TAB ─── */}
@@ -556,6 +562,13 @@ export default function PlanningCommercial({ startDate, endDate }: Props) {
                 )}
               </div>
             </TabsContent>
+
+            {/* ─── TICKET SIMULATOR TAB ─── */}
+            <TabsContent value="simulador">
+              <Suspense fallback={<div className="py-8 text-center text-sm text-muted-foreground">Carregando simulador...</div>}>
+                <TicketSimulator />
+              </Suspense>
+            </TabsContent>
           </Tabs>
         </>
       )}
@@ -681,31 +694,31 @@ function BudgetLineTable({ lines, columns, period, onUpdate, onDelete, showEncar
           {lines.map((line: any) => (
             <TableRow key={line.id}>
               <TableCell>
-                <Input
+                <DebouncedInput
                   className="h-7 text-xs"
                   value={line.description}
-                  onChange={(e) => handleChange(line, "description", e.target.value)}
+                  onChange={(v) => handleChange(line, "description", v)}
                   placeholder="Descrição"
                 />
               </TableCell>
               {showEncargos ? (
                 <>
                   <TableCell>
-                    <Input className="h-7 text-xs w-16" type="number" value={line.quantidade} onChange={(e) => handleChange(line, "quantidade", Number(e.target.value))} />
+                    <DebouncedInput className="h-7 text-xs w-16" type="number" value={line.quantidade} onChange={(v) => handleChange(line, "quantidade", Number(v))} />
                   </TableCell>
                   <TableCell>
-                    <Input className="h-7 text-xs w-24" type="number" value={line.valor_unitario} onChange={(e) => handleChange(line, "valor_unitario", Number(e.target.value))} />
+                    <DebouncedInput className="h-7 text-xs w-24" type="number" value={line.valor_unitario} onChange={(v) => handleChange(line, "valor_unitario", Number(v))} />
                   </TableCell>
                   <TableCell>
-                    <Input className="h-7 text-xs w-20" type="number" value={line.encargos_pct} onChange={(e) => handleChange(line, "encargos_pct", Number(e.target.value))} />
+                    <DebouncedInput className="h-7 text-xs w-20" type="number" value={line.encargos_pct} onChange={(v) => handleChange(line, "encargos_pct", Number(v))} />
                   </TableCell>
                   <TableCell>
-                    <Input className="h-7 text-xs w-24" type="number" value={line.beneficios} onChange={(e) => handleChange(line, "beneficios", Number(e.target.value))} />
+                    <DebouncedInput className="h-7 text-xs w-24" type="number" value={line.beneficios} onChange={(v) => handleChange(line, "beneficios", Number(v))} />
                   </TableCell>
                 </>
               ) : (
                 <TableCell>
-                  <Input className="h-7 text-xs w-28" type="number" value={line.valor_unitario} onChange={(e) => handleChange(line, "valor_unitario", Number(e.target.value))} />
+                  <DebouncedInput className="h-7 text-xs w-28" type="number" value={line.valor_unitario} onChange={(v) => handleChange(line, "valor_unitario", Number(v))} />
                 </TableCell>
               )}
               <TableCell className="text-xs text-right font-mono">{fmt(Number(line.valor_mensal))}</TableCell>
@@ -739,10 +752,10 @@ function ChannelCard({ channel, period, onUpdate, onDelete }: ChannelCardProps) 
     <div className="glass-card p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Input
+           <DebouncedInput
             className="h-7 text-sm font-semibold w-40 bg-transparent border-none p-0 focus-visible:ring-0"
             value={channel.name}
-            onChange={(e) => handleChange("name", e.target.value)}
+            onChange={(v) => handleChange("name", v)}
           />
           {channel.is_custom && <Badge variant="outline" className="text-[10px]">Custom</Badge>}
         </div>
@@ -754,19 +767,19 @@ function ChannelCard({ channel, period, onUpdate, onDelete }: ChannelCardProps) 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div>
           <Label className="text-[10px] text-muted-foreground">Orçamento Alocado (R$)</Label>
-          <Input className="h-7 text-xs" type="number" value={channel.orcamento_alocado} onChange={(e) => handleChange("orcamento_alocado", Number(e.target.value))} />
+          <DebouncedInput className="h-7 text-xs" type="number" value={channel.orcamento_alocado} onChange={(v) => handleChange("orcamento_alocado", Number(v))} />
         </div>
         <div>
           <Label className="text-[10px] text-muted-foreground">CPL Estimado (R$/lead)</Label>
-          <Input className="h-7 text-xs" type="number" value={channel.cpl_estimado} onChange={(e) => handleChange("cpl_estimado", Number(e.target.value))} />
+          <DebouncedInput className="h-7 text-xs" type="number" value={channel.cpl_estimado} onChange={(v) => handleChange("cpl_estimado", Number(v))} />
         </div>
         <div>
           <Label className="text-[10px] text-muted-foreground">Leads Projetados</Label>
-          <Input className="h-7 text-xs" type="number" value={channel.leads_projetados} onChange={(e) => handleChange("leads_projetados", Number(e.target.value))} />
+          <DebouncedInput className="h-7 text-xs" type="number" value={channel.leads_projetados} onChange={(v) => handleChange("leads_projetados", Number(v))} />
         </div>
         <div>
           <Label className="text-[10px] text-muted-foreground">Ticket Médio (R$)</Label>
-          <Input className="h-7 text-xs" type="number" value={channel.ticket_medio} onChange={(e) => handleChange("ticket_medio", Number(e.target.value))} />
+          <DebouncedInput className="h-7 text-xs" type="number" value={channel.ticket_medio} onChange={(v) => handleChange("ticket_medio", Number(v))} />
         </div>
       </div>
 
@@ -775,19 +788,19 @@ function ChannelCard({ channel, period, onUpdate, onDelete }: ChannelCardProps) 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div>
           <Label className="text-[10px] text-muted-foreground">Lead → Oportunidade (%)</Label>
-          <Input className="h-7 text-xs" type="number" value={channel.conv_lead_oportunidade} onChange={(e) => handleChange("conv_lead_oportunidade", Number(e.target.value))} />
+          <DebouncedInput className="h-7 text-xs" type="number" value={channel.conv_lead_oportunidade} onChange={(v) => handleChange("conv_lead_oportunidade", Number(v))} />
         </div>
         <div>
           <Label className="text-[10px] text-muted-foreground">Oportunidade → Proposta (%)</Label>
-          <Input className="h-7 text-xs" type="number" value={channel.conv_oportunidade_proposta} onChange={(e) => handleChange("conv_oportunidade_proposta", Number(e.target.value))} />
+          <DebouncedInput className="h-7 text-xs" type="number" value={channel.conv_oportunidade_proposta} onChange={(v) => handleChange("conv_oportunidade_proposta", Number(v))} />
         </div>
         <div>
           <Label className="text-[10px] text-muted-foreground">Proposta → Fechamento (%)</Label>
-          <Input className="h-7 text-xs" type="number" value={channel.conv_proposta_fechamento} onChange={(e) => handleChange("conv_proposta_fechamento", Number(e.target.value))} />
+          <DebouncedInput className="h-7 text-xs" type="number" value={channel.conv_proposta_fechamento} onChange={(v) => handleChange("conv_proposta_fechamento", Number(v))} />
         </div>
         <div>
           <Label className="text-[10px] text-muted-foreground">Ciclo Médio (dias)</Label>
-          <Input className="h-7 text-xs" type="number" value={channel.ciclo_medio_dias} onChange={(e) => handleChange("ciclo_medio_dias", Number(e.target.value))} />
+          <DebouncedInput className="h-7 text-xs" type="number" value={channel.ciclo_medio_dias} onChange={(v) => handleChange("ciclo_medio_dias", Number(v))} />
         </div>
       </div>
 
@@ -806,17 +819,17 @@ function ChannelCard({ channel, period, onUpdate, onDelete }: ChannelCardProps) 
           <>
             <div>
               <Label className="text-[10px] text-muted-foreground">MRR (R$)</Label>
-              <Input className="h-7 text-xs" type="number" value={channel.mrr} onChange={(e) => handleChange("mrr", Number(e.target.value))} />
+              <DebouncedInput className="h-7 text-xs" type="number" value={channel.mrr} onChange={(v) => handleChange("mrr", Number(v))} />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Duração Média (meses)</Label>
-              <Input className="h-7 text-xs" type="number" value={channel.duracao_media_meses} onChange={(e) => handleChange("duracao_media_meses", Number(e.target.value))} />
+              <DebouncedInput className="h-7 text-xs" type="number" value={channel.duracao_media_meses} onChange={(v) => handleChange("duracao_media_meses", Number(v))} />
             </div>
           </>
         )}
         <div>
           <Label className="text-[10px] text-muted-foreground">Comissão (%)</Label>
-          <Input className="h-7 text-xs" type="number" value={channel.comissao_pct} onChange={(e) => handleChange("comissao_pct", Number(e.target.value))} />
+          <DebouncedInput className="h-7 text-xs" type="number" value={channel.comissao_pct} onChange={(v) => handleChange("comissao_pct", Number(v))} />
         </div>
       </div>
     </div>
