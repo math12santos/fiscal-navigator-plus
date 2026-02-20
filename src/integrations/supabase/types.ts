@@ -1643,6 +1643,71 @@ export type Database = {
           },
         ]
       }
+      user_permissions: {
+        Row: {
+          allowed: boolean
+          created_at: string
+          granted_by: string
+          id: string
+          module: string
+          organization_id: string
+          tab: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allowed?: boolean
+          created_at?: string
+          granted_by: string
+          id?: string
+          module: string
+          organization_id: string
+          tab?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allowed?: boolean
+          created_at?: string
+          granted_by?: string
+          id?: string
+          module?: string
+          organization_id?: string
+          tab?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1650,8 +1715,24 @@ export type Database = {
     Functions: {
       check_linked_transactions: { Args: { p_user_id: string }; Returns: Json }
       get_user_org_ids: { Args: { p_user_id: string }; Returns: string[] }
+      has_module_access: {
+        Args: {
+          p_module: string
+          p_org_id: string
+          p_tab?: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       has_org_role: {
         Args: { p_org_id: string; p_roles: string[]; p_user_id: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
         Returns: boolean
       }
       is_org_member: {
@@ -1660,7 +1741,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "master" | "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1787,6 +1868,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["master", "admin", "user"],
+    },
   },
 } as const
