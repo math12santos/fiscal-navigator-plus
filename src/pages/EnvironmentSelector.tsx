@@ -4,6 +4,11 @@ import { ShieldCheck, LayoutDashboard } from "lucide-react";
 export default function EnvironmentSelector() {
   const navigate = useNavigate();
 
+  const handleNavigate = (path: string) => {
+    sessionStorage.setItem("env_selected", "true");
+    navigate(path);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="space-y-8 text-center max-w-lg w-full">
@@ -14,7 +19,7 @@ export default function EnvironmentSelector() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <button
-            onClick={() => navigate("/app")}
+            onClick={() => handleNavigate("/app")}
             className="glass-card p-8 flex flex-col items-center gap-4 hover:border-primary/40 transition-all duration-200 group cursor-pointer"
           >
             <div className="rounded-xl bg-primary/10 p-4 group-hover:bg-primary/20 transition-colors">
@@ -27,7 +32,7 @@ export default function EnvironmentSelector() {
           </button>
 
           <button
-            onClick={() => navigate("/app/backoffice")}
+            onClick={() => handleNavigate("/app/backoffice")}
             className="glass-card p-8 flex flex-col items-center gap-4 hover:border-warning/40 transition-all duration-200 group cursor-pointer"
           >
             <div className="rounded-xl bg-warning/10 p-4 group-hover:bg-warning/20 transition-colors">
