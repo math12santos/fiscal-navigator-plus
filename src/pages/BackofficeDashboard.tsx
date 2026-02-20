@@ -42,8 +42,8 @@ export default function BackofficeDashboard() {
     <div className="animate-fade-in space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-[hsl(222_47%_11%)]">Empresas Cadastradas</h1>
-        <p className="text-sm text-[hsl(215_16%_47%)]">
+        <h1 className="text-2xl font-bold text-foreground">Empresas Cadastradas</h1>
+        <p className="text-sm text-muted-foreground">
           {orgs.length} empresa{orgs.length !== 1 ? "s" : ""} na plataforma
         </p>
       </div>
@@ -51,16 +51,16 @@ export default function BackofficeDashboard() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(215_16%_47%)]" size={16} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
           <Input
             placeholder="Buscar por nome ou CNPJ..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)] text-[hsl(222_47%_11%)]"
+            className="pl-9"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40 bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)] text-[hsl(222_47%_11%)]">
+          <SelectTrigger className="w-40">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -71,7 +71,7 @@ export default function BackofficeDashboard() {
           </SelectContent>
         </Select>
         <Select value={planoFilter} onValueChange={setPlanoFilter}>
-          <SelectTrigger className="w-40 bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)] text-[hsl(222_47%_11%)]">
+          <SelectTrigger className="w-40">
             <SelectValue placeholder="Plano" />
           </SelectTrigger>
           <SelectContent>
@@ -81,7 +81,7 @@ export default function BackofficeDashboard() {
             ))}
           </SelectContent>
         </Select>
-        <div className="flex gap-1 border border-[hsl(220_13%_90%)] rounded-lg p-0.5 bg-[hsl(0_0%_100%)]">
+        <div className="flex gap-1 border border-border rounded-lg p-0.5 bg-card">
           <Button
             variant={viewMode === "cards" ? "default" : "ghost"}
             size="icon"
@@ -103,9 +103,9 @@ export default function BackofficeDashboard() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="text-center py-16 text-[hsl(215_16%_47%)]">Carregando empresas...</div>
+        <div className="text-center py-16 text-muted-foreground">Carregando empresas...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-[hsl(215_16%_47%)]">Nenhuma empresa encontrada.</div>
+        <div className="text-center py-16 text-muted-foreground">Nenhuma empresa encontrada.</div>
       ) : viewMode === "cards" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((org) => {
@@ -113,7 +113,7 @@ export default function BackofficeDashboard() {
             return (
               <Card
                 key={org.id}
-                className="bg-[hsl(0_0%_100%)] border-[hsl(220_13%_90%)] hover:border-primary/40 transition-colors cursor-pointer"
+                className="hover:border-primary/40 transition-colors cursor-pointer"
                 onClick={() => navigate(`/backoffice/empresa/${org.id}`)}
               >
                 <CardContent className="p-5 space-y-3">
@@ -123,13 +123,13 @@ export default function BackofficeDashboard() {
                         <Building2 size={18} className="text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-[hsl(222_47%_11%)] text-sm">{org.name}</h3>
-                        <p className="text-xs text-[hsl(215_16%_47%)] font-mono">{org.document_number}</p>
+                        <h3 className="font-semibold text-foreground text-sm">{org.name}</h3>
+                        <p className="text-xs text-muted-foreground font-mono">{org.document_number}</p>
                       </div>
                     </div>
                     <Badge variant={st.variant} className="text-xs">{st.label}</Badge>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-[hsl(215_16%_47%)]">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Users size={12} />
                       <span>{memberCounts[org.id] ?? 0} usuários</span>
@@ -137,7 +137,7 @@ export default function BackofficeDashboard() {
                     <Badge variant="outline" className="text-xs capitalize">{org.plano}</Badge>
                   </div>
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] text-[hsl(215_16%_47%)]">
+                    <span className="text-[10px] text-muted-foreground">
                       Última atualização: {format(new Date(org.updated_at), "dd/MM/yyyy", { locale: ptBR })}
                     </span>
                     <Button variant="outline" size="sm" className="h-7 text-xs">
@@ -150,30 +150,30 @@ export default function BackofficeDashboard() {
           })}
         </div>
       ) : (
-        <div className="bg-[hsl(0_0%_100%)] border border-[hsl(220_13%_90%)] rounded-xl overflow-hidden">
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="border-[hsl(220_13%_90%)]">
-                <TableHead className="text-[hsl(215_16%_47%)]">Empresa</TableHead>
-                <TableHead className="text-[hsl(215_16%_47%)]">CNPJ</TableHead>
-                <TableHead className="text-[hsl(215_16%_47%)]">Plano</TableHead>
-                <TableHead className="text-[hsl(215_16%_47%)]">Status</TableHead>
-                <TableHead className="text-[hsl(215_16%_47%)]">Usuários</TableHead>
-                <TableHead className="text-[hsl(215_16%_47%)]">Última Atividade</TableHead>
-                <TableHead className="text-[hsl(215_16%_47%)] w-24">Ações</TableHead>
+              <TableRow>
+                <TableHead>Empresa</TableHead>
+                <TableHead>CNPJ</TableHead>
+                <TableHead>Plano</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Usuários</TableHead>
+                <TableHead>Última Atividade</TableHead>
+                <TableHead className="w-24">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((org) => {
                 const st = STATUS_MAP[org.status] || STATUS_MAP.ativa;
                 return (
-                  <TableRow key={org.id} className="border-[hsl(220_13%_90%)] hover:bg-[hsl(220_14%_96%)]">
-                    <TableCell className="font-medium text-[hsl(222_47%_11%)]">{org.name}</TableCell>
-                    <TableCell className="font-mono text-xs text-[hsl(215_16%_47%)]">{org.document_number}</TableCell>
+                  <TableRow key={org.id} className="hover:bg-secondary/50">
+                    <TableCell className="font-medium text-foreground">{org.name}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{org.document_number}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{org.plano}</Badge></TableCell>
                     <TableCell><Badge variant={st.variant}>{st.label}</Badge></TableCell>
-                    <TableCell className="text-[hsl(215_16%_47%)]">{memberCounts[org.id] ?? 0}</TableCell>
-                    <TableCell className="text-[hsl(215_16%_47%)] text-xs">
+                    <TableCell className="text-muted-foreground">{memberCounts[org.id] ?? 0}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
                       {format(new Date(org.updated_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                     </TableCell>
                     <TableCell>
