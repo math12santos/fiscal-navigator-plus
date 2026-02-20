@@ -1308,6 +1308,9 @@ export type Database = {
           id: string
           logo_url: string | null
           name: string
+          onboarding_completed: boolean
+          plano: string
+          status: string
           updated_at: string
         }
         Insert: {
@@ -1318,6 +1321,9 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name: string
+          onboarding_completed?: boolean
+          plano?: string
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -1328,6 +1334,9 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name?: string
+          onboarding_completed?: boolean
+          plano?: string
+          status?: string
           updated_at?: string
         }
         Relationships: []
@@ -1550,6 +1559,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active: boolean
+          cargo: string | null
           company_name: string | null
           created_at: string
           full_name: string | null
@@ -1557,6 +1568,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active?: boolean
+          cargo?: string | null
           company_name?: string | null
           created_at?: string
           full_name?: string | null
@@ -1564,6 +1577,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active?: boolean
+          cargo?: string | null
           company_name?: string | null
           created_at?: string
           full_name?: string | null
