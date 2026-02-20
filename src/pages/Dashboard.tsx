@@ -125,7 +125,7 @@ export default function Dashboard() {
             Para começar a usar o FinCore, cadastre uma empresa. Você poderá gerenciar múltiplas empresas
             posteriormente.
           </p>
-          <Button onClick={() => navigate("/nova-empresa")} className="mt-2">
+          <Button onClick={() => navigate("/app/nova-empresa")} className="mt-2">
             <Plus size={16} className="mr-2" /> Cadastrar Empresa
           </Button>
         </div>
