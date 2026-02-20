@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -56,6 +57,11 @@ function ProtectedRoutes() {
   }
 
   if (!user) return <Navigate to="/auth" replace />;
+
+  // Master users must go through environment selector first
+  if (isMaster && !sessionStorage.getItem("env_selected")) {
+    return <Navigate to="/selecionar-ambiente" replace />;
+  }
 
   return (
     <AppLayout>
