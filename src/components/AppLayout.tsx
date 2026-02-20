@@ -13,31 +13,28 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUserRole } from "@/hooks/useUserRole";
 import OrgSelector from "@/components/OrgSelector";
 
 const navItems = [
-  { path: "/app", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/app/fluxo-caixa", label: "Fluxo de Caixa", icon: ArrowLeftRight },
-  { path: "/app/contratos", label: "Contratos", icon: FileText },
-  { path: "/app/planejamento", label: "Planejamento", icon: Target },
-  { path: "/app/conciliacao", label: "Conciliação", icon: Building2 },
-  { path: "/app/tarefas", label: "Tarefas", icon: CheckSquare },
-  { path: "/app/integracoes", label: "Integrações", icon: Plug },
-  { path: "/app/ia", label: "IA Financeira", icon: Brain },
-  { path: "/app/configuracoes", label: "Configurações", icon: Settings },
+  { path: "/", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/fluxo-caixa", label: "Fluxo de Caixa", icon: ArrowLeftRight },
+  { path: "/contratos", label: "Contratos", icon: FileText },
+  { path: "/planejamento", label: "Planejamento", icon: Target },
+  { path: "/conciliacao", label: "Conciliação", icon: Building2 },
+  { path: "/tarefas", label: "Tarefas", icon: CheckSquare },
+  { path: "/integracoes", label: "Integrações", icon: Plug },
+  { path: "/ia", label: "IA Financeira", icon: Brain },
+  { path: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const { signOut, user } = useAuth();
-  const { isMaster } = useUserRole();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -86,20 +83,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-          {isMaster && (
-            <Link
-              to="/app/backoffice"
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 mt-2 border-t border-border/30 pt-3",
-                location.pathname === "/app/backoffice"
-                  ? "bg-warning/10 text-warning"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )}
-            >
-              <ShieldCheck size={18} className={location.pathname === "/app/backoffice" ? "text-warning" : ""} />
-              {!collapsed && <span>Backoffice</span>}
-            </Link>
-          )}
         </nav>
 
         {/* Footer */}
