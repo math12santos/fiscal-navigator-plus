@@ -1411,6 +1411,8 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+          vt_ativo: boolean
+          vt_diario: number
           workload_hours: number | null
         }
         Insert: {
@@ -1434,6 +1436,8 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id: string
+          vt_ativo?: boolean
+          vt_diario?: number
           workload_hours?: number | null
         }
         Update: {
@@ -1457,6 +1461,8 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+          vt_ativo?: boolean
+          vt_diario?: number
           workload_hours?: number | null
         }
         Relationships: [
