@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState as useReactState } from "react";
+import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -21,18 +21,19 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import OrgSelector from "@/components/OrgSelector";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 const navItems = [
-  { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/fluxo-caixa", label: "Fluxo de Caixa", icon: ArrowLeftRight },
-  { path: "/contratos", label: "Contratos", icon: FileText },
-  { path: "/planejamento", label: "Planejamento", icon: Target },
-  { path: "/dp", label: "Depto. Pessoal", icon: Users },
-  { path: "/conciliacao", label: "Conciliação", icon: Building2 },
-  { path: "/tarefas", label: "Tarefas", icon: CheckSquare },
-  { path: "/integracoes", label: "Integrações", icon: Plug },
-  { path: "/ia", label: "IA Financeira", icon: Brain },
-  { path: "/configuracoes", label: "Configurações", icon: Settings },
+  { path: "/", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+  { path: "/fluxo-caixa", label: "Fluxo de Caixa", icon: ArrowLeftRight, module: "fluxo-caixa" },
+  { path: "/contratos", label: "Contratos", icon: FileText, module: "contratos" },
+  { path: "/planejamento", label: "Planejamento", icon: Target, module: "planejamento" },
+  { path: "/dp", label: "Depto. Pessoal", icon: Users, module: "dp" },
+  { path: "/conciliacao", label: "Conciliação", icon: Building2, module: "conciliacao" },
+  { path: "/tarefas", label: "Tarefas", icon: CheckSquare, module: "tarefas" },
+  { path: "/integracoes", label: "Integrações", icon: Plug, module: "integracoes" },
+  { path: "/ia", label: "IA Financeira", icon: Brain, module: "ia" },
+  { path: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes" },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -40,18 +41,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const { signOut, user } = useAuth();
-  const [isMaster, setIsMaster] = useReactState(false);
+  const { canAccessModule, isMaster } = useUserPermissions();
 
-  useEffect(() => {
-    if (!user) { setIsMaster(false); return; }
-    supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "master")
-      .maybeSingle()
-      .then(({ data }) => setIsMaster(!!data));
-  }, [user]);
+  const visibleNavItems = navItems.filter((item) => canAccessModule(item.module));
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -82,7 +74,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link

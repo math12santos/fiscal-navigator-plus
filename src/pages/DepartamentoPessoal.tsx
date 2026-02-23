@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import DPDashboard from "@/components/dp/DPDashboard";
 import DPColaboradores from "@/components/dp/DPColaboradores";
 import DPFolha from "@/components/dp/DPFolha";
@@ -10,8 +11,40 @@ import DPEncargos from "@/components/dp/DPEncargos";
 import DPCargos from "@/components/dp/DPCargos";
 import DPConfig from "@/components/dp/DPConfig";
 
+const ALL_TABS = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "colaboradores", label: "Colaboradores" },
+  { key: "folha", label: "Folha" },
+  { key: "ferias", label: "Férias / 13º" },
+  { key: "rescisoes", label: "Rescisões" },
+  { key: "encargos", label: "Encargos" },
+  { key: "cargos", label: "Cargos & Rotinas" },
+  { key: "config", label: "Configurações" },
+];
+
+const TAB_COMPONENTS: Record<string, React.ReactNode> = {
+  dashboard: <DPDashboard />,
+  colaboradores: <DPColaboradores />,
+  folha: <DPFolha />,
+  ferias: <DPFerias />,
+  rescisoes: <DPRescisoes />,
+  encargos: <DPEncargos />,
+  cargos: <DPCargos />,
+  config: <DPConfig />,
+};
+
 export default function DepartamentoPessoal() {
-  const [tab, setTab] = useState("dashboard");
+  const { getAllowedTabs } = useUserPermissions();
+  const allowedTabs = getAllowedTabs("dp", ALL_TABS);
+  const [tab, setTab] = useState(allowedTabs[0]?.key || "dashboard");
+
+  if (allowedTabs.length === 0) {
+    return (
+      <div className="animate-fade-in space-y-6">
+        <PageHeader title="Departamento Pessoal" description="Você não possui permissão para acessar este módulo." />
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -22,24 +55,16 @@ export default function DepartamentoPessoal() {
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="colaboradores">Colaboradores</TabsTrigger>
-          <TabsTrigger value="folha">Folha</TabsTrigger>
-          <TabsTrigger value="ferias">Férias / 13º</TabsTrigger>
-          <TabsTrigger value="rescisoes">Rescisões</TabsTrigger>
-          <TabsTrigger value="encargos">Encargos</TabsTrigger>
-          <TabsTrigger value="cargos">Cargos & Rotinas</TabsTrigger>
-          <TabsTrigger value="config">Configurações</TabsTrigger>
+          {allowedTabs.map((t) => (
+            <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="dashboard"><DPDashboard /></TabsContent>
-        <TabsContent value="colaboradores"><DPColaboradores /></TabsContent>
-        <TabsContent value="folha"><DPFolha /></TabsContent>
-        <TabsContent value="ferias"><DPFerias /></TabsContent>
-        <TabsContent value="rescisoes"><DPRescisoes /></TabsContent>
-        <TabsContent value="encargos"><DPEncargos /></TabsContent>
-        <TabsContent value="cargos"><DPCargos /></TabsContent>
-        <TabsContent value="config"><DPConfig /></TabsContent>
+        {allowedTabs.map((t) => (
+          <TabsContent key={t.key} value={t.key}>
+            {TAB_COMPONENTS[t.key]}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );
