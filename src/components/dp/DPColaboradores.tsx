@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Edit2, Trash2 } from "lucide-react";
-import { useEmployees, useMutateEmployee } from "@/hooks/useDP";
+import { useEmployees, useMutateEmployee, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { usePositions } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,7 @@ export default function DPColaboradores() {
   const { data: positions = [] } = usePositions();
   const { costCenters = [] } = useCostCenters();
   const { create, update, remove } = useMutateEmployee();
+  const { data: dpConfig } = useDPConfig();
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
@@ -142,6 +143,8 @@ export default function DPColaboradores() {
                 <TableHead>Cargo</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Salário Base</TableHead>
+                <TableHead>Custo Total</TableHead>
+                <TableHead>Custo Diário</TableHead>
                 <TableHead>Centro de Custo</TableHead>
                 <TableHead>Admissão</TableHead>
                 <TableHead>Status</TableHead>
@@ -151,12 +154,18 @@ export default function DPColaboradores() {
             <TableBody>
               {filtered.map((e: any) => {
                 const st = STATUS_MAP[e.status] || STATUS_MAP.ativo;
+                const salario = Number(e.salary_base || 0);
+                const encargos = calcEncargosPatronais(salario, dpConfig);
+                const custoTotal = salario + encargos.total;
+                const custoDiario = custoTotal / 30;
                 return (
                   <TableRow key={e.id}>
                     <TableCell className="font-medium text-foreground">{e.name}</TableCell>
                     <TableCell className="text-muted-foreground">{posMap[e.position_id] || "—"}</TableCell>
                     <TableCell><Badge variant="outline">{e.contract_type}</Badge></TableCell>
-                    <TableCell className="font-mono text-foreground">{fmt(Number(e.salary_base))}</TableCell>
+                    <TableCell className="font-mono text-foreground">{fmt(salario)}</TableCell>
+                    <TableCell className="font-mono text-foreground">{fmt(custoTotal)}</TableCell>
+                    <TableCell className="font-mono text-muted-foreground">{fmt(custoDiario)}</TableCell>
                     <TableCell className="text-muted-foreground">{ccMap[e.cost_center_id] || "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">{format(new Date(e.admission_date), "dd/MM/yyyy")}</TableCell>
                     <TableCell><Badge variant={st.variant}>{st.label}</Badge></TableCell>
