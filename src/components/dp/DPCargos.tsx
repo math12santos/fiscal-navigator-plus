@@ -115,20 +115,20 @@ export default function DPCargos() {
               <div className="space-y-1"><Label>Nível Hierárquico</Label><Input type="number" value={posForm.level_hierarchy} onChange={(e) => setPosForm({ ...posForm, level_hierarchy: e.target.value })} /></div>
               <div className="space-y-1">
                 <Label>Superior</Label>
-                <Select value={posForm.parent_id} onValueChange={(v) => setPosForm({ ...posForm, parent_id: v })}>
+                <Select value={posForm.parent_id || "__none__"} onValueChange={(v) => setPosForm({ ...posForm, parent_id: v === "__none__" ? "" : v })}>
                   <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="__none__">Nenhum</SelectItem>
                     {positions.filter((p: any) => p.id !== editingPos?.id).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
                 <Label>Centro de Custo</Label>
-                <Select value={posForm.cost_center_id} onValueChange={(v) => setPosForm({ ...posForm, cost_center_id: v })}>
+                <Select value={posForm.cost_center_id || "__none__"} onValueChange={(v) => setPosForm({ ...posForm, cost_center_id: v === "__none__" ? "" : v })}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="__none__">Nenhum</SelectItem>
                     {costCenters.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
