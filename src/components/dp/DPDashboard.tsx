@@ -1,17 +1,21 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEmployees, usePayrollRuns, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
-import { Users, DollarSign, TrendingUp, Percent } from "lucide-react";
+import { useEmployeeBenefits, useDPBenefits } from "@/hooks/useDPBenefits";
+import { Users, DollarSign, TrendingUp, Percent, Bus, UtensilsCrossed, HeartPulse } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useCostCenters } from "@/hooks/useCostCenters";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "hsl(var(--accent))", "#8884d8", "#82ca9d", "#ffc658"];
+const DIAS_UTEIS_MES = 22;
 
 export default function DPDashboard() {
   const { data: employees = [] } = useEmployees();
   const { data: payrollRuns = [] } = usePayrollRuns();
   const { data: dpConfig } = useDPConfig();
   const { costCenters = [] } = useCostCenters();
+  const { data: allBenefits = [] } = useDPBenefits();
+  const { data: allEmployeeBenefits = [] } = useEmployeeBenefits();
 
   const activeEmployees = employees.filter((e: any) => e.status === "ativo");
   const totalFolhaBruta = activeEmployees.reduce((sum: number, e: any) => sum + Number(e.salary_base || 0), 0);
@@ -22,6 +26,43 @@ export default function DPDashboard() {
   }, 0);
 
   const custoMedioPorColab = activeEmployees.length > 0 ? (totalFolhaBruta + encargosTotal) / activeEmployees.length : 0;
+
+  // VT totals
+  const vtStats = useMemo(() => {
+    const vtAtivos = activeEmployees.filter((e: any) => e.vt_ativo);
+    const custoTotal = vtAtivos.reduce((sum: number, e: any) => {
+      const vtMensal = Number(e.vt_diario || 0) * DIAS_UTEIS_MES;
+      const desconto = Number(e.salary_base || 0) * 0.06;
+      return sum + Math.max(vtMensal - desconto, 0);
+    }, 0);
+    return { count: vtAtivos.length, custoTotal };
+  }, [activeEmployees]);
+
+  // Benefits totals by name (VA, Plano de Saúde, etc.)
+  const benefitStats = useMemo(() => {
+    const benefitMap: Record<string, { name: string; count: number; custoTotal: number }> = {};
+    allEmployeeBenefits.forEach((eb: any) => {
+      const benefit = allBenefits.find((b: any) => b.id === eb.benefit_id);
+      if (!benefit || !benefit.active) return;
+      const emp = activeEmployees.find((e: any) => e.id === eb.employee_id);
+      if (!emp || !eb.active) return;
+      if (!benefitMap[benefit.id]) benefitMap[benefit.id] = { name: benefit.name, count: 0, custoTotal: 0 };
+      benefitMap[benefit.id].count++;
+      const valor = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
+      if (benefit.type === "percentual") {
+        benefitMap[benefit.id].custoTotal += Number(emp.salary_base || 0) * (valor / 100);
+      } else {
+        benefitMap[benefit.id].custoTotal += valor;
+      }
+    });
+    return Object.values(benefitMap);
+  }, [allEmployeeBenefits, allBenefits, activeEmployees]);
+
+  // Find specific well-known benefits for dedicated cards
+  const findBenefit = (keywords: string[]) => benefitStats.find((b) => keywords.some((k) => b.name.toLowerCase().includes(k)));
+  const vaStats = findBenefit(["alimentação", "alimentacao", "refeição", "refeicao", "vale alimentação", "vale refeição", "va", "vr"]);
+  const saudeStats = findBenefit(["saúde", "saude", "plano de saúde", "health"]);
+  const otherBenefits = benefitStats.filter((b) => b !== vaStats && b !== saudeStats);
 
   const costCenterMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -53,6 +94,18 @@ export default function DPDashboard() {
         <KPICard icon={DollarSign} label="Folha Bruta Total" value={fmt(totalFolhaBruta)} />
         <KPICard icon={TrendingUp} label="Encargos Totais" value={fmt(encargosTotal)} />
         <KPICard icon={Percent} label="Custo Médio/Colab." value={fmt(custoMedioPorColab)} />
+      </div>
+
+      {/* Benefícios KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KPICard icon={Bus} label="Vale Transporte" value={fmt(vtStats.custoTotal)} subtitle={`${vtStats.count} colaborador(es)`} />
+        <KPICard icon={UtensilsCrossed} label={vaStats?.name || "Vale Alimentação"} value={fmt(vaStats?.custoTotal || 0)} subtitle={`${vaStats?.count || 0} colaborador(es)`} />
+        <KPICard icon={HeartPulse} label={saudeStats?.name || "Plano de Saúde"} value={fmt(saudeStats?.custoTotal || 0)} subtitle={`${saudeStats?.count || 0} colaborador(es)`} />
+        {otherBenefits.length > 0 ? (
+          <KPICard icon={DollarSign} label="Outros Benefícios" value={fmt(otherBenefits.reduce((s, b) => s + b.custoTotal, 0))} subtitle={`${otherBenefits.length} tipo(s)`} />
+        ) : (
+          <KPICard icon={DollarSign} label="Total Benefícios" value={fmt(vtStats.custoTotal + (vaStats?.custoTotal || 0) + (saudeStats?.custoTotal || 0))} subtitle="Custo mensal" />
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -101,7 +154,7 @@ export default function DPDashboard() {
   );
 }
 
-function KPICard({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function KPICard({ icon: Icon, label, value, subtitle }: { icon: any; label: string; value: string; subtitle?: string }) {
   return (
     <Card>
       <CardContent className="p-4 flex items-center gap-3">
@@ -111,6 +164,7 @@ function KPICard({ icon: Icon, label, value }: { icon: any; label: string; value
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">{label}</p>
           <p className="text-lg font-bold text-foreground truncate">{value}</p>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
       </CardContent>
     </Card>
