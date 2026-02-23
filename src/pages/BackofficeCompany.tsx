@@ -30,6 +30,8 @@ import {
   Power,
   Copy,
   Eye,
+  Link2,
+  Unlink,
 } from "lucide-react";
 import {
   useBackofficeOrgs,
@@ -226,11 +228,12 @@ export default function BackofficeCompany() {
 
       {/* Tabs */}
       <Tabs defaultValue="resumo" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="resumo">Resumo</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="permissoes">Permissões</TabsTrigger>
           <TabsTrigger value="modulos">Módulos</TabsTrigger>
+          <TabsTrigger value="holding">Holding</TabsTrigger>
           <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
           <TabsTrigger value="integracoes">Integrações</TabsTrigger>
           <TabsTrigger value="plano">Plano & Cobrança</TabsTrigger>
@@ -437,6 +440,11 @@ export default function BackofficeCompany() {
           </Card>
         </TabsContent>
 
+        {/* ===== HOLDING ===== */}
+        <TabsContent value="holding" className="space-y-4">
+          <HoldingTab orgId={orgId!} orgs={orgs} orgName={org.name} />
+        </TabsContent>
+
         {/* ===== AUDITORIA ===== */}
         <TabsContent value="auditoria" className="space-y-4">
           <div className="flex items-center gap-3">
@@ -602,5 +610,184 @@ function SummaryCard({ icon: Icon, label, value }: { icon: any; label: string; v
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function HoldingTab({ orgId, orgs, orgName }: { orgId: string; orgs: any[]; orgName: string }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+  const [selectedOrgId, setSelectedOrgId] = useState("");
+  const [linkAs, setLinkAs] = useState<"holding" | "subsidiary">("subsidiary");
+  const [loading, setLoading] = useState(false);
+
+  // Fetch holdings where this org is the holding (subsidiaries)
+  const { data: subsidiaries = [] } = useQuery({
+    queryKey: ["org_holdings_subsidiaries", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("organization_holdings")
+        .select("*")
+        .eq("holding_id", orgId);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Fetch holdings where this org is a subsidiary
+  const { data: parents = [] } = useQuery({
+    queryKey: ["org_holdings_parents", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("organization_holdings")
+        .select("*")
+        .eq("subsidiary_id", orgId);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const linkedOrgIds = new Set([
+    ...subsidiaries.map((s: any) => s.subsidiary_id),
+    ...parents.map((p: any) => p.holding_id),
+    orgId,
+  ]);
+
+  const availableOrgs = orgs.filter((o) => !linkedOrgIds.has(o.id));
+
+  const getOrgName = (id: string) => orgs.find((o) => o.id === id)?.name || id.substring(0, 8);
+
+  const handleLink = async () => {
+    if (!selectedOrgId || !user) return;
+    setLoading(true);
+    try {
+      const payload = linkAs === "subsidiary"
+        ? { holding_id: orgId, subsidiary_id: selectedOrgId, created_by: user.id }
+        : { holding_id: selectedOrgId, subsidiary_id: orgId, created_by: user.id };
+
+      const { error } = await supabase.from("organization_holdings").insert(payload);
+      if (error) throw error;
+
+      qc.invalidateQueries({ queryKey: ["org_holdings_subsidiaries", orgId] });
+      qc.invalidateQueries({ queryKey: ["org_holdings_parents", orgId] });
+      toast({ title: "Vínculo de holding criado" });
+      setAddOpen(false);
+      setSelectedOrgId("");
+    } catch (err: any) {
+      toast({ title: "Erro ao vincular", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnlink = async (holdingRelId: string) => {
+    const { error } = await supabase.from("organization_holdings").delete().eq("id", holdingRelId);
+    if (error) {
+      toast({ title: "Erro ao desvincular", variant: "destructive" });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["org_holdings_subsidiaries", orgId] });
+    qc.invalidateQueries({ queryKey: ["org_holdings_parents", orgId] });
+    toast({ title: "Vínculo removido" });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Parent holdings */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-sm">Holding (empresa-mãe)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {parents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Esta empresa não pertence a nenhuma holding.</p>
+          ) : (
+            <div className="space-y-2">
+              {parents.map((p: any) => (
+                <div key={p.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Building2 size={16} className="text-primary" />
+                    <span className="text-sm font-medium text-foreground">{getOrgName(p.holding_id)}</span>
+                    <Badge variant="outline" className="text-[10px]">Holding</Badge>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleUnlink(p.id)} title="Desvincular">
+                    <Unlink size={13} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Subsidiaries */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-sm">Subsidiárias / Controladas</CardTitle>
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus size={14} className="mr-1" /> Vincular Empresa
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {subsidiaries.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma subsidiária vinculada.</p>
+          ) : (
+            <div className="space-y-2">
+              {subsidiaries.map((s: any) => (
+                <div key={s.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Building2 size={16} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">{getOrgName(s.subsidiary_id)}</span>
+                    <Badge variant="secondary" className="text-[10px]">Subsidiária</Badge>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleUnlink(s.id)} title="Desvincular">
+                    <Unlink size={13} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add Link Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Vincular Empresa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Tipo de vínculo</Label>
+              <Select value={linkAs} onValueChange={(v) => setLinkAs(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="subsidiary">{orgName} é a Holding (adicionar subsidiária)</SelectItem>
+                  <SelectItem value="holding">{orgName} é Subsidiária (adicionar holding)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>{linkAs === "subsidiary" ? "Empresa subsidiária" : "Empresa holding"}</Label>
+              <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+                <SelectTrigger><SelectValue placeholder="Selecione uma empresa" /></SelectTrigger>
+                <SelectContent>
+                  {availableOrgs.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancelar</Button>
+            <Button onClick={handleLink} disabled={loading || !selectedOrgId}>
+              <Link2 size={14} className="mr-1" /> {loading ? "Vinculando..." : "Vincular"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
