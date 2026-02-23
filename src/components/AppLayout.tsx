@@ -14,6 +14,7 @@ import {
   ChevronRight,
   LogOut,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ const navItems = [
   { path: "/fluxo-caixa", label: "Fluxo de Caixa", icon: ArrowLeftRight },
   { path: "/contratos", label: "Contratos", icon: FileText },
   { path: "/planejamento", label: "Planejamento", icon: Target },
+  { path: "/dp", label: "Depto. Pessoal", icon: Users },
   { path: "/conciliacao", label: "Conciliação", icon: Building2 },
   { path: "/tarefas", label: "Tarefas", icon: CheckSquare },
   { path: "/integracoes", label: "Integrações", icon: Plug },
