@@ -13,22 +13,19 @@ export function useUserPermissions() {
   const { user } = useAuth();
   const { currentOrg, currentRole } = useOrganization();
 
-  const { data: permissions = [], isLoading, isFetching } = useQuery({
-    queryKey: ["user_permissions", user?.id, currentOrg?.id],
+  const { data: permissions = [], isLoading } = useQuery({
+    queryKey: ["user_permissions", user?.id],
     queryFn: async () => {
-      if (!user || !currentOrg) return [];
+      if (!user) return [];
       const { data, error } = await supabase
         .from("user_permissions")
         .select("module, tab, allowed")
-        .eq("user_id", user.id)
-        .eq("organization_id", currentOrg.id);
+        .eq("user_id", user.id);
       if (error) throw error;
       return (data ?? []) as Permission[];
     },
-    enabled: !!user && !!currentOrg,
-    staleTime: 10_000,
-    // Don't keep previous org data when switching orgs
-    placeholderData: undefined,
+    enabled: !!user,
+    staleTime: 30_000,
   });
 
   // Check if user has a master role (bypasses all permissions)
