@@ -4,14 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Eye, Edit2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Search, Plus, Edit2, Trash2 } from "lucide-react";
 import { useBackofficeOrgs } from "@/hooks/useBackoffice";
 import { CreateUserDialog } from "@/components/CreateUserDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 const ROLES = [
   { value: "owner", label: "Admin" },
@@ -22,10 +29,19 @@ const ROLES = [
 
 export default function BackofficeUsers() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const { data: orgs = [] } = useBackofficeOrgs();
   const [search, setSearch] = useState("");
   const [orgFilter, setOrgFilter] = useState("__all__");
   const [createUserOpen, setCreateUserOpen] = useState(false);
+
+  // Edit user state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editName, setEditName] = useState("");
+  const [editCargo, setEditCargo] = useState("");
+  const [editMemberships, setEditMemberships] = useState<{ id: string; organization_id: string; role: string }[]>([]);
 
   // Fetch all members across all orgs
   const { data: allMembers = [], refetch } = useQuery({
@@ -91,6 +107,66 @@ export default function BackofficeUsers() {
     });
   }, [userList, search, orgFilter, profileMap]);
 
+  const handleOpenEdit = (u: any) => {
+    const profile = profileMap[u.userId];
+    setEditingUser(u);
+    setEditName(profile?.full_name || "");
+    setEditCargo(profile?.cargo || "");
+    setEditMemberships(u.memberships.map((m: any) => ({
+      id: m.id,
+      organization_id: m.organization_id,
+      role: m.role,
+    })));
+    setEditOpen(true);
+  };
+
+  const handleMembershipRoleChange = (membershipId: string, newRole: string) => {
+    setEditMemberships((prev) =>
+      prev.map((m) => m.id === membershipId ? { ...m, role: newRole } : m)
+    );
+  };
+
+  const handleRemoveMembership = (membershipId: string) => {
+    setEditMemberships((prev) => prev.filter((m) => m.id !== membershipId));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingUser) return;
+    try {
+      // Update profile
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .update({ full_name: editName, cargo: editCargo })
+        .eq("id", editingUser.userId);
+      if (profileErr) throw profileErr;
+
+      // Update each membership role
+      for (const m of editMemberships) {
+        const { error } = await supabase
+          .from("organization_members")
+          .update({ role: m.role })
+          .eq("id", m.id);
+        if (error) throw error;
+      }
+
+      // Remove deleted memberships
+      const currentIds = editMemberships.map((m) => m.id);
+      const removedIds = editingUser.memberships
+        .filter((m: any) => !currentIds.includes(m.id))
+        .map((m: any) => m.id);
+      for (const id of removedIds) {
+        await supabase.from("organization_members").delete().eq("id", id);
+      }
+
+      toast({ title: "Usuário atualizado com sucesso" });
+      setEditOpen(false);
+      qc.invalidateQueries({ queryKey: ["backoffice_all_members"] });
+      qc.invalidateQueries({ queryKey: ["backoffice_all_profiles"] });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
@@ -136,12 +212,13 @@ export default function BackofficeUsers() {
               <TableHead>Cargo</TableHead>
               <TableHead>Empresas</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="w-16">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   Nenhum usuário encontrado.
                 </TableCell>
               </TableRow>
@@ -168,6 +245,11 @@ export default function BackofficeUsers() {
                         {profile?.active !== false ? "Ativo" : "Inativo"}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(u)} title="Editar usuário">
+                        <Edit2 size={14} />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -181,6 +263,62 @@ export default function BackofficeUsers() {
         onOpenChange={setCreateUserOpen}
         onSuccess={() => refetch()}
       />
+
+      {/* Edit User Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Nome completo</Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cargo</Label>
+              <Input value={editCargo} onChange={(e) => setEditCargo(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Vínculos com empresas</Label>
+              {editMemberships.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nenhum vínculo.</p>
+              )}
+              {editMemberships.map((m) => (
+                <div key={m.id} className="flex items-center gap-2 p-2 rounded-lg border border-border bg-muted/30">
+                  <span className="flex-1 text-sm font-medium truncate">
+                    {orgMap[m.organization_id] || m.organization_id.substring(0, 8)}
+                  </span>
+                  <Select value={m.role} onValueChange={(v) => handleMembershipRoleChange(m.id, v)}>
+                    <SelectTrigger className="w-40 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLES.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    onClick={() => handleRemoveMembership(m.id)}
+                    title="Remover vínculo"
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
