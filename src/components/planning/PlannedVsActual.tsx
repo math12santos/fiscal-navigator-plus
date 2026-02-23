@@ -8,6 +8,7 @@ import {
 import { useCashFlow } from "@/hooks/useCashFlow";
 import { useBudget, useBudgetLines, BudgetLine } from "@/hooks/useBudget";
 import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
+import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -26,8 +27,21 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
   const { entries } = useCashFlow(startDate, endDate);
   const budgetLinesQuery = useBudgetLines(budgetVersionId);
   const { accounts } = useChartOfAccounts();
+  const { payrollProjections } = usePayrollProjections(startDate, endDate);
 
   const budgetLines = (budgetLinesQuery.data ?? []) as BudgetLine[];
+
+  // DP realized costs by month (from cashflow entries with source "dp")
+  const dpByMonth = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const e of entries) {
+      if ((e as any).source === "dp" && e.tipo === "saida") {
+        const key = e.data_prevista.slice(0, 7);
+        map[key] = (map[key] ?? 0) + Number(e.valor_realizado ?? e.valor_previsto);
+      }
+    }
+    return map;
+  }, [entries]);
 
   const accountMap = useMemo(
     () => new Map(accounts.map((a) => [a.id, a])),
@@ -72,6 +86,7 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
       const budgeted = budgetedByMonth[key] ?? { receita: 0, gasto: 0 };
       data.push({
         mes: format(cursor, "MMM/yy", { locale: ptBR }),
+        monthKey: key,
         "Realizado (Entrada)": realized.entradas,
         "Realizado (Saída)": -realized.saidas,
         "Orçado (Receita)": budgeted.receita,
@@ -87,16 +102,18 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
     return chartData.map((d) => {
       const realizado = d["Realizado (Entrada)"] + d["Realizado (Saída)"];
       const orcado = d["Orçado (Receita)"] + d["Orçado (Gasto)"];
+      const dp = dpByMonth[d.monthKey] ?? 0;
       const variacao = orcado !== 0 ? ((realizado - orcado) / Math.abs(orcado)) * 100 : 0;
       return {
         mes: d.mes,
-        orcado: orcado,
-        realizado: realizado,
+        orcado,
+        realizado,
+        dp,
         diferenca: realizado - orcado,
         variacao,
       };
     });
-  }, [chartData]);
+  }, [chartData, dpByMonth]);
 
   if (!budgetVersionId) {
     return (
@@ -149,6 +166,7 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
               <TableHead>Mês</TableHead>
               <TableHead className="text-right">Orçado</TableHead>
               <TableHead className="text-right">Realizado</TableHead>
+              <TableHead className="text-right">Custo DP</TableHead>
               <TableHead className="text-right">Diferença</TableHead>
               <TableHead className="text-right">Variação</TableHead>
             </TableRow>
@@ -159,6 +177,7 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
                 <TableCell className="font-medium">{row.mes}</TableCell>
                 <TableCell className="text-right">{fmt(row.orcado)}</TableCell>
                 <TableCell className="text-right">{fmt(row.realizado)}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{fmt(row.dp)}</TableCell>
                 <TableCell className={`text-right font-medium ${row.diferenca >= 0 ? "text-success" : "text-destructive"}`}>
                   {fmt(row.diferenca)}
                 </TableCell>

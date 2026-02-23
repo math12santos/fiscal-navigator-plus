@@ -9,8 +9,9 @@ import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
 import { useCashFlow } from "@/hooks/useCashFlow";
 import { useContracts } from "@/hooks/useContracts";
 import { usePlanningConfig } from "@/hooks/usePlanningConfig";
+import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 import { KPICard } from "@/components/KPICard";
-import { AlertTriangle, TrendingUp, Wallet, Shield } from "lucide-react";
+import { AlertTriangle, TrendingUp, Wallet, Shield, Users } from "lucide-react";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -25,6 +26,7 @@ export default function PlanningOverview({ startDate, endDate }: Props) {
   const { contracts } = useContracts();
   const { config } = usePlanningConfig();
   const { accounts } = useChartOfAccounts();
+  const { avgMonthlyPayroll } = usePayrollProjections(startDate, endDate);
 
   // Monthly aggregation
   const monthlyData = useMemo(() => {
@@ -70,7 +72,7 @@ export default function PlanningOverview({ startDate, endDate }: Props) {
   return (
     <div className="space-y-6">
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <KPICard
           title="Receita Projetada"
           value={fmt(totals.entradas)}
@@ -82,10 +84,14 @@ export default function PlanningOverview({ startDate, endDate }: Props) {
           icon={<Wallet size={20} />}
         />
         <KPICard
+          title="Custo Folha/mês"
+          value={fmt(avgMonthlyPayroll)}
+          icon={<Users size={20} />}
+        />
+        <KPICard
           title="Saldo Projetado"
           value={fmt(totals.saldo)}
           icon={<Shield size={20} />}
-          change={totals.saldo > 0 ? undefined : undefined}
         />
         <div className="glass-card p-5 animate-slide-up">
           <div className="flex items-start justify-between">

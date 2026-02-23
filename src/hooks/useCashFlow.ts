@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useContracts, Contract } from "@/hooks/useContracts";
+import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 import { useMemo } from "react";
 import { addMonths, format, isBefore, isAfter } from "date-fns";
 
@@ -199,13 +200,16 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     return [...recurrentProjections, ...installmentProjections];
   }, [contracts, rangeFrom, rangeTo, entriesQuery.data, installmentsQuery.data]);
 
-  // Merge materialized + projected
+  // Payroll projections from DP
+  const { payrollProjections } = usePayrollProjections(rangeFrom, rangeTo);
+
+  // Merge materialized + projected + payroll
   const allEntries = useMemo(() => {
     const materialized = entriesQuery.data ?? [];
-    const merged = [...materialized, ...projectedEntries as any[]];
+    const merged = [...materialized, ...projectedEntries as any[], ...payrollProjections];
     merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
     return merged as CashFlowEntry[];
-  }, [entriesQuery.data, projectedEntries]);
+  }, [entriesQuery.data, projectedEntries, payrollProjections]);
 
   // KPIs
   const totals = useMemo(() => {
