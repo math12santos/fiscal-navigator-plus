@@ -1030,6 +1030,53 @@ export type Database = {
           },
         ]
       }
+      dp_benefits: {
+        Row: {
+          active: boolean
+          created_at: string
+          default_value: number
+          description: string | null
+          id: string
+          name: string
+          organization_id: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          default_value?: number
+          description?: string | null
+          id?: string
+          name: string
+          organization_id?: string | null
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          default_value?: number
+          description?: string | null
+          id?: string
+          name?: string
+          organization_id?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dp_benefits_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dp_config: {
         Row: {
           created_at: string
@@ -1078,6 +1125,61 @@ export type Database = {
             foreignKeyName: "dp_config_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_benefits: {
+        Row: {
+          active: boolean
+          benefit_id: string
+          created_at: string
+          custom_value: number | null
+          employee_id: string
+          id: string
+          organization_id: string | null
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          benefit_id: string
+          created_at?: string
+          custom_value?: number | null
+          employee_id: string
+          id?: string
+          organization_id?: string | null
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          benefit_id?: string
+          created_at?: string
+          custom_value?: number | null
+          employee_id?: string
+          id?: string
+          organization_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_benefits_benefit_id_fkey"
+            columns: ["benefit_id"]
+            isOneToOne: false
+            referencedRelation: "dp_benefits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_benefits_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_benefits_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -1290,6 +1392,8 @@ export type Database = {
       employees: {
         Row: {
           admission_date: string
+          comissao_tipo: string | null
+          comissao_valor: number | null
           contract_id: string | null
           contract_type: string
           cost_center_id: string | null
@@ -1311,6 +1415,8 @@ export type Database = {
         }
         Insert: {
           admission_date: string
+          comissao_tipo?: string | null
+          comissao_valor?: number | null
           contract_id?: string | null
           contract_type?: string
           cost_center_id?: string | null
@@ -1332,6 +1438,8 @@ export type Database = {
         }
         Update: {
           admission_date?: string
+          comissao_tipo?: string | null
+          comissao_valor?: number | null
           contract_id?: string | null
           contract_type?: string
           cost_center_id?: string | null
