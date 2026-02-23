@@ -1,0 +1,3 @@
+
+ALTER TABLE public.employees ADD COLUMN vt_ativo BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.employees ADD COLUMN vt_diario NUMERIC NOT NULL DEFAULT 0;

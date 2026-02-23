@@ -50,6 +50,7 @@ export default function DPColaboradores() {
     salary_base: "", workload_hours: "44",
     position_id: "", cost_center_id: "", status: "ativo", notes: "",
     comissao_tipo: "nenhuma", comissao_valor: "",
+    vt_ativo: false, vt_diario: "",
   });
   const [selectedBenefitIds, setSelectedBenefitIds] = useState<string[]>([]);
 
@@ -75,7 +76,7 @@ export default function DPColaboradores() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT", salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "", status: "ativo", notes: "", comissao_tipo: "nenhuma", comissao_valor: "" });
+    setForm({ name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT", salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "", status: "ativo", notes: "", comissao_tipo: "nenhuma", comissao_valor: "", vt_ativo: false, vt_diario: "" });
     setSelectedBenefitIds([]);
     setDialogOpen(true);
   };
@@ -89,6 +90,7 @@ export default function DPColaboradores() {
       position_id: e.position_id || "", cost_center_id: e.cost_center_id || "",
       status: e.status, notes: e.notes || "",
       comissao_tipo: e.comissao_tipo || "nenhuma", comissao_valor: String(e.comissao_valor || ""),
+      vt_ativo: e.vt_ativo || false, vt_diario: String(e.vt_diario || ""),
     });
     const empBenefits = allEmployeeBenefits.filter((eb: any) => eb.employee_id === e.id);
     setSelectedBenefitIds(empBenefits.map((eb: any) => eb.benefit_id));
@@ -96,13 +98,16 @@ export default function DPColaboradores() {
   };
 
   const handleSave = () => {
+    const { vt_ativo, vt_diario, ...rest } = form;
     const payload = {
-      ...form,
-      salary_base: Number(form.salary_base) || 0,
-      workload_hours: Number(form.workload_hours) || 44,
-      position_id: form.position_id && form.position_id !== "__none__" ? form.position_id : null,
-      cost_center_id: form.cost_center_id && form.cost_center_id !== "__none__" ? form.cost_center_id : null,
-      comissao_valor: Number(form.comissao_valor) || 0,
+      ...rest,
+      salary_base: Number(rest.salary_base) || 0,
+      workload_hours: Number(rest.workload_hours) || 44,
+      position_id: rest.position_id && rest.position_id !== "__none__" ? rest.position_id : null,
+      cost_center_id: rest.cost_center_id && rest.cost_center_id !== "__none__" ? rest.cost_center_id : null,
+      comissao_valor: Number(rest.comissao_valor) || 0,
+      vt_ativo,
+      vt_diario: Number(vt_diario) || 0,
     };
 
     const saveBenefits = (employeeId: string) => {
@@ -161,6 +166,7 @@ export default function DPColaboradores() {
                 <TableHead>Cargo</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Salário Base</TableHead>
+                <TableHead>VT</TableHead>
                 <TableHead>Custo Total</TableHead>
                 <TableHead>Custo Diário</TableHead>
                 <TableHead>Centro de Custo</TableHead>
@@ -174,7 +180,12 @@ export default function DPColaboradores() {
                 const st = STATUS_MAP[e.status] || STATUS_MAP.ativo;
                 const salario = Number(e.salary_base || 0);
                 const encargos = calcEncargosPatronais(salario, dpConfig);
-                const custoTotal = salario + encargos.total;
+                const vtDiario = Number(e.vt_diario || 0);
+                const DIAS_UTEIS_MES = 22;
+                const vtMensal = e.vt_ativo ? vtDiario * DIAS_UTEIS_MES : 0;
+                const vtDesconto = e.vt_ativo ? salario * 0.06 : 0;
+                const custoVTLiquido = Math.max(vtMensal - vtDesconto, 0);
+                const custoTotal = salario + encargos.total + custoVTLiquido;
                 const custoDiario = custoTotal / 30;
                 return (
                   <TableRow key={e.id}>
@@ -182,6 +193,7 @@ export default function DPColaboradores() {
                     <TableCell className="text-muted-foreground">{posMap[e.position_id] || "—"}</TableCell>
                     <TableCell><Badge variant="outline">{e.contract_type}</Badge></TableCell>
                     <TableCell className="font-mono text-foreground">{fmt(salario)}</TableCell>
+                    <TableCell>{e.vt_ativo ? <Badge variant="default" className="text-xs">R$ {vtDiario.toFixed(2)}/dia</Badge> : <span className="text-muted-foreground text-xs">—</span>}</TableCell>
                     <TableCell className="font-mono text-foreground">{fmt(custoTotal)}</TableCell>
                     <TableCell className="font-mono text-muted-foreground">{fmt(custoDiario)}</TableCell>
                     <TableCell className="text-muted-foreground">{ccMap[e.cost_center_id] || "—"}</TableCell>
@@ -272,6 +284,21 @@ export default function DPColaboradores() {
                 <div className="space-y-1">
                   <Label>{form.comissao_tipo === "percentual" ? "Percentual (%)" : "Valor (R$)"}</Label>
                   <Input type="number" value={form.comissao_valor} onChange={(e) => setForm({ ...form, comissao_valor: e.target.value })} />
+                </div>
+              )}
+              {/* Vale Transporte */}
+              <div className="col-span-2 flex items-center gap-3 pt-1">
+                <Checkbox
+                  id="vt_ativo"
+                  checked={form.vt_ativo}
+                  onCheckedChange={(checked) => setForm({ ...form, vt_ativo: !!checked })}
+                />
+                <Label htmlFor="vt_ativo" className="cursor-pointer">Vale Transporte ativo (desconto de 6% do salário)</Label>
+              </div>
+              {form.vt_ativo && (
+                <div className="space-y-1">
+                  <Label>VT Diário (R$)</Label>
+                  <Input type="number" value={form.vt_diario} onChange={(e) => setForm({ ...form, vt_diario: e.target.value })} placeholder="Ex: 12.00" />
                 </div>
               )}
             </div>
