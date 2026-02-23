@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import PlanningOverview from "@/components/planning/PlanningOverview";
 import BudgetTab from "@/components/planning/BudgetTab";
 import PlanningScenarios from "@/components/planning/PlanningScenarios";
@@ -19,13 +20,28 @@ import PlanningLiquidity from "@/components/planning/PlanningLiquidity";
 import PlanningLiabilities from "@/components/planning/PlanningLiabilities";
 import PlanningCommercial from "@/components/planning/PlanningCommercial";
 import PlanningHR from "@/components/planning/PlanningHR";
+
 type Horizon = "3m" | "6m" | "12m" | "24m" | "custom";
+
+const ALL_TABS = [
+  { key: "visao-geral", label: "Visão Geral" },
+  { key: "orcamento", label: "Orçamento" },
+  { key: "cenarios", label: "Cenários" },
+  { key: "planejado-realizado", label: "Plan. × Real." },
+  { key: "liquidez", label: "Liquidez" },
+  { key: "passivos", label: "Passivos" },
+  { key: "rh", label: "RH" },
+  { key: "comercial", label: "Comercial" },
+];
 
 export default function Planejamento() {
   const [horizon, setHorizon] = useState<Horizon>("12m");
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [budgetVersionId, setBudgetVersionId] = useState<string | null>(null);
+  const { getAllowedTabs } = useUserPermissions();
+
+  const allowedTabs = getAllowedTabs("planejamento", ALL_TABS);
 
   const { startDate, endDate } = useMemo(() => {
     const now = startOfMonth(new Date());
@@ -36,6 +52,20 @@ export default function Planejamento() {
     const m = monthsMap[horizon] ?? 12;
     return { startDate: now, endDate: endOfMonth(addMonths(now, m - 1)) };
   }, [horizon, customFrom, customTo]);
+
+  const renderTabContent = (tabKey: string) => {
+    switch (tabKey) {
+      case "visao-geral": return <PlanningOverview startDate={startDate} endDate={endDate} />;
+      case "orcamento": return <BudgetTab startDate={startDate} endDate={endDate} selectedVersionId={budgetVersionId} onSelectVersion={setBudgetVersionId} />;
+      case "cenarios": return <PlanningScenarios startDate={startDate} endDate={endDate} />;
+      case "planejado-realizado": return <PlannedVsActual startDate={startDate} endDate={endDate} budgetVersionId={budgetVersionId} />;
+      case "liquidez": return <PlanningLiquidity />;
+      case "passivos": return <PlanningLiabilities />;
+      case "rh": return <PlanningHR startDate={startDate} endDate={endDate} />;
+      case "comercial": return <PlanningCommercial startDate={startDate} endDate={endDate} />;
+      default: return null;
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -93,58 +123,18 @@ export default function Planejamento() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="visao-geral" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-8">
-          <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-          <TabsTrigger value="orcamento">Orçamento</TabsTrigger>
-          <TabsTrigger value="cenarios">Cenários</TabsTrigger>
-          <TabsTrigger value="planejado-realizado">Plan. × Real.</TabsTrigger>
-          <TabsTrigger value="liquidez">Liquidez</TabsTrigger>
-          <TabsTrigger value="passivos">Passivos</TabsTrigger>
-          <TabsTrigger value="rh">RH</TabsTrigger>
-          <TabsTrigger value="comercial">Comercial</TabsTrigger>
+      <Tabs defaultValue={allowedTabs[0]?.key || "visao-geral"} className="space-y-4">
+        <TabsList className={cn("grid w-full", `grid-cols-${allowedTabs.length}`)}>
+          {allowedTabs.map((t) => (
+            <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="visao-geral">
-          <PlanningOverview startDate={startDate} endDate={endDate} />
-        </TabsContent>
-
-        <TabsContent value="orcamento">
-          <BudgetTab
-            startDate={startDate}
-            endDate={endDate}
-            selectedVersionId={budgetVersionId}
-            onSelectVersion={setBudgetVersionId}
-          />
-        </TabsContent>
-
-        <TabsContent value="cenarios">
-          <PlanningScenarios startDate={startDate} endDate={endDate} />
-        </TabsContent>
-
-        <TabsContent value="planejado-realizado">
-          <PlannedVsActual
-            startDate={startDate}
-            endDate={endDate}
-            budgetVersionId={budgetVersionId}
-          />
-        </TabsContent>
-
-        <TabsContent value="liquidez">
-          <PlanningLiquidity />
-        </TabsContent>
-
-        <TabsContent value="passivos">
-          <PlanningLiabilities />
-        </TabsContent>
-
-        <TabsContent value="rh">
-          <PlanningHR startDate={startDate} endDate={endDate} />
-        </TabsContent>
-
-        <TabsContent value="comercial">
-          <PlanningCommercial startDate={startDate} endDate={endDate} />
-        </TabsContent>
+        {allowedTabs.map((t) => (
+          <TabsContent key={t.key} value={t.key}>
+            {renderTabContent(t.key)}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );
