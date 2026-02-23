@@ -49,10 +49,15 @@ export function useUserPermissions() {
   // Owners always have full access
   const isOwner = currentRole === "owner";
 
+  // Filter out meta-permissions (scope, action) to check if real module perms exist
+  const hasConfiguredPermissions = permissions.some(
+    (p) => !["scope", "action"].includes(p.module)
+  );
+
   const canAccessModule = (moduleKey: string): boolean => {
     if (isMaster || isOwner) return true;
-    // If no permissions exist at all, default to full access (backwards compat)
-    if (permissions.length === 0) return true;
+    // If no module permissions configured at all, default to full access (backwards compat)
+    if (!hasConfiguredPermissions) return true;
     // Check module-level permission (tab is null)
     const modulePerm = permissions.find(
       (p) => p.module === moduleKey && p.tab === null
@@ -61,24 +66,26 @@ export function useUserPermissions() {
     // If no explicit module-level permission, check if any tab is allowed
     const tabPerms = permissions.filter((p) => p.module === moduleKey && p.tab !== null);
     if (tabPerms.length > 0) return tabPerms.some((p) => p.allowed);
-    // No permission record means allowed by default
-    return true;
+    // Module has no permission record but other modules do → denied
+    return false;
   };
 
   const canAccessTab = (moduleKey: string, tabKey: string): boolean => {
     if (isMaster || isOwner) return true;
-    if (permissions.length === 0) return true;
+    if (!hasConfiguredPermissions) return true;
     const tabPerm = permissions.find(
       (p) => p.module === moduleKey && p.tab === tabKey
     );
     if (tabPerm) return tabPerm.allowed;
-    // No explicit tab permission — check module-level
+    // No explicit tab permission — allow if module is allowed (no tab granularity configured)
+    const hasAnyTabPerms = permissions.some((p) => p.module === moduleKey && p.tab !== null);
+    if (hasAnyTabPerms) return false; // tabs are configured but this one isn't → denied
     return canAccessModule(moduleKey);
   };
 
   const getAllowedTabs = (moduleKey: string, allTabs: { key: string; label: string }[]) => {
     if (isMaster || isOwner) return allTabs;
-    if (permissions.length === 0) return allTabs;
+    if (!hasConfiguredPermissions) return allTabs;
     return allTabs.filter((t) => canAccessTab(moduleKey, t.key));
   };
 
