@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,10 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Edit2, Trash2 } from "lucide-react";
 import { useEmployees, useMutateEmployee, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { usePositions } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
+import { useDPBenefits, useEmployeeBenefits, useMutateEmployeeBenefit } from "@/hooks/useDPBenefits";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -33,6 +35,9 @@ export default function DPColaboradores() {
   const { costCenters = [] } = useCostCenters();
   const { create, update, remove } = useMutateEmployee();
   const { data: dpConfig } = useDPConfig();
+  const { data: allBenefits = [] } = useDPBenefits();
+  const { data: allEmployeeBenefits = [] } = useEmployeeBenefits();
+  const { assign: assignBenefits } = useMutateEmployeeBenefit();
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
@@ -44,7 +49,9 @@ export default function DPColaboradores() {
     admission_date: "", contract_type: "CLT",
     salary_base: "", workload_hours: "44",
     position_id: "", cost_center_id: "", status: "ativo", notes: "",
+    comissao_tipo: "nenhuma", comissao_valor: "",
   });
+  const [selectedBenefitIds, setSelectedBenefitIds] = useState<string[]>([]);
 
   const filtered = useMemo(() => {
     return employees.filter((e: any) => {
@@ -68,7 +75,8 @@ export default function DPColaboradores() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT", salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "", status: "ativo", notes: "" });
+    setForm({ name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT", salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "", status: "ativo", notes: "", comissao_tipo: "nenhuma", comissao_valor: "" });
+    setSelectedBenefitIds([]);
     setDialogOpen(true);
   };
 
@@ -80,7 +88,10 @@ export default function DPColaboradores() {
       salary_base: String(e.salary_base), workload_hours: String(e.workload_hours || 44),
       position_id: e.position_id || "", cost_center_id: e.cost_center_id || "",
       status: e.status, notes: e.notes || "",
+      comissao_tipo: e.comissao_tipo || "nenhuma", comissao_valor: String(e.comissao_valor || ""),
     });
+    const empBenefits = allEmployeeBenefits.filter((eb: any) => eb.employee_id === e.id);
+    setSelectedBenefitIds(empBenefits.map((eb: any) => eb.benefit_id));
     setDialogOpen(true);
   };
 
@@ -91,15 +102,22 @@ export default function DPColaboradores() {
       workload_hours: Number(form.workload_hours) || 44,
       position_id: form.position_id && form.position_id !== "__none__" ? form.position_id : null,
       cost_center_id: form.cost_center_id && form.cost_center_id !== "__none__" ? form.cost_center_id : null,
+      comissao_valor: Number(form.comissao_valor) || 0,
+    };
+
+    const saveBenefits = (employeeId: string) => {
+      if (selectedBenefitIds.length > 0) {
+        assignBenefits.mutate(selectedBenefitIds.map((bid) => ({ employee_id: employeeId, benefit_id: bid })));
+      }
     };
 
     if (editing) {
       update.mutate({ id: editing.id, ...payload }, {
-        onSuccess: () => { toast({ title: "Colaborador atualizado" }); setDialogOpen(false); },
+        onSuccess: () => { toast({ title: "Colaborador atualizado" }); saveBenefits(editing.id); setDialogOpen(false); },
       });
     } else {
       create.mutate(payload, {
-        onSuccess: () => { toast({ title: "Colaborador cadastrado" }); setDialogOpen(false); },
+        onSuccess: (data: any) => { toast({ title: "Colaborador cadastrado" }); setDialogOpen(false); },
       });
     }
   };
@@ -238,7 +256,49 @@ export default function DPColaboradores() {
                   </Select>
                 </div>
               )}
+              {/* Comissão */}
+              <div className="space-y-1">
+                <Label>Comissão</Label>
+                <Select value={form.comissao_tipo} onValueChange={(v) => setForm({ ...form, comissao_tipo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nenhuma">Sem Comissão</SelectItem>
+                    <SelectItem value="percentual">Percentual (%)</SelectItem>
+                    <SelectItem value="valor_fixo">Valor Fixo (R$)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.comissao_tipo !== "nenhuma" && (
+                <div className="space-y-1">
+                  <Label>{form.comissao_tipo === "percentual" ? "Percentual (%)" : "Valor (R$)"}</Label>
+                  <Input type="number" value={form.comissao_valor} onChange={(e) => setForm({ ...form, comissao_valor: e.target.value })} />
+                </div>
+              )}
             </div>
+            {/* Benefícios */}
+            {allBenefits.length > 0 && (
+              <div className="space-y-2 pt-2 border-t">
+                <Label className="text-sm font-semibold">Benefícios</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {allBenefits.filter((b: any) => b.active).map((b: any) => (
+                    <label key={b.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={selectedBenefitIds.includes(b.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedBenefitIds((prev) =>
+                            checked ? [...prev, b.id] : prev.filter((id) => id !== b.id)
+                          );
+                        }}
+                      />
+                      <span>{b.name}</span>
+                      <span className="text-muted-foreground text-xs">
+                        ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>

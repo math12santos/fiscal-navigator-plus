@@ -9,6 +9,7 @@ import DPFerias from "@/components/dp/DPFerias";
 import DPRescisoes from "@/components/dp/DPRescisoes";
 import DPEncargos from "@/components/dp/DPEncargos";
 import DPCargos from "@/components/dp/DPCargos";
+import DPBeneficios from "@/components/dp/DPBeneficios";
 import DPConfig from "@/components/dp/DPConfig";
 
 const ALL_TABS = [
@@ -19,6 +20,7 @@ const ALL_TABS = [
   { key: "rescisoes", label: "Rescisões" },
   { key: "encargos", label: "Encargos" },
   { key: "cargos", label: "Cargos & Rotinas" },
+  { key: "beneficios", label: "Benefícios" },
   { key: "config", label: "Configurações" },
 ];
 
@@ -30,6 +32,7 @@ const TAB_COMPONENTS: Record<string, React.ReactNode> = {
   rescisoes: <DPRescisoes />,
   encargos: <DPEncargos />,
   cargos: <DPCargos />,
+  beneficios: <DPBeneficios />,
   config: <DPConfig />,
 };
 
