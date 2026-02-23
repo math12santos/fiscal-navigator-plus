@@ -1,5 +1,5 @@
-import { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { ReactNode, useEffect, useState as useReactState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -13,10 +13,12 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import OrgSelector from "@/components/OrgSelector";
 
 const navItems = [
@@ -33,8 +35,21 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const { signOut, user } = useAuth();
+  const [isMaster, setIsMaster] = useReactState(false);
+
+  useEffect(() => {
+    if (!user) { setIsMaster(false); return; }
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "master")
+      .maybeSingle()
+      .then(({ data }) => setIsMaster(!!data));
+  }, [user]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -88,12 +103,31 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         {/* Footer */}
         {!collapsed && (
           <div className="border-t border-border/50 p-4 space-y-3">
+            {isMaster && (
+              <button
+                onClick={() => navigate("/backoffice")}
+                className="flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors w-full font-medium"
+              >
+                <ShieldCheck size={14} /> Voltar ao BackOffice
+              </button>
+            )}
             <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
             <button
               onClick={signOut}
               className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors w-full"
             >
               <LogOut size={14} /> Sair
+            </button>
+          </div>
+        )}
+        {collapsed && isMaster && (
+          <div className="border-t border-border/50 p-2 flex justify-center">
+            <button
+              onClick={() => navigate("/backoffice")}
+              className="rounded-md p-1.5 text-primary hover:bg-primary/10 transition-colors"
+              title="Voltar ao BackOffice"
+            >
+              <ShieldCheck size={16} />
             </button>
           </div>
         )}
