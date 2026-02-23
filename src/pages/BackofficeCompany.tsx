@@ -590,19 +590,43 @@ export default function BackofficeCompany() {
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Módulos Disponíveis</CardTitle>
+              <p className="text-xs text-muted-foreground">Ative ou desative módulos para todos os usuários desta empresa.</p>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
                 {MODULES.map((mod) => {
                   const activeUsers = permissions.filter((p: any) => p.module === mod.key && p.allowed).length;
+                  const isEnabled = activeUsers > 0;
                   return (
                     <div key={mod.key} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                      <div>
-                        <span className="text-sm font-medium text-foreground">{mod.label}</span>
-                        <p className="text-xs text-muted-foreground">{activeUsers} usuário(s) com acesso</p>
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={isEnabled}
+                          onCheckedChange={(checked) => {
+                            if (!orgId) return;
+                            // Toggle module for all members
+                            members.forEach((m: any) => {
+                              upsertPermission.mutate({
+                                user_id: m.user_id,
+                                organization_id: orgId,
+                                module: mod.key,
+                                allowed: checked,
+                              });
+                            });
+                            toast({
+                              title: checked
+                                ? `Módulo "${mod.label}" ativado`
+                                : `Módulo "${mod.label}" desativado`,
+                            });
+                          }}
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-foreground">{mod.label}</span>
+                          <p className="text-xs text-muted-foreground">{activeUsers} usuário(s) com acesso</p>
+                        </div>
                       </div>
-                      <Badge variant={activeUsers > 0 ? "default" : "secondary"}>
-                        {activeUsers > 0 ? "Ativo" : "Inativo"}
+                      <Badge variant={isEnabled ? "default" : "secondary"}>
+                        {isEnabled ? "Ativo" : "Inativo"}
                       </Badge>
                     </div>
                   );
