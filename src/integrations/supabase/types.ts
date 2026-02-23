@@ -2543,6 +2543,36 @@ export type Database = {
           },
         ]
       }
+      system_modules: {
+        Row: {
+          enabled: boolean
+          id: string
+          label: string
+          maintenance_message: string | null
+          module_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          enabled?: boolean
+          id?: string
+          label: string
+          maintenance_message?: string | null
+          module_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          id?: string
+          label?: string
+          maintenance_message?: string | null
+          module_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           allowed: boolean

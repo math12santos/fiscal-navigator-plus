@@ -23,8 +23,10 @@ import BackofficeCompany from "@/pages/BackofficeCompany";
 import BackofficeUsers from "@/pages/BackofficeUsers";
 import BackofficeAudit from "@/pages/BackofficeAudit";
 import BackofficeConfig from "@/pages/BackofficeConfig";
+import BackofficeSystem from "@/pages/BackofficeSystem";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
+import ModuleMaintenanceGuard from "@/components/ModuleMaintenanceGuard";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -47,16 +49,16 @@ function ProtectedRoutes() {
   return (
     <AppLayout>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/fluxo-caixa" element={<FluxoCaixa />} />
-        <Route path="/contratos" element={<Contratos />} />
-        <Route path="/planejamento" element={<Planejamento />} />
-        <Route path="/conciliacao" element={<Conciliacao />} />
-        <Route path="/tarefas" element={<Tarefas />} />
-        <Route path="/integracoes" element={<Integracoes />} />
-        <Route path="/ia" element={<IAFinanceira />} />
-        <Route path="/configuracoes" element={<Configuracoes />} />
-        <Route path="/dp" element={<DepartamentoPessoal />} />
+        <Route path="/" element={<ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard>} />
+        <Route path="/fluxo-caixa" element={<ModuleMaintenanceGuard moduleKey="fluxo-caixa"><FluxoCaixa /></ModuleMaintenanceGuard>} />
+        <Route path="/contratos" element={<ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard>} />
+        <Route path="/planejamento" element={<ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard>} />
+        <Route path="/conciliacao" element={<ModuleMaintenanceGuard moduleKey="conciliacao"><Conciliacao /></ModuleMaintenanceGuard>} />
+        <Route path="/tarefas" element={<ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard>} />
+        <Route path="/integracoes" element={<ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard>} />
+        <Route path="/ia" element={<ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard>} />
+        <Route path="/configuracoes" element={<ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard>} />
+        <Route path="/dp" element={<ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard>} />
         <Route path="/nova-empresa" element={<CreateOrganization />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -95,6 +97,7 @@ function BackofficeRoutes() {
       <Routes>
         <Route path="/" element={<BackofficeDashboard />} />
         <Route path="/usuarios" element={<BackofficeUsers />} />
+        <Route path="/sistema" element={<BackofficeSystem />} />
         <Route path="/auditoria" element={<BackofficeAudit />} />
         <Route path="/config" element={<BackofficeConfig />} />
         <Route path="/empresa/:orgId" element={<BackofficeCompany />} />

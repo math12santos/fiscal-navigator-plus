@@ -4,6 +4,7 @@ import {
   Building2,
   Users,
   Shield,
+  Wrench,
   Activity,
   Settings,
   ChevronLeft,
@@ -18,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const navItems = [
   { path: "/backoffice", label: "Empresas", icon: Building2 },
   { path: "/backoffice/usuarios", label: "Usuários", icon: Users },
+  { path: "/backoffice/sistema", label: "Sistema", icon: Wrench },
   { path: "/backoffice/auditoria", label: "Auditoria", icon: Activity },
   { path: "/backoffice/config", label: "Configurações", icon: Settings },
 ];
