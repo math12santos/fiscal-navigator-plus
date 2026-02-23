@@ -1,16 +1,20 @@
 import { PageHeader } from "@/components/PageHeader";
 import { KPICard } from "@/components/KPICard";
-import { DollarSign, TrendingUp, Wallet, PiggyBank, Building2, Plus } from "lucide-react";
+import {
+  DollarSign, TrendingUp, Wallet, PiggyBank, Building2, Plus,
+  FileText, Users, AlertTriangle, Shield, Clock,
+} from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, Legend,
 } from "recharts";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { useCashFlow } from "@/hooks/useCashFlow";
+import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { useMemo } from "react";
-import { startOfMonth, subMonths, endOfMonth, format, startOfYear } from "date-fns";
+import { startOfMonth, subMonths, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const formatCurrency = (v: number) =>
@@ -36,14 +40,25 @@ export default function Dashboard() {
   const { currentOrg, organizations } = useOrganization();
   const navigate = useNavigate();
 
-  // Range: last 6 months including current
   const now = new Date();
   const rangeFrom = startOfMonth(subMonths(now, 5));
   const rangeTo = endOfMonth(now);
 
-  const { entries, totals, isLoading } = useCashFlow(rangeFrom, rangeTo);
+  const {
+    entries,
+    cashflowTotals,
+    activeContractsCount,
+    monthlyContractValue,
+    avgMonthlyPayroll,
+    liabilityTotals,
+    contingenciasProvaveis,
+    runway,
+    monthlyBurn,
+    alerts,
+    isLoading,
+  } = useFinancialSummary(rangeFrom, rangeTo);
 
-  // Previous month range for comparison
+  // Previous vs current month
   const prevMonthStart = startOfMonth(subMonths(now, 1));
   const prevMonthEnd = endOfMonth(subMonths(now, 1));
   const curMonthStart = startOfMonth(now);
@@ -73,23 +88,28 @@ export default function Dashboard() {
 
   // Monthly aggregation for charts
   const monthlyData = useMemo(() => {
-    const months: Record<string, { receita: number; despesas: number }> = {};
+    const months: Record<string, { receita: number; despesas: number; dp: number }> = {};
     for (let i = 5; i >= 0; i--) {
       const key = format(subMonths(now, i), "yyyy-MM");
-      months[key] = { receita: 0, despesas: 0 };
+      months[key] = { receita: 0, despesas: 0, dp: 0 };
     }
     for (const e of entries) {
       const key = e.data_prevista.substring(0, 7);
       if (months[key]) {
         const val = Number(e.valor_realizado ?? e.valor_previsto);
-        if (e.tipo === "entrada") months[key].receita += val;
-        else months[key].despesas += val;
+        if (e.tipo === "entrada") {
+          months[key].receita += val;
+        } else {
+          months[key].despesas += val;
+          if ((e as any).source === "dp") months[key].dp += val;
+        }
       }
     }
     return Object.entries(months).map(([key, v]) => ({
       month: shortMonth(new Date(key + "-01")),
       receita: v.receita,
       despesas: v.despesas,
+      dp: v.dp,
     }));
   }, [entries]);
 
@@ -122,8 +142,7 @@ export default function Dashboard() {
           </div>
           <h2 className="text-lg font-semibold">Cadastre sua primeira empresa</h2>
           <p className="text-sm text-muted-foreground max-w-md">
-            Para começar a usar o FinCore, cadastre uma empresa. Você poderá gerenciar múltiplas empresas
-            posteriormente.
+            Para começar a usar o FinCore, cadastre uma empresa. Você poderá gerenciar múltiplas empresas posteriormente.
           </p>
           <Button onClick={() => navigate("/nova-empresa")} className="mt-2">
             <Plus size={16} className="mr-2" /> Cadastrar Empresa
@@ -135,6 +154,12 @@ export default function Dashboard() {
 
   const noData = entries.length === 0 && !isLoading;
 
+  const alertIcon = (type: string) => {
+    if (type === "danger") return <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />;
+    if (type === "warning") return <Clock className="h-4 w-4 text-warning shrink-0" />;
+    return <Shield className="h-4 w-4 text-primary shrink-0" />;
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -142,7 +167,7 @@ export default function Dashboard() {
         description={currentOrg ? `Visão consolidada — ${currentOrg.name}` : "Visão consolidada da saúde financeira"}
       />
 
-      {/* KPIs */}
+      {/* KPIs Principais */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Receita Mensal"
@@ -167,12 +192,100 @@ export default function Dashboard() {
         />
         <KPICard
           title="Saldo Período"
-          value={formatCurrency(totals.saldo)}
+          value={formatCurrency(cashflowTotals.saldo)}
           change={0}
           subtitle="últimos 6 meses"
           icon={<Wallet size={20} />}
         />
       </div>
+
+      {/* Cards de Contexto */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="glass-card p-5 animate-slide-up">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contratos Ativos</p>
+              <p className="text-2xl font-bold text-foreground">{activeContractsCount}</p>
+              <p className="text-xs text-muted-foreground">{formatCurrency(monthlyContractValue)}/mês</p>
+            </div>
+            <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
+              <FileText size={20} />
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card p-5 animate-slide-up">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Custo Folha</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(avgMonthlyPayroll)}</p>
+              <p className="text-xs text-muted-foreground">mensal estimado</p>
+            </div>
+            <div className="rounded-lg bg-accent/10 p-2.5 text-accent-foreground">
+              <Users size={20} />
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card p-5 animate-slide-up">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Passivos</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(liabilityTotals.total)}</p>
+              <p className="text-xs text-muted-foreground">
+                {contingenciasProvaveis > 0 ? `${formatCurrency(contingenciasProvaveis)} prováveis` : "Sem contingências"}
+              </p>
+            </div>
+            <div className="rounded-lg bg-destructive/10 p-2.5 text-destructive">
+              <Shield size={20} />
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card p-5 animate-slide-up">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Runway</p>
+              <p className={`text-2xl font-bold ${runway <= 3 && runway !== Infinity ? "text-destructive" : "text-success"}`}>
+                {runway === Infinity ? "∞" : `${runway} meses`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                burn: {formatCurrency(monthlyBurn)}/mês
+              </p>
+            </div>
+            <div className={`rounded-lg p-2.5 ${runway <= 3 && runway !== Infinity ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>
+              <AlertTriangle size={20} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Alertas Inteligentes */}
+      {alerts.length > 0 && (
+        <div className="glass-card p-5 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">Alertas</h3>
+          <div className="space-y-2">
+            {alerts.map((alert, i) => (
+              <div
+                key={i}
+                className={`flex items-start gap-3 p-3 rounded-lg border ${
+                  alert.type === "danger"
+                    ? "bg-destructive/5 border-destructive/20"
+                    : alert.type === "warning"
+                    ? "bg-warning/5 border-warning/20"
+                    : "bg-primary/5 border-primary/20"
+                }`}
+              >
+                {alertIcon(alert.type)}
+                <div className="text-sm">
+                  <p className="font-medium text-foreground">{alert.title}</p>
+                  <p className="text-muted-foreground text-xs">{alert.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {noData && (
         <div className="glass-card p-6 text-center text-muted-foreground text-sm">
@@ -187,16 +300,16 @@ export default function Dashboard() {
           <h3 className="text-sm font-semibold text-foreground mb-4">Receita vs Despesas</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 16%)" />
-              <XAxis dataKey="month" tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
               <YAxis
-                tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                 tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12, color: "hsl(215, 20%, 55%)" }} />
-              <Bar dataKey="receita" name="Receita" fill="hsl(174, 72%, 50%)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="despesas" name="Despesas" fill="hsl(262, 60%, 55%)" radius={[4, 4, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="receita" name="Receita" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="despesas" name="Despesas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -251,14 +364,14 @@ export default function Dashboard() {
           <AreaChart data={monthlyData}>
             <defs>
               <linearGradient id="receitaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(174, 72%, 50%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(174, 72%, 50%)" stopOpacity={0} />
+                <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 16%)" />
-            <XAxis dataKey="month" tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
             <YAxis
-              tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 12 }}
+              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
               tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)}
             />
             <Tooltip content={<CustomTooltip />} />
@@ -266,7 +379,7 @@ export default function Dashboard() {
               type="monotone"
               dataKey="receita"
               name="Receita"
-              stroke="hsl(174, 72%, 50%)"
+              stroke="hsl(var(--success))"
               fill="url(#receitaGradient)"
               strokeWidth={2}
             />
