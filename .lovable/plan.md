@@ -1,120 +1,97 @@
 
-# Módulo de Planejamento Financeiro
 
-## Status: Fase 2 + Fase 3 (Passivos) — IMPLEMENTADO
+# Plano de Integração entre Módulos
 
-## Fase 1 — MVP Core ✅
+## Contexto Atual
 
-### Banco de Dados
-- [x] `budget_versions` — versões de orçamento com status (draft/approved/archived)
-- [x] `budget_lines` — linhas mensais por conta/centro de custo
-- [x] `planning_scenarios` — cenários com variáveis parametrizáveis
-- [x] `planning_config` — saldo mínimo, colchão de liquidez, alerta runway
-- [x] RLS policies em todas as tabelas
+Os módulos operam de forma relativamente isolada:
+- **Dashboard** mostra apenas dados do Fluxo de Caixa
+- **DP** calcula custos de folha mas nao projeta no Fluxo de Caixa
+- **Planejamento** tem dados de orçamento e cenários sem cruzar com custos reais de DP
+- **Passivos** existem no Planejamento mas nao aparecem no Dashboard
 
-### Hooks
-- [x] `useBudget.ts` + `useBudgetLines` — CRUD de versões e linhas de orçamento
-- [x] `usePlanningScenarios.ts` — CRUD de cenários + seed padrão
-- [x] `usePlanningConfig.ts` — upsert de configurações de liquidez
+## O Que Será Integrado
 
-### Interface (5 abas)
-- [x] **Visão Geral** — KPIs (receita/despesa/saldo projetados + runway), alerta saldo mínimo, gráfico mensal
-- [x] **Orçamento** — versionamento, linhas por conta/centro/mês, tipos fixo/variável/híbrido
-- [x] **Cenários** — Base/Otimista/Conservador/Stress + custom, gráfico comparativo
-- [x] **Planejado × Realizado** — comparação orçado vs realizado com tabela de variação
-- [x] **Liquidez** — configuração de saldo mínimo, colchão e alerta de runway
+### Fase 1 -- DP gera projeções no Fluxo de Caixa
 
-### Filtro de Horizonte Temporal
-- [x] 3m, 6m, 12m, 24m, Personalizado com seletor de datas
+O hook `useCashFlow` será estendido para gerar projeções virtuais (assim como já faz com contratos) a partir dos colaboradores ativos do DP. Para cada mês no range consultado, o sistema gerará lançamentos do tipo "saída" com:
 
-## Fase 2 — Planejamento Avançado ✅
+- **Folha de pagamento**: salário base + encargos (INSS, FGTS, RAT, Terceiros)
+- **Vale Transporte**: custo líquido (VT diário x 22 dias - desconto 6%)
+- **Benefícios**: soma dos benefícios ativos de cada colaborador
+- **Provisões**: 13o proporcional e férias proporcionais
 
-### Banco de Dados
-- [x] `scenario_overrides` — overrides por conta/centro de custo por cenário
+Cada projeção terá `source: "dp"` e um `id` prefixado com `proj-dp-` para diferenciar de projeções de contratos. Os lançamentos serão agrupados por centro de custo quando o colaborador tiver um `cost_center_id` associado.
 
-### Hooks
-- [x] `useScenarioOverrides.ts` — CRUD de overrides por cenário
+### Fase 2 -- Dashboard Executivo Consolidado
 
-### Funcionalidades
-- [x] Overrides por conta/centro (ajuste fino no cenário) — dialog com tabela + formulário inline
-- [x] Projeções automáticas baseadas em histórico + contratos ativos (via useCashFlow híbrido)
-- [x] Modo híbrido (fluxo de caixa real + contratos recorrentes como base de projeção)
-- [ ] Relatórios exportáveis (PDF/Excel) — pendente integração de lib de export
+O Dashboard será reformulado para exibir dados de todos os módulos:
 
-## Fase 3 — Governança (Parcial)
+**Seção 1 -- KPIs Principais (já existem, serão enriquecidos)**
+- Receita, Despesas, Resultado e Saldo (já funciona via cashflow)
 
-### Banco de Dados
-- [x] `liabilities` — passivos com tipo, probabilidade, stress e vínculos
+**Seção 2 -- Cards de Contexto (novos)**
+- Contratos Ativos / Valor comprometido mensal
+- Custo total de folha mensal (do DP)
+- Passivos totais / Contingências prováveis
+- Runway estimado (saldo / burn rate mensal)
 
-### Hooks
-- [x] `useLiabilities.ts` — CRUD + totais computados (dívidas, contingências, provisões, stress)
+**Seção 3 -- Alertas Inteligentes (novo)**
+- Contratos próximos do vencimento (< 30 dias)
+- Saldo projetado abaixo do mínimo configurado
+- Passivos com status "Judicial"
+- Orçamento excedido vs realizado
 
-### Interface
-- [x] **Passivos** (nova aba) — KPIs, filtro por tipo, tabela CRUD completa com dialog de edição
-  - Tipos: Dívida, Contingência, Provisão
-  - Status: Ativo, Negociação, Judicial, Quitado
-  - Probabilidade (contingências): Provável, Possível, Remota
-  - Impacto de stress (% adicional sob cenário adverso)
-  - Vínculos com entidade, contrato e centro de custo
+**Seção 4 -- Gráficos (aprimorados)**
+- Receita vs Despesas (já existe)
+- Composição de Despesas incluindo DP como categoria
+- Evolução de Receita (já existe)
 
-### Pendente (Fase 3)
-- [ ] Gestão de Patrimônio + depreciação gerencial
-- [ ] Gestão de Ativos Financeiros + rendimentos
-- [ ] Investor Pack (templates + geração versionada)
+### Fase 3 -- Planejamento usa dados reais
 
-## Fase 4 — Planejamento Comercial ✅
+A aba "Planejado x Realizado" do Planejamento será conectada ao:
+- Fluxo de Caixa real (já parcialmente feito)
+- Custo de DP real (folha efetiva vs orçada)
+- Passivos realizados vs provisionados
 
-### Banco de Dados
-- [x] `commercial_plans` — planos com modo top-down/bottom-up, período e orçamento
-- [x] `commercial_budget_lines` — linhas orçamentárias (fixos, variáveis, mídia)
-- [x] `commercial_channels` — canais de venda com funil de conversão
-- [x] `commercial_scenarios` — cenários comerciais (conservador/realista/agressivo)
-- [x] RLS policies em todas as tabelas
-
-### Hooks
-- [x] `useCommercialPlanning.ts` — CRUD de planos, linhas, canais e cenários + projeções
-
-### Interface (7ª aba "Comercial")
-- [x] Seletor de modo (Top-down / Bottom-up)
-- [x] KPIs executivos: Orçamento, Comprometido, Runway Comercial, Receita, ROI, Payback
-- [x] Linhas orçamentárias: Equipe (com encargos), Software, Comissões, Mídia
-- [x] Funil de vendas por canal: Leads, conversões, ticket médio, ciclo, tipo contrato
-- [x] Canais pré-definidos (Google Ads, Meta, LinkedIn, Indicação, Orgânico) + custom
-- [x] Tabela executiva de projeção por canal com ROI/Payback individuais
-- [x] Simulador de cenários com gráfico comparativo
-- [x] Alertas automáticos: orçamento excedido, funil vazio, ROI negativo, payback > período
-- [x] Trava orçamentária com pop-up de aprovação
+A aba "Visão Geral" incluirá o custo de DP nos KPIs de despesa projetada.
 
 ---
 
-# Módulo Backoffice Administrativo
+## Detalhes Técnicos
 
-## Status: Implementado ✅
+### Alterações no `useCashFlow.ts`
+- Importar dados de colaboradores ativos via `useDP` ou query direta
+- Nova função `generateProjectionsFromPayroll()` similar a `generateProjectionsFromContract()`
+- Mesclar projeções de DP no array `allEntries` mantendo a mesma interface `CashFlowEntry`
 
-### Banco de Dados
-- [x] `user_roles` — roles globais (master/admin/user) com enum `app_role`
-- [x] `user_permissions` — permissões por módulo/aba/organização
-- [x] `organizations.status` — campo de status (ativa/suspensa/onboarding)
-- [x] `organizations.plano` — campo de plano (básico/profissional/enterprise)
-- [x] `profiles.cargo` — campo de cargo do usuário
-- [x] `profiles.active` — campo de status ativo/inativo
-- [x] RLS: Masters podem ver todas as orgs, profiles, membros e roles
+### Novo hook `useFinancialSummary.ts`
+Hook centralizado que agrega dados de múltiplos módulos para o Dashboard:
+- `useCashFlow` para receitas/despesas
+- `useContracts` para contagem e valor comprometido
+- `useDP` + `useDPBenefits` para custo de folha
+- `useLiabilities` para passivos
+- `usePlanningConfig` para alertas de liquidez
 
-### Hooks
-- [x] `useBackoffice.ts` — queries e mutations para todo o backoffice
+### Alterações no `Dashboard.tsx`
+- Importar `useFinancialSummary` em vez de apenas `useCashFlow`
+- Adicionar seção de cards contextuais
+- Adicionar painel de alertas
+- Incluir DP na composição de despesas
 
-### Interface
-- [x] Layout separado com tema claro corporativo (`BackofficeLayout.tsx`)
-- [x] Guard de acesso: apenas usuários com role `master` acessam `/backoffice/*`
-- [x] **Listagem de Empresas** — cards/lista com filtros (nome, CNPJ, status, plano)
-- [x] **Tela Interna** com 7 abas:
-  1. Resumo — KPIs, informações da empresa
-  2. Usuários — tabela com nome, cargo, role, status, ações
-  3. Permissões & Granularidade — Camada A (módulos), Camada B (escopos), Ações Sensíveis
-  4. Módulos — visão geral dos módulos ativos com contagem de usuários
-  5. Auditoria — logs filtráveis por ação e busca
-  6. Integrações — placeholder
-  7. Plano & Cobrança — seletor de plano + placeholder cobrança
-- [x] Clonagem de permissões entre usuários
-- [x] Módulos placeholder: Departamento Pessoal, Documentos da Empresa
-- [x] Usuário master: m.santos@colliservice.com.br
+### Alterações em `PlanningOverview.tsx` e `PlannedVsActual.tsx`
+- Incluir custo de DP nas projeções de despesa
+- Cruzar orçamento de RH com folha real
+
+### Arquivos a criar
+- `src/hooks/useFinancialSummary.ts`
+
+### Arquivos a modificar
+- `src/hooks/useCashFlow.ts` -- adicionar projeções de DP
+- `src/pages/Dashboard.tsx` -- dashboard consolidado
+- `src/components/planning/PlanningOverview.tsx` -- incluir DP nos KPIs
+- `src/components/planning/PlannedVsActual.tsx` -- cruzar DP real vs orçado
+
+### Sem alterações de banco de dados
+Todas as tabelas necessárias já existem. A integração é puramente lógica no frontend, usando os dados já disponíveis para gerar projeções e cruzamentos.
+
