@@ -13,7 +13,7 @@ export function useUserPermissions() {
   const { user } = useAuth();
   const { currentOrg, currentRole } = useOrganization();
 
-  const { data: permissions = [], isLoading } = useQuery({
+  const { data: permissions = [], isLoading, isFetching } = useQuery({
     queryKey: ["user_permissions", user?.id, currentOrg?.id],
     queryFn: async () => {
       if (!user || !currentOrg) return [];
@@ -26,7 +26,9 @@ export function useUserPermissions() {
       return (data ?? []) as Permission[];
     },
     enabled: !!user && !!currentOrg,
-    staleTime: 30_000,
+    staleTime: 10_000,
+    // Don't keep previous org data when switching orgs
+    placeholderData: undefined,
   });
 
   // Check if user has a master role (bypasses all permissions)
@@ -46,8 +48,10 @@ export function useUserPermissions() {
     staleTime: 60_000,
   });
 
-  // Owners always have full access
+  // Owners and admins always have full access
   const isOwner = currentRole === "owner";
+  const isAdmin = currentRole === "admin";
+  const hasFullAccess = isMaster || isOwner || isAdmin;
 
   // Filter out meta-permissions (scope, action) to check if real module perms exist
   const hasConfiguredPermissions = permissions.some(
@@ -55,9 +59,11 @@ export function useUserPermissions() {
   );
 
   const canAccessModule = (moduleKey: string): boolean => {
-    if (isMaster || isOwner) return true;
-    // If no module permissions configured at all, default to full access (backwards compat)
-    if (!hasConfiguredPermissions) return true;
+    // While loading permissions for a new org, block access for non-privileged users
+    if (isLoading && !hasFullAccess) return false;
+    if (hasFullAccess) return true;
+    // If no module permissions configured, deny (must be configured via Backoffice)
+    if (!hasConfiguredPermissions) return false;
     // Check module-level permission (tab is null)
     const modulePerm = permissions.find(
       (p) => p.module === moduleKey && p.tab === null
@@ -71,21 +77,21 @@ export function useUserPermissions() {
   };
 
   const canAccessTab = (moduleKey: string, tabKey: string): boolean => {
-    if (isMaster || isOwner) return true;
-    if (!hasConfiguredPermissions) return true;
+    if (hasFullAccess) return true;
+    if (!hasConfiguredPermissions) return false;
     const tabPerm = permissions.find(
       (p) => p.module === moduleKey && p.tab === tabKey
     );
     if (tabPerm) return tabPerm.allowed;
     // No explicit tab permission — allow if module is allowed (no tab granularity configured)
     const hasAnyTabPerms = permissions.some((p) => p.module === moduleKey && p.tab !== null);
-    if (hasAnyTabPerms) return false; // tabs are configured but this one isn't → denied
+    if (hasAnyTabPerms) return false;
     return canAccessModule(moduleKey);
   };
 
   const getAllowedTabs = (moduleKey: string, allTabs: { key: string; label: string }[]) => {
-    if (isMaster || isOwner) return allTabs;
-    if (!hasConfiguredPermissions) return allTabs;
+    if (hasFullAccess) return allTabs;
+    if (!hasConfiguredPermissions) return [];
     return allTabs.filter((t) => canAccessTab(moduleKey, t.key));
   };
 
@@ -94,6 +100,7 @@ export function useUserPermissions() {
     isLoading,
     isMaster,
     isOwner,
+    hasFullAccess,
     canAccessModule,
     canAccessTab,
     getAllowedTabs,
