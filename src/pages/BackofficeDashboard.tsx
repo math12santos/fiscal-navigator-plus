@@ -6,8 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Building2, Users, LayoutGrid, List, Settings } from "lucide-react";
+import { Search, Building2, Users, LayoutGrid, List, Settings, LogIn } from "lucide-react";
 import { useBackofficeOrgs, useBackofficeOrgMemberCounts } from "@/hooks/useBackoffice";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -20,7 +24,52 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
 export default function BackofficeDashboard() {
   const { data: orgs = [], isLoading } = useBackofficeOrgs();
   const { data: memberCounts = {} } = useBackofficeOrgMemberCounts();
+  const { setCurrentOrg, refetch: refetchOrgs } = useOrganization();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
+  const [entering, setEntering] = useState<string | null>(null);
+
+  const handleEnterCompany = async (org: typeof orgs[0]) => {
+    if (!user) return;
+    setEntering(org.id);
+    try {
+      // Ensure master is a member (owner) of this org
+      const { data: existing } = await supabase
+        .from("organization_members")
+        .select("id, role")
+        .eq("organization_id", org.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase.from("organization_members").insert({
+          organization_id: org.id,
+          user_id: user.id,
+          role: "owner",
+        });
+      } else if (existing.role !== "owner") {
+        await supabase.from("organization_members").update({ role: "owner" }).eq("id", existing.id);
+      }
+
+      await refetchOrgs();
+      setCurrentOrg({
+        id: org.id,
+        name: org.name,
+        document_type: org.document_type,
+        document_number: org.document_number,
+        logo_url: org.logo_url,
+        created_by: org.created_by,
+        created_at: org.created_at,
+        updated_at: org.updated_at,
+      });
+      navigate("/");
+    } catch (err) {
+      toast({ title: "Erro ao acessar empresa", variant: "destructive" });
+    } finally {
+      setEntering(null);
+    }
+  };
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("__all__");
@@ -140,9 +189,21 @@ export default function BackofficeDashboard() {
                     <span className="text-[10px] text-muted-foreground">
                       Última atualização: {format(new Date(org.updated_at), "dd/MM/yyyy", { locale: ptBR })}
                     </span>
-                    <Button variant="outline" size="sm" className="h-7 text-xs">
-                      <Settings size={12} className="mr-1" /> Gerenciar
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={(e) => { e.stopPropagation(); handleEnterCompany(org); }}
+                        disabled={entering === org.id}
+                      >
+                        <LogIn size={12} className="mr-1" />
+                        {entering === org.id ? "Entrando..." : "Acessar"}
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/backoffice/empresa/${org.id}`); }}>
+                        <Settings size={12} className="mr-1" /> Gerenciar
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -160,7 +221,7 @@ export default function BackofficeDashboard() {
                 <TableHead>Status</TableHead>
                 <TableHead>Usuários</TableHead>
                 <TableHead>Última Atividade</TableHead>
-                <TableHead className="w-24">Ações</TableHead>
+                <TableHead className="w-48">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -177,14 +238,26 @@ export default function BackofficeDashboard() {
                       {format(new Date(org.updated_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => navigate(`/backoffice/empresa/${org.id}`)}
-                      >
-                        Gerenciar
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => handleEnterCompany(org)}
+                          disabled={entering === org.id}
+                        >
+                          <LogIn size={12} className="mr-1" />
+                          {entering === org.id ? "Entrando..." : "Acessar"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => navigate(`/backoffice/empresa/${org.id}`)}
+                        >
+                          Gerenciar
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
