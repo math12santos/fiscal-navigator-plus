@@ -50,7 +50,7 @@ export function useBackofficeOrgMembers(orgId?: string) {
   return useQuery({
     queryKey: ["backoffice_org_members", orgId],
     queryFn: async () => {
-      const query = supabase.from("organization_members").select("*, profiles:user_id(id, full_name, cargo, active)" as any);
+      const query = supabase.from("organization_members").select("*");
       if (orgId) {
         query.eq("organization_id", orgId);
       }
@@ -58,7 +58,7 @@ export function useBackofficeOrgMembers(orgId?: string) {
       if (error) throw error;
       return data as any[];
     },
-    enabled: orgId ? true : false,
+    enabled: !!orgId,
   });
 }
 
