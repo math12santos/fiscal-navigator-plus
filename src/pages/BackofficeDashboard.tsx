@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Building2, Users, LayoutGrid, List, Settings, LogIn } from "lucide-react";
+import { Search, Building2, Users, LayoutGrid, List, Settings, LogIn, Plus } from "lucide-react";
 import { useBackofficeOrgs, useBackofficeOrgMemberCounts } from "@/hooks/useBackoffice";
+import { CreateOrgDialog } from "@/components/CreateOrgDialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,7 @@ export default function BackofficeDashboard() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [entering, setEntering] = useState<string | null>(null);
+  const [createOrgOpen, setCreateOrgOpen] = useState(false);
 
   const handleEnterCompany = async (org: typeof orgs[0]) => {
     if (!user) return;
@@ -90,11 +92,16 @@ export default function BackofficeDashboard() {
   return (
     <div className="animate-fade-in space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Empresas Cadastradas</h1>
-        <p className="text-sm text-muted-foreground">
-          {orgs.length} empresa{orgs.length !== 1 ? "s" : ""} na plataforma
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Empresas Cadastradas</h1>
+          <p className="text-sm text-muted-foreground">
+            {orgs.length} empresa{orgs.length !== 1 ? "s" : ""} na plataforma
+          </p>
+        </div>
+        <Button onClick={() => setCreateOrgOpen(true)}>
+          <Plus size={14} className="mr-1" /> Criar Empresa
+        </Button>
       </div>
 
       {/* Filters */}
@@ -266,6 +273,7 @@ export default function BackofficeDashboard() {
           </Table>
         </div>
       )}
+      <CreateOrgDialog open={createOrgOpen} onOpenChange={setCreateOrgOpen} />
     </div>
   );
 }

@@ -1267,6 +1267,45 @@ export type Database = {
           },
         ]
       }
+      organization_holdings: {
+        Row: {
+          created_at: string
+          created_by: string
+          holding_id: string
+          id: string
+          subsidiary_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          holding_id: string
+          id?: string
+          subsidiary_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          holding_id?: string
+          id?: string
+          subsidiary_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_holdings_holding_id_fkey"
+            columns: ["holding_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_holdings_subsidiary_id_fkey"
+            columns: ["subsidiary_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
