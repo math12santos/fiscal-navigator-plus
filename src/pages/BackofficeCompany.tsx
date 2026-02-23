@@ -131,6 +131,12 @@ export default function BackofficeCompany() {
   const [editName, setEditName] = useState("");
   const [editDocNumber, setEditDocNumber] = useState("");
   const [editPlano, setEditPlano] = useState("");
+  const [activeTab, setActiveTab] = useState("resumo");
+  const [editUserOpen, setEditUserOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<any>(null);
+  const [editUserRole, setEditUserRole] = useState("");
+  const [editUserCargo, setEditUserCargo] = useState("");
+  const [editUserName, setEditUserName] = useState("");
 
   const profileMap = useMemo(() => {
     const map: Record<string, any> = {};
@@ -204,6 +210,42 @@ export default function BackofficeCompany() {
     );
   };
 
+  const handleViewUserLogs = (userId: string) => {
+    setAuditSearch(userId.substring(0, 8));
+    setActiveTab("auditoria");
+  };
+
+  const handleOpenEditUser = (member: any) => {
+    const profile = profileMap[member.user_id];
+    setEditingMember(member);
+    setEditUserRole(member.role);
+    setEditUserCargo(profile?.cargo || "");
+    setEditUserName(profile?.full_name || "");
+    setEditUserOpen(true);
+  };
+
+  const handleSaveEditUser = async () => {
+    if (!editingMember || !orgId) return;
+    try {
+      // Update role in organization_members
+      await supabase
+        .from("organization_members")
+        .update({ role: editUserRole })
+        .eq("id", editingMember.id);
+      // Update profile
+      await supabase
+        .from("profiles")
+        .update({ full_name: editUserName, cargo: editUserCargo })
+        .eq("id", editingMember.user_id);
+      toast({ title: "Usuário atualizado com sucesso" });
+      setEditUserOpen(false);
+      qc.invalidateQueries({ queryKey: ["backoffice_org_members"] });
+      qc.invalidateQueries({ queryKey: ["backoffice_profiles"] });
+    } catch (err: any) {
+      toast({ title: "Erro ao atualizar", description: err.message, variant: "destructive" });
+    }
+  };
+
   if (!org) {
     return (
       <div className="text-center py-16 text-muted-foreground">
@@ -253,7 +295,7 @@ export default function BackofficeCompany() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="resumo" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex-wrap">
           <TabsTrigger value="resumo">Resumo</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
@@ -377,12 +419,18 @@ export default function BackofficeCompany() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7"
-                              onClick={() => setSelectedUserId(m.user_id)}
-                              title="Ver permissões"
+                              onClick={() => handleViewUserLogs(m.user_id)}
+                              title="Ver logs do usuário"
                             >
                               <Eye size={13} />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleOpenEditUser(m)}
+                              title="Editar usuário"
+                            >
                               <Edit2 size={13} />
                             </Button>
                           </div>
@@ -661,6 +709,41 @@ export default function BackofficeCompany() {
         currentOrgName={org.name}
         onSuccess={() => qc.invalidateQueries({ queryKey: ["backoffice_org_members"] })}
       />
+      {/* Edit User Dialog */}
+      <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome Completo</Label>
+              <Input value={editUserName} onChange={(e) => setEditUserName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Cargo</Label>
+              <Input value={editUserCargo} onChange={(e) => setEditUserCargo(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Role na Organização</Label>
+              <Select value={editUserRole} onValueChange={setEditUserRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLES.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditUserOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEditUser}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
