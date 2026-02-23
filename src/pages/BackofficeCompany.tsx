@@ -127,6 +127,10 @@ export default function BackofficeCompany() {
   const [cloneTargetId, setCloneTargetId] = useState<string>("");
   const [auditSearch, setAuditSearch] = useState("");
   const [auditActionFilter, setAuditActionFilter] = useState("__all__");
+  const [editOrgOpen, setEditOrgOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDocNumber, setEditDocNumber] = useState("");
+  const [editPlano, setEditPlano] = useState("");
 
   const profileMap = useMemo(() => {
     const map: Record<string, any> = {};
@@ -154,6 +158,27 @@ export default function BackofficeCompany() {
     if (!orgId) return;
     updateOrg.mutate({ id: orgId, status: status as any });
     toast({ title: `Status alterado para ${status}` });
+  };
+
+  const handleOpenEditOrg = () => {
+    if (!org) return;
+    setEditName(org.name);
+    setEditDocNumber(org.document_number);
+    setEditPlano(org.plano);
+    setEditOrgOpen(true);
+  };
+
+  const handleSaveEditOrg = () => {
+    if (!orgId) return;
+    updateOrg.mutate(
+      { id: orgId, name: editName, document_number: editDocNumber, plano: editPlano as any },
+      {
+        onSuccess: () => {
+          toast({ title: "Empresa atualizada com sucesso" });
+          setEditOrgOpen(false);
+        },
+      }
+    );
   };
 
   const handleToggleModule = (userId: string, module: string, currentlyAllowed: boolean) => {
@@ -249,14 +274,56 @@ export default function BackofficeCompany() {
             <SummaryCard icon={Activity} label="Última Atividade" value={format(new Date(org.updated_at), "dd/MM/yy")} />
           </div>
           <Card>
-            <CardHeader><CardTitle className="text-sm">Informações da Empresa</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm">Informações da Empresa</CardTitle>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleOpenEditOrg}>
+                <Edit2 size={12} className="mr-1" /> Editar
+              </Button>
+            </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2 text-sm">
               <div><span className="text-muted-foreground">Nome:</span> <span className="text-foreground font-medium ml-1">{org.name}</span></div>
               <div><span className="text-muted-foreground">Documento:</span> <span className="font-mono ml-1 text-foreground">{org.document_type} {org.document_number}</span></div>
               <div><span className="text-muted-foreground">Criada em:</span> <span className="ml-1 text-foreground">{format(new Date(org.created_at), "dd/MM/yyyy", { locale: ptBR })}</span></div>
               <div><span className="text-muted-foreground">Status:</span> <Badge variant="outline" className="ml-1 capitalize">{org.status}</Badge></div>
+              <div><span className="text-muted-foreground">Plano:</span> <Badge variant="outline" className="ml-1 capitalize">{org.plano}</Badge></div>
             </CardContent>
           </Card>
+
+          {/* Edit Org Dialog */}
+          <Dialog open={editOrgOpen} onOpenChange={setEditOrgOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Empresa</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label>Nome</Label>
+                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Número do Documento</Label>
+                  <Input value={editDocNumber} onChange={(e) => setEditDocNumber(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Plano</Label>
+                  <Select value={editPlano} onValueChange={setEditPlano}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="starter">Starter</SelectItem>
+                      <SelectItem value="pro">Pro</SelectItem>
+                      <SelectItem value="enterprise">Enterprise</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditOrgOpen(false)}>Cancelar</Button>
+                <Button onClick={handleSaveEditOrg} disabled={updateOrg.isPending}>Salvar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* ===== USUÁRIOS ===== */}
