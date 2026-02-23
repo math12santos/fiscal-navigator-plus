@@ -16,6 +16,7 @@ import Tarefas from "@/pages/Tarefas";
 import Integracoes from "@/pages/Integracoes";
 import IAFinanceira from "@/pages/IAFinanceira";
 import Configuracoes from "@/pages/Configuracoes";
+import DepartamentoPessoal from "@/pages/DepartamentoPessoal";
 import CreateOrganization from "@/pages/CreateOrganization";
 import BackofficeDashboard from "@/pages/BackofficeDashboard";
 import BackofficeCompany from "@/pages/BackofficeCompany";
@@ -52,6 +53,7 @@ function ProtectedRoutes() {
         <Route path="/integracoes" element={<Integracoes />} />
         <Route path="/ia" element={<IAFinanceira />} />
         <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/dp" element={<DepartamentoPessoal />} />
         <Route path="/nova-empresa" element={<CreateOrganization />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
