@@ -39,6 +39,7 @@ import {
   useManagePermissions,
   useBackofficeAuditLog,
 } from "@/hooks/useBackoffice";
+import { CreateUserDialog } from "@/components/CreateUserDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -115,6 +116,7 @@ export default function BackofficeCompany() {
   const [userSearch, setUserSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [addUserOpen, setAddUserOpen] = useState(false);
+  const [createUserOpen, setCreateUserOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserRole, setNewUserRole] = useState("member");
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
@@ -260,6 +262,9 @@ export default function BackofficeCompany() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
               <Input placeholder="Buscar usuário..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="pl-9" />
             </div>
+            <Button onClick={() => setCreateUserOpen(true)} size="sm">
+              <Plus size={14} className="mr-1" /> Criar Usuário
+            </Button>
             <Button onClick={() => setCloneDialogOpen(true)} variant="outline" size="sm">
               <Copy size={14} className="mr-1" /> Clonar Permissões
             </Button>
@@ -572,6 +577,14 @@ export default function BackofficeCompany() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Create User Dialog */}
+      <CreateUserDialog
+        open={createUserOpen}
+        onOpenChange={setCreateUserOpen}
+        currentOrgId={orgId}
+        currentOrgName={org.name}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ["backoffice_org_members"] })}
+      />
     </div>
   );
 }
