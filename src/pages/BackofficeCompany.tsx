@@ -42,6 +42,7 @@ import {
   useBackofficeAuditLog,
 } from "@/hooks/useBackoffice";
 import { CreateUserDialog } from "@/components/CreateUserDialog";
+import { CreateOrgDialog } from "@/components/CreateOrgDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -618,6 +619,7 @@ function HoldingTab({ orgId, orgs, orgName }: { orgId: string; orgs: any[]; orgN
   const { toast } = useToast();
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const [createOrgOpen, setCreateOrgOpen] = useState(false);
   const [selectedOrgId, setSelectedOrgId] = useState("");
   const [linkAs, setLinkAs] = useState<"holding" | "subsidiary">("subsidiary");
   const [loading, setLoading] = useState(false);
@@ -770,14 +772,20 @@ function HoldingTab({ orgId, orgs, orgName }: { orgId: string; orgs: any[]; orgN
             </div>
             <div className="space-y-1.5">
               <Label>{linkAs === "subsidiary" ? "Empresa subsidiária" : "Empresa holding"}</Label>
-              <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
-                <SelectTrigger><SelectValue placeholder="Selecione uma empresa" /></SelectTrigger>
-                <SelectContent>
-                  {availableOrgs.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione uma empresa" /></SelectTrigger>
+                  <SelectContent>
+                    {availableOrgs.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="icon" className="shrink-0" onClick={() => setCreateOrgOpen(true)} title="Criar nova empresa">
+                  <Plus size={14} />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Ou crie uma nova empresa clicando no botão +</p>
             </div>
           </div>
           <DialogFooter>
@@ -788,6 +796,13 @@ function HoldingTab({ orgId, orgs, orgName }: { orgId: string; orgs: any[]; orgN
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreateOrgDialog open={createOrgOpen} onOpenChange={(open) => {
+        setCreateOrgOpen(open);
+        if (!open) {
+          qc.invalidateQueries({ queryKey: ["backoffice_orgs"] });
+        }
+      }} />
     </div>
   );
 }
