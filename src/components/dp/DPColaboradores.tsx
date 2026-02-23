@@ -88,8 +88,8 @@ export default function DPColaboradores() {
       ...form,
       salary_base: Number(form.salary_base) || 0,
       workload_hours: Number(form.workload_hours) || 44,
-      position_id: form.position_id || null,
-      cost_center_id: form.cost_center_id || null,
+      position_id: form.position_id && form.position_id !== "__none__" ? form.position_id : null,
+      cost_center_id: form.cost_center_id && form.cost_center_id !== "__none__" ? form.cost_center_id : null,
     };
 
     if (editing) {
@@ -201,7 +201,7 @@ export default function DPColaboradores() {
                 <Select value={form.position_id} onValueChange={(v) => setForm({ ...form, position_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="__none__">Nenhum</SelectItem>
                     {positions.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -211,7 +211,7 @@ export default function DPColaboradores() {
                 <Select value={form.cost_center_id} onValueChange={(v) => setForm({ ...form, cost_center_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="__none__">Nenhum</SelectItem>
                     {costCenters.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
