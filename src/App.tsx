@@ -20,6 +20,9 @@ import DepartamentoPessoal from "@/pages/DepartamentoPessoal";
 import CreateOrganization from "@/pages/CreateOrganization";
 import BackofficeDashboard from "@/pages/BackofficeDashboard";
 import BackofficeCompany from "@/pages/BackofficeCompany";
+import BackofficeUsers from "@/pages/BackofficeUsers";
+import BackofficeAudit from "@/pages/BackofficeAudit";
+import BackofficeConfig from "@/pages/BackofficeConfig";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
@@ -91,6 +94,9 @@ function BackofficeRoutes() {
     <BackofficeLayout>
       <Routes>
         <Route path="/" element={<BackofficeDashboard />} />
+        <Route path="/usuarios" element={<BackofficeUsers />} />
+        <Route path="/auditoria" element={<BackofficeAudit />} />
+        <Route path="/config" element={<BackofficeConfig />} />
         <Route path="/empresa/:orgId" element={<BackofficeCompany />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
