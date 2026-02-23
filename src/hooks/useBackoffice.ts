@@ -92,6 +92,7 @@ export function useBackofficePermissions(orgId: string, userId?: string) {
       return data ?? [];
     },
     enabled: !!orgId,
+    staleTime: 5000,
   });
 }
 
@@ -153,7 +154,40 @@ export function useManagePermissions() {
         if (error) throw error;
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["backoffice_permissions"] }),
+    onMutate: async (perm) => {
+      // Cancel outgoing refetches
+      await qc.cancelQueries({ queryKey: ["backoffice_permissions", perm.organization_id] });
+      
+      // Snapshot previous value
+      const previousPerms = qc.getQueryData(["backoffice_permissions", perm.organization_id, undefined]);
+      
+      // Optimistically update cache
+      qc.setQueryData(["backoffice_permissions", perm.organization_id, undefined], (old: any[] | undefined) => {
+        if (!old) return old;
+        const key = perm.tab ? `${perm.module}:${perm.tab}` : perm.module;
+        const existingIdx = old.findIndex((p: any) => 
+          p.user_id === perm.user_id && p.module === perm.module && (perm.tab ? p.tab === perm.tab : !p.tab)
+        );
+        if (existingIdx >= 0) {
+          const updated = [...old];
+          updated[existingIdx] = { ...updated[existingIdx], allowed: perm.allowed };
+          return updated;
+        }
+        return [...old, { ...perm, id: `temp-${Date.now()}`, granted_by: user!.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }];
+      });
+      
+      return { previousPerms };
+    },
+    onError: (_err, perm, context) => {
+      // Rollback on error
+      if (context?.previousPerms) {
+        qc.setQueryData(["backoffice_permissions", perm.organization_id, undefined], context.previousPerms);
+      }
+    },
+    onSettled: (_data, _err, perm) => {
+      // Refetch after settle to ensure consistency
+      qc.invalidateQueries({ queryKey: ["backoffice_permissions", perm.organization_id] });
+    },
   });
 
   const clonePermissions = useMutation({
