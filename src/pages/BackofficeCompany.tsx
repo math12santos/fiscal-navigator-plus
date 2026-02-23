@@ -50,14 +50,43 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-const MODULES = [
+const MODULES: { key: string; label: string; tabs?: { key: string; label: string }[] }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "fluxo-caixa", label: "Fluxo de Caixa" },
-  { key: "contratos", label: "Contratos" },
-  { key: "planejamento", label: "Planejamento" },
+  {
+    key: "contratos",
+    label: "Contratos",
+  },
+  {
+    key: "planejamento",
+    label: "Planejamento",
+    tabs: [
+      { key: "visao-geral", label: "Visão Geral" },
+      { key: "orcamento", label: "Orçamento" },
+      { key: "cenarios", label: "Cenários" },
+      { key: "planejado-realizado", label: "Planejado × Realizado" },
+      { key: "liquidez", label: "Liquidez" },
+      { key: "passivos", label: "Passivos" },
+      { key: "rh", label: "RH" },
+      { key: "comercial", label: "Comercial" },
+    ],
+  },
   { key: "conciliacao", label: "Conciliação" },
-  { key: "dp", label: "Departamento Pessoal", placeholder: true },
-  { key: "documentos", label: "Documentos da Empresa", placeholder: true },
+  {
+    key: "dp",
+    label: "Departamento Pessoal",
+    tabs: [
+      { key: "dashboard", label: "Dashboard" },
+      { key: "colaboradores", label: "Colaboradores" },
+      { key: "folha", label: "Folha" },
+      { key: "ferias", label: "Férias / 13º" },
+      { key: "rescisoes", label: "Rescisões" },
+      { key: "encargos", label: "Encargos" },
+      { key: "cargos", label: "Cargos & Rotinas" },
+      { key: "config", label: "Configurações" },
+    ],
+  },
+  { key: "documentos", label: "Documentos da Empresa" },
 ];
 
 const SCOPES = [
@@ -468,20 +497,48 @@ export default function BackofficeCompany() {
                 <CardHeader>
                   <CardTitle className="text-sm">Camada A — Acesso ao Módulo</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {MODULES.map((mod) => (
-                    <div key={mod.key} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-foreground">{mod.label}</span>
-                        {mod.placeholder && <Badge variant="outline" className="text-[10px]">Em breve</Badge>}
+                <CardContent className="space-y-1">
+                  {MODULES.map((mod) => {
+                    const moduleEnabled = permMap[mod.key] ?? false;
+                    return (
+                      <div key={mod.key}>
+                        <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                          <span className="text-sm text-foreground font-medium">{mod.label}</span>
+                          <Switch
+                            checked={moduleEnabled}
+                            onCheckedChange={() => handleToggleModule(selectedUserId, mod.key, moduleEnabled)}
+                          />
+                        </div>
+                        {/* Tab-level permissions when module is enabled and has tabs */}
+                        {moduleEnabled && mod.tabs && mod.tabs.length > 0 && (
+                          <div className="ml-6 border-l border-border/50 pl-4 py-1 space-y-1">
+                            {mod.tabs.map((tab) => {
+                              const tabKey = `${mod.key}:${tab.key}`;
+                              const tabAllowed = permMap[tabKey] ?? true;
+                              return (
+                                <div key={tab.key} className="flex items-center justify-between py-1.5">
+                                  <span className="text-xs text-muted-foreground">{tab.label}</span>
+                                  <Switch
+                                    className="scale-75"
+                                    checked={tabAllowed}
+                                    onCheckedChange={() => {
+                                      upsertPermission.mutate({
+                                        user_id: selectedUserId,
+                                        organization_id: orgId!,
+                                        module: mod.key,
+                                        tab: tab.key,
+                                        allowed: !tabAllowed,
+                                      });
+                                    }}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                      <Switch
-                        checked={permMap[mod.key] ?? false}
-                        onCheckedChange={() => handleToggleModule(selectedUserId, mod.key, permMap[mod.key] ?? false)}
-                        disabled={mod.placeholder}
-                      />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </CardContent>
               </Card>
 
@@ -542,7 +599,6 @@ export default function BackofficeCompany() {
                     <div key={mod.key} className="flex items-center justify-between p-3 border border-border rounded-lg">
                       <div>
                         <span className="text-sm font-medium text-foreground">{mod.label}</span>
-                        {mod.placeholder && <Badge variant="outline" className="ml-2 text-[10px]">Placeholder</Badge>}
                         <p className="text-xs text-muted-foreground">{activeUsers} usuário(s) com acesso</p>
                       </div>
                       <Badge variant={activeUsers > 0 ? "default" : "secondary"}>
