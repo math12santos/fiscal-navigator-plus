@@ -6,7 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Building2, Users, LayoutGrid, List, Settings, LogIn, Plus } from "lucide-react";
+import { Search, Building2, Users, LayoutGrid, List, Settings, LogIn, Plus, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useBackofficeOrgs, useBackofficeOrgMemberCounts } from "@/hooks/useBackoffice";
 import { CreateOrgDialog } from "@/components/CreateOrgDialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -31,6 +41,44 @@ export default function BackofficeDashboard() {
   const navigate = useNavigate();
   const [entering, setEntering] = useState<string | null>(null);
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
+  const [deleteOrgTarget, setDeleteOrgTarget] = useState<typeof orgs[0] | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteOrg = async () => {
+    if (!deleteOrgTarget) return;
+    setDeleting(true);
+    try {
+      // Delete related data then the org
+      const orgId = deleteOrgTarget.id;
+      await supabase.from("organization_modules" as any).delete().eq("organization_id", orgId);
+      await supabase.from("user_permissions").delete().eq("organization_id", orgId);
+      await supabase.from("organization_members").delete().eq("organization_id", orgId);
+      await supabase.from("audit_log").delete().eq("organization_id", orgId);
+      // Delete financial data
+      await supabase.from("cashflow_entries").delete().eq("organization_id", orgId);
+      await supabase.from("contract_installments").delete().eq("organization_id", orgId);
+      await supabase.from("contract_adjustments").delete().eq("organization_id", orgId);
+      await supabase.from("contract_documents").delete().eq("organization_id", orgId);
+      await supabase.from("contracts").delete().eq("organization_id", orgId);
+      await supabase.from("budget_lines").delete().eq("organization_id", orgId);
+      await supabase.from("budget_versions").delete().eq("organization_id", orgId);
+      await supabase.from("chart_of_accounts").delete().eq("organization_id", orgId);
+      await supabase.from("cost_centers").delete().eq("organization_id", orgId);
+      await supabase.from("entities").delete().eq("organization_id", orgId);
+      await supabase.from("products" as any).delete().eq("organization_id", orgId);
+      await supabase.from("employees").delete().eq("organization_id", orgId);
+      await supabase.from("liabilities").delete().eq("organization_id", orgId);
+      // Delete org
+      const { error } = await supabase.from("organizations").delete().eq("id", orgId);
+      if (error) throw error;
+      toast({ title: "Empresa excluída permanentemente" });
+      setDeleteOrgTarget(null);
+    } catch (err: any) {
+      toast({ title: "Erro ao excluir empresa", description: err.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleEnterCompany = async (org: typeof orgs[0]) => {
     if (!user) return;
@@ -211,6 +259,9 @@ export default function BackofficeDashboard() {
                       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/backoffice/empresa/${org.id}`); }}>
                         <Settings size={12} className="mr-1" /> Gerenciar
                       </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteOrgTarget(org); }} title="Excluir empresa">
+                        <Trash2 size={12} />
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -265,6 +316,9 @@ export default function BackofficeDashboard() {
                         >
                           Gerenciar
                         </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteOrgTarget(org)} title="Excluir empresa">
+                          <Trash2 size={12} />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -275,6 +329,28 @@ export default function BackofficeDashboard() {
         </div>
       )}
       <CreateOrgDialog open={createOrgOpen} onOpenChange={setCreateOrgOpen} />
+
+      {/* Delete Org Confirmation */}
+      <AlertDialog open={!!deleteOrgTarget} onOpenChange={(open) => !open && setDeleteOrgTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir empresa permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é irreversível. Todos os dados da empresa <strong>{deleteOrgTarget?.name}</strong> serão excluídos permanentemente, incluindo contratos, fluxo de caixa, colaboradores e demais registros.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOrg}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo..." : "Excluir Permanentemente"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

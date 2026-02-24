@@ -32,7 +32,18 @@ import {
   Eye,
   Link2,
   Unlink,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   useBackofficeOrgs,
   useBackofficeOrgMembers,
@@ -168,6 +179,40 @@ export default function BackofficeCompany() {
   const [editUserRole, setEditUserRole] = useState("");
   const [editUserCargo, setEditUserCargo] = useState("");
   const [editUserName, setEditUserName] = useState("");
+  const [deleteOrgOpen, setDeleteOrgOpen] = useState(false);
+  const [deletingOrg, setDeletingOrg] = useState(false);
+
+  const handleDeleteOrg = async () => {
+    if (!orgId) return;
+    setDeletingOrg(true);
+    try {
+      await supabase.from("organization_modules" as any).delete().eq("organization_id", orgId);
+      await supabase.from("user_permissions").delete().eq("organization_id", orgId);
+      await supabase.from("organization_members").delete().eq("organization_id", orgId);
+      await supabase.from("audit_log").delete().eq("organization_id", orgId);
+      await supabase.from("cashflow_entries").delete().eq("organization_id", orgId);
+      await supabase.from("contract_installments").delete().eq("organization_id", orgId);
+      await supabase.from("contract_adjustments").delete().eq("organization_id", orgId);
+      await supabase.from("contract_documents").delete().eq("organization_id", orgId);
+      await supabase.from("contracts").delete().eq("organization_id", orgId);
+      await supabase.from("budget_lines").delete().eq("organization_id", orgId);
+      await supabase.from("budget_versions").delete().eq("organization_id", orgId);
+      await supabase.from("chart_of_accounts").delete().eq("organization_id", orgId);
+      await supabase.from("cost_centers").delete().eq("organization_id", orgId);
+      await supabase.from("entities").delete().eq("organization_id", orgId);
+      await supabase.from("products" as any).delete().eq("organization_id", orgId);
+      await supabase.from("employees").delete().eq("organization_id", orgId);
+      await supabase.from("liabilities").delete().eq("organization_id", orgId);
+      const { error } = await supabase.from("organizations").delete().eq("id", orgId);
+      if (error) throw error;
+      toast({ title: "Empresa excluída permanentemente" });
+      navigate("/backoffice");
+    } catch (err: any) {
+      toast({ title: "Erro ao excluir empresa", description: err.message, variant: "destructive" });
+    } finally {
+      setDeletingOrg(false);
+    }
+  };
 
   const profileMap = useMemo(() => {
     const map: Record<string, any> = {};
@@ -322,8 +367,33 @@ export default function BackofficeCompany() {
               <SelectItem value="onboarding">Onboarding</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteOrgOpen(true)} title="Excluir empresa">
+            <Trash2 size={16} />
+          </Button>
         </div>
       </div>
+
+      {/* Delete Org Confirmation */}
+      <AlertDialog open={deleteOrgOpen} onOpenChange={setDeleteOrgOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir empresa permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é irreversível. Todos os dados da empresa <strong>{org.name}</strong> serão excluídos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingOrg}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOrg}
+              disabled={deletingOrg}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingOrg ? "Excluindo..." : "Excluir Permanentemente"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
