@@ -64,6 +64,7 @@ export default function BackofficeDashboard() {
         created_by: org.created_by,
         created_at: org.created_at,
         updated_at: org.updated_at,
+        onboarding_completed: org.onboarding_completed ?? true,
       });
       navigate("/");
     } catch (err) {

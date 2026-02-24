@@ -11,6 +11,7 @@ export interface Organization {
   created_by: string;
   created_at: string;
   updated_at: string;
+  onboarding_completed: boolean;
 }
 
 export interface OrgMember {
