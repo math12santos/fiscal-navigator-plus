@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useCashFlow } from "@/hooks/useCashFlow";
 import { useContracts } from "@/hooks/useContracts";
 import { useEmployees } from "@/hooks/useDP";
@@ -44,8 +44,8 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
   }, [activeContracts]);
 
   // Runway
-  const now = new Date();
-  const curMonthKey = format(now, "yyyy-MM");
+  const now = useMemo(() => new Date(), []);
+  const curMonthKey = useMemo(() => format(now, "yyyy-MM"), [now]);
 
   const monthlyBurn = useMemo(() => {
     // Average monthly outflow from cashflow entries
