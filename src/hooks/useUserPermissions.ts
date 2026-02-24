@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
 interface Permission {
   module: string;
@@ -12,6 +13,7 @@ interface Permission {
 export function useUserPermissions() {
   const { user } = useAuth();
   const { currentOrg, currentRole } = useOrganization();
+  const { isModuleEnabled: isOrgModuleEnabled, isLoading: orgModulesLoading } = useOrgModules();
 
   const { data: permissions = [], isLoading } = useQuery({
     queryKey: ["user_permissions", user?.id],
@@ -56,8 +58,11 @@ export function useUserPermissions() {
   );
 
   const canAccessModule = (moduleKey: string): boolean => {
+    // First check: is this module enabled at the organization level?
+    if (!isOrgModuleEnabled(moduleKey)) return false;
+
     // While loading permissions for a new org, block access for non-privileged users
-    if (isLoading && !hasFullAccess) return false;
+    if ((isLoading || orgModulesLoading) && !hasFullAccess) return false;
     if (hasFullAccess) return true;
     // If no module permissions configured, deny (must be configured via Backoffice)
     if (!hasConfiguredPermissions) return false;
@@ -74,6 +79,7 @@ export function useUserPermissions() {
   };
 
   const canAccessTab = (moduleKey: string, tabKey: string): boolean => {
+    if (!isOrgModuleEnabled(moduleKey)) return false;
     if (hasFullAccess) return true;
     if (!hasConfiguredPermissions) return false;
     const tabPerm = permissions.find(
@@ -87,6 +93,7 @@ export function useUserPermissions() {
   };
 
   const getAllowedTabs = (moduleKey: string, allTabs: { key: string; label: string }[]) => {
+    if (!isOrgModuleEnabled(moduleKey)) return [];
     if (hasFullAccess) return allTabs;
     if (!hasConfiguredPermissions) return [];
     return allTabs.filter((t) => canAccessTab(moduleKey, t.key));
@@ -94,7 +101,7 @@ export function useUserPermissions() {
 
   return {
     permissions,
-    isLoading,
+    isLoading: isLoading || orgModulesLoading,
     isMaster,
     isOwner,
     hasFullAccess,

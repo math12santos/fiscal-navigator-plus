@@ -49,6 +49,8 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOrgModules, useUpsertOrgModule } from "@/hooks/useOrgModules";
+import { useSystemModules } from "@/hooks/useSystemModules";
 
 const MODULES: { key: string; label: string; tabs?: { key: string; label: string }[] }[] = [
   { key: "dashboard", label: "Dashboard" },
@@ -587,53 +589,7 @@ export default function BackofficeCompany() {
 
         {/* ===== MÓDULOS ===== */}
         <TabsContent value="modulos" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Módulos Disponíveis</CardTitle>
-              <p className="text-xs text-muted-foreground">Ative ou desative módulos para todos os usuários desta empresa.</p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {MODULES.map((mod) => {
-                  const activeUsers = permissions.filter((p: any) => p.module === mod.key && p.allowed).length;
-                  const isEnabled = activeUsers > 0;
-                  return (
-                    <div key={mod.key} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={isEnabled}
-                          onCheckedChange={(checked) => {
-                            if (!orgId) return;
-                            // Toggle module for all members
-                            members.forEach((m: any) => {
-                              upsertPermission.mutate({
-                                user_id: m.user_id,
-                                organization_id: orgId,
-                                module: mod.key,
-                                allowed: checked,
-                              });
-                            });
-                            toast({
-                              title: checked
-                                ? `Módulo "${mod.label}" ativado`
-                                : `Módulo "${mod.label}" desativado`,
-                            });
-                          }}
-                        />
-                        <div>
-                          <span className="text-sm font-medium text-foreground">{mod.label}</span>
-                          <p className="text-xs text-muted-foreground">{activeUsers} usuário(s) com acesso</p>
-                        </div>
-                      </div>
-                      <Badge variant={isEnabled ? "default" : "secondary"}>
-                        {isEnabled ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+          <OrgModulesTab orgId={orgId!} />
         </TabsContent>
 
         {/* ===== HOLDING ===== */}
@@ -1034,5 +990,68 @@ function HoldingTab({ orgId, orgs, orgName }: { orgId: string; orgs: any[]; orgN
         }
       }} />
     </div>
+  );
+}
+
+/** Organization-level module control tab */
+function OrgModulesTab({ orgId }: { orgId: string }) {
+  const { data: systemModules = [], isLoading: loadingSystem } = useSystemModules();
+  const { modules: orgModules, isLoading: loadingOrg } = useOrgModules(orgId);
+  const upsertOrgModule = useUpsertOrgModule();
+  const { toast } = useToast();
+
+  if (loadingSystem || loadingOrg) {
+    return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
+  }
+
+  // Build a map of current org module states
+  const orgModuleMap: Record<string, boolean> = {};
+  orgModules.forEach((m) => { orgModuleMap[m.module_key] = m.enabled; });
+
+  // Show all system modules that are globally enabled
+  const availableModules = systemModules.filter((m) => m.enabled);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Módulos da Empresa</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Ative ou desative módulos para esta empresa. Módulos desativados ficam inacessíveis para todos os usuários da organização.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {availableModules.map((mod) => {
+            // If org has no module config, consider all as enabled
+            const isEnabled = orgModules.length === 0 ? true : (orgModuleMap[mod.module_key] ?? false);
+            return (
+              <div key={mod.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={isEnabled}
+                    onCheckedChange={(checked) => {
+                      upsertOrgModule.mutate({
+                        organization_id: orgId,
+                        module_key: mod.module_key,
+                        enabled: checked,
+                      });
+                      toast({
+                        title: checked
+                          ? `Módulo "${mod.label}" ativado`
+                          : `Módulo "${mod.label}" desativado`,
+                      });
+                    }}
+                  />
+                  <span className="text-sm font-medium text-foreground">{mod.label}</span>
+                </div>
+                <Badge variant={isEnabled ? "default" : "secondary"}>
+                  {isEnabled ? "Ativo" : "Inativo"}
+                </Badge>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
