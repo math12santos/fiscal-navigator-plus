@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useBackofficeOrgs, useBackofficeOrgMemberCounts } from "@/hooks/useBackoffice";
+import { useQueryClient } from "@tanstack/react-query";
 import { CreateOrgDialog } from "@/components/CreateOrgDialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,22 +40,53 @@ export default function BackofficeDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [entering, setEntering] = useState<string | null>(null);
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
   const [deleteOrgTarget, setDeleteOrgTarget] = useState<typeof orgs[0] | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const handleDeleteOrg = async () => {
-    if (!deleteOrgTarget) return;
+    if (!deleteOrgTarget || !user) return;
     setDeleting(true);
     try {
-      // Delete related data then the org
       const orgId = deleteOrgTarget.id;
+
+      // Ensure master is owner so RLS allows deletes
+      const { data: existing } = await supabase
+        .from("organization_members")
+        .select("id, role")
+        .eq("organization_id", orgId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase.from("organization_members").insert({
+          organization_id: orgId,
+          user_id: user.id,
+          role: "owner",
+        });
+      } else if (existing.role !== "owner") {
+        await supabase.from("organization_members").update({ role: "owner" }).eq("id", existing.id);
+      }
+
+      // Delete related data in correct order (children before parents)
       await supabase.from("organization_modules" as any).delete().eq("organization_id", orgId);
       await supabase.from("user_permissions").delete().eq("organization_id", orgId);
-      await supabase.from("organization_members").delete().eq("organization_id", orgId);
       await supabase.from("audit_log").delete().eq("organization_id", orgId);
-      // Delete financial data
+      // DP data (children first)
+      await supabase.from("payroll_items").delete().eq("organization_id", orgId);
+      await supabase.from("payroll_runs").delete().eq("organization_id", orgId);
+      await supabase.from("employee_benefits").delete().eq("organization_id", orgId);
+      await supabase.from("employee_compensations").delete().eq("organization_id", orgId);
+      await supabase.from("employee_terminations").delete().eq("organization_id", orgId);
+      await supabase.from("employee_vacations").delete().eq("organization_id", orgId);
+      await supabase.from("position_routines").delete().eq("organization_id", orgId);
+      await supabase.from("employees").delete().eq("organization_id", orgId);
+      await supabase.from("positions").delete().eq("organization_id", orgId);
+      await supabase.from("dp_benefits").delete().eq("organization_id", orgId);
+      await supabase.from("dp_config").delete().eq("organization_id", orgId);
+      // Financial data
       await supabase.from("cashflow_entries").delete().eq("organization_id", orgId);
       await supabase.from("contract_installments").delete().eq("organization_id", orgId);
       await supabase.from("contract_adjustments").delete().eq("organization_id", orgId);
@@ -62,17 +94,34 @@ export default function BackofficeDashboard() {
       await supabase.from("contracts").delete().eq("organization_id", orgId);
       await supabase.from("budget_lines").delete().eq("organization_id", orgId);
       await supabase.from("budget_versions").delete().eq("organization_id", orgId);
+      // Planning & commercial
+      await supabase.from("scenario_overrides").delete().eq("organization_id", orgId);
+      await supabase.from("planning_scenarios").delete().eq("organization_id", orgId);
+      await supabase.from("planning_config").delete().eq("organization_id", orgId);
+      await supabase.from("commercial_budget_lines").delete().eq("organization_id", orgId);
+      await supabase.from("commercial_channels").delete().eq("organization_id", orgId);
+      await supabase.from("commercial_scenarios").delete().eq("organization_id", orgId);
+      await supabase.from("commercial_plans").delete().eq("organization_id", orgId);
+      await supabase.from("hr_planning_items").delete().eq("organization_id", orgId);
+      // Config data
       await supabase.from("chart_of_accounts").delete().eq("organization_id", orgId);
       await supabase.from("cost_centers").delete().eq("organization_id", orgId);
       await supabase.from("entities").delete().eq("organization_id", orgId);
       await supabase.from("products" as any).delete().eq("organization_id", orgId);
-      await supabase.from("employees").delete().eq("organization_id", orgId);
+      await supabase.from("fiscal_groups").delete().eq("organization_id", orgId);
       await supabase.from("liabilities").delete().eq("organization_id", orgId);
+      await supabase.from("plan_migrations").delete().eq("organization_id", orgId);
+      await supabase.from("organization_holdings").delete().eq("holding_id", orgId);
+      await supabase.from("organization_holdings").delete().eq("subsidiary_id", orgId);
+      // Members last (we need to be member to delete above)
+      await supabase.from("organization_members").delete().eq("organization_id", orgId);
       // Delete org
       const { error } = await supabase.from("organizations").delete().eq("id", orgId);
       if (error) throw error;
       toast({ title: "Empresa excluída permanentemente" });
       setDeleteOrgTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["backoffice_orgs"] });
+      queryClient.invalidateQueries({ queryKey: ["backoffice_org_member_counts"] });
     } catch (err: any) {
       toast({ title: "Erro ao excluir empresa", description: err.message, variant: "destructive" });
     } finally {
