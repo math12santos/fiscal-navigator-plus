@@ -64,13 +64,15 @@ Deno.serve(async (req) => {
 
     const userId = newUser.user.id;
 
-    // Update profile
-    if (full_name || cargo) {
-      await adminClient
-        .from("profiles")
-        .update({ full_name: full_name || null, cargo: cargo || null })
-        .eq("id", userId);
-    }
+    // Update profile — mark must_change_password = true
+    const profileUpdate: Record<string, unknown> = { must_change_password: true };
+    if (full_name) profileUpdate.full_name = full_name;
+    if (cargo) profileUpdate.cargo = cargo;
+
+    await adminClient
+      .from("profiles")
+      .update(profileUpdate)
+      .eq("id", userId);
 
     // Add to organizations
     if (organization_ids && organization_ids.length > 0) {

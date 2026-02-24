@@ -19,6 +19,7 @@ import Configuracoes from "@/pages/Configuracoes";
 import DepartamentoPessoal from "@/pages/DepartamentoPessoal";
 import CRM from "@/pages/CRM";
 import CreateOrganization from "@/pages/CreateOrganization";
+import Onboarding from "@/pages/Onboarding";
 import BackofficeDashboard from "@/pages/BackofficeDashboard";
 import BackofficeCompany from "@/pages/BackofficeCompany";
 import BackofficeUsers from "@/pages/BackofficeUsers";
@@ -33,11 +34,41 @@ import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
 
+/** Hook to check if user needs onboarding */
+function useNeedsOnboarding() {
+  const { user } = useAuth();
+  const { organizations, currentOrg, loading: orgLoading } = useOrganization();
+  const [mustChangePassword, setMustChangePassword] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user) { setMustChangePassword(null); return; }
+    supabase
+      .from("profiles")
+      .select("must_change_password")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setMustChangePassword((data as any)?.must_change_password ?? false);
+      });
+  }, [user]);
+
+  if (orgLoading || mustChangePassword === null) return { loading: true, needs: false };
+
+  if (mustChangePassword) return { loading: false, needs: true };
+  if (organizations.length === 0) return { loading: false, needs: true };
+
+  const org = currentOrg || organizations[0];
+  if (org && !(org as any).onboarding_completed) return { loading: false, needs: true };
+
+  return { loading: false, needs: false };
+}
+
 function ProtectedRoutes() {
   const { user, loading: authLoading } = useAuth();
-  const { organizations, currentOrg, loading: orgLoading } = useOrganization();
+  const { loading: orgLoading } = useOrganization();
+  const { loading: onboardingLoading, needs: needsOnboarding } = useNeedsOnboarding();
 
-  if (authLoading || orgLoading) {
+  if (authLoading || orgLoading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
@@ -46,6 +77,7 @@ function ProtectedRoutes() {
   }
 
   if (!user) return <Navigate to="/auth" replace />;
+  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
 
   return (
     <AppLayout>
@@ -66,6 +98,25 @@ function ProtectedRoutes() {
       </Routes>
     </AppLayout>
   );
+}
+
+function OnboardingRoute() {
+  const { user, loading: authLoading } = useAuth();
+  const { loading: orgLoading } = useOrganization();
+  const { loading: onboardingLoading, needs: needsOnboarding } = useNeedsOnboarding();
+
+  if (authLoading || orgLoading || onboardingLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/auth" replace />;
+  if (!needsOnboarding) return <Navigate to="/" replace />;
+
+  return <Onboarding />;
 }
 
 function BackofficeRoutes() {
@@ -125,7 +176,7 @@ function AuthRoute() {
   }, [user]);
 
   if (loading) return null;
-  if (user && isMaster === null) return null; // still checking role
+  if (user && isMaster === null) return null;
   if (user && isMaster) return <Navigate to="/backoffice" replace />;
   if (user) return <Navigate to="/" replace />;
   return <Auth />;
@@ -141,6 +192,7 @@ const App = () => (
           <OrganizationProvider>
             <Routes>
               <Route path="/auth" element={<AuthRoute />} />
+              <Route path="/onboarding" element={<OnboardingRoute />} />
               <Route path="/backoffice/*" element={<BackofficeRoutes />} />
               <Route path="/*" element={<ProtectedRoutes />} />
             </Routes>
