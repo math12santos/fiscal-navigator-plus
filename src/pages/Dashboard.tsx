@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { startOfMonth, subMonths, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -40,9 +40,9 @@ export default function Dashboard() {
   const { currentOrg, organizations } = useOrganization();
   const navigate = useNavigate();
 
-  const now = new Date();
-  const rangeFrom = startOfMonth(subMonths(now, 5));
-  const rangeTo = endOfMonth(now);
+  const now = useMemo(() => new Date(), []);
+  const rangeFrom = useMemo(() => startOfMonth(subMonths(now, 5)), [now]);
+  const rangeTo = useMemo(() => endOfMonth(now), [now]);
 
   const {
     entries,
@@ -59,11 +59,11 @@ export default function Dashboard() {
     isLoading,
   } = useFinancialSummary(rangeFrom, rangeTo);
 
-  // Previous vs current month
-  const prevMonthStart = startOfMonth(subMonths(now, 1));
-  const prevMonthEnd = endOfMonth(subMonths(now, 1));
-  const curMonthStart = startOfMonth(now);
-  const curMonthEnd = endOfMonth(now);
+  // Previous vs current month (memoized to avoid re-renders)
+  const prevMonthStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
+  const prevMonthEnd = useMemo(() => endOfMonth(subMonths(now, 1)), [now]);
+  const curMonthStart = useMemo(() => startOfMonth(now), [now]);
+  const curMonthEnd = useMemo(() => endOfMonth(now), [now]);
 
   const { currentMonth, previousMonth } = useMemo(() => {
     let curEntradas = 0, curSaidas = 0, prevEntradas = 0, prevSaidas = 0;
