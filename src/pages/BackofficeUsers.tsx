@@ -13,6 +13,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Search, Plus, Edit2, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useBackofficeOrgs } from "@/hooks/useBackoffice";
 import { CreateUserDialog } from "@/components/CreateUserDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +45,28 @@ export default function BackofficeUsers() {
   const [search, setSearch] = useState("");
   const [orgFilter, setOrgFilter] = useState("__all__");
   const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [deleteUserTarget, setDeleteUserTarget] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserTarget) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { user_id: deleteUserTarget.userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Usuário excluído permanentemente" });
+      setDeleteUserTarget(null);
+      qc.invalidateQueries({ queryKey: ["backoffice_all_members"] });
+      qc.invalidateQueries({ queryKey: ["backoffice_all_profiles"] });
+    } catch (err: any) {
+      toast({ title: "Erro ao excluir usuário", description: err.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Edit user state
   const [editOpen, setEditOpen] = useState(false);
@@ -246,9 +278,14 @@ export default function BackofficeUsers() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(u)} title="Editar usuário">
-                        <Edit2 size={14} />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(u)} title="Editar usuário">
+                          <Edit2 size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteUserTarget(u)} title="Excluir usuário">
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -319,6 +356,28 @@ export default function BackofficeUsers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete User Confirmation */}
+      <AlertDialog open={!!deleteUserTarget} onOpenChange={(open) => !open && setDeleteUserTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é irreversível. O usuário <strong>{deleteUserTarget ? profileMap[deleteUserTarget.userId]?.full_name || "Sem nome" : ""}</strong> será excluído permanentemente, incluindo todos os vínculos, permissões e dados de autenticação.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo..." : "Excluir Permanentemente"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
