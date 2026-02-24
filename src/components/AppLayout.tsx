@@ -15,6 +15,7 @@ import {
   LogOut,
   ShieldCheck,
   Users,
+  Handshake,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const navItems = [
   { path: "/contratos", label: "Contratos", icon: FileText, module: "contratos" },
   { path: "/planejamento", label: "Planejamento", icon: Target, module: "planejamento" },
   { path: "/dp", label: "Depto. Pessoal", icon: Users, module: "dp" },
+  { path: "/crm", label: "CRM", icon: Handshake, module: "crm" },
   { path: "/conciliacao", label: "Conciliação", icon: Building2, module: "conciliacao" },
   { path: "/tarefas", label: "Tarefas", icon: CheckSquare, module: "tarefas" },
   { path: "/integracoes", label: "Integrações", icon: Plug, module: "integracoes" },

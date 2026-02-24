@@ -17,6 +17,7 @@ import Integracoes from "@/pages/Integracoes";
 import IAFinanceira from "@/pages/IAFinanceira";
 import Configuracoes from "@/pages/Configuracoes";
 import DepartamentoPessoal from "@/pages/DepartamentoPessoal";
+import CRM from "@/pages/CRM";
 import CreateOrganization from "@/pages/CreateOrganization";
 import BackofficeDashboard from "@/pages/BackofficeDashboard";
 import BackofficeCompany from "@/pages/BackofficeCompany";
@@ -59,6 +60,7 @@ function ProtectedRoutes() {
         <Route path="/ia" element={<ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard>} />
         <Route path="/configuracoes" element={<ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard>} />
         <Route path="/dp" element={<ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard>} />
+        <Route path="/crm" element={<ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard>} />
         <Route path="/nova-empresa" element={<CreateOrganization />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
