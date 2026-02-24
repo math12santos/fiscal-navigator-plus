@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { KPICard } from "@/components/KPICard";
 import {
   DollarSign, TrendingUp, Wallet, PiggyBank, Building2, Plus,
-  FileText, Users, AlertTriangle, Shield, Clock,
+  FileText, Users, AlertTriangle, Shield, Clock, Handshake,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -54,6 +54,7 @@ export default function Dashboard() {
     contingenciasProvaveis,
     runway,
     monthlyBurn,
+    crmWeightedValue,
     alerts,
     isLoading,
   } = useFinancialSummary(rangeFrom, rangeTo);
@@ -259,6 +260,22 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* CRM Pipeline Card */}
+      {crmWeightedValue > 0 && (
+        <div className="glass-card p-5 animate-slide-up cursor-pointer hover:border-primary/30 transition-colors" onClick={() => navigate("/crm")}>
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pipeline CRM</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(crmWeightedValue)}</p>
+              <p className="text-xs text-muted-foreground">receita ponderada em pipeline</p>
+            </div>
+            <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
+              <Handshake size={20} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Alertas Inteligentes */}
       {alerts.length > 0 && (

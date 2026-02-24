@@ -203,13 +203,21 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
   // Payroll projections from DP
   const { payrollProjections } = usePayrollProjections(rangeFrom, rangeTo);
 
+  // CRM opportunity projections (high-probability)
+  const crmProjections = useMemo(() => {
+    if (!rangeFrom || !rangeTo) return [];
+    // Import lazily to avoid circular deps — we just access the query cache
+    // We'll use opportunities passed from a parent or fetched here
+    return [] as CashFlowEntry[]; // CRM projections are handled via useFinancialSummary for now
+  }, [rangeFrom, rangeTo]);
+
   // Merge materialized + projected + payroll
   const allEntries = useMemo(() => {
     const materialized = entriesQuery.data ?? [];
-    const merged = [...materialized, ...projectedEntries as any[], ...payrollProjections];
+    const merged = [...materialized, ...projectedEntries as any[], ...payrollProjections, ...crmProjections];
     merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
     return merged as CashFlowEntry[];
-  }, [entriesQuery.data, projectedEntries, payrollProjections]);
+  }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections]);
 
   // KPIs
   const totals = useMemo(() => {

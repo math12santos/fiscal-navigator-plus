@@ -16,12 +16,13 @@ interface Props {
   onMove: (oppId: string, stageId: string, extras?: { won_at?: string | null; lost_at?: string | null; lost_reason?: string | null }) => void;
   onAddOpportunity: () => void;
   onEditOpportunity: (opp: CRMOpportunity) => void;
+  onWonOpportunity?: (opp: CRMOpportunity) => void;
 }
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
 
-export function CRMPipeline({ stages, opportunities, clients, onMove, onAddOpportunity, onEditOpportunity }: Props) {
+export function CRMPipeline({ stages, opportunities, clients, onMove, onAddOpportunity, onEditOpportunity, onWonOpportunity }: Props) {
   const [lostDialog, setLostDialog] = useState<{ oppId: string; stageId: string } | null>(null);
   const [lostReason, setLostReason] = useState("");
 
@@ -48,7 +49,13 @@ export function CRMPipeline({ stages, opportunities, clients, onMove, onAddOppor
       return;
     }
     const extras: any = {};
-    if (stage.is_won) extras.won_at = new Date().toISOString();
+    if (stage.is_won) {
+      extras.won_at = new Date().toISOString();
+      onMove(opp.id, stage.id, extras);
+      // Trigger contract creation flow
+      if (onWonOpportunity) onWonOpportunity(opp);
+      return;
+    }
     onMove(opp.id, stage.id, extras);
   };
 
