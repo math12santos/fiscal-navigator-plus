@@ -4,18 +4,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCRMClients, useCRMActivities, usePipelineStages, useCRMOpportunities, CRMClient, CRMOpportunity } from "@/hooks/useCRM";
 import { useCRMIntelligence } from "@/hooks/useCRMIntelligence";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useContracts } from "@/hooks/useContracts";
 import { CRMClientTable } from "@/components/crm/CRMClientTable";
 import { CRMClientDialog } from "@/components/crm/CRMClientDialog";
 import { CRMClientDetail } from "@/components/crm/CRMClientDetail";
 import { CRMPipeline } from "@/components/crm/CRMPipeline";
 import { CRMOpportunityDialog } from "@/components/crm/CRMOpportunityDialog";
 import { CRMIndicators } from "@/components/crm/CRMIndicators";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export default function CRM() {
   const { canAccessTab } = useUserPermissions();
+  const { toast } = useToast();
   const { clients, isLoading: clientsLoading, create: createClient, update: updateClient, remove: removeClient } = useCRMClients();
   const { stages, isLoading: stagesLoading } = usePipelineStages();
   const { opportunities, isLoading: oppsLoading, create: createOpp, update: updateOpp, remove: removeOpp, moveToStage } = useCRMOpportunities();
+  const { create: createContract } = useContracts();
 
   const [selectedClient, setSelectedClient] = useState<CRMClient | null>(null);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
@@ -23,6 +31,7 @@ export default function CRM() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [oppDialogOpen, setOppDialogOpen] = useState(false);
   const [editingOpp, setEditingOpp] = useState<CRMOpportunity | null>(null);
+  const [wonOpp, setWonOpp] = useState<CRMOpportunity | null>(null);
 
   const { activities, create: createActivity } = useCRMActivities(selectedClient?.id);
   const intelligence = useCRMIntelligence(opportunities, stages, clients);
@@ -45,6 +54,52 @@ export default function CRM() {
 
   const handleMoveOpp = (oppId: string, stageId: string, extras?: any) => {
     moveToStage.mutate({ id: oppId, stage_id: stageId, ...extras });
+  };
+
+  const handleWonOpportunity = (opp: CRMOpportunity) => {
+    setWonOpp(opp);
+  };
+
+  const handleCreateContractFromOpp = () => {
+    if (!wonOpp) return;
+    const client = clients.find((c) => c.id === wonOpp.client_id);
+    createContract.mutate({
+      nome: wonOpp.title,
+      tipo: wonOpp.contract_type === "compra" ? "compra" : wonOpp.contract_type === "patrimonio" ? "patrimonio" : "venda",
+      valor: Number(wonOpp.estimated_value),
+      valor_base: Number(wonOpp.estimated_value),
+      vencimento: wonOpp.estimated_close_date || new Date().toISOString().split("T")[0],
+      status: "Ativo",
+      tipo_recorrencia: wonOpp.recurrence || "mensal",
+      prazo_indeterminado: false,
+      entity_id: client?.entity_id || null,
+      product_id: null,
+      notes: wonOpp.notes,
+      data_inicio: new Date().toISOString().split("T")[0],
+      data_fim: null,
+      intervalo_personalizado: null,
+      dia_vencimento: null,
+      tipo_reajuste: "manual",
+      indice_reajuste: null,
+      percentual_reajuste: null,
+      periodicidade_reajuste: "anual",
+      proximo_reajuste: null,
+      natureza_financeira: "fixo",
+      impacto_resultado: "receita",
+      cost_center_id: null,
+      responsavel_interno: wonOpp.responsible,
+      area_responsavel: null,
+      sla_revisao_dias: null,
+      finalidade: null,
+      operacao: wonOpp.contract_type || "venda",
+      subtipo_operacao: null,
+      rendimento_mensal_esperado: null,
+    } as any, {
+      onSuccess: () => {
+        toast({ title: "Contrato criado a partir da oportunidade" });
+        setWonOpp(null);
+      },
+    });
   };
 
   const isLoading = clientsLoading || stagesLoading || oppsLoading;
@@ -84,6 +139,7 @@ export default function CRM() {
               onMove={handleMoveOpp}
               onAddOpportunity={() => { setEditingOpp(null); setOppDialogOpen(true); }}
               onEditOpportunity={(o) => { setEditingOpp(o); setOppDialogOpen(true); }}
+              onWonOpportunity={handleWonOpportunity}
             />
           </TabsContent>
 
@@ -117,6 +173,23 @@ export default function CRM() {
         onOpenChange={setDetailOpen}
         onAddActivity={(data) => createActivity.mutate(data)}
       />
+
+      {/* Won opportunity → Create contract dialog */}
+      <Dialog open={!!wonOpp} onOpenChange={() => setWonOpp(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Oportunidade Fechada!</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            A oportunidade <strong>{wonOpp?.title}</strong> foi marcada como ganha.
+            Deseja criar um contrato automaticamente?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWonOpp(null)}>Não, obrigado</Button>
+            <Button onClick={handleCreateContractFromOpp}>Criar Contrato</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

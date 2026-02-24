@@ -7,6 +7,7 @@ import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { usePlanningConfig } from "@/hooks/usePlanningConfig";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
+import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { format, addDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { calcEncargosPatronais } from "@/hooks/useDP";
 
@@ -22,6 +23,8 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
   const { liabilities, totals: liabTotals, isLoading: liabLoading } = useLiabilities();
   const { config: planConfig } = usePlanningConfig();
   const { avgMonthlyPayroll, isLoading: payrollLoading } = usePayrollProjections(rangeFrom, rangeTo);
+  const { opportunities } = useCRMOpportunities();
+  const { stages } = usePipelineStages();
 
   // Active contracts
   const activeContracts = useMemo(
@@ -106,8 +109,30 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
       });
     }
 
+    // CRM: opportunities without recent action
+    const staleOpps = opportunities.filter((o) => !o.won_at && !o.lost_at && !o.updated_at);
+    if (staleOpps.length > 0) {
+      list.push({
+        type: "info",
+        title: `${staleOpps.length} oportunidade(s) CRM sem ação recente`,
+        description: "Verifique o pipeline comercial para atualizar o status.",
+      });
+    }
+
     return list;
-  }, [contracts, liabilities, runway, totals.saldo, planConfig]);
+  }, [contracts, liabilities, runway, totals.saldo, planConfig, opportunities]);
+
+  // CRM pipeline weighted value
+  const crmWeightedValue = useMemo(() => {
+    const stageMap = new Map(stages.map((s) => [s.id, s]));
+    return opportunities
+      .filter((o) => !o.won_at && !o.lost_at)
+      .reduce((sum, o) => {
+        const stage = stageMap.get(o.stage_id);
+        const prob = stage ? Number(stage.probability) / 100 : 0;
+        return sum + Number(o.estimated_value) * prob;
+      }, 0);
+  }, [opportunities, stages]);
 
   return {
     // Cashflow
@@ -124,6 +149,8 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
     // Runway
     runway,
     monthlyBurn,
+    // CRM
+    crmWeightedValue,
     // Alerts
     alerts,
     // Loading
