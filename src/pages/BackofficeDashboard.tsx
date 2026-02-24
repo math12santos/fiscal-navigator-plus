@@ -380,7 +380,7 @@ export default function BackofficeDashboard() {
       <CreateOrgDialog open={createOrgOpen} onOpenChange={setCreateOrgOpen} />
 
       {/* Delete Org Confirmation */}
-      <AlertDialog open={!!deleteOrgTarget} onOpenChange={(open) => !open && setDeleteOrgTarget(null)}>
+      <AlertDialog open={!!deleteOrgTarget} onOpenChange={(open) => { if (!open && !deleting) setDeleteOrgTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir empresa permanentemente?</AlertDialogTitle>
@@ -390,13 +390,13 @@ export default function BackofficeDashboard() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <Button
+              variant="destructive"
               onClick={handleDeleteOrg}
               disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? "Excluindo..." : "Excluir Permanentemente"}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
