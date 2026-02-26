@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { CostCenterFormPayload } from "@/components/CostCenterFormDialog";
+import { useCostCenterPermissions } from "@/hooks/useCostCenterPermissions";
+import { useOrgModules } from "@/hooks/useOrgModules";
+import { MODULE_DEFINITIONS } from "@/data/moduleDefinitions";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -68,6 +72,13 @@ export default function Configuracoes() {
     enabled: !!orgId,
   });
 
+  // Org modules for CC permissions
+  const { isModuleEnabled, enabledModuleKeys } = useOrgModules();
+  const filteredOrgModules = useMemo(
+    () => MODULE_DEFINITIONS.filter((m) => isModuleEnabled(m.key)),
+    [enabledModuleKeys]
+  );
+
   // Plano de Contas
   const { accounts, isLoading: loadingAccounts, create: createAccount, update: updateAccount, toggleActive: toggleAccountActive, deleteAll: deleteAllAccounts, seedDefaultAccounts } = useChartOfAccounts();
   const [accountSearch, setAccountSearch] = useState("");
@@ -81,6 +92,9 @@ export default function Configuracoes() {
   const [centerUnitFilter, setCenterUnitFilter] = useState("__all__");
   const [centerDialogOpen, setCenterDialogOpen] = useState(false);
   const [editingCenter, setEditingCenter] = useState<CostCenter | null>(null);
+
+  // CC permissions for editing
+  const { permissions: editingCCPermissions } = useCostCenterPermissions(editingCenter?.id);
 
   // Entidades (Fornecedores/Clientes)
   const { entities, isLoading: loadingEntities, create: createEntity, update: updateEntity, toggleActive: toggleEntityActive } = useEntities();
@@ -230,7 +244,7 @@ export default function Configuracoes() {
               </Table>
             )}
           </div>
-          <CostCenterFormDialog open={centerDialogOpen} onOpenChange={setCenterDialogOpen} costCenter={editingCenter} costCenters={costCenters} orgMembers={orgMembers} onSubmit={(data) => { if (editingCenter) { updateCenter.mutate(data, { onSuccess: () => setCenterDialogOpen(false) }); } else { createCenter.mutate(data, { onSuccess: () => setCenterDialogOpen(false) }); } }} isLoading={createCenter.isPending || updateCenter.isPending} />
+          <CostCenterFormDialog open={centerDialogOpen} onOpenChange={setCenterDialogOpen} costCenter={editingCenter} costCenters={costCenters} orgMembers={orgMembers} orgModules={filteredOrgModules} existingPermissions={editingCCPermissions} onSubmit={(data: CostCenterFormPayload) => { if (editingCenter && data.id) { updateCenter.mutate(data as any, { onSuccess: () => setCenterDialogOpen(false) }); } else { const { id, ...rest } = data; createCenter.mutate(rest as any, { onSuccess: () => setCenterDialogOpen(false) }); } }} isLoading={createCenter.isPending || updateCenter.isPending} />
         </TabsContent>
 
         {/* ===== FORNECEDORES / CLIENTES ===== */}

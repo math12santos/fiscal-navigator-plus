@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useAuditLog } from "./useAuditLog";
+import { saveCostCenterPermissions } from "./useCostCenterPermissions";
 
 export interface CostCenter {
   id: string;
@@ -20,8 +21,12 @@ export interface CostCenter {
   updated_at: string;
 }
 
-type CreateInput = Omit<CostCenter, "id" | "user_id" | "created_at" | "updated_at" | "responsible_name">;
-type UpdateInput = { id: string } & Partial<CreateInput>;
+type CreateInput = Omit<CostCenter, "id" | "user_id" | "created_at" | "updated_at" | "responsible_name"> & {
+  permissions?: { module_key: string; tab_key: string | null; role: string; allowed: boolean }[];
+};
+type UpdateInput = { id: string } & Partial<Omit<CreateInput, "permissions">> & {
+  permissions?: { module_key: string; tab_key: string | null; role: string; allowed: boolean }[];
+};
 
 async function syncResponsibleAccess(
   costCenterId: string,
@@ -29,7 +34,6 @@ async function syncResponsibleAccess(
   oldResponsible: string | null,
   orgId: string
 ) {
-  // Grant access to new responsible
   if (newResponsible) {
     await supabase
       .from("user_cost_center_access" as any)
@@ -38,17 +42,13 @@ async function syncResponsibleAccess(
         { onConflict: "user_id,cost_center_id" }
       );
   }
-
-  // Remove access from old responsible if changed
   if (oldResponsible && oldResponsible !== newResponsible) {
-    // Only remove if old responsible is not responsible for another CC
     const { data: otherCCs } = await supabase
       .from("cost_centers" as any)
       .select("id")
       .eq("responsible", oldResponsible)
       .eq("organization_id", orgId)
       .neq("id", costCenterId);
-
     if (!otherCCs || otherCCs.length === 0) {
       await supabase
         .from("user_cost_center_access" as any)
@@ -88,14 +88,21 @@ export function useCostCenters() {
   });
 
   const create = useMutation({
-    mutationFn: async (input: CreateInput) => {
+    mutationFn: async ({ permissions, ...input }: CreateInput) => {
       const { data, error } = await supabase
         .from("cost_centers" as any)
         .insert({ ...input, user_id: user!.id, organization_id: orgId })
         .select()
         .single();
       if (error) throw error;
-      return data as unknown as CostCenter;
+      const cc = data as unknown as CostCenter;
+
+      // Save permissions
+      if (permissions && permissions.length > 0 && orgId) {
+        await saveCostCenterPermissions(cc.id, orgId, permissions);
+      }
+
+      return cc;
     },
     onSuccess: async (data) => {
       if (data.responsible && orgId) {
@@ -103,6 +110,8 @@ export function useCostCenters() {
         qc.invalidateQueries({ queryKey: ["user_cost_center_access"] });
       }
       qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
+      qc.invalidateQueries({ queryKey: ["cost_center_permissions"] });
+      qc.invalidateQueries({ queryKey: ["cost_center_permissions_bulk"] });
       log({ entity_type: "cost_centers", entity_id: data.id, action: "INSERT", new_data: data as any });
       toast({ title: "Centro de custo criado" });
     },
@@ -110,8 +119,7 @@ export function useCostCenters() {
   });
 
   const update = useMutation({
-    mutationFn: async ({ id, ...input }: UpdateInput) => {
-      // Get old responsible before updating
+    mutationFn: async ({ id, permissions, ...input }: UpdateInput) => {
       const { data: old } = await supabase
         .from("cost_centers" as any)
         .select("responsible")
@@ -125,6 +133,12 @@ export function useCostCenters() {
         .select()
         .single();
       if (error) throw error;
+
+      // Save permissions
+      if (permissions && orgId) {
+        await saveCostCenterPermissions(id, orgId, permissions);
+      }
+
       return { ...(data as unknown as CostCenter), _oldResponsible: (old as any)?.responsible ?? null };
     },
     onSuccess: async (data: any) => {
@@ -135,6 +149,8 @@ export function useCostCenters() {
         qc.invalidateQueries({ queryKey: ["user_cost_center_access"] });
       }
       qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
+      qc.invalidateQueries({ queryKey: ["cost_center_permissions"] });
+      qc.invalidateQueries({ queryKey: ["cost_center_permissions_bulk"] });
       log({ entity_type: "cost_centers", entity_id: data.id, action: "UPDATE", new_data: data as any });
       toast({ title: "Centro de custo atualizado" });
     },
@@ -198,9 +214,7 @@ export function useCostCenters() {
 
   const seedDefaultCenters = async () => {
     if (!user || !orgId) throw new Error("Usuário ou organização não definidos");
-
     const uid = user.id;
-
     const level1 = [
       { code: "CC-01", name: "Diretoria / Administração Geral" },
       { code: "CC-02", name: "Operações BPO Financeiro" },
@@ -209,7 +223,6 @@ export function useCostCenters() {
       { code: "CC-05", name: "Comercial e Marketing" },
       { code: "CC-06", name: "Recursos Humanos" },
     ];
-
     const { data: l1Data, error: l1Err } = await supabase
       .from("cost_centers" as any)
       .insert(level1.map((c) => ({ ...c, user_id: uid, organization_id: orgId, parent_id: null, business_unit: "Matriz", responsible: null, description: null, active: true })))
@@ -217,7 +230,6 @@ export function useCostCenters() {
     if (l1Err) throw l1Err;
     const l1 = l1Data as unknown as CostCenter[];
     const l1Map = Object.fromEntries(l1.map((c) => [c.code, c.id]));
-
     const level2 = [
       { code: "CC-01.01", name: "Financeiro Interno", parentCode: "CC-01" },
       { code: "CC-01.02", name: "Jurídico", parentCode: "CC-01" },
@@ -235,12 +247,10 @@ export function useCostCenters() {
       { code: "CC-05.01", name: "Vendas e Relacionamento", parentCode: "CC-05" },
       { code: "CC-05.02", name: "Marketing Digital", parentCode: "CC-05" },
     ];
-
     const { error: l2Err } = await supabase
       .from("cost_centers" as any)
       .insert(level2.map(({ parentCode, ...c }) => ({ ...c, user_id: uid, organization_id: orgId, parent_id: l1Map[parentCode], business_unit: "Matriz", responsible: null, description: null, active: true })));
     if (l2Err) throw l2Err;
-
     qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
     toast({ title: "Centros de custo padrão criados com sucesso" });
   };

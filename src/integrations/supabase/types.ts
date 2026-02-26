@@ -970,6 +970,54 @@ export type Database = {
           },
         ]
       }
+      cost_center_permissions: {
+        Row: {
+          allowed: boolean
+          cost_center_id: string
+          created_at: string | null
+          id: string
+          module_key: string
+          organization_id: string
+          role: string
+          tab_key: string | null
+        }
+        Insert: {
+          allowed?: boolean
+          cost_center_id: string
+          created_at?: string | null
+          id?: string
+          module_key: string
+          organization_id: string
+          role: string
+          tab_key?: string | null
+        }
+        Update: {
+          allowed?: boolean
+          cost_center_id?: string
+          created_at?: string | null
+          id?: string
+          module_key?: string
+          organization_id?: string
+          role?: string
+          tab_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_center_permissions_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_center_permissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cost_centers: {
         Row: {
           active: boolean
