@@ -74,15 +74,15 @@ export function useContracts() {
   });
 
   const sanitizeInput = (data: Record<string, any>) => {
-    const dateFields = ["data_inicio", "data_fim", "proximo_reajuste"];
+    const dateFields = ["data_inicio", "data_fim", "proximo_reajuste", "vencimento"];
     const uuidFields = ["entity_id", "product_id", "cost_center_id"];
     const sanitized = { ...data };
     for (const field of [...dateFields, ...uuidFields]) {
       if (sanitized[field] === "") sanitized[field] = null;
     }
-    // vencimento is NOT NULL — fallback to data_fim, data_inicio, or today
-    if (!sanitized.vencimento) {
-      sanitized.vencimento = sanitized.data_fim || sanitized.data_inicio || new Date().toISOString().slice(0, 10);
+    // For non-indefinite contracts, fallback vencimento to data_fim
+    if (!sanitized.vencimento && !sanitized.prazo_indeterminado) {
+      sanitized.vencimento = sanitized.data_fim || sanitized.data_inicio || null;
     }
     return sanitized;
   };

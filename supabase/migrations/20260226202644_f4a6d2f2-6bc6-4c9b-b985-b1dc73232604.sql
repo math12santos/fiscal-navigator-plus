@@ -1,0 +1,1 @@
+ALTER TABLE public.contracts ALTER COLUMN vencimento DROP NOT NULL;
