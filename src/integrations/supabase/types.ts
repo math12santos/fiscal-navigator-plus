@@ -1030,6 +1030,307 @@ export type Database = {
           },
         ]
       }
+      crm_activities: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          description: string
+          id: string
+          organization_id: string
+          scheduled_at: string | null
+          status: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          organization_id: string
+          scheduled_at?: string | null
+          status?: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          organization_id?: string
+          scheduled_at?: string | null
+          status?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "crm_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_clients: {
+        Row: {
+          active: boolean
+          churn_risk: string
+          contract_renewal_date: string | null
+          contract_start_date: string | null
+          created_at: string
+          document_number: string | null
+          engagement: string
+          entity_id: string | null
+          estimated_margin: number
+          health_score: number
+          id: string
+          last_contact_at: string | null
+          mrr: number
+          name: string
+          next_action_at: string | null
+          next_action_description: string | null
+          next_action_type: string | null
+          notes: string | null
+          organization_id: string
+          origin: string | null
+          responsible: string | null
+          score: number
+          segment: string | null
+          status: string
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          churn_risk?: string
+          contract_renewal_date?: string | null
+          contract_start_date?: string | null
+          created_at?: string
+          document_number?: string | null
+          engagement?: string
+          entity_id?: string | null
+          estimated_margin?: number
+          health_score?: number
+          id?: string
+          last_contact_at?: string | null
+          mrr?: number
+          name: string
+          next_action_at?: string | null
+          next_action_description?: string | null
+          next_action_type?: string | null
+          notes?: string | null
+          organization_id: string
+          origin?: string | null
+          responsible?: string | null
+          score?: number
+          segment?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          churn_risk?: string
+          contract_renewal_date?: string | null
+          contract_start_date?: string | null
+          created_at?: string
+          document_number?: string | null
+          engagement?: string
+          entity_id?: string | null
+          estimated_margin?: number
+          health_score?: number
+          id?: string
+          last_contact_at?: string | null
+          mrr?: number
+          name?: string
+          next_action_at?: string | null
+          next_action_description?: string | null
+          next_action_type?: string | null
+          notes?: string | null
+          organization_id?: string
+          origin?: string | null
+          responsible?: string | null
+          score?: number
+          segment?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_clients_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_clients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_opportunities: {
+        Row: {
+          client_id: string
+          contract_id: string | null
+          contract_type: string | null
+          created_at: string
+          estimated_close_date: string | null
+          estimated_value: number
+          id: string
+          lost_at: string | null
+          lost_reason: string | null
+          notes: string | null
+          organization_id: string
+          recurrence: string
+          responsible: string | null
+          stage_id: string
+          title: string
+          updated_at: string
+          user_id: string
+          won_at: string | null
+        }
+        Insert: {
+          client_id: string
+          contract_id?: string | null
+          contract_type?: string | null
+          created_at?: string
+          estimated_close_date?: string | null
+          estimated_value?: number
+          id?: string
+          lost_at?: string | null
+          lost_reason?: string | null
+          notes?: string | null
+          organization_id: string
+          recurrence?: string
+          responsible?: string | null
+          stage_id: string
+          title: string
+          updated_at?: string
+          user_id: string
+          won_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          contract_id?: string | null
+          contract_type?: string | null
+          created_at?: string
+          estimated_close_date?: string | null
+          estimated_value?: number
+          id?: string
+          lost_at?: string | null
+          lost_reason?: string | null
+          notes?: string | null
+          organization_id?: string
+          recurrence?: string
+          responsible?: string | null
+          stage_id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          won_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "crm_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "crm_pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_pipeline_stages: {
+        Row: {
+          avg_days: number
+          color: string
+          created_at: string
+          id: string
+          is_lost: boolean
+          is_won: boolean
+          name: string
+          order_index: number
+          organization_id: string
+          probability: number
+          user_id: string
+        }
+        Insert: {
+          avg_days?: number
+          color?: string
+          created_at?: string
+          id?: string
+          is_lost?: boolean
+          is_won?: boolean
+          name: string
+          order_index?: number
+          organization_id: string
+          probability?: number
+          user_id: string
+        }
+        Update: {
+          avg_days?: number
+          color?: string
+          created_at?: string
+          id?: string
+          is_lost?: boolean
+          is_won?: boolean
+          name?: string
+          order_index?: number
+          organization_id?: string
+          probability?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_pipeline_stages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dp_benefits: {
         Row: {
           active: boolean
