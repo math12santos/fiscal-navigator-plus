@@ -73,10 +73,11 @@ export function useContracts() {
     enabled: !!user && !!orgId,
   });
 
-  const sanitizeDates = (data: Record<string, any>) => {
+  const sanitizeInput = (data: Record<string, any>) => {
     const dateFields = ["data_inicio", "data_fim", "proximo_reajuste", "vencimento"];
+    const uuidFields = ["entity_id", "product_id", "cost_center_id"];
     const sanitized = { ...data };
-    for (const field of dateFields) {
+    for (const field of [...dateFields, ...uuidFields]) {
       if (sanitized[field] === "") sanitized[field] = null;
     }
     return sanitized;
@@ -84,7 +85,7 @@ export function useContracts() {
 
   const create = useMutation({
     mutationFn: async (c: ContractInput) => {
-      const { error } = await supabase.from("contracts").insert(sanitizeDates({
+      const { error } = await supabase.from("contracts").insert(sanitizeInput({
         ...c,
         user_id: user!.id,
         organization_id: orgId,
@@ -101,7 +102,7 @@ export function useContracts() {
 
   const update = useMutation({
     mutationFn: async ({ id, ...c }: { id: string } & Partial<ContractInput>) => {
-      const { error } = await supabase.from("contracts").update(sanitizeDates(c) as any).eq("id", id);
+      const { error } = await supabase.from("contracts").update(sanitizeInput(c) as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
