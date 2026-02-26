@@ -1,12 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useUserDataScope } from "@/hooks/useUserDataScope";
 
 // ========== EMPLOYEES ==========
 export function useEmployees() {
   const { currentOrg } = useOrganization();
-  return useQuery({
+  const { filterByScope } = useUserDataScope();
+  const query = useQuery({
     queryKey: ["employees", currentOrg?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -19,6 +22,8 @@ export function useEmployees() {
     },
     enabled: !!currentOrg?.id,
   });
+  const employees = useMemo(() => filterByScope(query.data ?? []), [query.data, filterByScope]);
+  return { ...query, data: employees };
 }
 
 export function useMutateEmployee() {

@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
+import { useUserDataScope } from "@/hooks/useUserDataScope";
 
 export interface Contract {
   id: string;
@@ -121,5 +123,8 @@ export function useContracts() {
     onError: (e: any) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
   });
 
-  return { contracts: query.data ?? [], isLoading: query.isLoading, create, update, remove };
+  const { filterByScope } = useUserDataScope();
+  const contracts = useMemo(() => filterByScope(query.data ?? []), [query.data, filterByScope]);
+
+  return { contracts, isLoading: query.isLoading, create, update, remove };
 }

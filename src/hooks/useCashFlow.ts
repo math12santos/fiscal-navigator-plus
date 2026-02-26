@@ -5,6 +5,7 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useContracts, Contract } from "@/hooks/useContracts";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
+import { useUserDataScope } from "@/hooks/useUserDataScope";
 import { useMemo } from "react";
 import { addMonths, format, isBefore, isAfter } from "date-fns";
 
@@ -211,13 +212,16 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     return [] as CashFlowEntry[]; // CRM projections are handled via useFinancialSummary for now
   }, [rangeFrom, rangeTo]);
 
+  // Scope filter
+  const { filterByScope } = useUserDataScope();
+
   // Merge materialized + projected + payroll
   const allEntries = useMemo(() => {
     const materialized = entriesQuery.data ?? [];
     const merged = [...materialized, ...projectedEntries as any[], ...payrollProjections, ...crmProjections];
     merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
-    return merged as CashFlowEntry[];
-  }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections]);
+    return filterByScope(merged as CashFlowEntry[]);
+  }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections, filterByScope]);
 
   // KPIs
   const totals = useMemo(() => {

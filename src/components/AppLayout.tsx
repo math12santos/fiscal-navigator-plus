@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import OrgSelector from "@/components/OrgSelector";
+import { ScopeIndicator } from "@/components/ScopeIndicator";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 const navItems = [
@@ -70,8 +71,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Org Selector */}
-        <div className="border-b border-border/50 p-2">
+        <div className="border-b border-border/50 p-2 space-y-2">
           <OrgSelector collapsed={collapsed} />
+          {!collapsed && <ScopeIndicator />}
         </div>
 
         {/* Nav */}
