@@ -2781,6 +2781,7 @@ export type Database = {
           cargo: string | null
           company_name: string | null
           created_at: string
+          email: string | null
           full_name: string | null
           id: string
           must_change_password: boolean
@@ -2791,6 +2792,7 @@ export type Database = {
           cargo?: string | null
           company_name?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id: string
           must_change_password?: boolean
@@ -2801,6 +2803,7 @@ export type Database = {
           cargo?: string | null
           company_name?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id?: string
           must_change_password?: boolean

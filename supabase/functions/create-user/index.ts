@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     const userId = newUser.user.id;
 
     // Update profile — mark must_change_password = true
-    const profileUpdate: Record<string, unknown> = { must_change_password: true };
+    const profileUpdate: Record<string, unknown> = { must_change_password: true, email };
     if (full_name) profileUpdate.full_name = full_name;
     if (cargo) profileUpdate.cargo = cargo;
 
