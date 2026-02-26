@@ -52,6 +52,7 @@ function useNeedsOnboarding() {
       });
   }, [user]);
 
+  if (!user) return { loading: false, needs: false };
   if (orgLoading || mustChangePassword === null) return { loading: true, needs: false };
 
   if (mustChangePassword) return { loading: false, needs: true };
