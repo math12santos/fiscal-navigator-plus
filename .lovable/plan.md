@@ -1,78 +1,74 @@
 
-# Plano: Filtro de Dados por Departamento (Centro de Custo)
+
+# Plano: Responsavel do Centro de Custo como Seletor de Usuarios com Acesso Automatico
 
 ## Objetivo
-Permitir que gestores de departamento vejam apenas os dados financeiros vinculados aos centros de custo sob sua responsabilidade. Hoje, todos os usuários com acesso a um modulo veem todos os dados da organizacao.
 
-## Abordagem
-
-A filtragem sera feita por **Centro de Custo**, que ja existe como conceito no sistema e esta vinculado a contratos, fluxo de caixa, colaboradores, orcamento, etc. A ideia e criar uma tabela de associacao entre usuarios e centros de custo permitidos, e usar isso como filtro nos hooks de dados.
+Transformar o campo "Responsavel" do centro de custo de texto livre para um seletor de usuarios membros da organizacao. Ao atribuir um responsavel, o sistema automaticamente concede acesso ao centro de custo para esse usuario na tabela `user_cost_center_access`.
 
 ---
 
 ## Etapas
 
-### 1. Criar tabela `user_cost_center_access`
+### 1. Migrar coluna `responsible` de text para uuid
 
-Nova tabela no banco de dados:
+Alterar a coluna `cost_centers.responsible` de `text` para `uuid`, referenciando o `id` do usuario (tabela `profiles`). Como o campo atual e texto livre e provavelmente contem nomes (nao UUIDs), os valores existentes serao limpos (definidos como NULL) antes da conversao.
 
-```text
-user_cost_center_access
------------------------
-id              uuid PK
-user_id         uuid NOT NULL
-organization_id uuid NOT NULL
-cost_center_id  uuid NOT NULL  (FK -> cost_centers)
-granted_by      uuid NOT NULL
-created_at      timestamptz
-UNIQUE(user_id, organization_id, cost_center_id)
-```
+### 2. Atualizar o formulario de Centro de Custo
 
-Com RLS: membros da organizacao podem visualizar; owners/admins podem inserir/deletar.
+No `CostCenterFormDialog.tsx`:
+- Receber a lista de membros da organizacao como prop
+- Substituir o `<Input>` de "Responsavel" por um `<SearchableSelect>` que lista os membros da empresa (nome + cargo)
+- Adaptar o estado do formulario para armazenar `responsible` como `uuid | null`
 
-### 2. Criar hook `useUserDataScope`
+### 3. Carregar membros da organizacao na pagina de Configuracoes
 
-Um hook central que:
-- Consulta `user_cost_center_access` para o usuario atual na organizacao atual
-- Retorna a lista de `cost_center_ids` permitidos
-- Retorna `hasFullScope: true` se o usuario for master/owner/admin OU se nao houver restricoes configuradas (compatibilidade)
-- Exporta uma funcao utilitaria `filterByScope(items)` que filtra arrays pelo campo `cost_center_id`
+Na pagina que renderiza o formulario de centros de custo (`Configuracoes.tsx`), buscar os membros da organizacao (via `organization_members` + `profiles`) e passa-los como prop para o dialog.
 
-### 3. Integrar filtro nos hooks de dados
+### 4. Automatizar concessao de acesso ao salvar
 
-Alterar os seguintes hooks para aplicar o filtro de escopo:
-- `useCashFlow` -- filtrar entries por `cost_center_id`
-- `useContracts` -- filtrar contratos por `cost_center_id`
-- `useBudget` -- filtrar budget lines por `cost_center_id`
-- `useDP` (colaboradores) -- filtrar employees por `cost_center_id`
-- `useLiabilities` -- filtrar passivos por `cost_center_id`
+No hook `useCostCenters.ts`, apos criar ou atualizar um centro de custo com um `responsible` definido:
+- Inserir automaticamente um registro em `user_cost_center_access` para o usuario responsavel (se ainda nao existir)
+- Se o responsavel mudar, remover o acesso do responsavel anterior e conceder ao novo
+- Isso garante que o gestor sempre tenha visibilidade sobre os dados do seu departamento
 
-A filtragem sera feita no lado do cliente (pos-query) para manter a simplicidade. Usuarios privilegiados (master, owner, admin) continuam vendo tudo.
+### 5. Exibir nome do responsavel na listagem
 
-### 4. Interface de configuracao no Backoffice
-
-Na aba "Permissoes" do BackofficeCompany, substituir a "Camada B -- Granularidade de Visualizacao" (que hoje sao toggles sem efeito real) por um seletor de centros de custo:
-- Listar todos os centros de custo da organizacao com checkboxes
-- Marcar/desmarcar quais centros de custo o usuario pode ver
-- Se nenhum centro estiver selecionado, o usuario ve tudo (compatibilidade retroativa)
-- Salvar na tabela `user_cost_center_access`
-
-### 5. Indicador visual no app
-
-Adicionar um indicador sutil na interface principal (proximo ao OrgSelector ou no header) mostrando "Visualizando: [nomes dos centros de custo]" quando o usuario tiver escopo restrito, para que fique claro que os dados estao filtrados.
+Atualizar a query de centros de custo para fazer join com `profiles` e exibir o nome do responsavel na tabela/listagem, em vez de um UUID.
 
 ---
 
 ## Detalhes Tecnicos
 
-- A tabela `user_cost_center_access` segue o padrao multi-tenant com `organization_id` e RLS via `is_org_member`
-- O hook `useUserDataScope` usa `useQuery` com cache de 30s
-- A filtragem e aplicada via `useMemo` dentro de cada hook de dados, sem alterar as queries ao banco
-- Itens sem `cost_center_id` (null) serao visíveis para todos os usuarios (dados nao classificados permanecem acessiveis)
-- Usuarios com `hasFullAccess` (master/owner/admin) ignoram completamente o filtro
+### Migracao SQL
 
-## Compatibilidade
+```text
+- ALTER cost_centers: SET responsible = NULL WHERE responsible IS NOT NULL
+- ALTER cost_centers: ALTER COLUMN responsible TYPE uuid USING NULL
+- Nao adicionar FK formal para manter flexibilidade (usuarios podem ser removidos)
+```
 
-- Se um usuario nao tiver nenhum registro em `user_cost_center_access`, ele continua vendo todos os dados (comportamento atual preservado)
-- Nenhuma alteracao em tabelas existentes
-- Nenhuma alteracao em RLS existentes
+### Logica de acesso automatico (no hook useCostCenters)
+
+```text
+onSuccess do create/update:
+  1. Se responsible != null:
+     - UPSERT em user_cost_center_access (user_id=responsible, cost_center_id=cc.id)
+  2. Se houve mudanca de responsible (update):
+     - DELETE do acesso antigo (se o antigo nao for responsavel de outro CC)
+     - INSERT do acesso novo
+  3. Invalidar query de user_cost_center_access
+```
+
+### Props do formulario
+
+```text
+CostCenterFormDialog recebe:
+  orgMembers: { id: string; full_name: string; cargo: string }[]
+```
+
+### Compatibilidade
+
+- Centros de custo sem responsavel continuam funcionando normalmente
+- A concessao automatica e aditiva: nao remove acessos configurados manualmente pelo Backoffice
+- Apenas remove o acesso automatico quando o responsavel e trocado por outro
