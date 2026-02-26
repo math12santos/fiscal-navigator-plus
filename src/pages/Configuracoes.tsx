@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +47,27 @@ const PRODUCT_TYPES = [
 ];
 
 export default function Configuracoes() {
+  const { currentOrg } = useOrganization();
+  const orgId = currentOrg?.id;
+
+  // Fetch org members for responsible selector
+  const { data: orgMembers = [] } = useQuery({
+    queryKey: ["org_members_for_cc", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("organization_members" as any)
+        .select("user_id, role, profiles:user_id(full_name, cargo)")
+        .eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data as any[]).map((m) => ({
+        id: m.user_id,
+        full_name: m.profiles?.full_name ?? "",
+        cargo: m.profiles?.cargo ?? m.role ?? "",
+      }));
+    },
+    enabled: !!orgId,
+  });
+
   // Plano de Contas
   const { accounts, isLoading: loadingAccounts, create: createAccount, update: updateAccount, toggleActive: toggleAccountActive, deleteAll: deleteAllAccounts, seedDefaultAccounts } = useChartOfAccounts();
   const [accountSearch, setAccountSearch] = useState("");
@@ -192,7 +216,7 @@ export default function Configuracoes() {
                       <TableCell className="font-mono text-xs">{cc.code}</TableCell>
                       <TableCell className="font-medium">{cc.name}</TableCell>
                       <TableCell className="text-muted-foreground">{cc.business_unit ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{cc.responsible ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{cc.responsible_name ?? "—"}</TableCell>
                       <TableCell><Badge variant={cc.active ? "default" : "secondary"}>{cc.active ? "Ativo" : "Inativo"}</Badge></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -206,7 +230,7 @@ export default function Configuracoes() {
               </Table>
             )}
           </div>
-          <CostCenterFormDialog open={centerDialogOpen} onOpenChange={setCenterDialogOpen} costCenter={editingCenter} costCenters={costCenters} onSubmit={(data) => { if (editingCenter) { updateCenter.mutate(data, { onSuccess: () => setCenterDialogOpen(false) }); } else { createCenter.mutate(data, { onSuccess: () => setCenterDialogOpen(false) }); } }} isLoading={createCenter.isPending || updateCenter.isPending} />
+          <CostCenterFormDialog open={centerDialogOpen} onOpenChange={setCenterDialogOpen} costCenter={editingCenter} costCenters={costCenters} orgMembers={orgMembers} onSubmit={(data) => { if (editingCenter) { updateCenter.mutate(data, { onSuccess: () => setCenterDialogOpen(false) }); } else { createCenter.mutate(data, { onSuccess: () => setCenterDialogOpen(false) }); } }} isLoading={createCenter.isPending || updateCenter.isPending} />
         </TabsContent>
 
         {/* ===== FORNECEDORES / CLIENTES ===== */}

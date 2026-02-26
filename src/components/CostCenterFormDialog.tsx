@@ -6,7 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { SearchableSelect, SearchableOption } from "@/components/ui/searchable-select";
 import { CostCenter } from "@/hooks/useCostCenters";
+
+export interface OrgMember {
+  id: string;
+  full_name: string;
+  cargo: string;
+}
 
 interface Props {
   open: boolean;
@@ -15,9 +22,10 @@ interface Props {
   costCenters: CostCenter[];
   onSubmit: (data: any) => void;
   isLoading?: boolean;
+  orgMembers?: OrgMember[];
 }
 
-export default function CostCenterFormDialog({ open, onOpenChange, costCenter, costCenters, onSubmit, isLoading }: Props) {
+export default function CostCenterFormDialog({ open, onOpenChange, costCenter, costCenters, onSubmit, isLoading, orgMembers = [] }: Props) {
   const [form, setForm] = useState({
     code: "",
     name: "",
@@ -45,6 +53,12 @@ export default function CostCenterFormDialog({ open, onOpenChange, costCenter, c
   }, [costCenter, open]);
 
   const parentOptions = costCenters.filter((cc) => cc.active && cc.id !== costCenter?.id);
+
+  const memberOptions: SearchableOption[] = orgMembers.map((m) => ({
+    value: m.id,
+    label: m.full_name || "Sem nome",
+    sublabel: m.cargo || undefined,
+  }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +116,14 @@ export default function CostCenterFormDialog({ open, onOpenChange, costCenter, c
             </div>
             <div className="space-y-2">
               <Label>Responsável</Label>
-              <Input value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} />
+              <SearchableSelect
+                options={memberOptions}
+                value={form.responsible}
+                onValueChange={(v) => setForm({ ...form, responsible: v })}
+                placeholder="Selecionar responsável..."
+                searchPlaceholder="Buscar membro..."
+                emptyMessage="Nenhum membro encontrado."
+              />
             </div>
           </div>
 
