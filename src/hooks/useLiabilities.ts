@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
+import { useUserDataScope } from "@/hooks/useUserDataScope";
 
 export interface Liability {
   id: string;
@@ -94,8 +96,11 @@ export function useLiabilities() {
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
+  const { filterByScope } = useUserDataScope();
+  const filteredLiabilities = useMemo(() => filterByScope(query.data ?? []), [query.data, filterByScope]);
+
   // Computed totals
-  const totals = (query.data ?? []).reduce(
+  const totals = filteredLiabilities.reduce(
     (acc, l) => {
       if (l.status === "quitado") return acc;
       acc.total += Number(l.valor_atualizado);
@@ -114,7 +119,7 @@ export function useLiabilities() {
   );
 
   return {
-    liabilities: query.data ?? [],
+    liabilities: filteredLiabilities,
     isLoading: query.isLoading,
     totals,
     create,

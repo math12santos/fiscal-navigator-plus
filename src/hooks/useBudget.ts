@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
+import { useUserDataScope } from "@/hooks/useUserDataScope";
 
 export interface BudgetVersion {
   id: string;
@@ -185,9 +187,10 @@ export function useBudget() {
 export function useBudgetLines(versionId: string | null) {
   const { user } = useAuth();
   const { currentOrg } = useOrganization();
+  const { filterByScope } = useUserDataScope();
   const orgId = currentOrg?.id;
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["budget_lines", orgId, versionId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -200,4 +203,8 @@ export function useBudgetLines(versionId: string | null) {
     },
     enabled: !!user && !!orgId && !!versionId,
   });
+
+  const filteredData = useMemo(() => filterByScope(query.data ?? []), [query.data, filterByScope]);
+
+  return { ...query, data: filteredData };
 }

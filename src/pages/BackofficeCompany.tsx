@@ -62,6 +62,8 @@ import { ptBR } from "date-fns/locale";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOrgModules, useUpsertOrgModule } from "@/hooks/useOrgModules";
 import { useSystemModules } from "@/hooks/useSystemModules";
+import { useCostCenters } from "@/hooks/useCostCenters";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const MODULES: { key: string; label: string; tabs?: { key: string; label: string }[] }[] = [
   { key: "dashboard", label: "Dashboard" },
@@ -102,14 +104,7 @@ const MODULES: { key: string; label: string; tabs?: { key: string; label: string
   { key: "documentos", label: "Documentos da Empresa" },
 ];
 
-const SCOPES = [
-  { key: "empresa", label: "Empresa (consolidado)" },
-  { key: "filial", label: "Filial / Unidade" },
-  { key: "centro_custo", label: "Centro de Custo" },
-  { key: "projeto", label: "Projeto / Contrato" },
-  { key: "conta_bancaria", label: "Conta Bancária" },
-  { key: "entidade", label: "Entidade (cliente/fornecedor)" },
-];
+// SCOPES removed — replaced by cost center access selector
 
 const SENSITIVE_ACTIONS = [
   { key: "exportar", label: "Pode exportar dados" },
@@ -614,23 +609,12 @@ export default function BackofficeCompany() {
                 </CardContent>
               </Card>
 
-              {/* Camada B — Escopos */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Camada B — Granularidade de Visualização</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {SCOPES.map((scope) => (
-                    <div key={scope.key} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                      <span className="text-sm text-foreground">{scope.label}</span>
-                      <Switch
-                        checked={permMap[`scope:${scope.key}`] ?? false}
-                        onCheckedChange={() => handleToggleModule(selectedUserId, `scope`, permMap[`scope:${scope.key}`] ?? false)}
-                      />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+              {/* Camada B — Centros de Custo */}
+              <CostCenterAccessCard
+                orgId={orgId!}
+                userId={selectedUserId}
+                currentUserId={user!.id}
+              />
 
               {/* Ações Sensíveis */}
               <Card>
@@ -1121,6 +1105,105 @@ function OrgModulesTab({ orgId }: { orgId: string }) {
             );
           })}
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Cost Center Access selector for a user */
+function CostCenterAccessCard({ orgId, userId, currentUserId }: { orgId: string; userId: string; currentUserId: string }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  // Fetch cost centers for the org — we can't use useCostCenters because it uses OrganizationContext
+  // which points to the impersonated org. Here we fetch by orgId directly.
+  const { data: costCenters = [] } = useQuery({
+    queryKey: ["cost_centers_for_org", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cost_centers" as any)
+        .select("id, code, name, active")
+        .eq("organization_id", orgId)
+        .eq("active", true)
+        .order("code");
+      if (error) throw error;
+      return (data ?? []) as unknown as { id: string; code: string; name: string; active: boolean }[];
+    },
+    enabled: !!orgId,
+  });
+
+  // Fetch current access for this user
+  const { data: accessEntries = [] } = useQuery({
+    queryKey: ["user_cost_center_access", userId, orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_cost_center_access" as any)
+        .select("*")
+        .eq("user_id", userId)
+        .eq("organization_id", orgId);
+      if (error) throw error;
+      return (data ?? []) as unknown as { id: string; cost_center_id: string }[];
+    },
+    enabled: !!userId && !!orgId,
+  });
+
+  const accessSet = new Set(accessEntries.map((a) => a.cost_center_id));
+
+  const handleToggle = async (costCenterId: string, isCurrentlyAllowed: boolean) => {
+    try {
+      if (isCurrentlyAllowed) {
+        // Remove access
+        const entry = accessEntries.find((a) => a.cost_center_id === costCenterId);
+        if (entry) {
+          await supabase.from("user_cost_center_access" as any).delete().eq("id", entry.id);
+        }
+      } else {
+        // Grant access
+        await supabase.from("user_cost_center_access" as any).insert({
+          user_id: userId,
+          organization_id: orgId,
+          cost_center_id: costCenterId,
+          granted_by: currentUserId,
+        } as any);
+      }
+      qc.invalidateQueries({ queryKey: ["user_cost_center_access", userId, orgId] });
+    } catch (err: any) {
+      toast({ title: "Erro ao atualizar acesso", description: err.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Camada B — Centros de Custo Permitidos</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Selecione os centros de custo que este usuário pode visualizar. Se nenhum estiver selecionado, o usuário vê todos os dados.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {costCenters.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum centro de custo cadastrado nesta organização.</p>
+        ) : (
+          <div className="space-y-2">
+            {accessSet.size === 0 && (
+              <Badge variant="secondary" className="mb-3 text-xs">Acesso total — sem restrição por centro de custo</Badge>
+            )}
+            {costCenters.map((cc) => {
+              const isAllowed = accessSet.has(cc.id);
+              return (
+                <label key={cc.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0 cursor-pointer">
+                  <Checkbox
+                    checked={isAllowed}
+                    onCheckedChange={() => handleToggle(cc.id, isAllowed)}
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-foreground">{cc.code} — {cc.name}</span>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -2912,6 +2912,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_cost_center_access: {
+        Row: {
+          cost_center_id: string
+          created_at: string
+          granted_by: string
+          id: string
+          organization_id: string
+          user_id: string
+        }
+        Insert: {
+          cost_center_id: string
+          created_at?: string
+          granted_by: string
+          id?: string
+          organization_id: string
+          user_id: string
+        }
+        Update: {
+          cost_center_id?: string
+          created_at?: string
+          granted_by?: string
+          id?: string
+          organization_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_cost_center_access_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_cost_center_access_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_permissions: {
         Row: {
           allowed: boolean
