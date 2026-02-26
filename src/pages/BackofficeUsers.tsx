@@ -12,7 +12,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Search, Plus, Edit2, Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, Plus, Edit2, Trash2, Building2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -132,8 +133,8 @@ export default function BackofficeUsers() {
     return userList.filter((u) => {
       const profile = profileMap[u.userId];
       const name = profile?.full_name || "";
-      const email = profile?.id || "";
-      const matchSearch = !search || name.toLowerCase().includes(search.toLowerCase()) || email.includes(search);
+      const email = profile?.email || "";
+      const matchSearch = !search || name.toLowerCase().includes(search.toLowerCase()) || email.toLowerCase().includes(search.toLowerCase());
       const matchOrg = orgFilter === "__all__" || u.memberships.some((m: any) => m.organization_id === orgFilter);
       return matchSearch && matchOrg;
     });
@@ -241,6 +242,7 @@ export default function BackofficeUsers() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
+              <TableHead>E-mail</TableHead>
               <TableHead>Cargo</TableHead>
               <TableHead>Empresas</TableHead>
               <TableHead>Status</TableHead>
@@ -250,7 +252,7 @@ export default function BackofficeUsers() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   Nenhum usuário encontrado.
                 </TableCell>
               </TableRow>
@@ -262,15 +264,27 @@ export default function BackofficeUsers() {
                     <TableCell>
                       <span className="font-medium text-foreground">{profile?.full_name || "Sem nome"}</span>
                     </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">{profile?.email || "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{profile?.cargo || "—"}</TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {u.memberships.map((m: any) => (
-                          <Badge key={m.id} variant="outline" className="text-xs">
-                            {orgMap[m.organization_id] || "?"} ({m.role})
-                          </Badge>
-                        ))}
-                      </div>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground">
+                            <Building2 size={13} />
+                            {u.memberships.length} empresa{u.memberships.length !== 1 ? "s" : ""}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-2" align="start">
+                          <div className="space-y-1.5">
+                            {u.memberships.map((m: any) => (
+                              <div key={m.id} className="flex items-center justify-between text-sm px-2 py-1 rounded bg-muted/40">
+                                <span className="truncate font-medium">{orgMap[m.organization_id] || "?"}</span>
+                                <Badge variant="outline" className="text-[10px] ml-2 shrink-0">{m.role}</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
                     <TableCell>
                       <Badge variant={profile?.active !== false ? "default" : "secondary"}>
