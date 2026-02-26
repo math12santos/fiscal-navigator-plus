@@ -859,7 +859,7 @@ export type Database = {
           user_id: string
           valor: number
           valor_base: number
-          vencimento: string
+          vencimento: string | null
         }
         Insert: {
           area_responsavel?: string | null
@@ -898,7 +898,7 @@ export type Database = {
           user_id: string
           valor?: number
           valor_base?: number
-          vencimento: string
+          vencimento?: string | null
         }
         Update: {
           area_responsavel?: string | null
@@ -937,7 +937,7 @@ export type Database = {
           user_id?: string
           valor?: number
           valor_base?: number
-          vencimento?: string
+          vencimento?: string | null
         }
         Relationships: [
           {
