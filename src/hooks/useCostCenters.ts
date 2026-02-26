@@ -13,14 +13,52 @@ export interface CostCenter {
   parent_id: string | null;
   business_unit: string | null;
   responsible: string | null;
+  responsible_name?: string | null;
   description: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
 }
 
-type CreateInput = Omit<CostCenter, "id" | "user_id" | "created_at" | "updated_at">;
+type CreateInput = Omit<CostCenter, "id" | "user_id" | "created_at" | "updated_at" | "responsible_name">;
 type UpdateInput = { id: string } & Partial<CreateInput>;
+
+async function syncResponsibleAccess(
+  costCenterId: string,
+  newResponsible: string | null,
+  oldResponsible: string | null,
+  orgId: string
+) {
+  // Grant access to new responsible
+  if (newResponsible) {
+    await supabase
+      .from("user_cost_center_access" as any)
+      .upsert(
+        { user_id: newResponsible, cost_center_id: costCenterId, organization_id: orgId, granted_by: "system" },
+        { onConflict: "user_id,cost_center_id" }
+      );
+  }
+
+  // Remove access from old responsible if changed
+  if (oldResponsible && oldResponsible !== newResponsible) {
+    // Only remove if old responsible is not responsible for another CC
+    const { data: otherCCs } = await supabase
+      .from("cost_centers" as any)
+      .select("id")
+      .eq("responsible", oldResponsible)
+      .eq("organization_id", orgId)
+      .neq("id", costCenterId);
+
+    if (!otherCCs || otherCCs.length === 0) {
+      await supabase
+        .from("user_cost_center_access" as any)
+        .delete()
+        .eq("user_id", oldResponsible)
+        .eq("cost_center_id", costCenterId)
+        .eq("organization_id", orgId);
+    }
+  }
+}
 
 export function useCostCenters() {
   const { user } = useAuth();
@@ -35,12 +73,16 @@ export function useCostCenters() {
     queryFn: async () => {
       let q = supabase
         .from("cost_centers" as any)
-        .select("*")
+        .select("*, profiles:responsible(full_name)")
         .order("code", { ascending: true });
       if (orgId) q = q.eq("organization_id", orgId);
       const { data, error } = await q;
       if (error) throw error;
-      return data as unknown as CostCenter[];
+      return (data as any[]).map((cc) => ({
+        ...cc,
+        responsible_name: cc.profiles?.full_name ?? null,
+        profiles: undefined,
+      })) as CostCenter[];
     },
     enabled: !!user && !!orgId,
   });
@@ -55,7 +97,11 @@ export function useCostCenters() {
       if (error) throw error;
       return data as unknown as CostCenter;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      if (data.responsible && orgId) {
+        await syncResponsibleAccess(data.id, data.responsible, null, orgId);
+        qc.invalidateQueries({ queryKey: ["user_cost_center_access"] });
+      }
       qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
       log({ entity_type: "cost_centers", entity_id: data.id, action: "INSERT", new_data: data as any });
       toast({ title: "Centro de custo criado" });
@@ -65,6 +111,13 @@ export function useCostCenters() {
 
   const update = useMutation({
     mutationFn: async ({ id, ...input }: UpdateInput) => {
+      // Get old responsible before updating
+      const { data: old } = await supabase
+        .from("cost_centers" as any)
+        .select("responsible")
+        .eq("id", id)
+        .single();
+
       const { data, error } = await supabase
         .from("cost_centers" as any)
         .update(input)
@@ -72,9 +125,15 @@ export function useCostCenters() {
         .select()
         .single();
       if (error) throw error;
-      return data as unknown as CostCenter;
+      return { ...(data as unknown as CostCenter), _oldResponsible: (old as any)?.responsible ?? null };
     },
-    onSuccess: (data) => {
+    onSuccess: async (data: any) => {
+      const oldResponsible = data._oldResponsible;
+      const newResponsible = data.responsible;
+      if (orgId && (newResponsible || oldResponsible)) {
+        await syncResponsibleAccess(data.id, newResponsible, oldResponsible, orgId);
+        qc.invalidateQueries({ queryKey: ["user_cost_center_access"] });
+      }
       qc.invalidateQueries({ queryKey: ["cost_centers", orgId] });
       log({ entity_type: "cost_centers", entity_id: data.id, action: "UPDATE", new_data: data as any });
       toast({ title: "Centro de custo atualizado" });
