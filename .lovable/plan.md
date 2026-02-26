@@ -1,74 +1,139 @@
 
 
-# Plano: Responsavel do Centro de Custo como Seletor de Usuarios com Acesso Automatico
+# Plano: Configuracao de Modulos e Abas por Centro de Custo
 
 ## Objetivo
 
-Transformar o campo "Responsavel" do centro de custo de texto livre para um seletor de usuarios membros da organizacao. Ao atribuir um responsavel, o sistema automaticamente concede acesso ao centro de custo para esse usuario na tabela `user_cost_center_access`.
+Quando o Owner cria ou edita um centro de custo, ele define:
+1. Quais **modulos** aquele centro de custo tera acesso
+2. Quais **abas** dentro de cada modulo serao visiveis para cada **nivel de acesso** (role) do setor
+
+Isso transforma o centro de custo de uma unidade de agrupamento de dados em uma **unidade organizacional com permissoes proprias**.
+
+---
+
+## Modelo Conceitual
+
+Hoje as permissoes sao definidas por usuario (`user_permissions`). A proposta e adicionar uma camada intermediaria:
+
+```text
+Organizacao
+  -> Centro de Custo
+       -> Modulos habilitados para o setor
+       -> Abas visiveis por role (admin, member, viewer)
+  -> Usuario
+       -> Vinculado a 1+ centros de custo (user_cost_center_access)
+       -> Herda as permissoes do centro de custo conforme seu role na org
+```
+
+Owner/Admin continuam com bypass total. A configuracao do centro de custo define o que members e viewers podem ver quando estao restritos a um setor.
 
 ---
 
 ## Etapas
 
-### 1. Migrar coluna `responsible` de text para uuid
+### 1. Criar tabela `cost_center_permissions`
 
-Alterar a coluna `cost_centers.responsible` de `text` para `uuid`, referenciando o `id` do usuario (tabela `profiles`). Como o campo atual e texto livre e provavelmente contem nomes (nao UUIDs), os valores existentes serao limpos (definidos como NULL) antes da conversao.
+Nova tabela para armazenar quais modulos e abas cada centro de custo permite, por nivel de acesso:
 
-### 2. Atualizar o formulario de Centro de Custo
+```text
+cost_center_permissions
+-----------------------
+id                uuid PK
+organization_id   uuid NOT NULL
+cost_center_id    uuid NOT NULL (FK -> cost_centers)
+module_key        text NOT NULL
+tab_key           text NULL (NULL = permissao no nivel do modulo)
+role              text NOT NULL ('member' | 'viewer')
+allowed           boolean NOT NULL DEFAULT true
+created_at        timestamptz
+UNIQUE(cost_center_id, module_key, tab_key, role)
+```
 
-No `CostCenterFormDialog.tsx`:
-- Receber a lista de membros da organizacao como prop
-- Substituir o `<Input>` de "Responsavel" por um `<SearchableSelect>` que lista os membros da empresa (nome + cargo)
-- Adaptar o estado do formulario para armazenar `responsible` como `uuid | null`
+RLS: membros da organizacao podem visualizar; owners/admins podem inserir/atualizar/deletar.
 
-### 3. Carregar membros da organizacao na pagina de Configuracoes
+### 2. Expandir o formulario de Centro de Custo
 
-Na pagina que renderiza o formulario de centros de custo (`Configuracoes.tsx`), buscar os membros da organizacao (via `organization_members` + `profiles`) e passa-los como prop para o dialog.
+No `CostCenterFormDialog.tsx`, apos os campos basicos, adicionar uma secao colapsavel "Modulos e Permissoes" com:
+- Lista de modulos da organizacao (habilitados em `organization_modules`)
+- Para cada modulo: toggle de ativacao para o setor
+- Para modulos com abas: grid de checkboxes (abas x roles)
+- Roles configuráveis: `member` (Analista) e `viewer` (Visualizador)
+- Owner e Admin nao aparecem na grid pois tem acesso total
 
-### 4. Automatizar concessao de acesso ao salvar
+O dialog sera expandido para `sm:max-w-2xl` para acomodar a grid.
 
-No hook `useCostCenters.ts`, apos criar ou atualizar um centro de custo com um `responsible` definido:
-- Inserir automaticamente um registro em `user_cost_center_access` para o usuario responsavel (se ainda nao existir)
-- Se o responsavel mudar, remover o acesso do responsavel anterior e conceder ao novo
-- Isso garante que o gestor sempre tenha visibilidade sobre os dados do seu departamento
+### 3. Salvar permissoes ao criar/editar centro de custo
 
-### 5. Exibir nome do responsavel na listagem
+No hook `useCostCenters.ts`, apos salvar o centro de custo:
+- Deletar permissoes antigas do centro de custo (`cost_center_permissions`)
+- Inserir as novas permissoes em batch
+- Invalidar queries de permissoes
 
-Atualizar a query de centros de custo para fazer join com `profiles` e exibir o nome do responsavel na tabela/listagem, em vez de um UUID.
+### 4. Integrar no hook de permissoes do usuario
+
+Atualizar `useUserPermissions.ts` para considerar as permissoes herdadas do centro de custo:
+- Se o usuario tem escopo restrito (vinculado a centros de custo via `user_cost_center_access`):
+  - Consultar `cost_center_permissions` dos centros de custo permitidos
+  - Unificar as permissoes: se qualquer centro de custo permite um modulo/aba, o usuario pode acessar
+- Se o usuario tem escopo total (sem restricoes ou Owner/Admin): comportamento atual mantido
+- A tabela `user_permissions` continua existindo como override manual (prioridade sobre heranca do CC)
+
+### 5. Valores padrao e compatibilidade
+
+- Centros de custo sem permissoes configuradas: todos os modulos da org ficam acessiveis (compatibilidade retroativa)
+- Se um centro de custo tem pelo menos uma permissao configurada, o modo restritivo e ativado para aquele CC
+- Modulos desativados na organizacao (`organization_modules`) nao aparecem como opcao no formulario do CC
 
 ---
 
 ## Detalhes Tecnicos
 
-### Migracao SQL
+### Resolucao de permissoes (ordem de precedencia)
 
 ```text
-- ALTER cost_centers: SET responsible = NULL WHERE responsible IS NOT NULL
-- ALTER cost_centers: ALTER COLUMN responsible TYPE uuid USING NULL
-- Nao adicionar FK formal para manter flexibilidade (usuarios podem ser removidos)
+1. system_modules (global) -- modulo desativado globalmente = bloqueado para todos
+2. organization_modules (tenant) -- modulo desativado na org = bloqueado para todos da org
+3. Owner/Admin/Master -- bypass total, ignora camadas abaixo
+4. cost_center_permissions (setor) -- define o que member/viewer podem ver no setor
+5. user_permissions (individual) -- override manual por usuario (opcional)
 ```
 
-### Logica de acesso automatico (no hook useCostCenters)
-
-```text
-onSuccess do create/update:
-  1. Se responsible != null:
-     - UPSERT em user_cost_center_access (user_id=responsible, cost_center_id=cc.id)
-  2. Se houve mudanca de responsible (update):
-     - DELETE do acesso antigo (se o antigo nao for responsavel de outro CC)
-     - INSERT do acesso novo
-  3. Invalidar query de user_cost_center_access
-```
-
-### Props do formulario
+### Fluxo de dados no formulario
 
 ```text
 CostCenterFormDialog recebe:
-  orgMembers: { id: string; full_name: string; cargo: string }[]
+  orgModules: { key: string; label: string; tabs?: { key: string; label: string }[] }[]
+  existingPermissions: CostCenterPermission[] (ao editar)
+
+Armazena estado local:
+  permissions: Map<string, { enabled: boolean; tabs: Map<string, { member: boolean; viewer: boolean }> }>
+
+Ao submeter: envia junto com os dados do CC
+```
+
+### Migracao SQL
+
+```text
+CREATE TABLE cost_center_permissions (
+  id uuid PK DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES organizations(id),
+  cost_center_id uuid NOT NULL REFERENCES cost_centers(id) ON DELETE CASCADE,
+  module_key text NOT NULL,
+  tab_key text,
+  role text NOT NULL,
+  allowed boolean NOT NULL DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(cost_center_id, module_key, COALESCE(tab_key, '__module__'), role)
+);
+
+RLS: org member can SELECT; owner/admin can INSERT/UPDATE/DELETE
 ```
 
 ### Compatibilidade
 
-- Centros de custo sem responsavel continuam funcionando normalmente
-- A concessao automatica e aditiva: nao remove acessos configurados manualmente pelo Backoffice
-- Apenas remove o acesso automatico quando o responsavel e trocado por outro
+- Nenhuma alteracao em tabelas existentes
+- `user_permissions` continua funcionando como override
+- Centros de custo sem configuracao de permissoes mantem comportamento atual
+- A UI no Backoffice (BackofficeCompany) continua permitindo override individual por usuario
+
