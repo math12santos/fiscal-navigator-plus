@@ -66,22 +66,35 @@ function getCycleLabel(cycle: DateCycle, ref: Date): string {
  * the contract is active within the period.
  * For unique (one-time) contracts, returns the contract value if active in range.
  */
+/**
+ * Determine if a contract generates recurring cashflow (same logic as useCashFlow).
+ * Only recurring services produce repeated entries.
+ */
+function isRecurringCashflow(c: Contract): boolean {
+  if (c.tipo_recorrencia === "unico") return false;
+  const isServicos = c.subtipo_operacao === "servicos";
+  if (!isServicos) return false;
+  const nonRecurringFinalidades = ["servicos_pontuais", "servicos_tecnicos", "servicos_contrato"];
+  if (c.finalidade && nonRecurringFinalidades.includes(c.finalidade)) return false;
+  return true;
+}
+
 function getProjectedValue(c: Contract, from?: Date, to?: Date): number {
   const valor = Number(c.valor);
-  if (!from || !to) return valor; // no period filter = show face value
+  if (!from || !to) return valor;
 
   const contractStart = c.data_inicio ? new Date(c.data_inicio) : new Date(c.created_at);
   const contractEnd = c.data_fim ? new Date(c.data_fim) : (c.prazo_indeterminado ? null : new Date(c.vencimento));
 
-  // Effective overlap period
   const effectiveStart = max([contractStart, from]);
   const effectiveEnd = contractEnd ? min([contractEnd, to]) : to;
 
   if (effectiveStart > effectiveEnd) return 0;
 
-  if (c.tipo_recorrencia === "unico") return valor;
+  // Non-recurring contracts (products, assets, one-off services) = single value
+  if (!isRecurringCashflow(c)) return valor;
 
-  // For recurring contracts, calculate how many months fall within the overlap
+  // Only truly recurring services get multiplied
   const recurrenceMonths: Record<string, number> = {
     mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12,
   };
