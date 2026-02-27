@@ -36,8 +36,34 @@ export interface CashFlowEntry {
 export type CashFlowInput = Omit<CashFlowEntry, "id" | "created_at" | "updated_at" | "user_id" | "organization_id">;
 
 /**
+ * Determine if a contract should generate recurring cashflow projections.
+ * Only recurring services (subscriptions, outsourcing, etc.) produce repeated entries.
+ * All other types (merchandise, assets, one-off services) are single-entry or installment-based.
+ */
+function isRecurringCashflow(contract: Contract): boolean {
+  if (contract.tipo_recorrencia === "unico") return false;
+
+  // Only "servicos" subtipo generates automatic recurring projections
+  const isServicos = contract.subtipo_operacao === "servicos";
+  if (!isServicos) return false;
+
+  // Specific service finalidades that are NOT recurring in cashflow
+  const nonRecurringFinalidades = [
+    "servicos_pontuais",
+    "servicos_tecnicos",
+    "servicos_contrato",
+  ];
+  if (contract.finalidade && nonRecurringFinalidades.includes(contract.finalidade)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Generate projected cashflow entries from a contract's recurrence.
  * These are virtual entries (not persisted) for display purposes.
+ * Only called for contracts where isRecurringCashflow() returns true.
  */
 function generateProjectionsFromContract(
   contract: Contract,
@@ -47,7 +73,7 @@ function generateProjectionsFromContract(
   const projections: Omit<CashFlowEntry, "user_id" | "organization_id">[] = [];
 
   if (contract.status !== "Ativo") return projections;
-  if (contract.tipo_recorrencia === "unico") return projections; // handled by installments
+  if (!isRecurringCashflow(contract)) return projections;
 
   const contractStart = contract.data_inicio ? new Date(contract.data_inicio) : new Date(contract.created_at);
   const contractEnd = contract.data_fim ? new Date(contract.data_fim) : null;
@@ -60,14 +86,6 @@ function generateProjectionsFromContract(
 
   const tipo = contract.impacto_resultado === "receita" ? "entrada" : "saida";
 
-  // Iterate from contract start, generating one entry per recurrence interval
-  let current = new Date(contractStart.getFullYear(), contractStart.getMonth(), Math.min(dia, 28));
-
-  // Go back to align with interval start
-  while (isBefore(current, rangeFrom) && (!contractEnd || isBefore(current, contractEnd))) {
-    current = addMonths(current, interval);
-  }
-  // Also go back to catch entries before rangeFrom that might still be in range
   let cursor = new Date(contractStart.getFullYear(), contractStart.getMonth(), Math.min(dia, 28));
 
   while (!isAfter(cursor, rangeTo)) {
@@ -136,25 +154,25 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
   // Contract projections (virtual) — recurrent contracts
   const { contracts } = useContracts();
 
-  // Installments for "unico" contracts — fetch all installments for active unique contracts
-  const uniqueContractIds = useMemo(
-    () => contracts.filter((c) => c.tipo_recorrencia === "unico" && c.status === "Ativo").map((c) => c.id),
+  // Installments for all non-recurring contracts (merchandise, assets, one-off services, etc.)
+  const nonRecurringContractIds = useMemo(
+    () => contracts.filter((c) => c.status === "Ativo" && !isRecurringCashflow(c)).map((c) => c.id),
     [contracts]
   );
 
   const installmentsQuery = useQuery({
-    queryKey: ["cashflow_installments", orgId, uniqueContractIds],
+    queryKey: ["cashflow_installments", orgId, nonRecurringContractIds],
     queryFn: async () => {
-      if (uniqueContractIds.length === 0) return [];
+      if (nonRecurringContractIds.length === 0) return [];
       const { data, error } = await supabase
         .from("contract_installments" as any)
         .select("*")
-        .in("contract_id", uniqueContractIds)
+        .in("contract_id", nonRecurringContractIds)
         .order("data_vencimento", { ascending: true });
       if (error) throw error;
       return (data ?? []) as unknown as import("@/hooks/useContractInstallments").ContractInstallment[];
     },
-    enabled: !!user && !!orgId && uniqueContractIds.length > 0,
+    enabled: !!user && !!orgId && nonRecurringContractIds.length > 0,
   });
 
   const projectedEntries = useMemo(() => {
@@ -165,7 +183,7 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
         .map((e) => `${e.contract_id}-${e.data_prevista}`)
     );
 
-    // 1. Recurrent contract projections
+    // 1. Recurrent contract projections (only truly recurring services)
     const recurrentProjections = contracts.flatMap((c) => {
       const projections = generateProjectionsFromContract(c, rangeFrom, rangeTo);
       return projections.filter(
@@ -173,9 +191,12 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
       );
     });
 
-    // 2. Installment projections (for "unico" contracts)
+    // 2. Installment projections (for non-recurring contracts that have manual installments)
     const contractMap = new Map(contracts.map((c) => [c.id, c]));
-    const installmentProjections = (installmentsQuery.data ?? [])
+    const installmentData = installmentsQuery.data ?? [];
+    const contractsWithInstallments = new Set(installmentData.map((i) => i.contract_id));
+
+    const installmentProjections = installmentData
       .filter((inst) => {
         const d = new Date(inst.data_vencimento);
         return !isBefore(d, rangeFrom) && !isAfter(d, rangeTo) &&
@@ -206,7 +227,38 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
         } as Omit<CashFlowEntry, "user_id" | "organization_id">;
       });
 
-    return [...recurrentProjections, ...installmentProjections];
+    // 3. Single-entry fallback for non-recurring contracts WITHOUT installments
+    const singleEntryProjections = contracts
+      .filter((c) => c.status === "Ativo" && !isRecurringCashflow(c) && c.tipo_recorrencia !== "unico" && !contractsWithInstallments.has(c.id))
+      .flatMap((c) => {
+        const dateStr = c.data_inicio ?? format(new Date(c.created_at), "yyyy-MM-dd");
+        const d = new Date(dateStr);
+        if (isBefore(d, rangeFrom) || isAfter(d, rangeTo)) return [];
+        if (materializedKeys.has(`${c.id}-${dateStr}`)) return [];
+        const tipo = c.impacto_resultado === "receita" ? "entrada" : "saida";
+        return [{
+          id: `proj-single-${c.id}`,
+          contract_id: c.id,
+          contract_installment_id: null,
+          tipo,
+          categoria: c.natureza_financeira,
+          descricao: `${c.nome} — entrada única`,
+          valor_previsto: Number(c.valor),
+          valor_realizado: null,
+          data_prevista: dateStr,
+          data_realizada: null,
+          status: "previsto" as const,
+          account_id: null,
+          cost_center_id: c.cost_center_id,
+          entity_id: c.entity_id,
+          notes: null,
+          source: "contrato",
+          created_at: c.created_at,
+          updated_at: c.created_at,
+        } as Omit<CashFlowEntry, "user_id" | "organization_id">];
+      });
+
+    return [...recurrentProjections, ...installmentProjections, ...singleEntryProjections];
   }, [contracts, rangeFrom, rangeTo, entriesQuery.data, installmentsQuery.data]);
 
   // Payroll projections from DP
