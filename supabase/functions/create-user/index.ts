@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -59,7 +59,14 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
-      return new Response(JSON.stringify({ error: createError.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      console.error("[create-user] Error:", createError);
+      let userMessage = "Não foi possível criar o usuário";
+      if (createError.message?.includes("duplicate") || createError.message?.includes("already")) {
+        userMessage = "Este e-mail já está em uso";
+      } else if (createError.message?.includes("invalid")) {
+        userMessage = "Dados inválidos fornecidos";
+      }
+      return new Response(JSON.stringify({ error: userMessage }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const userId = newUser.user.id;
@@ -89,8 +96,9 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
+    console.error("[create-user] Unexpected error:", err);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: "Erro interno do servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

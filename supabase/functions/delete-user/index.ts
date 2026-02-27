@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -63,7 +63,8 @@ Deno.serve(async (req) => {
     // Delete auth user
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(user_id);
     if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      console.error("[delete-user] Error:", deleteError);
+      return new Response(JSON.stringify({ error: "Não foi possível excluir o usuário" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(
@@ -71,8 +72,9 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
+    console.error("[delete-user] Unexpected error:", err);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: "Erro interno do servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
