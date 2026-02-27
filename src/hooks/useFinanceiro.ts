@@ -7,8 +7,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useHolding } from "@/contexts/HoldingContext";
 import { useUserDataScope } from "@/hooks/useUserDataScope";
 import { useContracts, Contract } from "@/hooks/useContracts";
-import { format, isBefore, isAfter } from "date-fns";
+import { format, addMonths } from "date-fns";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
+import { isRecurringCashflow, generateProjectionsFromContract } from "@/lib/contractProjections";
 
 export interface FinanceiroEntry extends CashFlowEntry {}
 
@@ -98,8 +99,15 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
         .filter((e) => e.contract_installment_id)
         .map((e) => e.contract_installment_id)
     );
+    const materializedContractDateKeys = new Set(
+      materialized
+        .filter((e) => e.contract_id && e.source === "contrato")
+        .map((e) => `${e.contract_id}-${e.data_prevista}`)
+    );
 
     const contractMap = new Map(contracts.map((c) => [c.id, c]));
+
+    // 1. Manual installment projections (non-materialized)
     const installments = (installmentsQuery.data ?? [])
       .filter((inst: any) => !materializedInstKeys.has(inst.id))
       .map((inst: any) => {
@@ -128,7 +136,30 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
         } as FinanceiroEntry;
       });
 
-    const merged = [...materialized, ...installments];
+    // 2. Recurring contract projections (today → +12 months)
+    const now = new Date();
+    const rangeFrom = now;
+    const rangeTo = addMonths(now, 12);
+
+    const recurringProjections = contracts
+      .filter((c) => {
+        const isTipo = tipo === "entrada"
+          ? c.impacto_resultado === "receita"
+          : c.impacto_resultado !== "receita";
+        return c.status === "Ativo" && isTipo && isRecurringCashflow(c);
+      })
+      .flatMap((c) => {
+        const projections = generateProjectionsFromContract(c, rangeFrom, rangeTo);
+        return projections
+          .filter((p) => !materializedContractDateKeys.has(`${p.contract_id}-${p.data_prevista}`))
+          .map((p) => ({
+            ...p,
+            organization_id: c.organization_id ?? orgId,
+            user_id: user?.id ?? "",
+          } as FinanceiroEntry));
+      });
+
+    const merged = [...materialized, ...installments, ...recurringProjections];
     merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
     return filterByScope(merged);
   }, [entriesQuery.data, installmentsQuery.data, contracts, tipo, orgId, filterByScope]);
