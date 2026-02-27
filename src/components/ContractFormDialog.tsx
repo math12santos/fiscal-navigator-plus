@@ -931,7 +931,7 @@ function InstallmentConfigSection({ form, set, contractId, isEditing }: {
 
       {/* Parcelas */}
       {isEditing && contractId ? (
-        <InstallmentsSection contractId={contractId} contractValue={form.valor} />
+        <InstallmentsSection contractId={contractId} contractValue={form.valor} operacao={form.operacao} />
       ) : (
         <p className="text-sm text-muted-foreground border border-dashed border-border rounded-md p-3">
           💡 Salve o contrato primeiro para cadastrar entrada e parcelas de pagamento.
@@ -942,7 +942,7 @@ function InstallmentConfigSection({ form, set, contractId, isEditing }: {
 }
 
 // ==================== Installments Section ====================
-function InstallmentsSection({ contractId, contractValue }: { contractId: string; contractValue: number }) {
+function InstallmentsSection({ contractId, contractValue, operacao }: { contractId: string; contractValue: number; operacao: string }) {
   const { installments, isLoading, create, createMany, remove, update } = useContractInstallments(contractId);
   const [showGenerator, setShowGenerator] = useState(false);
   const [genQty, setGenQty] = useState(3);
@@ -1144,8 +1144,8 @@ function InstallmentsSection({ contractId, contractValue }: { contractId: string
                 {inst.status}
               </Badge>
               {inst.status === "pendente" && (
-                <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1 text-success hover:text-success" onClick={() => update.mutate({ id: inst.id, status: "pago" })}>
-                  <CheckCircle2 size={12} /> Pagar
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1 text-success hover:text-success" onClick={() => update.mutate({ id: inst.id, status: operacao === "venda" ? "recebido" : "pago" })}>
+                  <CheckCircle2 size={12} /> {operacao === "venda" ? "Receber" : "Pagar"}
                 </Button>
               )}
               {(inst.status === "pago" || inst.status === "recebido") && (
