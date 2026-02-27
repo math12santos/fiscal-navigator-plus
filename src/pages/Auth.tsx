@@ -79,7 +79,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <main className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="glass-card p-8 w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold gradient-text">FinCore</h1>
@@ -152,6 +152,6 @@ export default function Auth() {
           </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
