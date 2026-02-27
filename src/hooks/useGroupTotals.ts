@@ -94,19 +94,60 @@ export function useGroupTotals(rangeFrom: Date, rangeTo: Date) {
     staleTime: 30_000,
   });
 
-  // Group employees (payroll) totals
+  // Group employees (payroll) totals — must mirror usePayrollProjections logic
+  // including encargos, provisions, VT and benefits for a fair comparison
   const groupPayroll = useQuery({
     queryKey: ["group_payroll_totals", allOrgIds],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch employees
+      const { data: empData, error: empError } = await supabase
         .from("employees" as any)
-        .select("salary_base")
+        .select("id, salary_base, vt_ativo, vt_diario")
         .in("organization_id", allOrgIds)
         .eq("status", "ativo");
-      if (error) throw error;
+      if (empError) throw empError;
+
+      // Fetch employee benefits with benefit details
+      const { data: ebData, error: ebError } = await supabase
+        .from("employee_benefits" as any)
+        .select("employee_id, active, custom_value, dp_benefits(default_value)")
+        .in("organization_id", allOrgIds)
+        .eq("active", true);
+      if (ebError) throw ebError;
+
+      // Build benefits map per employee
+      const benefitsByEmp = new Map<string, number>();
+      for (const eb of (ebData ?? []) as any[]) {
+        if (!eb.active) continue;
+        const val = eb.custom_value ?? eb.dp_benefits?.default_value ?? 0;
+        benefitsByEmp.set(eb.employee_id, (benefitsByEmp.get(eb.employee_id) ?? 0) + Number(val));
+      }
+
+      // Use default percentages (same defaults as usePayrollProjections)
+      const inssPatronalPct = 0.20;
+      const ratPct = 0.02;
+      const fgtsPct = 0.08;
+      const terceirosPct = 0.058;
+      const provisao13Pct = 0.0833;
+      const provisaoFeriasPct = 0.1111;
+      const vtDescontoPct = 0.06;
+      const encargosPct = inssPatronalPct + ratPct + fgtsPct + terceirosPct;
+      const provisoesPct = provisao13Pct + provisaoFeriasPct;
+
       let total = 0;
-      for (const e of (data ?? []) as any[]) {
-        total += Number(e.salary_base);
+      for (const e of (empData ?? []) as any[]) {
+        const salary = Number(e.salary_base);
+        total += salary; // base
+        total += salary * encargosPct; // encargos
+        total += salary * provisoesPct; // provisões
+        // VT
+        if (e.vt_ativo && Number(e.vt_diario) > 0) {
+          const vtBruto = Number(e.vt_diario) * 22;
+          const vtDesconto = salary * vtDescontoPct;
+          total += Math.max(0, vtBruto - vtDesconto);
+        }
+        // Benefits
+        total += benefitsByEmp.get(e.id) ?? 0;
       }
       return { total };
     },
