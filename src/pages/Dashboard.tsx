@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
+import { useGroupTotals } from "@/hooks/useGroupTotals";
 import { useMemo, useCallback } from "react";
 import { startOfMonth, subMonths, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -58,6 +59,16 @@ export default function Dashboard() {
     alerts,
     isLoading,
   } = useFinancialSummary(rangeFrom, rangeTo);
+
+  const { isPerCompany, groupTotals } = useGroupTotals(rangeFrom, rangeTo);
+
+  const share = useCallback(
+    (value: number, groupValue: number) => {
+      if (!isPerCompany || !groupTotals || groupValue === 0) return undefined;
+      return (value / groupValue) * 100;
+    },
+    [isPerCompany, groupTotals]
+  );
 
   // Previous vs current month (memoized to avoid re-renders)
   const prevMonthStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
@@ -176,6 +187,7 @@ export default function Dashboard() {
           change={pctChange(currentMonth.entradas, previousMonth.entradas)}
           subtitle="vs mês anterior"
           icon={<DollarSign size={20} />}
+          groupShare={share(currentMonth.entradas, groupTotals?.entradas ?? 0)}
         />
         <KPICard
           title="Despesas Mensais"
@@ -183,6 +195,7 @@ export default function Dashboard() {
           change={pctChange(currentMonth.saidas, previousMonth.saidas)}
           subtitle="vs mês anterior"
           icon={<TrendingUp size={20} />}
+          groupShare={share(currentMonth.saidas, groupTotals?.saidas ?? 0)}
         />
         <KPICard
           title="Resultado Mensal"
@@ -190,6 +203,7 @@ export default function Dashboard() {
           change={pctChange(currentMonth.lucro, previousMonth.lucro)}
           subtitle="vs mês anterior"
           icon={<PiggyBank size={20} />}
+          groupShare={share(Math.abs(currentMonth.lucro), Math.abs(groupTotals?.saldo ?? 0))}
         />
         <KPICard
           title="Saldo Período"
@@ -197,6 +211,7 @@ export default function Dashboard() {
           change={0}
           subtitle="últimos 6 meses"
           icon={<Wallet size={20} />}
+          groupShare={share(cashflowTotals.saldo, groupTotals?.saldo ?? 0)}
         />
       </div>
 
@@ -205,9 +220,21 @@ export default function Dashboard() {
         <div className="glass-card p-5 animate-slide-up">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contratos Ativos</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contratos Ativos</p>
+                {isPerCompany && groupTotals && groupTotals.contractsCount > 0 && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
+                    {((activeContractsCount / groupTotals.contractsCount) * 100).toFixed(1)}% do grupo
+                  </span>
+                )}
+              </div>
               <p className="text-2xl font-bold text-foreground">{activeContractsCount}</p>
               <p className="text-xs text-muted-foreground">{formatCurrency(monthlyContractValue)}/mês</p>
+              {isPerCompany && groupTotals && groupTotals.contractsCount > 0 && (
+                <div className="w-full bg-muted/50 rounded-full h-1 mt-1">
+                  <div className="bg-primary/60 h-1 rounded-full transition-all duration-500" style={{ width: `${Math.min((activeContractsCount / groupTotals.contractsCount) * 100, 100)}%` }} />
+                </div>
+              )}
             </div>
             <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
               <FileText size={20} />
@@ -218,9 +245,21 @@ export default function Dashboard() {
         <div className="glass-card p-5 animate-slide-up">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Custo Folha</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Custo Folha</p>
+                {isPerCompany && groupTotals && groupTotals.payrollTotal > 0 && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
+                    {((avgMonthlyPayroll / groupTotals.payrollTotal) * 100).toFixed(1)}% do grupo
+                  </span>
+                )}
+              </div>
               <p className="text-2xl font-bold text-foreground">{formatCurrency(avgMonthlyPayroll)}</p>
               <p className="text-xs text-muted-foreground">mensal estimado</p>
+              {isPerCompany && groupTotals && groupTotals.payrollTotal > 0 && (
+                <div className="w-full bg-muted/50 rounded-full h-1 mt-1">
+                  <div className="bg-primary/60 h-1 rounded-full transition-all duration-500" style={{ width: `${Math.min((avgMonthlyPayroll / groupTotals.payrollTotal) * 100, 100)}%` }} />
+                </div>
+              )}
             </div>
             <div className="rounded-lg bg-accent/10 p-2.5 text-accent-foreground">
               <Users size={20} />
@@ -231,11 +270,23 @@ export default function Dashboard() {
         <div className="glass-card p-5 animate-slide-up">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Passivos</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Passivos</p>
+                {isPerCompany && groupTotals && groupTotals.liabilitiesTotal > 0 && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
+                    {((liabilityTotals.total / groupTotals.liabilitiesTotal) * 100).toFixed(1)}% do grupo
+                  </span>
+                )}
+              </div>
               <p className="text-2xl font-bold text-foreground">{formatCurrency(liabilityTotals.total)}</p>
               <p className="text-xs text-muted-foreground">
                 {contingenciasProvaveis > 0 ? `${formatCurrency(contingenciasProvaveis)} prováveis` : "Sem contingências"}
               </p>
+              {isPerCompany && groupTotals && groupTotals.liabilitiesTotal > 0 && (
+                <div className="w-full bg-muted/50 rounded-full h-1 mt-1">
+                  <div className="bg-primary/60 h-1 rounded-full transition-all duration-500" style={{ width: `${Math.min((liabilityTotals.total / groupTotals.liabilitiesTotal) * 100, 100)}%` }} />
+                </div>
+              )}
             </div>
             <div className="rounded-lg bg-destructive/10 p-2.5 text-destructive">
               <Shield size={20} />

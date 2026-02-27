@@ -8,16 +8,25 @@ interface KPICardProps {
   change?: number;
   subtitle?: string;
   icon?: ReactNode;
+  /** Group share percentage (0-100), shown as "X% do grupo" */
+  groupShare?: number | null;
 }
 
-export function KPICard({ title, value, change, subtitle, icon }: KPICardProps) {
+export function KPICard({ title, value, change, subtitle, icon, groupShare }: KPICardProps) {
   return (
     <div className="glass-card p-5 animate-slide-up">
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            {title}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {title}
+            </p>
+            {groupShare != null && groupShare > 0 && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
+                {groupShare.toFixed(1)}% do grupo
+              </span>
+            )}
+          </div>
           <p className="text-2xl font-bold text-foreground animate-count">{value}</p>
           {change !== undefined && (
             <div className="flex items-center gap-1">
@@ -38,6 +47,14 @@ export function KPICard({ title, value, change, subtitle, icon }: KPICardProps) 
               {subtitle && (
                 <span className="text-xs text-muted-foreground ml-1">{subtitle}</span>
               )}
+            </div>
+          )}
+          {groupShare != null && groupShare > 0 && (
+            <div className="w-full bg-muted/50 rounded-full h-1 mt-1.5">
+              <div
+                className="bg-primary/60 h-1 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(groupShare, 100)}%` }}
+              />
             </div>
           )}
         </div>
