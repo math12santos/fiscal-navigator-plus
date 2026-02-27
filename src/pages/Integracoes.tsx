@@ -13,7 +13,7 @@ const integrations = [
 export default function Integracoes() {
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Integrações" description="Gerencie conexões com ERPs, bancos e sistemas financeiros" />
+      <PageHeader title="Integrações" description="Gerencie conexões com ERPs, bancos e sistemas financeiros" showHoldingToggle={false} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {integrations.map((int) => (

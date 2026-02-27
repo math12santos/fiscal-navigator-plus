@@ -162,7 +162,7 @@ export default function Configuracoes() {
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center gap-3">
-        <PageHeader title="Configurações" description="Plano de Contas, Centros de Custo, Cadastros e Produtos" />
+        <PageHeader title="Configurações" description="Plano de Contas, Centros de Custo, Cadastros e Produtos" showHoldingToggle={false} />
         <Button variant="outline" className="ml-auto" onClick={() => setSeedDialogOpen(true)}>
           <Wand2 size={16} /> Gerar Plano Padrão
         </Button>

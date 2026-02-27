@@ -5,21 +5,22 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUserDataScope } from "@/hooks/useUserDataScope";
+import { useHolding } from "@/contexts/HoldingContext";
 
 export interface Liability {
   id: string;
   organization_id: string | null;
   user_id: string;
   name: string;
-  tipo: string; // divida | contingencia | provisao
+  tipo: string;
   descricao: string | null;
   valor_original: number;
   valor_atualizado: number;
   taxa_juros: number;
   data_inicio: string | null;
   data_vencimento: string | null;
-  status: string; // ativo | quitado | negociacao | judicial
-  probabilidade: string; // provavel | possivel | remota
+  status: string;
+  probabilidade: string;
   impacto_stress: number;
   entity_id: string | null;
   contract_id: string | null;
@@ -37,15 +38,21 @@ export function useLiabilities() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const orgId = currentOrg?.id;
+  const { holdingMode, activeOrgIds } = useHolding();
 
   const query = useQuery({
-    queryKey: ["liabilities", orgId],
+    queryKey: ["liabilities", holdingMode ? activeOrgIds : orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("liabilities" as any)
         .select("*")
-        .eq("organization_id", orgId)
         .order("data_vencimento", { ascending: true });
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else if (orgId) {
+        q = q.eq("organization_id", orgId);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as unknown as Liability[];
     },
