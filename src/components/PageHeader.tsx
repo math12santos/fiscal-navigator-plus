@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 import { HoldingToggle } from "@/components/HoldingToggle";
+import { HoldingCompanyTabs } from "@/components/HoldingCompanyTabs";
 
 interface PageHeaderProps {
   title: string;
@@ -13,17 +14,20 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, children, className, showHoldingToggle = true }: PageHeaderProps) {
   return (
-    <div className={cn("flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-6", className)}>
-      <div className="flex items-center gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{title}</h1>
-          {description && (
-            <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
-          )}
+    <div className={cn("mb-6", className)}>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+            {description && (
+              <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
+            )}
+          </div>
+          {showHoldingToggle && <HoldingToggle />}
         </div>
-        {showHoldingToggle && <HoldingToggle />}
+        {children && <div className="flex items-center gap-2 mt-2 sm:mt-0">{children}</div>}
       </div>
-      {children && <div className="flex items-center gap-2 mt-2 sm:mt-0">{children}</div>}
+      {showHoldingToggle && <HoldingCompanyTabs />}
     </div>
   );
 }

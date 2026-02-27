@@ -22,6 +22,10 @@ interface HoldingContextType {
   subsidiaryOrgs: Organization[];
   /** The list of org IDs to query: if holding mode is on, includes current + all subsidiaries; otherwise just current */
   activeOrgIds: string[];
+  /** In per-company mode, the currently selected subsidiary ID (null = holding org itself) */
+  selectedSubsidiaryId: string | null;
+  /** Set the selected subsidiary in per-company mode */
+  setSelectedSubsidiaryId: (id: string | null) => void;
   /** Loading state */
   isLoading: boolean;
 }
@@ -35,6 +39,8 @@ const HoldingContext = createContext<HoldingContextType>({
   subsidiaryIds: [],
   subsidiaryOrgs: [],
   activeOrgIds: [],
+  selectedSubsidiaryId: null,
+  setSelectedSubsidiaryId: () => {},
   isLoading: false,
 });
 
@@ -46,6 +52,7 @@ export function HoldingProvider({ children }: { children: ReactNode }) {
 
   const [holdingMode, setHoldingMode] = useState(false);
   const [holdingView, setHoldingView] = useState<HoldingView>("consolidated");
+  const [selectedSubsidiaryId, setSelectedSubsidiaryId] = useState<string | null>(null);
 
   // Check if current org is a holding
   const holdingQuery = useQuery({
@@ -108,8 +115,12 @@ export function HoldingProvider({ children }: { children: ReactNode }) {
   const activeOrgIds = useMemo(() => {
     if (!orgId) return [];
     if (!effectiveHoldingMode) return [orgId];
+    // In per-company mode with a selection, narrow to just that org
+    if (holdingView === "per-company" && selectedSubsidiaryId !== null) {
+      return [selectedSubsidiaryId];
+    }
     return [orgId, ...subsidiaryIds];
-  }, [orgId, effectiveHoldingMode, subsidiaryIds]);
+  }, [orgId, effectiveHoldingMode, subsidiaryIds, holdingView, selectedSubsidiaryId]);
 
   return (
     <HoldingContext.Provider
@@ -122,6 +133,8 @@ export function HoldingProvider({ children }: { children: ReactNode }) {
         subsidiaryIds,
         subsidiaryOrgs,
         activeOrgIds,
+        selectedSubsidiaryId,
+        setSelectedSubsidiaryId,
         isLoading: holdingQuery.isLoading,
       }}
     >
