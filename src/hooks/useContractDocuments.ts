@@ -9,6 +9,7 @@ export interface ContractDocument {
   contract_id: string;
   file_name: string;
   file_url: string;
+  file_path?: string;
   file_type: string;
   version: number;
   observacao: string | null;
@@ -31,7 +32,27 @@ export function useContractDocuments(contractId?: string) {
         .eq("contract_id", contractId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as unknown as ContractDocument[];
+      const docs = data as unknown as ContractDocument[];
+      // Generate signed URLs for each document
+      const docsWithSignedUrls = await Promise.all(
+        docs.map(async (doc) => {
+          const filePath = doc.file_path || doc.file_url;
+          // Extract storage path from full URL if needed
+          const storagePath = filePath.includes("/storage/v1/object/public/contract-documents/")
+            ? filePath.split("/storage/v1/object/public/contract-documents/")[1]
+            : filePath.includes("/storage/v1/object/sign/contract-documents/")
+            ? filePath.split("/storage/v1/object/sign/contract-documents/")[1]?.split("?")[0]
+            : filePath;
+          const { data: signedData } = await supabase.storage
+            .from("contract-documents")
+            .createSignedUrl(storagePath, 3600); // 1 hour expiry
+          return {
+            ...doc,
+            file_url: signedData?.signedUrl || doc.file_url,
+          };
+        })
+      );
+      return docsWithSignedUrls;
     },
     enabled: !!user && !!contractId,
   });
@@ -42,7 +63,6 @@ export function useContractDocuments(contractId?: string) {
       const path = `${orgId}/${contractId}/${Date.now()}_${file.name}`;
       const { error: uploadErr } = await supabase.storage.from("contract-documents").upload(path, file);
       if (uploadErr) throw uploadErr;
-      const { data: urlData } = supabase.storage.from("contract-documents").getPublicUrl(path);
       const currentDocs = query.data ?? [];
       const version = currentDocs.filter((d) => d.file_type === fileType).length + 1;
       const { error } = await supabase.from("contract_documents" as any).insert({
@@ -50,7 +70,7 @@ export function useContractDocuments(contractId?: string) {
         organization_id: orgId,
         user_id: user!.id,
         file_name: file.name,
-        file_url: urlData.publicUrl,
+        file_url: path, // Store the storage path, not a public URL
         file_type: fileType,
         version,
         observacao: observacao || null,
