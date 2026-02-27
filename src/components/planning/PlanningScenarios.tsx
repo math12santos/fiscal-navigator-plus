@@ -45,7 +45,7 @@ interface Props {
 }
 
 export default function PlanningScenarios({ startDate, endDate }: Props) {
-  const { scenarios, isLoading, create, remove, seedDefaults } = usePlanningScenarios();
+  const { scenarios, isLoading, create, update, remove, seedDefaults } = usePlanningScenarios();
   const { entries } = useCashFlow(startDate, endDate);
   const { contracts } = useContracts();
   const { accounts } = useChartOfAccounts();
@@ -53,6 +53,8 @@ export default function PlanningScenarios({ startDate, endDate }: Props) {
   const [activeTypes, setActiveTypes] = useState<string[]>(["base"]);
   const [showCreate, setShowCreate] = useState(false);
   const [showOverrides, setShowOverrides] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ variacao_receita: 0, variacao_custos: 0, atraso_recebimento_dias: 0 });
   const [form, setForm] = useState({
     name: "",
     type: "custom" as string,
@@ -213,24 +215,70 @@ export default function PlanningScenarios({ startDate, endDate }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {scenarios
           .filter((s) => activeTypes.includes(s.type))
-          .map((s) => (
-            <Card key={s.id} className="glass-card">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium capitalize">{s.name}</CardTitle>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowOverrides(s.id)} title="Overrides por conta">
-                    <Settings2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-1 text-xs text-muted-foreground">
-                <p>Receita: <span className={cn("font-medium", s.variacao_receita >= 0 ? "text-success" : "text-destructive")}>{s.variacao_receita > 0 ? "+" : ""}{s.variacao_receita}%</span></p>
-                <p>Custos: <span className={cn("font-medium", s.variacao_custos <= 0 ? "text-success" : "text-destructive")}>{s.variacao_custos > 0 ? "+" : ""}{s.variacao_custos}%</span></p>
-                <p>Atraso recebimento: <span className="font-medium text-foreground">{s.atraso_recebimento_dias}d</span></p>
-                {s.description && <p className="mt-1 italic">{s.description}</p>}
-              </CardContent>
-            </Card>
-          ))}
+          .map((s) => {
+            const isEditing = editingId === s.id;
+            return (
+              <Card key={s.id} className="glass-card">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium capitalize">{s.name}</CardTitle>
+                    <div className="flex gap-0.5">
+                      {isEditing ? (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={async () => {
+                            await update.mutateAsync({ id: s.id, ...editForm });
+                            setEditingId(null);
+                          }} disabled={update.isPending} title="Salvar">
+                            {update.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-xs font-bold">✓</span>}
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingId(null)} title="Cancelar">
+                            <span className="text-xs">✕</span>
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                            setEditingId(s.id);
+                            setEditForm({ variacao_receita: s.variacao_receita, variacao_custos: s.variacao_custos, atraso_recebimento_dias: s.atraso_recebimento_dias });
+                          }} title="Editar parâmetros">
+                            <Settings2 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowOverrides(s.id)} title="Overrides por conta">
+                            <Zap className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-1.5 text-xs text-muted-foreground">
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px]">Variação Receita (%)</Label>
+                        <Input type="number" className="h-7 text-xs" value={editForm.variacao_receita} onChange={(e) => setEditForm({ ...editForm, variacao_receita: Number(e.target.value) })} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px]">Variação Custos (%)</Label>
+                        <Input type="number" className="h-7 text-xs" value={editForm.variacao_custos} onChange={(e) => setEditForm({ ...editForm, variacao_custos: Number(e.target.value) })} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px]">Atraso Receb. (dias)</Label>
+                        <Input type="number" className="h-7 text-xs" value={editForm.atraso_recebimento_dias} onChange={(e) => setEditForm({ ...editForm, atraso_recebimento_dias: Number(e.target.value) })} />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p>Receita: <span className={cn("font-medium", s.variacao_receita >= 0 ? "text-success" : "text-destructive")}>{s.variacao_receita > 0 ? "+" : ""}{s.variacao_receita}%</span></p>
+                      <p>Custos: <span className={cn("font-medium", s.variacao_custos <= 0 ? "text-success" : "text-destructive")}>{s.variacao_custos > 0 ? "+" : ""}{s.variacao_custos}%</span></p>
+                      <p>Atraso recebimento: <span className="font-medium text-foreground">{s.atraso_recebimento_dias}d</span></p>
+                      {s.description && <p className="mt-1 italic">{s.description}</p>}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
       </div>
 
       {/* Projection source info */}
