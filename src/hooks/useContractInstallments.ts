@@ -80,6 +80,8 @@ export function useContractInstallments(contractId: string | null | undefined) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["contract_installments", contractId] });
+      qc.invalidateQueries({ queryKey: ["cashflow_entries"] });
+      qc.invalidateQueries({ queryKey: ["cashflow_installments"] });
     },
     onError: (e: any) => toast({ title: "Erro ao atualizar parcela", description: e.message, variant: "destructive" }),
   });

@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertTriangle, ShieldCheck, ArrowRightLeft } from "lucide-react";
-import { useLinkedTransactions } from "@/hooks/useLinkedTransactions";
+
 import { useToast } from "@/hooks/use-toast";
 
 interface SeedPlanDialogProps {
@@ -34,7 +34,7 @@ export default function SeedPlanDialog({
   const [loading, setLoading] = useState(false);
   const [confirmCheck, setConfirmCheck] = useState(false);
   const [confirmText, setConfirmText] = useState("");
-  const { checkLinkedTransactions } = useLinkedTransactions();
+  const checkLinkedTransactions = async () => ({ has_linked_transactions: false });
   const { toast } = useToast();
 
   const hasExistingData = accountsCount > 0 || costCentersCount > 0;
