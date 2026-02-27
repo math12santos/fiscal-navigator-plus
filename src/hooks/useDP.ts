@@ -4,19 +4,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useUserDataScope } from "@/hooks/useUserDataScope";
+import { useHolding } from "@/contexts/HoldingContext";
 
 // ========== EMPLOYEES ==========
 export function useEmployees() {
   const { currentOrg } = useOrganization();
   const { filterByScope } = useUserDataScope();
+  const { holdingMode, activeOrgIds } = useHolding();
+
   const query = useQuery({
-    queryKey: ["employees", currentOrg?.id],
+    queryKey: ["employees", holdingMode ? activeOrgIds : currentOrg?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("organization_id", currentOrg!.id)
-        .order("name");
+      let q = supabase.from("employees").select("*").order("name");
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else {
+        q = q.eq("organization_id", currentOrg!.id);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },

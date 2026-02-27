@@ -3073,6 +3073,10 @@ export type Database = {
     }
     Functions: {
       check_linked_transactions: { Args: { p_user_id: string }; Returns: Json }
+      get_all_subsidiary_ids: {
+        Args: { p_holding_id: string }
+        Returns: string[]
+      }
       get_user_org_ids: { Args: { p_user_id: string }; Returns: string[] }
       has_module_access: {
         Args: {
@@ -3094,6 +3098,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_holding: { Args: { p_org_id: string }; Returns: boolean }
       is_org_member: {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean

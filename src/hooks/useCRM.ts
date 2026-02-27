@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
+import { useHolding } from "@/contexts/HoldingContext";
 
 // ========== TYPES ==========
 export interface CRMClient {
@@ -90,15 +91,21 @@ export function useCRMClients() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const orgId = currentOrg?.id;
+  const { holdingMode, activeOrgIds } = useHolding();
 
   const query = useQuery({
-    queryKey: ["crm_clients", orgId],
+    queryKey: ["crm_clients", holdingMode ? activeOrgIds : orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("crm_clients" as any)
         .select("*")
-        .eq("organization_id", orgId!)
         .order("name");
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else {
+        q = q.eq("organization_id", orgId!);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as unknown as CRMClient[];
     },
@@ -221,15 +228,21 @@ export function useCRMOpportunities() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const orgId = currentOrg?.id;
+  const { holdingMode, activeOrgIds } = useHolding();
 
   const query = useQuery({
-    queryKey: ["crm_opportunities", orgId],
+    queryKey: ["crm_opportunities", holdingMode ? activeOrgIds : orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("crm_opportunities" as any)
         .select("*")
-        .eq("organization_id", orgId!)
         .order("created_at", { ascending: false });
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else {
+        q = q.eq("organization_id", orgId!);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as unknown as CRMOpportunity[];
     },

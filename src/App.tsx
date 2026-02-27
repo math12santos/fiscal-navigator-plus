@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
+import { HoldingProvider } from "@/contexts/HoldingContext";
 import AppLayout from "@/components/AppLayout";
 import BackofficeLayout from "@/components/BackofficeLayout";
 import Dashboard from "@/pages/Dashboard";
@@ -191,12 +192,14 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <OrganizationProvider>
-            <Routes>
-              <Route path="/auth" element={<AuthRoute />} />
-              <Route path="/onboarding" element={<OnboardingRoute />} />
-              <Route path="/backoffice/*" element={<BackofficeRoutes />} />
-              <Route path="/*" element={<ProtectedRoutes />} />
-            </Routes>
+            <HoldingProvider>
+              <Routes>
+                <Route path="/auth" element={<AuthRoute />} />
+                <Route path="/onboarding" element={<OnboardingRoute />} />
+                <Route path="/backoffice/*" element={<BackofficeRoutes />} />
+                <Route path="/*" element={<ProtectedRoutes />} />
+              </Routes>
+            </HoldingProvider>
           </OrganizationProvider>
         </AuthProvider>
       </BrowserRouter>

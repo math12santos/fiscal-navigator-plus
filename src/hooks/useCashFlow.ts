@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useContracts, Contract } from "@/hooks/useContracts";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 import { useUserDataScope } from "@/hooks/useUserDataScope";
+import { useHolding } from "@/contexts/HoldingContext";
 import { useMemo } from "react";
 import { addMonths, format, isBefore, isAfter } from "date-fns";
 
@@ -107,15 +108,22 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
   const qc = useQueryClient();
   const orgId = currentOrg?.id;
 
+  // Holding mode support
+  const { holdingMode, activeOrgIds } = useHolding();
+
   // Materialized entries from DB
   const entriesQuery = useQuery({
-    queryKey: ["cashflow_entries", orgId, rangeFrom?.toISOString(), rangeTo?.toISOString()],
+    queryKey: ["cashflow_entries", holdingMode ? activeOrgIds : orgId, rangeFrom?.toISOString(), rangeTo?.toISOString()],
     queryFn: async () => {
       let q = supabase
         .from("cashflow_entries" as any)
         .select("*")
         .order("data_prevista", { ascending: true });
-      if (orgId) q = q.eq("organization_id", orgId);
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else if (orgId) {
+        q = q.eq("organization_id", orgId);
+      }
       if (rangeFrom) q = q.gte("data_prevista", format(rangeFrom, "yyyy-MM-dd"));
       if (rangeTo) q = q.lte("data_prevista", format(rangeTo, "yyyy-MM-dd"));
       const { data, error } = await q;

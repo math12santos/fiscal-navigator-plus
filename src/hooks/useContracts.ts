@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUserDataScope } from "@/hooks/useUserDataScope";
+import { useHolding } from "@/contexts/HoldingContext";
 
 export interface Contract {
   id: string;
@@ -19,7 +20,6 @@ export interface Contract {
   external_ref: string | null;
   notes: string | null;
   created_at: string;
-  // Recorrência / Condições de pagamento
   tipo_recorrencia: string;
   intervalo_personalizado: number | null;
   data_inicio: string | null;
@@ -27,29 +27,25 @@ export interface Contract {
   prazo_indeterminado: boolean;
   valor_base: number;
   dia_vencimento: number | null;
-  // Reajustes
   tipo_reajuste: string | null;
   indice_reajuste: string | null;
   percentual_reajuste: number | null;
   periodicidade_reajuste: string | null;
   proximo_reajuste: string | null;
-  // Classificações
   natureza_financeira: string | null;
   impacto_resultado: string | null;
   cost_center_id: string | null;
-  // Governança
   responsavel_interno: string | null;
   area_responsavel: string | null;
   sla_revisao_dias: number | null;
-  // Finalidade (fornecedor)
   finalidade: string | null;
-  // New wizard fields
   operacao: string | null;
   subtipo_operacao: string | null;
   rendimento_mensal_esperado: number | null;
+  organization_id?: string | null;
 }
 
-export type ContractInput = Omit<Contract, "id" | "source" | "external_ref" | "created_at">;
+export type ContractInput = Omit<Contract, "id" | "source" | "external_ref" | "created_at" | "organization_id">;
 
 export function useContracts() {
   const { user } = useAuth();
@@ -57,15 +53,20 @@ export function useContracts() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const orgId = currentOrg?.id;
+  const { holdingMode, activeOrgIds } = useHolding();
 
   const query = useQuery({
-    queryKey: ["contracts", orgId],
+    queryKey: ["contracts", holdingMode ? activeOrgIds : orgId],
     queryFn: async () => {
       let q = supabase
         .from("contracts")
         .select("*")
         .order("vencimento", { ascending: true });
-      if (orgId) q = q.eq("organization_id", orgId);
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else if (orgId) {
+        q = q.eq("organization_id", orgId);
+      }
       const { data, error } = await q;
       if (error) throw error;
       return data as unknown as Contract[];
