@@ -6,35 +6,45 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
 import { HoldingProvider } from "@/contexts/HoldingContext";
-import AppLayout from "@/components/AppLayout";
-import BackofficeLayout from "@/components/BackofficeLayout";
-import Dashboard from "@/pages/Dashboard";
-import FluxoCaixa from "@/pages/FluxoCaixa";
-import Contratos from "@/pages/Contratos";
-import Planejamento from "@/pages/Planejamento";
-import Conciliacao from "@/pages/Conciliacao";
-import Tarefas from "@/pages/Tarefas";
-import Integracoes from "@/pages/Integracoes";
-import IAFinanceira from "@/pages/IAFinanceira";
-import Configuracoes from "@/pages/Configuracoes";
-import DepartamentoPessoal from "@/pages/DepartamentoPessoal";
-import CRM from "@/pages/CRM";
-import Financeiro from "@/pages/Financeiro";
-import CreateOrganization from "@/pages/CreateOrganization";
-import Onboarding from "@/pages/Onboarding";
-import BackofficeDashboard from "@/pages/BackofficeDashboard";
-import BackofficeCompany from "@/pages/BackofficeCompany";
-import BackofficeUsers from "@/pages/BackofficeUsers";
-import BackofficeAudit from "@/pages/BackofficeAudit";
-import BackofficeConfig from "@/pages/BackofficeConfig";
-import BackofficeSystem from "@/pages/BackofficeSystem";
-import Auth from "@/pages/Auth";
-import NotFound from "./pages/NotFound";
-import ModuleMaintenanceGuard from "@/components/ModuleMaintenanceGuard";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+// Lazy-loaded layouts
+const AppLayout = lazy(() => import("@/components/AppLayout"));
+const BackofficeLayout = lazy(() => import("@/components/BackofficeLayout"));
+
+// Lazy-loaded pages
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const FluxoCaixa = lazy(() => import("@/pages/FluxoCaixa"));
+const Contratos = lazy(() => import("@/pages/Contratos"));
+const Planejamento = lazy(() => import("@/pages/Planejamento"));
+const Conciliacao = lazy(() => import("@/pages/Conciliacao"));
+const Tarefas = lazy(() => import("@/pages/Tarefas"));
+const Integracoes = lazy(() => import("@/pages/Integracoes"));
+const IAFinanceira = lazy(() => import("@/pages/IAFinanceira"));
+const Configuracoes = lazy(() => import("@/pages/Configuracoes"));
+const DepartamentoPessoal = lazy(() => import("@/pages/DepartamentoPessoal"));
+const CRM = lazy(() => import("@/pages/CRM"));
+const Financeiro = lazy(() => import("@/pages/Financeiro"));
+const CreateOrganization = lazy(() => import("@/pages/CreateOrganization"));
+const Onboarding = lazy(() => import("@/pages/Onboarding"));
+const BackofficeDashboard = lazy(() => import("@/pages/BackofficeDashboard"));
+const BackofficeCompany = lazy(() => import("@/pages/BackofficeCompany"));
+const BackofficeUsers = lazy(() => import("@/pages/BackofficeUsers"));
+const BackofficeAudit = lazy(() => import("@/pages/BackofficeAudit"));
+const BackofficeConfig = lazy(() => import("@/pages/BackofficeConfig"));
+const BackofficeSystem = lazy(() => import("@/pages/BackofficeSystem"));
+const Auth = lazy(() => import("@/pages/Auth"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const ModuleMaintenanceGuard = lazy(() => import("@/components/ModuleMaintenanceGuard"));
+
 const queryClient = new QueryClient();
+
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
+  </div>
+);
 
 /** Hook to check if user needs onboarding */
 function useNeedsOnboarding() {
@@ -71,36 +81,31 @@ function ProtectedRoutes() {
   const { loading: orgLoading } = useOrganization();
   const { loading: onboardingLoading, needs: needsOnboarding } = useNeedsOnboarding();
 
-  if (authLoading || orgLoading || onboardingLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
-      </div>
-    );
-  }
-
+  if (authLoading || orgLoading || onboardingLoading) return <LoadingFallback />;
   if (!user) return <Navigate to="/auth" replace />;
   if (needsOnboarding) return <Navigate to="/onboarding" replace />;
 
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard>} />
-        <Route path="/financeiro" element={<ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard>} />
-        <Route path="/fluxo-caixa" element={<ModuleMaintenanceGuard moduleKey="fluxo-caixa"><FluxoCaixa /></ModuleMaintenanceGuard>} />
-        <Route path="/contratos" element={<ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard>} />
-        <Route path="/planejamento" element={<ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard>} />
-        <Route path="/conciliacao" element={<ModuleMaintenanceGuard moduleKey="conciliacao"><Conciliacao /></ModuleMaintenanceGuard>} />
-        <Route path="/tarefas" element={<ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard>} />
-        <Route path="/integracoes" element={<ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard>} />
-        <Route path="/ia" element={<ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard>} />
-        <Route path="/configuracoes" element={<ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard>} />
-        <Route path="/dp" element={<ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard>} />
-        <Route path="/crm" element={<ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard>} />
-        <Route path="/nova-empresa" element={<CreateOrganization />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppLayout>
+    <Suspense fallback={<LoadingFallback />}>
+      <AppLayout>
+        <Routes>
+          <Route path="/" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/financeiro" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/fluxo-caixa" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="fluxo-caixa"><FluxoCaixa /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/contratos" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/planejamento" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/conciliacao" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="conciliacao"><Conciliacao /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/tarefas" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/integracoes" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/ia" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/configuracoes" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/dp" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/crm" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/nova-empresa" element={<Suspense fallback={<LoadingFallback />}><CreateOrganization /></Suspense>} />
+          <Route path="*" element={<Suspense fallback={<LoadingFallback />}><NotFound /></Suspense>} />
+        </Routes>
+      </AppLayout>
+    </Suspense>
   );
 }
 
@@ -109,18 +114,15 @@ function OnboardingRoute() {
   const { loading: orgLoading } = useOrganization();
   const { loading: onboardingLoading, needs: needsOnboarding } = useNeedsOnboarding();
 
-  if (authLoading || orgLoading || onboardingLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
-      </div>
-    );
-  }
-
+  if (authLoading || orgLoading || onboardingLoading) return <LoadingFallback />;
   if (!user) return <Navigate to="/auth" replace />;
   if (!needsOnboarding) return <Navigate to="/" replace />;
 
-  return <Onboarding />;
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <Onboarding />
+    </Suspense>
+  );
 }
 
 function BackofficeRoutes() {
@@ -138,29 +140,24 @@ function BackofficeRoutes() {
       .then(({ data }) => setIsMaster(!!data));
   }, [user]);
 
-  if (authLoading || isMaster === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[hsl(220_14%_96%)]">
-        <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
-      </div>
-    );
-  }
-
+  if (authLoading || isMaster === null) return <LoadingFallback />;
   if (!user) return <Navigate to="/auth" replace />;
   if (!isMaster) return <Navigate to="/" replace />;
 
   return (
-    <BackofficeLayout>
-      <Routes>
-        <Route path="/" element={<BackofficeDashboard />} />
-        <Route path="/usuarios" element={<BackofficeUsers />} />
-        <Route path="/sistema" element={<BackofficeSystem />} />
-        <Route path="/auditoria" element={<BackofficeAudit />} />
-        <Route path="/config" element={<BackofficeConfig />} />
-        <Route path="/empresa/:orgId" element={<BackofficeCompany />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BackofficeLayout>
+    <Suspense fallback={<LoadingFallback />}>
+      <BackofficeLayout>
+        <Routes>
+          <Route path="/" element={<Suspense fallback={<LoadingFallback />}><BackofficeDashboard /></Suspense>} />
+          <Route path="/usuarios" element={<Suspense fallback={<LoadingFallback />}><BackofficeUsers /></Suspense>} />
+          <Route path="/sistema" element={<Suspense fallback={<LoadingFallback />}><BackofficeSystem /></Suspense>} />
+          <Route path="/auditoria" element={<Suspense fallback={<LoadingFallback />}><BackofficeAudit /></Suspense>} />
+          <Route path="/config" element={<Suspense fallback={<LoadingFallback />}><BackofficeConfig /></Suspense>} />
+          <Route path="/empresa/:orgId" element={<Suspense fallback={<LoadingFallback />}><BackofficeCompany /></Suspense>} />
+          <Route path="*" element={<Suspense fallback={<LoadingFallback />}><NotFound /></Suspense>} />
+        </Routes>
+      </BackofficeLayout>
+    </Suspense>
   );
 }
 
@@ -183,7 +180,12 @@ function AuthRoute() {
   if (user && isMaster === null) return null;
   if (user && isMaster) return <Navigate to="/backoffice" replace />;
   if (user) return <Navigate to="/" replace />;
-  return <Auth />;
+
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <Auth />
+    </Suspense>
+  );
 }
 
 const App = () => (
