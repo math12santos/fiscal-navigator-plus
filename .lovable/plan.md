@@ -1,70 +1,47 @@
+## Problema
 
-# Correcao: Contratos x Fluxo de Caixa -- Conexoes quebradas e redundantes
+O hook `useFinanceiro` (que alimenta as abas Contas a Pagar e Contas a Receber) nao gera projecoes automaticas para contratos recorrentes de servicos. Ele so exibe:
 
-## Problema Principal
+1. Lancamentos materializados na tabela `cashflow_entries`
+2. Parcelas manuais da tabela `contract_installments`
 
-Quando o usuario clica em "Receber" numa parcela de venda, o status da parcela muda para `"recebido"`. Porem, no `useCashFlow.ts` (linha 219), a verificacao so reconhece `"pago"`:
+A logica de projecao automatica para contratos recorrentes (`generateProjectionsFromContract`) existe apenas no hook `useCashFlow`, mas nao foi replicada no `useFinanceiro`.
 
-```typescript
-status: inst.status === "pago" ? "pago" : "previsto",
-```
+## Solucao
 
-O status `"recebido"` nao e tratado, entao a parcela continua aparecendo como "previsto" no fluxo de caixa mesmo apos confirmacao.
+Incorporar no `useFinanceiro` a mesma logica de projecao de contratos recorrentes que ja existe no `useCashFlow`, adaptada para funcionar sem filtro de datas (o Financeiro mostra todos os periodos) evitando duplicidade de lançamentos.
 
-## Problema Secundario: Invalidacao de cache
+### Alteracoes
 
-Quando uma parcela e atualizada via `useContractInstallments.update`, o hook so invalida a query `["contract_installments", contractId]`. Ele **nao** invalida as queries do fluxo de caixa (`["cashflow_entries"]` e `["cashflow_installments"]`), entao o fluxo de caixa nao reflete a mudanca ate o usuario recarregar a pagina.
+**Arquivo: `src/hooks/useFinanceiro.ts**`
 
-## Conexoes Redundantes/Inativas Identificadas
+1. Importar as funcoes `addMonths`, `format`, `isBefore`, `isAfter` de `date-fns` (algumas ja estao importadas)
+2. Copiar/reutilizar as funcoes `isRecurringCashflow` e `generateProjectionsFromContract` do `useCashFlow` (ou extrair para um utilitario compartilhado)
+3. No `useMemo` que monta `allEntries`, alem das parcelas manuais, tambem gerar projecoes automaticas para contratos recorrentes ativos filtrados pelo tipo (receita para "entrada", custo/despesa para "saida")
+4. Usar um range padrao (ex: hoje ate +12 meses) para gerar as projecoes, ja que o Financeiro nao tem filtro de periodo
 
-1. **`useLinkedTransactions.ts`**: Hook que chama a funcao `check_linked_transactions` no banco. A funcao retorna sempre `{ has_linked_transactions: false }` (corpo vazio). Nao e utilizada em nenhum lugar visivel da aplicacao -- e codigo morto.
+### Abordagem tecnica
 
-2. **`getProjectedValue()` em `Contratos.tsx`**: Calcula projecoes financeiras de contratos para KPIs do modulo de contratos, mas usa logica propria que **nao** respeita a distincao `isRecurringCashflow()` do `useCashFlow`. Contratos de mercadoria com recorrencia mensal e 3 meses de vigencia mostram valor multiplicado por 3 nos KPIs de contratos, contradizendo a correcao feita no fluxo de caixa.
+A melhor abordagem e extrair `isRecurringCashflow` e `generateProjectionsFromContract` para um arquivo utilitario compartilhado (ex: `src/lib/contractProjections.ts`) e usa-lo em ambos os hooks, evitando duplicacao de logica.
 
-3. **Campo `valor_realizado` nas projecoes de parcelas**: As projecoes de installments sempre setam `valor_realizado: null`, mesmo quando o status e "pago"/"recebido". O valor realizado deveria ser preenchido com o valor da parcela quando confirmada.
+**Novo arquivo: `src/lib/contractProjections.ts**`
 
-## Plano de Implementacao
+- Mover `isRecurringCashflow()` e `generateProjectionsFromContract()` do `useCashFlow.ts`
+- Exportar ambas as funcoes
 
-### 1. Corrigir mapeamento de status no useCashFlow (arquivo: `src/hooks/useCashFlow.ts`)
+**Arquivo: `src/hooks/useCashFlow.ts**`
 
-Na linha 219, alterar a verificacao para reconhecer ambos os status de confirmacao:
+- Importar de `@/lib/contractProjections` em vez de ter as funcoes locais
 
-```typescript
-// De:
-status: inst.status === "pago" ? "pago" : "previsto",
-// Para:
-status: (inst.status === "pago" || inst.status === "recebido") ? "pago" : "previsto",
-```
+**Arquivo: `src/hooks/useFinanceiro.ts**`
 
-E tambem preencher `valor_realizado` quando a parcela esta confirmada:
+- Importar `isRecurringCashflow` e `generateProjectionsFromContract` de `@/lib/contractProjections`
+- No `useMemo` de `allEntries`:
+  - Identificar contratos recorrentes ativos do tipo correto (receita/custo)
+  - Gerar projecoes com range de hoje ate +12 meses
+  - Deduplicar contra entries ja materializadas (mesmo contract_id + data_prevista)
+  - Mesclar com as parcelas manuais existentes
 
-```typescript
-valor_realizado: (inst.status === "pago" || inst.status === "recebido") ? Number(inst.valor) : null,
-```
+### Resultado esperado
 
-### 2. Adicionar invalidacao cruzada de cache (arquivo: `src/hooks/useContractInstallments.ts`)
-
-No `onSuccess` do mutation `update`, alem de invalidar `contract_installments`, tambem invalidar as queries do fluxo de caixa:
-
-```typescript
-onSuccess: () => {
-  qc.invalidateQueries({ queryKey: ["contract_installments", contractId] });
-  qc.invalidateQueries({ queryKey: ["cashflow_entries"] });
-  qc.invalidateQueries({ queryKey: ["cashflow_installments"] });
-},
-```
-
-### 3. Alinhar KPIs de contratos com logica do fluxo de caixa (arquivo: `src/pages/Contratos.tsx`)
-
-Atualizar a funcao `getProjectedValue()` para usar a mesma distincao de `isRecurringCashflow()`. Contratos de mercadoria devem mostrar o valor unico, nao multiplicado pelo numero de meses.
-
-### 4. Remover codigo morto (arquivo: `src/hooks/useLinkedTransactions.ts`)
-
-Marcar ou remover o hook `useLinkedTransactions` e a funcao SQL `check_linked_transactions`, que nao tem implementacao real.
-
-### Arquivos Modificados
-
-- `src/hooks/useCashFlow.ts` -- correcao do status "recebido" e valor_realizado
-- `src/hooks/useContractInstallments.ts` -- invalidacao cruzada de cache
-- `src/pages/Contratos.tsx` -- alinhamento da funcao getProjectedValue
-- `src/hooks/useLinkedTransactions.ts` -- remocao de codigo morto (opcional)
+Contratos recorrentes de servico (como o "Visa S.A - SPB IA AUDITORIA") aparecerao automaticamente em Contas a Receber com projecoes mensais para os proximos 12 meses, assim como ja apareceriam no Fluxo de Caixa.
