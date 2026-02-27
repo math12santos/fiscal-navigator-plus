@@ -19,6 +19,7 @@ import IAFinanceira from "@/pages/IAFinanceira";
 import Configuracoes from "@/pages/Configuracoes";
 import DepartamentoPessoal from "@/pages/DepartamentoPessoal";
 import CRM from "@/pages/CRM";
+import Financeiro from "@/pages/Financeiro";
 import CreateOrganization from "@/pages/CreateOrganization";
 import Onboarding from "@/pages/Onboarding";
 import BackofficeDashboard from "@/pages/BackofficeDashboard";
@@ -85,6 +86,7 @@ function ProtectedRoutes() {
     <AppLayout>
       <Routes>
         <Route path="/" element={<ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard>} />
+        <Route path="/financeiro" element={<ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard>} />
         <Route path="/fluxo-caixa" element={<ModuleMaintenanceGuard moduleKey="fluxo-caixa"><FluxoCaixa /></ModuleMaintenanceGuard>} />
         <Route path="/contratos" element={<ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard>} />
         <Route path="/planejamento" element={<ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard>} />

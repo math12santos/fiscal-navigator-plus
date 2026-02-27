@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   FileText,
+  DollarSign,
   Target,
   Building2,
   CheckSquare,
@@ -27,6 +28,7 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+  { path: "/financeiro", label: "Financeiro", icon: DollarSign, module: "financeiro" },
   { path: "/fluxo-caixa", label: "Fluxo de Caixa", icon: ArrowLeftRight, module: "fluxo-caixa" },
   { path: "/contratos", label: "Contratos", icon: FileText, module: "contratos" },
   { path: "/planejamento", label: "Planejamento", icon: Target, module: "planejamento" },
