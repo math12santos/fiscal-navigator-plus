@@ -75,9 +75,15 @@ export function useContracts() {
 
   const sanitizeInput = (data: Record<string, any>) => {
     const dateFields = ["data_inicio", "data_fim", "proximo_reajuste", "vencimento"];
-    const uuidFields = ["entity_id", "product_id", "cost_center_id"];
+    const uuidFields = ["entity_id", "product_id", "cost_center_id", "organization_id"];
     const sanitized = { ...data };
+    // Convert empty strings to null for date and uuid fields
     for (const field of [...dateFields, ...uuidFields]) {
+      if (sanitized[field] === "") sanitized[field] = null;
+    }
+    // Also catch any other field that looks like an empty string going to a uuid column
+    const allPossibleUuidKeys = Object.keys(sanitized).filter(k => k.endsWith("_id"));
+    for (const field of allPossibleUuidKeys) {
       if (sanitized[field] === "") sanitized[field] = null;
     }
     // For non-indefinite contracts, fallback vencimento to data_fim

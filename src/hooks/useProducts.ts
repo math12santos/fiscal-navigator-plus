@@ -47,13 +47,21 @@ export function useProducts() {
     },
   });
 
+  const sanitizeUuids = (data: Record<string, any>) => {
+    const sanitized = { ...data };
+    for (const key of Object.keys(sanitized)) {
+      if (key.endsWith("_id") && sanitized[key] === "") sanitized[key] = null;
+    }
+    return sanitized;
+  };
+
   const create = useMutation({
     mutationFn: async (input: Partial<ProductInsert>) => {
-      const { error } = await supabase.from("products").insert({
+      const { error } = await supabase.from("products").insert(sanitizeUuids({
         ...input,
         user_id: user!.id,
         organization_id: orgId,
-      } as any);
+      }) as any);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast({ title: "Produto criado" }); },
