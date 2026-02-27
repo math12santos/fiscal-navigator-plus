@@ -1,0 +1,275 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { useToast } from "@/hooks/use-toast";
+import { useHolding } from "@/contexts/HoldingContext";
+import { useUserDataScope } from "@/hooks/useUserDataScope";
+import { useContracts, Contract } from "@/hooks/useContracts";
+import { format, isBefore, isAfter } from "date-fns";
+import type { CashFlowEntry } from "@/hooks/useCashFlow";
+
+export interface FinanceiroEntry extends CashFlowEntry {}
+
+export interface FinanceiroInput {
+  tipo: string;
+  categoria: string | null;
+  descricao: string;
+  valor_previsto: number;
+  valor_realizado: number | null;
+  data_prevista: string;
+  data_realizada: string | null;
+  status: string;
+  account_id: string | null;
+  cost_center_id: string | null;
+  entity_id: string | null;
+  notes: string | null;
+  source: string;
+  contract_id: string | null;
+  contract_installment_id: string | null;
+}
+
+/**
+ * Hook for the Financeiro module — AP/AR management.
+ * Fetches ALL cashflow_entries (no date filter) + contract installment projections.
+ * Provides create/update/remove mutations and pay/receive actions.
+ */
+export function useFinanceiro(tipo: "saida" | "entrada") {
+  const { user } = useAuth();
+  const { currentOrg } = useOrganization();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const orgId = currentOrg?.id;
+  const { holdingMode, activeOrgIds } = useHolding();
+  const { filterByScope } = useUserDataScope();
+
+  // All materialized entries of this type
+  const entriesQuery = useQuery({
+    queryKey: ["financeiro_entries", tipo, holdingMode ? activeOrgIds : orgId],
+    queryFn: async () => {
+      let q = supabase
+        .from("cashflow_entries" as any)
+        .select("*")
+        .eq("tipo", tipo)
+        .order("data_prevista", { ascending: true });
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else if (orgId) {
+        q = q.eq("organization_id", orgId);
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as unknown as FinanceiroEntry[];
+    },
+    enabled: !!user && !!orgId,
+  });
+
+  // Contract installment projections (not yet materialized)
+  const { contracts } = useContracts();
+
+  const installmentsQuery = useQuery({
+    queryKey: ["financeiro_installments", tipo, orgId],
+    queryFn: async () => {
+      const relevantContracts = contracts.filter((c) => {
+        const isTipo = tipo === "entrada"
+          ? c.impacto_resultado === "receita"
+          : c.impacto_resultado !== "receita";
+        return c.status === "Ativo" && isTipo;
+      });
+      if (relevantContracts.length === 0) return [];
+      const ids = relevantContracts.map((c) => c.id);
+      const { data, error } = await supabase
+        .from("contract_installments" as any)
+        .select("*")
+        .in("contract_id", ids)
+        .order("data_vencimento", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as any[];
+    },
+    enabled: !!user && !!orgId && contracts.length > 0,
+  });
+
+  // Merge materialized + projected installments
+  const allEntries = useMemo(() => {
+    const materialized = entriesQuery.data ?? [];
+    const materializedInstKeys = new Set(
+      materialized
+        .filter((e) => e.contract_installment_id)
+        .map((e) => e.contract_installment_id)
+    );
+
+    const contractMap = new Map(contracts.map((c) => [c.id, c]));
+    const installments = (installmentsQuery.data ?? [])
+      .filter((inst: any) => !materializedInstKeys.has(inst.id))
+      .map((inst: any) => {
+        const contract = contractMap.get(inst.contract_id);
+        return {
+          id: `proj-fin-${inst.id}`,
+          contract_id: inst.contract_id,
+          contract_installment_id: inst.id,
+          tipo,
+          categoria: contract?.natureza_financeira ?? null,
+          descricao: `${contract?.nome ?? "Contrato"} — ${inst.descricao}`,
+          valor_previsto: Number(inst.valor),
+          valor_realizado: (inst.status === "pago" || inst.status === "recebido") ? Number(inst.valor) : null,
+          data_prevista: inst.data_vencimento,
+          data_realizada: null,
+          status: (inst.status === "pago" || inst.status === "recebido") ? (tipo === "entrada" ? "recebido" : "pago") : "previsto",
+          account_id: null,
+          cost_center_id: contract?.cost_center_id ?? null,
+          entity_id: contract?.entity_id ?? null,
+          notes: null,
+          source: "contrato",
+          created_at: inst.created_at,
+          updated_at: inst.created_at,
+          organization_id: contract?.organization_id ?? orgId,
+          user_id: inst.user_id,
+        } as FinanceiroEntry;
+      });
+
+    const merged = [...materialized, ...installments];
+    merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
+    return filterByScope(merged);
+  }, [entriesQuery.data, installmentsQuery.data, contracts, tipo, orgId, filterByScope]);
+
+  // Totals
+  const totals = useMemo(() => {
+    let total_previsto = 0;
+    let total_realizado = 0;
+    let pendente = 0;
+    let count_pendente = 0;
+
+    for (const e of allEntries) {
+      total_previsto += Number(e.valor_previsto);
+      if (e.valor_realizado != null) {
+        total_realizado += Number(e.valor_realizado);
+      }
+      if (e.status === "previsto" || e.status === "confirmado") {
+        pendente += Number(e.valor_previsto);
+        count_pendente++;
+      }
+    }
+
+    return { total_previsto, total_realizado, pendente, count_pendente, total: allEntries.length };
+  }, [allEntries]);
+
+  // Create manual entry
+  const create = useMutation({
+    mutationFn: async (input: FinanceiroInput) => {
+      const { error } = await supabase.from("cashflow_entries" as any).insert({
+        ...input,
+        user_id: user!.id,
+        organization_id: orgId,
+      } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: tipo === "entrada" ? "Receita registrada" : "Despesa registrada" });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  // Update entry
+  const update = useMutation({
+    mutationFn: async ({ id, ...data }: { id: string } & Partial<FinanceiroInput>) => {
+      const { error } = await supabase.from("cashflow_entries" as any).update(data as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Lançamento atualizado" });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  // Mark as paid/received
+  const markAsPaid = useMutation({
+    mutationFn: async (entry: { id: string; valor_realizado: number; data_realizada: string; isProjected: boolean }) => {
+      const status = tipo === "entrada" ? "recebido" : "pago";
+
+      if (entry.isProjected) {
+        // Find the original entry data from allEntries
+        const original = allEntries.find((e) => e.id === entry.id);
+        if (!original) throw new Error("Entry not found");
+
+        // Materialize: create a new cashflow_entries record
+        const { error } = await supabase.from("cashflow_entries" as any).insert({
+          contract_id: original.contract_id,
+          contract_installment_id: original.contract_installment_id,
+          tipo: original.tipo,
+          categoria: original.categoria,
+          descricao: original.descricao,
+          valor_previsto: original.valor_previsto,
+          valor_realizado: entry.valor_realizado,
+          data_prevista: original.data_prevista,
+          data_realizada: entry.data_realizada,
+          status,
+          account_id: original.account_id,
+          cost_center_id: original.cost_center_id,
+          entity_id: original.entity_id,
+          notes: original.notes,
+          source: original.source,
+          user_id: user!.id,
+          organization_id: orgId,
+        } as any);
+        if (error) throw error;
+
+        // Also update installment status if linked
+        if (original.contract_installment_id) {
+          await supabase
+            .from("contract_installments" as any)
+            .update({ status } as any)
+            .eq("id", original.contract_installment_id);
+        }
+      } else {
+        // Update existing record
+        const { error } = await supabase
+          .from("cashflow_entries" as any)
+          .update({
+            status,
+            valor_realizado: entry.valor_realizado,
+            data_realizada: entry.data_realizada,
+          } as any)
+          .eq("id", entry.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: tipo === "entrada" ? "Recebimento confirmado" : "Pagamento confirmado" });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("cashflow_entries" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Lançamento removido" });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  function invalidateAll() {
+    qc.invalidateQueries({ queryKey: ["financeiro_entries"] });
+    qc.invalidateQueries({ queryKey: ["financeiro_installments"] });
+    qc.invalidateQueries({ queryKey: ["cashflow_entries"] });
+    qc.invalidateQueries({ queryKey: ["cashflow_installments"] });
+    qc.invalidateQueries({ queryKey: ["contract_installments"] });
+  }
+
+  return {
+    entries: allEntries,
+    totals,
+    isLoading: entriesQuery.isLoading,
+    create,
+    update,
+    markAsPaid,
+    remove,
+  };
+}

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useLiabilities, Liability, LiabilityInput } from "@/hooks/useLiabilities";
+import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { useEntities } from "@/hooks/useEntities";
 import { useContracts } from "@/hooks/useContracts";
 import { useCostCenters } from "@/hooks/useCostCenters";
@@ -24,7 +25,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Loader2, Trash2, AlertTriangle, TrendingDown, Shield, Scale } from "lucide-react";
+import { Plus, Loader2, Trash2, AlertTriangle, TrendingDown, Shield, Scale, Receipt } from "lucide-react";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -54,6 +55,7 @@ const emptyForm: LiabilityInput = {
 
 export default function PlanningLiabilities() {
   const { liabilities, isLoading, totals, create, update, remove } = useLiabilities();
+  const { totals: apTotals, isLoading: apLoading } = useFinanceiro("saida");
   const { entities } = useEntities();
   const { contracts } = useContracts();
   const { costCenters } = useCostCenters();
@@ -124,11 +126,16 @@ export default function PlanningLiabilities() {
   return (
     <div className="space-y-6">
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <KPICard title="Total Passivos" value={fmt(totals.total)} icon={<TrendingDown size={20} />} />
         <KPICard title="Dívidas" value={fmt(totals.dividas)} icon={<AlertTriangle size={20} />} />
         <KPICard title="Contingências (Prováveis)" value={fmt(totals.contingencias_provaveis)} icon={<Scale size={20} />} />
         <KPICard title="Exposição Stress" value={fmt(totals.stress_total)} icon={<Shield size={20} />} />
+        <KPICard
+          title="Contas a Pagar (Pendente)"
+          value={apLoading ? "..." : fmt(apTotals.pendente)}
+          icon={<Receipt size={20} />}
+        />
       </div>
 
       {/* Filter + Add */}

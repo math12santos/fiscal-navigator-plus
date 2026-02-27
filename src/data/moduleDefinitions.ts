@@ -10,6 +10,14 @@ export interface ModuleDefinition {
 
 export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   { key: "dashboard", label: "Dashboard" },
+  {
+    key: "financeiro",
+    label: "Financeiro",
+    tabs: [
+      { key: "pagar", label: "Contas a Pagar" },
+      { key: "receber", label: "Contas a Receber" },
+    ],
+  },
   { key: "fluxo-caixa", label: "Fluxo de Caixa" },
   { key: "contratos", label: "Contratos" },
   {
