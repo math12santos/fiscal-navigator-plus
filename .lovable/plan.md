@@ -1,47 +1,54 @@
-## Problema
 
-O hook `useFinanceiro` (que alimenta as abas Contas a Pagar e Contas a Receber) nao gera projecoes automaticas para contratos recorrentes de servicos. Ele so exibe:
 
-1. Lancamentos materializados na tabela `cashflow_entries`
-2. Parcelas manuais da tabela `contract_installments`
+## Otimizacao da Arvore de Dependencia de Rede
 
-A logica de projecao automatica para contratos recorrentes (`generateProjectionsFromContract`) existe apenas no hook `useCashFlow`, mas nao foi replicada no `useFinanceiro`.
+### Diagnostico
 
-## Solucao
+O Lighthouse identificou que **314 KiB de JavaScript nao utilizado** esta sendo carregado na pagina inicial. Isso ocorre porque **todas as 20+ paginas** do sistema sao importadas estaticamente no `App.tsx`, gerando um unico bundle JavaScript de ~422 KB. Quando o usuario acessa `/auth`, por exemplo, todo o codigo de Dashboard, CRM, Planejamento, Backoffice, etc. e carregado desnecessariamente.
 
-Incorporar no `useFinanceiro` a mesma logica de projecao de contratos recorrentes que ja existe no `useCashFlow`, adaptada para funcionar sem filtro de datas (o Financeiro mostra todos os periodos) evitando duplicidade de lançamentos.
+### Solucao: Code Splitting com React.lazy
+
+Substituir os imports estaticos por imports dinamicos usando `React.lazy()` e `Suspense`. Isso faz com que o Vite gere chunks separados para cada pagina, carregando apenas o codigo necessario para a rota atual.
 
 ### Alteracoes
 
-**Arquivo: `src/hooks/useFinanceiro.ts**`
+**Arquivo: `src/App.tsx`**
 
-1. Importar as funcoes `addMonths`, `format`, `isBefore`, `isAfter` de `date-fns` (algumas ja estao importadas)
-2. Copiar/reutilizar as funcoes `isRecurringCashflow` e `generateProjectionsFromContract` do `useCashFlow` (ou extrair para um utilitario compartilhado)
-3. No `useMemo` que monta `allEntries`, alem das parcelas manuais, tambem gerar projecoes automaticas para contratos recorrentes ativos filtrados pelo tipo (receita para "entrada", custo/despesa para "saida")
-4. Usar um range padrao (ex: hoje ate +12 meses) para gerar as projecoes, ja que o Financeiro nao tem filtro de periodo
+1. Substituir todos os imports de paginas por `React.lazy()`:
 
-### Abordagem tecnica
+```text
+// ANTES (import estatico - tudo no bundle principal)
+import Dashboard from "@/pages/Dashboard";
+import FluxoCaixa from "@/pages/FluxoCaixa";
+...
 
-A melhor abordagem e extrair `isRecurringCashflow` e `generateProjectionsFromContract` para um arquivo utilitario compartilhado (ex: `src/lib/contractProjections.ts`) e usa-lo em ambos os hooks, evitando duplicacao de logica.
+// DEPOIS (import dinamico - chunk separado por pagina)
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const FluxoCaixa = lazy(() => import("@/pages/FluxoCaixa"));
+...
+```
 
-**Novo arquivo: `src/lib/contractProjections.ts**`
+2. Tambem aplicar lazy loading nos layouts pesados (`AppLayout`, `BackofficeLayout`)
 
-- Mover `isRecurringCashflow()` e `generateProjectionsFromContract()` do `useCashFlow.ts`
-- Exportar ambas as funcoes
+3. Envolver as `<Routes>` com `<Suspense>` usando o mesmo componente de loading que ja existe no codigo (o "Carregando..." com animate-pulse)
 
-**Arquivo: `src/hooks/useCashFlow.ts**`
+### Paginas que serao lazy-loaded (17 paginas + 2 layouts)
 
-- Importar de `@/lib/contractProjections` em vez de ter as funcoes locais
+- Dashboard, Financeiro, FluxoCaixa, Contratos, Planejamento, Conciliacao
+- Tarefas, Integracoes, IAFinanceira, Configuracoes, DepartamentoPessoal, CRM
+- CreateOrganization, Onboarding, Auth, NotFound
+- BackofficeDashboard, BackofficeCompany, BackofficeUsers, BackofficeAudit, BackofficeConfig, BackofficeSystem
+- AppLayout, BackofficeLayout
 
-**Arquivo: `src/hooks/useFinanceiro.ts**`
+### Impacto esperado
 
-- Importar `isRecurringCashflow` e `generateProjectionsFromContract` de `@/lib/contractProjections`
-- No `useMemo` de `allEntries`:
-  - Identificar contratos recorrentes ativos do tipo correto (receita/custo)
-  - Gerar projecoes com range de hoje ate +12 meses
-  - Deduplicar contra entries ja materializadas (mesmo contract_id + data_prevista)
-  - Mesclar com as parcelas manuais existentes
+- O bundle principal cairia de ~422 KB para ~100-150 KB (framework + roteamento + auth)
+- Cada pagina seria carregada sob demanda como um chunk separado de ~20-50 KB
+- Reducao significativa do "Unused JavaScript" reportado pelo Lighthouse
+- A cadeia de requisicoes criticas ficaria mais curta pois o bundle inicial seria menor
 
-### Resultado esperado
+### Nenhuma outra alteracao necessaria
 
-Contratos recorrentes de servico (como o "Visa S.A - SPB IA AUDITORIA") aparecerao automaticamente em Contas a Receber com projecoes mensais para os proximos 12 meses, assim como ja apareceriam no Fluxo de Caixa.
+- O Vite ja suporta code splitting nativamente com `import()` dinamico
+- Nao requer mudanca em configuracao, dependencias ou banco de dados
+
