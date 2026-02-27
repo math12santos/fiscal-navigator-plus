@@ -1,77 +1,70 @@
 
+# Correcao: Contratos x Fluxo de Caixa -- Conexoes quebradas e redundantes
 
-# Revisao da Logica de Integracao Contratos x Fluxo de Caixa
+## Problema Principal
 
-## Problema Identificado
-
-A funcao `generateProjectionsFromContract` em `useCashFlow.ts` trata **todos** os contratos com recorrencia da mesma forma: se um contrato tem `tipo_recorrencia = "mensal"` e dura 3 meses, o sistema gera 3 lancamentos no fluxo de caixa.
-
-Isso esta correto para **servicos recorrentes** (assinatura mensal de software, contrato de limpeza, etc.), mas esta **errado para mercadorias/produtos**. Um contrato de venda de mercadoria com vigencia de 3 meses representa uma unica transacao comercial com prazo de entrega ou garantia -- nao implica cobranças mensais.
-
-## Regras de Negocio Corrigidas
-
-| Operacao | Subtipo | Comportamento no Fluxo de Caixa |
-|----------|---------|--------------------------------|
-| Compra/Venda | Servicos (recorrentes, terceirizacao) | Gera projecoes recorrentes conforme `tipo_recorrencia` |
-| Compra/Venda | Mercadoria | Entrada unica (ou parcelas manuais via installments) |
-| Compra/Venda | Material de Uso e Consumo | Entrada unica (ou parcelas manuais) |
-| Compra/Venda | Servicos pontuais / tecnicos / projeto | Entrada unica (ou parcelas manuais) |
-| Patrimonio | Investimento / Venda de Ativo | Entrada unica (ou parcelas manuais) |
-
-Resumindo: **somente servicos com finalidade recorrente** devem gerar projecoes automaticas repetidas. Todos os demais tipos devem se comportar como contratos "unico" no fluxo de caixa, usando parcelas manuais (installments) quando necessario.
-
-## Solucao Tecnica
-
-### 1. Criar funcao auxiliar para determinar se contrato e recorrente no fluxo de caixa
-
-Em `useCashFlow.ts`, adicionar uma funcao:
+Quando o usuario clica em "Receber" numa parcela de venda, o status da parcela muda para `"recebido"`. Porem, no `useCashFlow.ts` (linha 219), a verificacao so reconhece `"pago"`:
 
 ```typescript
-function isRecurringCashflow(contract: Contract): boolean {
-  if (contract.tipo_recorrencia === "unico") return false;
-  
-  // Somente servicos recorrentes geram projecoes automaticas
-  const isServicos = contract.subtipo_operacao === "servicos";
-  if (!isServicos) return false;
-  
-  // Servicos pontuais e por projeto nao sao recorrentes no fluxo
-  const nonRecurringFinalidades = [
-    "servicos_pontuais", 
-    "servicos_tecnicos", 
-    "servicos_contrato"
-  ];
-  if (contract.finalidade && nonRecurringFinalidades.includes(contract.finalidade)) {
-    return false;
-  }
-  
-  return true;
-}
+status: inst.status === "pago" ? "pago" : "previsto",
 ```
 
-### 2. Atualizar `generateProjectionsFromContract`
+O status `"recebido"` nao e tratado, entao a parcela continua aparecendo como "previsto" no fluxo de caixa mesmo apos confirmacao.
 
-Substituir a verificacao `if (contract.tipo_recorrencia === "unico") return projections;` por `if (!isRecurringCashflow(contract)) return projections;`.
+## Problema Secundario: Invalidacao de cache
 
-### 3. Atualizar query de installments em `useCashFlow`
+Quando uma parcela e atualizada via `useContractInstallments.update`, o hook so invalida a query `["contract_installments", contractId]`. Ele **nao** invalida as queries do fluxo de caixa (`["cashflow_entries"]` e `["cashflow_installments"]`), entao o fluxo de caixa nao reflete a mudanca ate o usuario recarregar a pagina.
 
-Atualmente o hook so busca installments para contratos com `tipo_recorrencia === "unico"`. Precisa expandir para buscar installments de **todos os contratos que nao sao recorrentes no fluxo de caixa**:
+## Conexoes Redundantes/Inativas Identificadas
+
+1. **`useLinkedTransactions.ts`**: Hook que chama a funcao `check_linked_transactions` no banco. A funcao retorna sempre `{ has_linked_transactions: false }` (corpo vazio). Nao e utilizada em nenhum lugar visivel da aplicacao -- e codigo morto.
+
+2. **`getProjectedValue()` em `Contratos.tsx`**: Calcula projecoes financeiras de contratos para KPIs do modulo de contratos, mas usa logica propria que **nao** respeita a distincao `isRecurringCashflow()` do `useCashFlow`. Contratos de mercadoria com recorrencia mensal e 3 meses de vigencia mostram valor multiplicado por 3 nos KPIs de contratos, contradizendo a correcao feita no fluxo de caixa.
+
+3. **Campo `valor_realizado` nas projecoes de parcelas**: As projecoes de installments sempre setam `valor_realizado: null`, mesmo quando o status e "pago"/"recebido". O valor realizado deveria ser preenchido com o valor da parcela quando confirmada.
+
+## Plano de Implementacao
+
+### 1. Corrigir mapeamento de status no useCashFlow (arquivo: `src/hooks/useCashFlow.ts`)
+
+Na linha 219, alterar a verificacao para reconhecer ambos os status de confirmacao:
 
 ```typescript
-const nonRecurringContractIds = useMemo(
-  () => contracts
-    .filter((c) => c.status === "Ativo" && !isRecurringCashflow(c))
-    .map((c) => c.id),
-  [contracts]
-);
+// De:
+status: inst.status === "pago" ? "pago" : "previsto",
+// Para:
+status: (inst.status === "pago" || inst.status === "recebido") ? "pago" : "previsto",
 ```
 
-### 4. Gerar entrada unica para contratos sem parcelas
+E tambem preencher `valor_realizado` quando a parcela esta confirmada:
 
-Para contratos de mercadoria/produto que nao tem installments cadastrados, gerar uma **unica** projecao na `data_inicio` (ou `data_fim` se for recebimento ao final) do contrato, em vez de multiplas entradas mensais.
+```typescript
+valor_realizado: (inst.status === "pago" || inst.status === "recebido") ? Number(inst.valor) : null,
+```
 
-Isso sera tratado na logica de `projectedEntries` no `useMemo`: se um contrato nao-recorrente nao possui installments, criar uma unica entrada virtual com o valor total do contrato na data de inicio.
+### 2. Adicionar invalidacao cruzada de cache (arquivo: `src/hooks/useContractInstallments.ts`)
+
+No `onSuccess` do mutation `update`, alem de invalidar `contract_installments`, tambem invalidar as queries do fluxo de caixa:
+
+```typescript
+onSuccess: () => {
+  qc.invalidateQueries({ queryKey: ["contract_installments", contractId] });
+  qc.invalidateQueries({ queryKey: ["cashflow_entries"] });
+  qc.invalidateQueries({ queryKey: ["cashflow_installments"] });
+},
+```
+
+### 3. Alinhar KPIs de contratos com logica do fluxo de caixa (arquivo: `src/pages/Contratos.tsx`)
+
+Atualizar a funcao `getProjectedValue()` para usar a mesma distincao de `isRecurringCashflow()`. Contratos de mercadoria devem mostrar o valor unico, nao multiplicado pelo numero de meses.
+
+### 4. Remover codigo morto (arquivo: `src/hooks/useLinkedTransactions.ts`)
+
+Marcar ou remover o hook `useLinkedTransactions` e a funcao SQL `check_linked_transactions`, que nao tem implementacao real.
 
 ### Arquivos Modificados
 
-- `src/hooks/useCashFlow.ts` -- toda a logica de correcao concentrada neste arquivo
-
+- `src/hooks/useCashFlow.ts` -- correcao do status "recebido" e valor_realizado
+- `src/hooks/useContractInstallments.ts` -- invalidacao cruzada de cache
+- `src/pages/Contratos.tsx` -- alinhamento da funcao getProjectedValue
+- `src/hooks/useLinkedTransactions.ts` -- remocao de codigo morto (opcional)
