@@ -21,6 +21,7 @@ export function HoldingToggle() {
     holdingView,
     setHoldingView,
     subsidiaryIds,
+    setSelectedSubsidiaryId,
   } = useHolding();
 
   if (!isHolding) return null;
@@ -69,7 +70,7 @@ export function HoldingToggle() {
                 ? "bg-background text-foreground shadow-sm font-medium"
                 : "text-muted-foreground hover:text-foreground"
             )}
-            onClick={() => setHoldingView("consolidated")}
+            onClick={() => { setHoldingView("consolidated"); setSelectedSubsidiaryId(null); }}
           >
             Consolidado
           </button>
@@ -80,7 +81,7 @@ export function HoldingToggle() {
                 ? "bg-background text-foreground shadow-sm font-medium"
                 : "text-muted-foreground hover:text-foreground"
             )}
-            onClick={() => setHoldingView("per-company")}
+            onClick={() => { setHoldingView("per-company"); setSelectedSubsidiaryId(null); }}
           >
             <LayoutGrid size={12} />
             Por Empresa
