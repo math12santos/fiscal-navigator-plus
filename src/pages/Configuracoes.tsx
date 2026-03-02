@@ -6,6 +6,7 @@ import { useOrgModules } from "@/hooks/useOrgModules";
 import { MODULE_DEFINITIONS } from "@/data/moduleDefinitions";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,13 @@ import { useEntities, Entity } from "@/hooks/useEntities";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { useToast } from "@/hooks/use-toast";
+
+const ALL_TABS = [
+  { key: "accounts", label: "Plano de Contas" },
+  { key: "cost-centers", label: "Centros de Custo" },
+  { key: "entities", label: "Fornecedores / Clientes" },
+  { key: "products", label: "Produtos / Serviços" },
+];
 
 const ACCOUNT_TYPES = [
   { value: "__all__", label: "Todos os tipos" },
@@ -51,6 +59,9 @@ const PRODUCT_TYPES = [
 ];
 
 export default function Configuracoes() {
+  const { getAllowedTabs } = useUserPermissions();
+  const allowedTabs = getAllowedTabs("configuracoes", ALL_TABS);
+
   const { currentOrg } = useOrganization();
   const orgId = currentOrg?.id;
 
@@ -171,12 +182,11 @@ export default function Configuracoes() {
       <SeedPlanDialog open={seedDialogOpen} onOpenChange={setSeedDialogOpen} accountsCount={accounts.length} costCentersCount={costCenters.length} onSeedFresh={handleSeedFresh} onReplace={handleReplace} onStartTransfer={() => setTransferWizardOpen(true)} />
       <TransferWizard open={transferWizardOpen} onOpenChange={setTransferWizardOpen} onComplete={() => {}} />
 
-      <Tabs defaultValue="accounts" className="space-y-4">
+      <Tabs defaultValue={allowedTabs[0]?.key || "accounts"} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="accounts">Plano de Contas</TabsTrigger>
-          <TabsTrigger value="cost-centers">Centros de Custo</TabsTrigger>
-          <TabsTrigger value="entities">Fornecedores / Clientes</TabsTrigger>
-          <TabsTrigger value="products">Produtos / Serviços</TabsTrigger>
+          {allowedTabs.map((t) => (
+            <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
+          ))}
         </TabsList>
 
         {/* ===== PLANO DE CONTAS ===== */}

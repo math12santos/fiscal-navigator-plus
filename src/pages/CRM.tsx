@@ -4,6 +4,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCRMClients, useCRMActivities, usePipelineStages, useCRMOpportunities, CRMClient, CRMOpportunity } from "@/hooks/useCRM";
 import { useCRMIntelligence } from "@/hooks/useCRMIntelligence";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+
+const ALL_TABS = [
+  { key: "carteira", label: "Carteira" },
+  { key: "pipeline", label: "Pipeline" },
+  { key: "indicadores", label: "Indicadores" },
+];
 import { useContracts } from "@/hooks/useContracts";
 import { CRMClientTable } from "@/components/crm/CRMClientTable";
 import { CRMClientDialog } from "@/components/crm/CRMClientDialog";
@@ -18,7 +24,8 @@ import {
 import { Button } from "@/components/ui/button";
 
 export default function CRM() {
-  const { canAccessTab } = useUserPermissions();
+  const { getAllowedTabs } = useUserPermissions();
+  const allowedTabs = getAllowedTabs("crm", ALL_TABS);
   const { toast } = useToast();
   const { clients, isLoading: clientsLoading, create: createClient, update: updateClient, remove: removeClient } = useCRMClients();
   const { stages, isLoading: stagesLoading } = usePipelineStages();
@@ -114,11 +121,11 @@ export default function CRM() {
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground animate-pulse">Carregando...</div>
       ) : (
-        <Tabs defaultValue="carteira">
+        <Tabs defaultValue={allowedTabs[0]?.key || "carteira"}>
           <TabsList>
-            {canAccessTab("crm", "carteira") && <TabsTrigger value="carteira">Carteira</TabsTrigger>}
-            {canAccessTab("crm", "pipeline") && <TabsTrigger value="pipeline">Pipeline</TabsTrigger>}
-            {canAccessTab("crm", "indicadores") && <TabsTrigger value="indicadores">Indicadores</TabsTrigger>}
+            {allowedTabs.map((t) => (
+              <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
+            ))}
           </TabsList>
 
           <TabsContent value="carteira" className="mt-4">
