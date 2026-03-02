@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +11,7 @@ import { Loader2 } from "lucide-react";
 type Step = "loading" | "password" | "company" | "modules" | "done";
 
 export default function Onboarding() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { organizations, currentOrg, loading: orgLoading, refetch } = useOrganization();
   const [step, setStep] = useState<Step>("loading");
@@ -55,7 +57,14 @@ export default function Onboarding() {
     setStep("done");
   }, [mustChangePassword, organizations, currentOrg, orgLoading]);
 
-  if (step === "loading") {
+  // Redirect when done
+  useEffect(() => {
+    if (step === "done") {
+      navigate("/", { replace: true });
+    }
+  }, [step, navigate]);
+
+  if (step === "loading" || step === "done") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -88,6 +97,5 @@ export default function Onboarding() {
     );
   }
 
-  // step === "done" — this should not render, parent route handles redirect
   return null;
 }
