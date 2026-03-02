@@ -33,7 +33,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Handle session-only mode: sign out when browser/tab is closed
+    const handleBeforeUnload = () => {
+      if (sessionStorage.getItem("session_only") === "true") {
+        supabase.auth.signOut();
+        sessionStorage.removeItem("session_only");
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, []);
 
   const signOut = async () => {
