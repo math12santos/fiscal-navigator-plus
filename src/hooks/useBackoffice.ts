@@ -224,7 +224,77 @@ export function useManagePermissions() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["backoffice_permissions"] }),
   });
 
-  return { upsertPermission, clonePermissions };
+  const propagateToGroup = useMutation({
+    mutationFn: async ({
+      userId,
+      sourceOrgId,
+      targetOrgIds,
+    }: {
+      userId: string;
+      sourceOrgId: string;
+      targetOrgIds: string[];
+    }) => {
+      // Get source permissions
+      const { data: sourcePerms, error: fetchErr } = await supabase
+        .from("user_permissions")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("organization_id", sourceOrgId);
+      if (fetchErr) throw fetchErr;
+
+      // Get memberships to check which orgs the user belongs to
+      const { data: memberships, error: memErr } = await supabase
+        .from("organization_members")
+        .select("organization_id")
+        .eq("user_id", userId)
+        .in("organization_id", targetOrgIds);
+      if (memErr) throw memErr;
+
+      const memberOrgIds = new Set((memberships ?? []).map((m: any) => m.organization_id));
+      const skipped: string[] = [];
+      let updated = 0;
+
+      for (const targetOrgId of targetOrgIds) {
+        if (!memberOrgIds.has(targetOrgId)) {
+          skipped.push(targetOrgId);
+          continue;
+        }
+
+        // Delete existing permissions
+        await supabase
+          .from("user_permissions")
+          .delete()
+          .eq("user_id", userId)
+          .eq("organization_id", targetOrgId);
+
+        // Insert cloned permissions
+        if (sourcePerms && sourcePerms.length > 0) {
+          const newPerms = sourcePerms.map((p) => ({
+            user_id: userId,
+            organization_id: targetOrgId,
+            module: p.module,
+            tab: p.tab,
+            allowed: p.allowed,
+            granted_by: user!.id,
+          }));
+          const { error } = await supabase.from("user_permissions").insert(newPerms);
+          if (error) throw error;
+        }
+        updated++;
+      }
+
+      return { updated, skipped };
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate all affected orgs
+      qc.invalidateQueries({ queryKey: ["backoffice_permissions"] });
+      for (const orgId of variables.targetOrgIds) {
+        qc.invalidateQueries({ queryKey: ["backoffice_permissions", orgId] });
+      }
+    },
+  });
+
+  return { upsertPermission, clonePermissions, propagateToGroup };
 }
 
 // Audit log queries
