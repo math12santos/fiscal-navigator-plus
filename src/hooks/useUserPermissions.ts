@@ -18,17 +18,18 @@ export function useUserPermissions() {
   const orgId = currentOrg?.id;
 
   const { data: permissions = [], isLoading } = useQuery({
-    queryKey: ["user_permissions", user?.id],
+    queryKey: ["user_permissions", user?.id, orgId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user || !orgId) return [];
       const { data, error } = await supabase
         .from("user_permissions")
         .select("module, tab, allowed")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("organization_id", orgId);
       if (error) throw error;
       return (data ?? []) as Permission[];
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId,
     staleTime: 30_000,
   });
 
