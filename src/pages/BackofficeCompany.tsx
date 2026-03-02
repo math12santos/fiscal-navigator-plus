@@ -33,6 +33,7 @@ import {
   Link2,
   Unlink,
   Trash2,
+  KeyRound,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -286,6 +287,28 @@ export default function BackofficeCompany() {
     setActiveTab("auditoria");
   };
 
+  const [resettingPasswordUserId, setResettingPasswordUserId] = useState<string | null>(null);
+
+  const handleResetPassword = async (userId: string) => {
+    const profile = profileMap[userId];
+    const email = profile?.email;
+    if (!email) {
+      toast({ title: "E-mail não encontrado", description: "Este usuário não possui e-mail cadastrado no perfil.", variant: "destructive" });
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+      if (error) throw error;
+      toast({ title: "E-mail de redefinição enviado", description: `Um link de redefinição foi enviado para ${email}.` });
+    } catch (err: any) {
+      toast({ title: "Erro ao enviar redefinição", description: err.message, variant: "destructive" });
+    } finally {
+      setResettingPasswordUserId(null);
+    }
+  };
+
   const handleOpenEditUser = (member: any) => {
     const profile = profileMap[member.user_id];
     setEditingMember(member);
@@ -529,6 +552,15 @@ export default function BackofficeCompany() {
                             >
                               <Edit2 size={13} />
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setResettingPasswordUserId(m.user_id)}
+                              title="Resetar senha"
+                            >
+                              <KeyRound size={13} />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -538,6 +570,26 @@ export default function BackofficeCompany() {
               </Table>
             )}
           </div>
+
+
+          {/* Reset Password Confirmation */}
+          <AlertDialog open={!!resettingPasswordUserId} onOpenChange={(open) => !open && setResettingPasswordUserId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Resetar senha do usuário?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Um e-mail de redefinição de senha será enviado para{" "}
+                  <strong>{resettingPasswordUserId ? profileMap[resettingPasswordUserId]?.email || "o usuário" : ""}</strong>.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => resettingPasswordUserId && handleResetPassword(resettingPasswordUserId)}>
+                  Enviar e-mail de redefinição
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
 
         {/* ===== PERMISSÕES & GRANULARIDADE ===== */}
