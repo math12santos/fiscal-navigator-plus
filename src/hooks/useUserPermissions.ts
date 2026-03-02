@@ -133,11 +133,20 @@ export function useUserPermissions() {
 
     // User-level override
     if (hasConfiguredPermissions) {
+      // Check explicit tab permission first
       const tabPerm = permissions.find((p) => p.module === moduleKey && p.tab === tabKey);
       if (tabPerm) return tabPerm.allowed;
+
+      // If there are explicit tab perms for this module but NOT for this tab,
+      // fall back to the module-level permission (allow-by-default for unlisted tabs)
+      const modulePerm = permissions.find((p) => p.module === moduleKey && p.tab === null);
+      if (modulePerm) return modulePerm.allowed;
+
+      // No module-level perm either — check if any tab is allowed
       const hasAnyTabPerms = permissions.some((p) => p.module === moduleKey && p.tab !== null);
       if (hasAnyTabPerms) return false;
-      return canAccessModule(moduleKey);
+
+      return false;
     }
 
     // CC-level
