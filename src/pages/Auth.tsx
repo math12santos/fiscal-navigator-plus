@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { LogIn, UserPlus } from "lucide-react";
 
@@ -12,6 +13,7 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -53,6 +55,11 @@ export default function Auth() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (!rememberMe) {
+          sessionStorage.setItem("session_only", "true");
+        } else {
+          sessionStorage.removeItem("session_only");
+        }
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -124,12 +131,23 @@ export default function Auth() {
               minLength={6}
             />
           </div>
+          {isLogin && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="remember-me"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked === true)}
+              />
+              <Label htmlFor="remember-me" className="text-sm font-normal text-muted-foreground cursor-pointer">
+                Manter conectado
+              </Label>
+            </div>
+          )}
 
           <Button type="submit" className="w-full" disabled={loading}>
             {isLogin ? <LogIn className="mr-2 h-4 w-4" /> : <UserPlus className="mr-2 h-4 w-4" />}
             {loading ? "Aguarde..." : isLogin ? "Entrar" : "Cadastrar"}
           </Button>
-
           {isLogin && (
             <button
               type="button"
