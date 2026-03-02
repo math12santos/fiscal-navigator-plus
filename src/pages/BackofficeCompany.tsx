@@ -68,11 +68,24 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 const MODULES: { key: string; label: string; tabs?: { key: string; label: string }[] }[] = [
   { key: "dashboard", label: "Dashboard" },
-  { key: "fluxo-caixa", label: "Fluxo de Caixa" },
   {
-    key: "contratos",
-    label: "Contratos",
+    key: "financeiro",
+    label: "Financeiro",
+    tabs: [
+      { key: "pagar", label: "Contas a Pagar" },
+      { key: "receber", label: "Contas a Receber" },
+    ],
   },
+  {
+    key: "fluxo-caixa",
+    label: "Fluxo de Caixa",
+    tabs: [
+      { key: "visao-geral", label: "Visão Geral" },
+      { key: "projetado", label: "Projetado" },
+      { key: "realizado", label: "Realizado" },
+    ],
+  },
+  { key: "contratos", label: "Contratos" },
   {
     key: "planejamento",
     label: "Planejamento",
@@ -87,7 +100,6 @@ const MODULES: { key: string; label: string; tabs?: { key: string; label: string
       { key: "comercial", label: "Comercial" },
     ],
   },
-  { key: "conciliacao", label: "Conciliação" },
   {
     key: "dp",
     label: "Departamento Pessoal",
@@ -99,10 +111,33 @@ const MODULES: { key: string; label: string; tabs?: { key: string; label: string
       { key: "rescisoes", label: "Rescisões" },
       { key: "encargos", label: "Encargos" },
       { key: "cargos", label: "Cargos & Rotinas" },
+      { key: "beneficios", label: "Benefícios" },
       { key: "config", label: "Configurações" },
     ],
   },
-  { key: "documentos", label: "Documentos da Empresa" },
+  {
+    key: "crm",
+    label: "CRM",
+    tabs: [
+      { key: "carteira", label: "Carteira" },
+      { key: "pipeline", label: "Pipeline" },
+      { key: "indicadores", label: "Indicadores" },
+    ],
+  },
+  { key: "conciliacao", label: "Conciliação" },
+  {
+    key: "configuracoes",
+    label: "Configurações",
+    tabs: [
+      { key: "plano-contas", label: "Plano de Contas" },
+      { key: "centros-custo", label: "Centros de Custo" },
+      { key: "fornecedores", label: "Fornecedores / Clientes" },
+      { key: "produtos", label: "Produtos / Serviços" },
+    ],
+  },
+  { key: "tarefas", label: "Tarefas" },
+  { key: "integracoes", label: "Integrações" },
+  { key: "ia", label: "IA Financeira" },
 ];
 
 // SCOPES removed — replaced by cost center access selector
