@@ -1,54 +1,64 @@
 
+# Propagação de Permissões em Holding
 
-## Otimizacao da Arvore de Dependencia de Rede
+## Problema
+Ao configurar permissões para funcionários que atuam em múltiplas empresas de um grupo (holding), o administrador precisa acessar cada empresa individualmente e repetir a mesma configuração. No caso da Thayna Leite, foram 6 organizações configuradas uma a uma, totalizando mais de 20 registros manuais.
 
-### Diagnostico
+## Solução
+Adicionar uma funcionalidade de **"Propagar para o Grupo"** na tela de permissões do Backoffice (aba Permissões da empresa). Quando o admin configura as permissões de um usuário em uma empresa que faz parte de uma holding, ele poderá replicar essas permissões para todas as subsidiárias do grupo com um clique.
 
-O Lighthouse identificou que **314 KiB de JavaScript nao utilizado** esta sendo carregado na pagina inicial. Isso ocorre porque **todas as 20+ paginas** do sistema sao importadas estaticamente no `App.tsx`, gerando um unico bundle JavaScript de ~422 KB. Quando o usuario acessa `/auth`, por exemplo, todo o codigo de Dashboard, CRM, Planejamento, Backoffice, etc. e carregado desnecessariamente.
+## Funcionalidades
 
-### Solucao: Code Splitting com React.lazy
+### 1. Botão "Propagar para o Grupo"
+- Visível apenas quando a organização atual é uma holding ou faz parte de uma holding
+- Aparece na aba de Permissões, ao lado do seletor de usuário, após selecionar um usuário
+- Ao clicar, abre um diálogo de confirmação mostrando:
+  - As permissões atuais do usuário nesta empresa (resumo)
+  - A lista de empresas do grupo onde as permissões serão aplicadas
+  - Checkboxes para selecionar/deselecionar empresas específicas
+  - Indicação de quais empresas o usuário já é membro
 
-Substituir os imports estaticos por imports dinamicos usando `React.lazy()` e `Suspense`. Isso faz com que o Vite gere chunks separados para cada pagina, carregando apenas o codigo necessario para a rota atual.
+### 2. Lógica de Propagação
+- Copia as permissões (`user_permissions`) da organização atual para todas as organizações selecionadas do grupo
+- Para cada empresa destino: remove permissões existentes do usuário e insere as novas (mesmo comportamento do "Clonar Permissões" existente)
+- Se o usuário não for membro de alguma subsidiária selecionada, exibe aviso e pula essa empresa
 
-### Alteracoes
+### 3. Feedback
+- Toast de sucesso indicando quantas empresas foram atualizadas
+- Invalidação de cache para todas as organizações afetadas
 
-**Arquivo: `src/App.tsx`**
+## Detalhes Técnicos
 
-1. Substituir todos os imports de paginas por `React.lazy()`:
+### Alterações em `src/hooks/useBackoffice.ts`
+- Adicionar mutation `propagateToGroup` que:
+  1. Busca as subsidiárias da holding via tabela `organization_holdings`
+  2. Busca as permissões atuais do usuário na org fonte
+  3. Para cada org destino selecionada: deleta permissões existentes e insere cópia
+  4. Utiliza a mesma lógica já existente em `clonePermissions`, mas iterando sobre múltiplas orgs
 
+### Alterações em `src/pages/BackofficeCompany.tsx`
+- Adicionar query para verificar se a org atual pertence a uma holding (busca `organization_holdings`)
+- Adicionar botão "Propagar para o Grupo" com icone `Copy` ou `Building2`
+- Adicionar `AlertDialog` de confirmação com lista de empresas e checkboxes
+- Após execução, invalidar queries de permissões de todas as orgs afetadas
+
+### Fluxo
 ```text
-// ANTES (import estatico - tudo no bundle principal)
-import Dashboard from "@/pages/Dashboard";
-import FluxoCaixa from "@/pages/FluxoCaixa";
-...
-
-// DEPOIS (import dinamico - chunk separado por pagina)
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const FluxoCaixa = lazy(() => import("@/pages/FluxoCaixa"));
-...
+[Seleciona usuário] -> [Configura permissões na empresa atual]
+       |
+       v
+[Clica "Propagar para o Grupo"]
+       |
+       v
+[Dialog: lista subsidiárias com checkboxes]
+  - [x] Danfessi (membro)
+  - [x] Davanti (membro)  
+  - [x] Licita Winners (membro)
+  - [x] Viva7 (membro)
+       |
+       v
+[Confirma] -> Replica permissões -> Toast "4 empresas atualizadas"
 ```
 
-2. Tambem aplicar lazy loading nos layouts pesados (`AppLayout`, `BackofficeLayout`)
-
-3. Envolver as `<Routes>` com `<Suspense>` usando o mesmo componente de loading que ja existe no codigo (o "Carregando..." com animate-pulse)
-
-### Paginas que serao lazy-loaded (17 paginas + 2 layouts)
-
-- Dashboard, Financeiro, FluxoCaixa, Contratos, Planejamento, Conciliacao
-- Tarefas, Integracoes, IAFinanceira, Configuracoes, DepartamentoPessoal, CRM
-- CreateOrganization, Onboarding, Auth, NotFound
-- BackofficeDashboard, BackofficeCompany, BackofficeUsers, BackofficeAudit, BackofficeConfig, BackofficeSystem
-- AppLayout, BackofficeLayout
-
-### Impacto esperado
-
-- O bundle principal cairia de ~422 KB para ~100-150 KB (framework + roteamento + auth)
-- Cada pagina seria carregada sob demanda como um chunk separado de ~20-50 KB
-- Reducao significativa do "Unused JavaScript" reportado pelo Lighthouse
-- A cadeia de requisicoes criticas ficaria mais curta pois o bundle inicial seria menor
-
-### Nenhuma outra alteracao necessaria
-
-- O Vite ja suporta code splitting nativamente com `import()` dinamico
-- Nao requer mudanca em configuracao, dependencias ou banco de dados
-
+### Nenhuma migração de banco necessária
+A funcionalidade utiliza as tabelas existentes (`user_permissions`, `organization_holdings`, `organization_members`) sem alterações de schema.
