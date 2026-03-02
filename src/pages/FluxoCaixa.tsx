@@ -3,6 +3,7 @@ import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
 import { useCashFlow, CashFlowEntry } from "@/hooks/useCashFlow";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { KPICard } from "@/components/KPICard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FluxoCaixaPeriodNav } from "@/components/fluxocaixa/FluxoCaixaPeriodNav";
@@ -11,6 +12,12 @@ import { FluxoCaixaTable } from "@/components/fluxocaixa/FluxoCaixaTable";
 import {
   ArrowUpCircle, ArrowDownCircle, Wallet, Loader2,
 } from "lucide-react";
+
+const ALL_TABS = [
+  { key: "geral", label: "Visão Geral" },
+  { key: "projetado", label: "Projetado" },
+  { key: "realizado", label: "Realizado" },
+];
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -31,11 +38,13 @@ function getCycleMonths(cycle: DateCycle): number {
 }
 
 export default function FluxoCaixa() {
+  const { getAllowedTabs } = useUserPermissions();
+  const allowedTabs = getAllowedTabs("fluxo-caixa", ALL_TABS);
   const [refDate, setRefDate] = useState(new Date());
   const [cycle, setCycle] = useState<DateCycle>("mensal");
   const [customFrom, setCustomFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [customTo, setCustomTo] = useState<Date | undefined>(endOfMonth(new Date()));
-  const [activeTab, setActiveTab] = useState("geral");
+  const [activeTab, setActiveTab] = useState(allowedTabs[0]?.key || "geral");
 
   const isCustom = cycle === "personalizado";
   const months = getCycleMonths(cycle);
@@ -102,9 +111,9 @@ export default function FluxoCaixa() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="geral">Visão Geral</TabsTrigger>
-          <TabsTrigger value="projetado">Projetado</TabsTrigger>
-          <TabsTrigger value="realizado">Realizado</TabsTrigger>
+          {allowedTabs.map((t) => (
+            <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-6 mt-4">
