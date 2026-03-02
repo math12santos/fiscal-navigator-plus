@@ -136,7 +136,61 @@ export default function BackofficeCompany() {
   const { data: permissions = [] } = useBackofficePermissions(orgId!);
   const { data: auditLogs = [] } = useBackofficeAuditLog(orgId);
   const updateOrg = useUpdateOrg();
-  const { upsertPermission, clonePermissions } = useManagePermissions();
+  const { upsertPermission, clonePermissions, propagateToGroup } = useManagePermissions();
+
+  // Holding propagation
+  const { data: holdingSubsidiaries = [] } = useQuery({
+    queryKey: ["holding_subsidiaries_for_propagation", orgId],
+    queryFn: async () => {
+      if (!orgId) return [];
+      // Check if this org is a holding
+      const { data: subs, error } = await supabase
+        .from("organization_holdings" as any)
+        .select("subsidiary_id")
+        .eq("holding_id", orgId);
+      if (error || !subs || subs.length === 0) return [];
+      const subIds = (subs as any[]).map((s: any) => s.subsidiary_id);
+      // Get org names
+      const { data: subOrgs } = await supabase
+        .from("organizations")
+        .select("id, name")
+        .in("id", subIds)
+        .order("name");
+      return (subOrgs ?? []) as { id: string; name: string }[];
+    },
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+
+  const [propagateDialogOpen, setPropagateDialogOpen] = useState(false);
+  const [propagateSelectedOrgs, setPropagateSelectedOrgs] = useState<string[]>([]);
+  const [propagating, setPropagating] = useState(false);
+
+  const handleOpenPropagateDialog = () => {
+    setPropagateSelectedOrgs(holdingSubsidiaries.map((s) => s.id));
+    setPropagateDialogOpen(true);
+  };
+
+  const handlePropagate = async () => {
+    if (!orgId || !selectedUserId || propagateSelectedOrgs.length === 0) return;
+    setPropagating(true);
+    try {
+      const result = await propagateToGroup.mutateAsync({
+        userId: selectedUserId,
+        sourceOrgId: orgId,
+        targetOrgIds: propagateSelectedOrgs,
+      });
+      const msgs: string[] = [];
+      if (result.updated > 0) msgs.push(`${result.updated} empresa(s) atualizada(s)`);
+      if (result.skipped.length > 0) msgs.push(`${result.skipped.length} empresa(s) ignorada(s) (usuário não é membro)`);
+      toast({ title: "Permissões propagadas", description: msgs.join(". ") });
+      setPropagateDialogOpen(false);
+    } catch (err: any) {
+      toast({ title: "Erro ao propagar", description: err.message, variant: "destructive" });
+    } finally {
+      setPropagating(false);
+    }
+  };
 
   // Fetch profiles for members
   const memberUserIds = useMemo(() => members.map((m: any) => m.user_id), [members]);
@@ -594,7 +648,7 @@ export default function BackofficeCompany() {
 
         {/* ===== PERMISSÕES & GRANULARIDADE ===== */}
         <TabsContent value="permissoes" className="space-y-4">
-          <div className="flex items-center gap-3">
+           <div className="flex items-center gap-3">
             <Select value={selectedUserId || ""} onValueChange={setSelectedUserId}>
               <SelectTrigger className="w-64">
                 <SelectValue placeholder="Selecione um usuário" />
@@ -607,7 +661,51 @@ export default function BackofficeCompany() {
                 ))}
               </SelectContent>
             </Select>
+            {selectedUserId && holdingSubsidiaries.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleOpenPropagateDialog}>
+                <Building2 size={14} className="mr-1.5" />
+                Propagar para o Grupo
+              </Button>
+            )}
           </div>
+
+          {/* Propagate to Group Dialog */}
+          <Dialog open={propagateDialogOpen} onOpenChange={setPropagateDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Propagar Permissões para o Grupo</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                As permissões de <strong>{selectedUserId ? (profileMap[selectedUserId]?.full_name || "usuário") : ""}</strong> nesta empresa serão replicadas para as subsidiárias selecionadas.
+              </p>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {holdingSubsidiaries.map((sub) => {
+                  const isMember = members.some((m: any) => m.user_id === selectedUserId) || true; // membership checked server-side
+                  return (
+                    <label key={sub.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer">
+                      <Checkbox
+                        checked={propagateSelectedOrgs.includes(sub.id)}
+                        onCheckedChange={(checked) => {
+                          setPropagateSelectedOrgs((prev) =>
+                            checked ? [...prev, sub.id] : prev.filter((id) => id !== sub.id)
+                          );
+                        }}
+                      />
+                      <span className="text-sm">{sub.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPropagateDialogOpen(false)} disabled={propagating}>
+                  Cancelar
+                </Button>
+                <Button onClick={handlePropagate} disabled={propagating || propagateSelectedOrgs.length === 0}>
+                  {propagating ? "Propagando..." : `Propagar para ${propagateSelectedOrgs.length} empresa(s)`}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {selectedUserId ? (
             <div className="space-y-6">
