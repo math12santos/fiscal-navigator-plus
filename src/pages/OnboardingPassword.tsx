@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { KeyRound, Loader2 } from "lucide-react";
@@ -61,9 +62,8 @@ export default function OnboardingPassword({ onComplete }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="new-password">Nova senha</Label>
-            <Input
+            <PasswordInput
               id="new-password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Mínimo 6 caracteres"
@@ -73,9 +73,8 @@ export default function OnboardingPassword({ onComplete }: Props) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirm-password">Confirmar senha</Label>
-            <Input
+            <PasswordInput
               id="confirm-password"
-              type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="Repita a nova senha"
