@@ -1,64 +1,133 @@
+# Plano: Módulo de Gestão de Tarefas por Solicitações
 
-# Propagação de Permissões em Holding
+## Visão Geral
 
-## Problema
-Ao configurar permissões para funcionários que atuam em múltiplas empresas de um grupo (holding), o administrador precisa acessar cada empresa individualmente e repetir a mesma configuração. No caso da Thayna Leite, foram 6 organizações configuradas uma a uma, totalizando mais de 20 registros manuais.
+Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
 
-## Solução
-Adicionar uma funcionalidade de **"Propagar para o Grupo"** na tela de permissões do Backoffice (aba Permissões da empresa). Quando o admin configura as permissões de um usuário em uma empresa que faz parte de uma holding, ele poderá replicar essas permissões para todas as subsidiárias do grupo com um clique.
+---
 
-## Funcionalidades
+## 1. Estrutura de Dados (Migrações)
 
-### 1. Botão "Propagar para o Grupo"
-- Visível apenas quando a organização atual é uma holding ou faz parte de uma holding
-- Aparece na aba de Permissões, ao lado do seletor de usuário, após selecionar um usuário
-- Ao clicar, abre um diálogo de confirmação mostrando:
-  - As permissões atuais do usuário nesta empresa (resumo)
-  - A lista de empresas do grupo onde as permissões serão aplicadas
-  - Checkboxes para selecionar/deselecionar empresas específicas
-  - Indicação de quais empresas o usuário já é membro
+### Tabela `requests` (Solicitações)
 
-### 2. Lógica de Propagação
-- Copia as permissões (`user_permissions`) da organização atual para todas as organizações selecionadas do grupo
-- Para cada empresa destino: remove permissões existentes do usuário e insere as novas (mesmo comportamento do "Clonar Permissões" existente)
-- Se o usuário não for membro de alguma subsidiária selecionada, exibe aviso e pula essa empresa
-
-### 3. Feedback
-- Toast de sucesso indicando quantas empresas foram atualizadas
-- Invalidação de cache para todas as organizações afetadas
-
-## Detalhes Técnicos
-
-### Alterações em `src/hooks/useBackoffice.ts`
-- Adicionar mutation `propagateToGroup` que:
-  1. Busca as subsidiárias da holding via tabela `organization_holdings`
-  2. Busca as permissões atuais do usuário na org fonte
-  3. Para cada org destino selecionada: deleta permissões existentes e insere cópia
-  4. Utiliza a mesma lógica já existente em `clonePermissions`, mas iterando sobre múltiplas orgs
-
-### Alterações em `src/pages/BackofficeCompany.tsx`
-- Adicionar query para verificar se a org atual pertence a uma holding (busca `organization_holdings`)
-- Adicionar botão "Propagar para o Grupo" com icone `Copy` ou `Building2`
-- Adicionar `AlertDialog` de confirmação com lista de empresas e checkboxes
-- Após execução, invalidar queries de permissões de todas as orgs afetadas
-
-### Fluxo
 ```text
-[Seleciona usuário] -> [Configura permissões na empresa atual]
-       |
-       v
-[Clica "Propagar para o Grupo"]
-       |
-       v
-[Dialog: lista subsidiárias com checkboxes]
-  - [x] Danfessi (membro)
-  - [x] Davanti (membro)  
-  - [x] Licita Winners (membro)
-  - [x] Viva7 (membro)
-       |
-       v
-[Confirma] -> Replica permissões -> Toast "4 empresas atualizadas"
+id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
+area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
+due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
+created_at, updated_at
 ```
 
-### Nenhuma migração de banco necessária
-A funcionalidade utiliza as tabelas existentes (`user_permissions`, `organization_holdings`, `organization_members`) sem alterações de schema.
+### Tabela `request_tasks` (Tarefas geradas)
+
+```text
+id, request_id (FK), organization_id, assigned_to, status, due_date,
+created_by, executed_by, approved_by, created_at, updated_at
+```
+
+### Tabela `request_comments` (Comentarios/Historico)
+
+```text
+id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
+old_value, new_value, created_at
+```
+
+### Tabela `request_attachments`
+
+```text
+id, request_id (FK), user_id, file_name, file_path, created_at
+```
+
+### Tabela `notifications`
+
+```text
+id, organization_id, user_id (destinatario), title, body, type, priority,
+reference_type (request/task), reference_id, read, read_at, created_at
+```
+
+RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
+
+Habilitar realtime em `notifications` para push instantâneo.
+
+---
+
+## 2. Componentes e Páginas
+
+### Página `Tarefas.tsx` (reescrita completa)
+
+Três abas controladas por permissões (`getAllowedTabs`):
+
+
+| Aba            | Key              | Conteúdo                                                                                  |
+| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
+| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
+| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
+
+
+### Dialog `RequestFormDialog.tsx`
+
+Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
+
+### Componente `RequestDetail.tsx`
+
+Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
+
+### Central de Notificações `NotificationCenter.tsx`
+
+Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
+
+---
+
+## 3. Hooks
+
+- `useRequests.ts` — CRUD de solicitações com filtros
+- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
+- `useRequestComments.ts` — Comentários e histórico
+- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
+
+---
+
+## 4. Integração com Outros Módulos
+
+Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
+
+- Financeiro → "Aprovação de pagamento"
+- Contratos → "Revisão jurídica"
+- DP → "Solicitação de contratação"
+
+Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
+
+---
+
+## 5. Atualização de Definições
+
+- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
+- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
+- `AppLayout.tsx`: Adicionar ícone de notificações no header
+
+---
+
+## 6. Fluxo Operacional
+
+```text
+Usuário cria solicitação
+  → Sistema gera task vinculada
+  → Responsável recebe notificação (realtime)
+  → Responsável executa (muda status)
+  → Sistema registra histórico
+  → Se necessário → status "Aguardando Aprovação"
+  → Aprovador recebe notificação
+  → Solicitação concluída/rejeitada
+```
+
+---
+
+## Ordem de Implementação
+
+1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
+2. Habilitar realtime em `notifications`
+3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
+4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
+5. Criar `RequestFormDialog` e `RequestDetail`
+6. Criar `NotificationCenter` e integrar no `AppLayout`
+7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
