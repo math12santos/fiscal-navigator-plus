@@ -135,7 +135,15 @@ const MODULES: { key: string; label: string; tabs?: { key: string; label: string
       { key: "produtos", label: "Produtos / Serviços" },
     ],
   },
-  { key: "tarefas", label: "Tarefas" },
+  {
+    key: "tarefas",
+    label: "Tarefas",
+    tabs: [
+      { key: "dashboard", label: "Dashboard" },
+      { key: "solicitacoes", label: "Solicitações" },
+      { key: "minhas-tarefas", label: "Minhas Tarefas" },
+    ],
+  },
   { key: "integracoes", label: "Integrações" },
   { key: "ia", label: "IA Financeira" },
 ];

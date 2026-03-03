@@ -59,7 +59,15 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     ],
   },
   { key: "conciliacao", label: "Conciliação" },
-  { key: "tarefas", label: "Tarefas" },
+  {
+    key: "tarefas",
+    label: "Tarefas",
+    tabs: [
+      { key: "dashboard", label: "Dashboard" },
+      { key: "solicitacoes", label: "Solicitações" },
+      { key: "minhas-tarefas", label: "Minhas Tarefas" },
+    ],
+  },
   { key: "integracoes", label: "Integrações" },
   { key: "ia", label: "IA Financeira" },
   { key: "configuracoes", label: "Configurações" },

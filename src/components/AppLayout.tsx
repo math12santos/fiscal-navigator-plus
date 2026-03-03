@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import OrgSelector from "@/components/OrgSelector";
 import { ScopeIndicator } from "@/components/ScopeIndicator";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
@@ -135,7 +136,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main */}
       <main className="flex-1 overflow-y-auto">
-        <div className="p-6 lg:p-8">{children}</div>
+        <div className="flex items-center justify-end gap-2 px-6 pt-4 lg:px-8">
+          <NotificationCenter />
+        </div>
+        <div className="p-6 lg:p-8 pt-2">{children}</div>
       </main>
     </div>
   );
