@@ -84,9 +84,15 @@ export default function OnboardingGuiado() {
   }, [currentStep, goToStep]);
 
   const handleFinish = useCallback(async () => {
+    const dimensions = getStepData(10);
+    const scores = Object.values(dimensions).filter((v) => typeof v === "number") as number[];
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    const levels = ["iniciante", "básico", "intermediário", "avançado", "excelência"];
+    const maturityScore = levels[Math.min(Math.floor(avgScore / 20), 4)] || "iniciante";
+    await finishOnboarding(maturityScore, dimensions as Record<string, number>);
     toast({ title: "Onboarding concluído!", description: "Seu cockpit financeiro está pronto." });
     navigate("/");
-  }, [navigate]);
+  }, [navigate, finishOnboarding, getStepData]);
 
   const getStepData = (step: number) => {
     if (!progress) return {};

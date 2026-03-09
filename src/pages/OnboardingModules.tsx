@@ -57,7 +57,8 @@ export default function OnboardingModules({ organizationId, onComplete }: Props)
         .eq("id", organizationId);
 
       toast({ title: "Módulos configurados com sucesso!" });
-      onComplete();
+      // Navigate to guided onboarding instead of dashboard
+      window.location.href = "/onboarding-guiado";
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {

@@ -164,6 +164,17 @@ function BackofficeRoutes() {
   );
 }
 
+function GuidedOnboardingRoute() {
+  const { user, loading: authLoading } = useAuth();
+  if (authLoading) return <LoadingFallback />;
+  if (!user) return <Navigate to="/auth" replace />;
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <OnboardingGuiado />
+    </Suspense>
+  );
+}
+
 function AuthRoute() {
   const { user, loading } = useAuth();
   const [isMaster, setIsMaster] = useState<boolean | null>(null);
