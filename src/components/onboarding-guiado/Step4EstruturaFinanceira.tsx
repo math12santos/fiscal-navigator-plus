@@ -208,17 +208,14 @@ export function Step4EstruturaFinanceira({ data, onChange }: Props) {
   return (
     <Card>
       <CardContent className="pt-6 space-y-2">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="rounded-lg bg-primary/10 p-2">
-            <BookOpen className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Estrutura Financeira</h2>
-            <p className="text-sm text-muted-foreground">Configure o plano de contas e centros de custo da organização</p>
-          </div>
-        </div>
+        <StepHeader
+          stepNumber={4}
+          fallbackTitle="Estrutura Financeira"
+          fallbackDescription="Configure o plano de contas e centros de custo da organização"
+          fallbackIcon={BookOpen}
+        />
 
-        <Accordion type="multiple" defaultValue={["accounts", "centers"]} className="space-y-2">
+        <Accordion type="single" collapsible defaultValue="accounts" className="space-y-2">
           {/* ── Plano de Contas ── */}
           <AccordionItem value="accounts" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">
