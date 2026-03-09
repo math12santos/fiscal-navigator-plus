@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Loader2, Building2, BarChart3, FileText, Cpu, Target, Wallet, Plug, CalendarCheck, LayoutDashboard, Lightbulb, ShieldCheck, Trophy, Database } from "lucide-react";
 import { useOnboardingConfig } from "@/hooks/useOnboardingConfig";
 import { type LucideIcon } from "lucide-react";
