@@ -1,50 +1,165 @@
+# Plano: Módulo de Gestão de Tarefas por Solicitações
 
+## Visão Geral
 
-# Etapas 8 e 9 do Onboarding Guiado
-
-## Objetivo
-
-Substituir o `StepShell` placeholder das etapas 8 e 9 por componentes funcionais. Sem mudanças no banco — usa campos existentes `cockpit_activated` e `assisted_start_date` da tabela `onboarding_progress`.
+Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
 
 ---
 
-## Etapa 8 — Ativação do Cockpit
+## 1. Estrutura de Dados (Migrações)
 
-**Componente**: `src/components/onboarding-guiado/Step8Cockpit.tsx`
+### Tabela `requests` (Solicitações)
 
-Tela de ativação dos dashboards financeiros com:
+```text
+id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
+area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
+due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
+created_at, updated_at
+```
 
-- **Resumo de prontidão**: Checklist visual mostrando o que já foi configurado nas etapas anteriores (contas, centros de custo, contratos, cenários, rotinas) com ícones verde/cinza baseado nos `completedSteps`
-- **Preview dos dashboards**: Cards visuais representando os dashboards que serão liberados (Dashboard CFO, Dashboard Board, Fluxo de Caixa, Planejamento)
-- **Botão "Ativar Cockpit"**: Salva `cockpit_activated: true` via `saveProgress()` e mostra confirmação visual
-- **Estado ativado**: Após ativação, exibe badge de sucesso e mensagem de que os dashboards estão disponíveis
+### Tabela `request_tasks` (Tarefas geradas)
+
+```text
+id, request_id (FK), organization_id, assigned_to, status, due_date,
+created_by, executed_by, approved_by, created_at, updated_at
+```
+
+### Tabela `request_comments` (Comentarios/Historico)
+
+```text
+id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
+old_value, new_value, created_at
+```
+
+### Tabela `request_attachments`
+
+```text
+id, request_id (FK), user_id, file_name, file_path, created_at
+```
+
+### Tabela `notifications`
+
+```text
+id, organization_id, user_id (destinatario), title, body, type, priority,
+reference_type (request/task), reference_id, read, read_at, created_at
+```
+
+RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
+
+Habilitar realtime em `notifications` para push instantâneo.
 
 ---
 
-## Etapa 9 — Operação Assistida
+## 2. Componentes e Páginas
 
-**Componente**: `src/components/onboarding-guiado/Step9Assistida.tsx`
+### Página `Tarefas.tsx` (reescrita completa)
 
-Configuração do período de acompanhamento pós-onboarding:
+Três abas controladas por permissões (`getAllowedTabs`):
 
-- **Explicação**: Card informativo sobre os primeiros 90 dias de operação assistida
-- **Funcionalidades incluídas**: Checklist informativo (alertas de dados faltantes, sugestões de classificação, acompanhamento de preenchimento, relatórios semanais automáticos)
-- **Data de início**: Campo de data para definir quando começa a operação assistida (default: hoje). Salva em `assisted_start_date`
-- **Timeline visual**: Mostra marcos dos 90 dias (Semana 1-2: Setup, Semana 3-4: Ajustes, Mês 2-3: Otimização)
-- **Botão "Iniciar Operação Assistida"**: Confirma a data e marca a etapa como configurada
+
+| Aba            | Key              | Conteúdo                                                                                  |
+| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
+| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
+| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
+
+
+### Dialog `RequestFormDialog.tsx`
+
+Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
+
+### Componente `RequestDetail.tsx`
+
+Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
+
+### Central de Notificações `NotificationCenter.tsx`
+
+Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
 
 ---
 
-## Integração no Wizard
+## 3. Hooks
 
-**`src/pages/OnboardingGuiado.tsx`**:
-- Importar `Step8Cockpit` e `Step9Assistida`
-- Render para `currentStep === 8` e `currentStep === 9`
-- Remover condição do StepShell (não há mais steps usando shell)
-- Passar `completedSteps` como prop para Step8
+- `useRequests.ts` — CRUD de solicitações com filtros
+- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
+- `useRequestComments.ts` — Comentários e histórico
+- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
 
-## Arquivos
+---
 
-- **Novo**: `Step8Cockpit.tsx`, `Step9Assistida.tsx`
-- **Editado**: `OnboardingGuiado.tsx` (imports + render, remover StepShell)
+## 4. Integração com Outros Módulos
 
+Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
+
+- Financeiro → "Aprovação de pagamento"
+- Contratos → "Revisão jurídica"
+- DP → "Solicitação de contratação"
+
+Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
+
+---
+
+## 5. Atualização de Definições
+
+- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
+- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
+- `AppLayout.tsx`: Adicionar ícone de notificações no header
+
+---
+
+## 6. Fluxo Operacional
+
+```text
+Usuário cria solicitação
+  → Sistema gera task vinculada
+  → Responsável recebe notificação (realtime)
+  → Responsável executa (muda status)
+  → Sistema registra histórico
+  → Se necessário → status "Aguardando Aprovação"
+  → Aprovador recebe notificação
+  → Solicitação concluída/rejeitada
+```
+
+---
+
+## Ordem de Implementação
+
+1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
+2. Habilitar realtime em `notifications`
+3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
+4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
+5. Criar `RequestFormDialog` e `RequestDetail`
+6. Criar `NotificationCenter` e integrar no `AppLayout`
+7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
+
+---
+
+# Onboarding Guiado — Implementação (Fase 1 ✅)
+
+## Status: Implementado
+
+### Tabelas criadas
+- `onboarding_progress` — progresso por organização com JSONB por etapa
+- `onboarding_recommendations` — recomendações automáticas
+
+### RLS
+- Org members: SELECT, INSERT (com user_id check), UPDATE
+- Masters: ALL
+
+### Componentes implementados
+- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
+- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
+- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
+- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
+- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
+- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
+- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
+
+### Rotas
+- `/onboarding-guiado` — Wizard no app
+- `/backoffice/onboarding` — Gestão no backoffice
+
+### Fase 2 (pendente)
+- Integração profunda das etapas 2-8 com módulos existentes
+- Sistema de recomendações automáticas (Etapa 9)
+- Score no dashboard principal
