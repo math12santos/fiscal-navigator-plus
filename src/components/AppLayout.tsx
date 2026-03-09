@@ -113,7 +113,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 <ShieldCheck size={14} /> Voltar ao BackOffice
               </button>
             )}
-            <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
+            <div className="text-xs text-sidebar-foreground/70 truncate">{user?.email}</div>
             <button
               onClick={signOut}
               className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors w-full"
