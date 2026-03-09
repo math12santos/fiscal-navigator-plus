@@ -131,3 +131,35 @@ Usuário cria solicitação
 5. Criar `RequestFormDialog` e `RequestDetail`
 6. Criar `NotificationCenter` e integrar no `AppLayout`
 7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
+
+---
+
+# Onboarding Guiado — Implementação (Fase 1 ✅)
+
+## Status: Implementado
+
+### Tabelas criadas
+- `onboarding_progress` — progresso por organização com JSONB por etapa
+- `onboarding_recommendations` — recomendações automáticas
+
+### RLS
+- Org members: SELECT, INSERT (com user_id check), UPDATE
+- Masters: ALL
+
+### Componentes implementados
+- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
+- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
+- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
+- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
+- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
+- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
+- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
+
+### Rotas
+- `/onboarding-guiado` — Wizard no app
+- `/backoffice/onboarding` — Gestão no backoffice
+
+### Fase 2 (pendente)
+- Integração profunda das etapas 2-8 com módulos existentes
+- Sistema de recomendações automáticas (Etapa 9)
+- Score no dashboard principal
