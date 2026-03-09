@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,6 +38,7 @@ import {
   Loader2,
   CheckCircle2,
   Crown,
+  Info,
 } from "lucide-react";
 
 interface Step2EstruturaProps {
@@ -84,7 +84,6 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
   const [showUserForm, setShowUserForm] = useState(false);
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
-  const [userPassword, setUserPassword] = useState("");
   const [userCargo, setUserCargo] = useState("");
   const [userRole, setUserRole] = useState("member");
   const [savingUser, setSavingUser] = useState(false);
@@ -92,7 +91,7 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
   // === State: Areas ===
   const [showAreaForm, setShowAreaForm] = useState(false);
   const [areaName, setAreaName] = useState("");
-  const [savingArea, setSavingArea] = useState(false);
+  const [savingAreaName, setSavingAreaName] = useState<string | null>(null);
 
   const orgId = currentOrg?.id;
 
@@ -177,7 +176,6 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
     if (!companyName.trim() || !companyDocNumber.trim() || !user || !orgId) return;
     setSavingCompany(true);
     try {
-      // 1. Create organization
       const { data: newOrg, error: orgErr } = await supabase
         .from("organizations" as any)
         .insert({
@@ -191,14 +189,12 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
       if (orgErr) throw orgErr;
       const org = newOrg as unknown as Organization;
 
-      // 2. Add current user as owner
       await supabase.from("organization_members" as any).insert({
         organization_id: org.id,
         user_id: user.id,
         role: "owner",
       } as any);
 
-      // 3. Link as subsidiary
       await supabase.from("organization_holdings" as any).insert({
         holding_id: orgId,
         subsidiary_id: org.id,
@@ -219,19 +215,18 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
     }
   };
 
-  // === Handlers: User ===
+  // === Handlers: User (auto-generated temp password) ===
   const handleCreateUser = async () => {
-    if (!userEmail.trim() || !userPassword.trim() || !orgId) return;
-    if (userPassword.length < 6) {
-      toast({ title: "Senha deve ter no mínimo 6 caracteres", variant: "destructive" });
-      return;
-    }
+    if (!userEmail.trim() || !orgId) return;
     setSavingUser(true);
     try {
+      // Generate a temporary password — user will be forced to change on first login
+      const tempPassword = crypto.randomUUID().slice(0, 12) + "Aa1!";
+
       const res = await supabase.functions.invoke("create-user", {
         body: {
           email: userEmail.trim(),
-          password: userPassword,
+          password: tempPassword,
           full_name: userName.trim(),
           cargo: userCargo.trim(),
           organization_ids: [{ id: orgId, role: userRole }],
@@ -241,10 +236,12 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
       if (res.error) throw new Error(res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
 
-      toast({ title: "Usuário criado com sucesso!" });
+      toast({
+        title: "Usuário convidado com sucesso!",
+        description: `${userName.trim() || userEmail.trim()} receberá acesso ao primeiro login.`,
+      });
       setUserName("");
       setUserEmail("");
-      setUserPassword("");
       setUserCargo("");
       setUserRole("member");
       setShowUserForm(false);
@@ -256,10 +253,10 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
     }
   };
 
-  // === Handlers: Area ===
+  // === Handlers: Area (granular loading per area name) ===
   const handleCreateArea = async (name: string) => {
     if (!name.trim() || !user || !orgId) return;
-    setSavingArea(true);
+    setSavingAreaName(name);
     try {
       const existingCodes = costCenters.map((c) => c.code);
       const nextNum = existingCodes.length + 1;
@@ -275,12 +272,13 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
         description: `Área organizacional criada no onboarding`,
       });
 
+      toast({ title: `Área "${name}" criada como Centro de Custo` });
       setAreaName("");
       setShowAreaForm(false);
     } catch (err: any) {
       toast({ title: "Erro ao criar área", description: err.message, variant: "destructive" });
     } finally {
-      setSavingArea(false);
+      setSavingAreaName(null);
     }
   };
 
@@ -323,7 +321,6 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Current org as principal */}
                 <TableRow>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
@@ -454,14 +451,10 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
                     <Input value={userCargo} onChange={(e) => setUserCargo(e.target.value)} placeholder="Controller" />
                   </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label>Email *</Label>
                     <Input type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="usuario@empresa.com" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Senha *</Label>
-                    <PasswordInput value={userPassword} onChange={(e) => setUserPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Papel</Label>
@@ -475,13 +468,17 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
                     </Select>
                   </div>
                 </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                  <Info size={14} className="shrink-0" />
+                  <span>O usuário definirá sua própria senha no primeiro acesso ao sistema.</span>
+                </div>
                 <div className="flex gap-2 justify-end">
                   <Button variant="outline" size="sm" onClick={() => setShowUserForm(false)} disabled={savingUser}>
                     Cancelar
                   </Button>
-                  <Button size="sm" onClick={handleCreateUser} disabled={savingUser || !userEmail.trim() || !userPassword.trim()}>
+                  <Button size="sm" onClick={handleCreateUser} disabled={savingUser || !userEmail.trim()}>
                     {savingUser ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus size={14} className="mr-1" />}
-                    Criar Usuário
+                    Convidar Usuário
                   </Button>
                 </div>
               </div>
@@ -533,15 +530,25 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
                       variant="outline"
                       size="sm"
                       className="text-xs"
-                      disabled={savingArea}
+                      disabled={savingAreaName === s}
                       onClick={() => handleCreateArea(s)}
                     >
-                      <Plus size={12} className="mr-1" /> {s}
+                      {savingAreaName === s ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <Plus size={12} className="mr-1" />
+                      )}
+                      {s}
                     </Button>
                   ))}
                 </div>
               </div>
             )}
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+              <Info size={14} className="shrink-0" />
+              <span>Cada área organizacional será criada como um Centro de Custo com DRE Gerencial própria.</span>
+            </div>
 
             {showAreaForm ? (
               <div className="flex items-end gap-2">
@@ -556,8 +563,8 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
                     }}
                   />
                 </div>
-                <Button size="sm" onClick={() => handleCreateArea(areaName)} disabled={savingArea || !areaName.trim()}>
-                  {savingArea ? <Loader2 className="h-4 w-4 animate-spin" /> : "Adicionar"}
+                <Button size="sm" onClick={() => handleCreateArea(areaName)} disabled={!!savingAreaName || !areaName.trim()}>
+                  {savingAreaName ? <Loader2 className="h-4 w-4 animate-spin" /> : "Adicionar"}
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowAreaForm(false)}>
                   Cancelar

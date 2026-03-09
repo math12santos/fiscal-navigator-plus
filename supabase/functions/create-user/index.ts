@@ -11,7 +11,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify caller is master
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -21,7 +20,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify caller with anon client
+    // Verify caller
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -30,24 +29,43 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Check master role
+    const body = await req.json();
+    const { email, password, full_name, cargo, organization_ids, roles } = body;
+
+    if (!email || !password) {
+      return new Response(JSON.stringify({ error: "Email e senha são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    const { data: roleData } = await adminClient
+
+    // Check authorization: master role OR owner/admin in at least one target org
+    const { data: masterRole } = await adminClient
       .from("user_roles")
       .select("role")
       .eq("user_id", caller.id)
       .eq("role", "master")
       .maybeSingle();
 
-    if (!roleData) {
-      return new Response(JSON.stringify({ error: "Acesso negado: apenas masters" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    let authorized = !!masterRole;
+
+    if (!authorized && organization_ids && organization_ids.length > 0) {
+      const targetOrgIds = organization_ids.map((o: { id: string }) => o.id);
+      const { data: callerMemberships } = await adminClient
+        .from("organization_members")
+        .select("organization_id, role")
+        .eq("user_id", caller.id)
+        .in("organization_id", targetOrgIds)
+        .in("role", ["owner", "admin"]);
+
+      if (callerMemberships && callerMemberships.length > 0) {
+        // Caller must be owner/admin in ALL target orgs
+        const authorizedOrgIds = new Set(callerMemberships.map((m: any) => m.organization_id));
+        authorized = targetOrgIds.every((id: string) => authorizedOrgIds.has(id));
+      }
     }
 
-    const body = await req.json();
-    const { email, password, full_name, cargo, organization_ids, roles } = body;
-
-    if (!email || !password) {
-      return new Response(JSON.stringify({ error: "Email e senha são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!authorized) {
+      return new Response(JSON.stringify({ error: "Acesso negado: permissão insuficiente" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Create user via admin API
@@ -71,7 +89,7 @@ Deno.serve(async (req) => {
 
     const userId = newUser.user.id;
 
-    // Update profile — mark must_change_password = true
+    // Update profile
     const profileUpdate: Record<string, unknown> = { must_change_password: true, email };
     if (full_name) profileUpdate.full_name = full_name;
     if (cargo) profileUpdate.cargo = cargo;
