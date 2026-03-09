@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 195 65% 38%;
+    --primary: 174 72% 49%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96%;
@@ -24,7 +24,7 @@
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 195 50% 32%;
+    --accent: 174 45% 40%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 56%;
@@ -38,20 +38,20 @@
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 195 65% 38%;
+    --ring: 174 72% 49%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 222 47% 5%;
     --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 195 65% 40%;
+    --sidebar-primary: 174 72% 50%;
     --sidebar-primary-foreground: 222 47% 6%;
     --sidebar-accent: 222 30% 12%;
     --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 222 30% 12%;
-    --sidebar-ring: 195 65% 40%;
+    --sidebar-ring: 174 72% 50%;
 
-    --chart-1: 195 65% 38%;
+    --chart-1: 174 72% 49%;
     --chart-2: 152 60% 45%;
     --chart-3: 38 91% 55%;
     --chart-4: 262 60% 55%;
@@ -71,7 +71,7 @@
     --popover: 222 44% 10%;
     --popover-foreground: 210 40% 96%;
 
-    --primary: 195 65% 40%;
+    --primary: 174 72% 50%;
     --primary-foreground: 222 47% 6%;
 
     --secondary: 222 30% 14%;
@@ -80,7 +80,7 @@
     --muted: 222 30% 12%;
     --muted-foreground: 215 20% 55%;
 
-    --accent: 195 50% 34%;
+    --accent: 174 60% 40%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 72% 55%;
@@ -94,18 +94,18 @@
 
     --border: 222 30% 16%;
     --input: 222 30% 16%;
-    --ring: 195 65% 40%;
+    --ring: 174 72% 50%;
 
     --sidebar-background: 222 47% 5%;
     --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 195 65% 40%;
+    --sidebar-primary: 174 72% 50%;
     --sidebar-primary-foreground: 222 47% 6%;
     --sidebar-accent: 222 30% 12%;
     --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 222 30% 12%;
-    --sidebar-ring: 195 65% 40%;
+    --sidebar-ring: 174 72% 50%;
 
-    --chart-1: 195 65% 40%;
+    --chart-1: 174 72% 50%;
     --chart-2: 152 60% 45%;
     --chart-3: 38 92% 55%;
     --chart-4: 262 60% 55%;
@@ -152,7 +152,7 @@
   }
 
   .glow-primary {
-    box-shadow: 0 0 20px hsl(195 65% 40% / 0.15), 0 0 60px hsl(195 65% 40% / 0.05);
+    box-shadow: 0 0 20px hsl(174 72% 50% / 0.15), 0 0 60px hsl(174 72% 50% / 0.05);
   }
 
   .stat-positive {
