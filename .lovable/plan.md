@@ -1,165 +1,56 @@
-# Plano: Módulo de Gestão de Tarefas por Solicitações
-
-## Visão Geral
-
-Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
-
----
-
-## 1. Estrutura de Dados (Migrações)
-
-### Tabela `requests` (Solicitações)
-
-```text
-id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
-area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
-due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
-created_at, updated_at
-```
-
-### Tabela `request_tasks` (Tarefas geradas)
-
-```text
-id, request_id (FK), organization_id, assigned_to, status, due_date,
-created_by, executed_by, approved_by, created_at, updated_at
-```
-
-### Tabela `request_comments` (Comentarios/Historico)
-
-```text
-id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
-old_value, new_value, created_at
-```
-
-### Tabela `request_attachments`
-
-```text
-id, request_id (FK), user_id, file_name, file_path, created_at
-```
-
-### Tabela `notifications`
-
-```text
-id, organization_id, user_id (destinatario), title, body, type, priority,
-reference_type (request/task), reference_id, read, read_at, created_at
-```
-
-RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
-
-Habilitar realtime em `notifications` para push instantâneo.
-
----
-
-## 2. Componentes e Páginas
-
-### Página `Tarefas.tsx` (reescrita completa)
-
-Três abas controladas por permissões (`getAllowedTabs`):
 
 
-| Aba            | Key              | Conteúdo                                                                                  |
-| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
-| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
-| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
+# Redesign do Editor de Diagnóstico no Backoffice
 
+## Problemas Identificados
 
-### Dialog `RequestFormDialog.tsx`
+1. **Accordion dentro de Accordion**: O Step 1 abre dentro de um accordion geral, e dentro dele há seções com perguntas aninhadas — muita profundidade visual
+2. **Excesso de campos técnicos visíveis**: Key, tipo, condicional, cor CSS — tudo aparece ao mesmo tempo para cada pergunta, criando ruído visual
+3. **Sem preview**: O editor não mostra como a pergunta ficará para o usuário final
+4. **Thresholds e perguntas misturados**: Os 3 blocos (seções, thresholds de maturidade, thresholds de complexidade) competem por atenção na mesma view
+5. **Opções em grid denso**: Label + Value + Points + Delete em colunas apertadas, difícil de ler com muitas opções
 
-Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
+## Proposta de Redesign
 
-### Componente `RequestDetail.tsx`
+### 1. Separar em sub-abas internas (Tabs dentro do Step 1)
 
-Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
+Em vez de tudo empilhado, dividir o editor do Step 1 em 3 tabs:
+- **Perguntas** — Editor visual das seções e perguntas
+- **Pontuação** — Thresholds de maturidade + complexidade
+- **Preview** — Simulação read-only de como o diagnóstico aparece para o usuário
 
-### Central de Notificações `NotificationCenter.tsx`
+### 2. Modo colapsado para perguntas (Progressive Disclosure)
 
-Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
+Cada pergunta mostra apenas uma linha resumo: `[tipo] Pergunta — X opções — Y pts max`. Ao clicar, expande para edição inline com os campos detalhados (key, tipo, condicional, opções). Reduz drasticamente o ruído visual.
 
----
+### 3. Drag-and-drop visual para reordenação
 
-## 3. Hooks
+Adicionar handle de arraste nas perguntas e seções para reordenar sem editar campo "order" manualmente. (Possível com CSS + lógica de swap, sem lib extra.)
 
-- `useRequests.ts` — CRUD de solicitações com filtros
-- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
-- `useRequestComments.ts` — Comentários e histórico
-- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
+### 4. Preview inline por seção
 
----
+Na tab "Preview", renderizar as perguntas como o usuário final veria — usando os mesmos componentes de `Step1Diagnostico` mas em modo read-only. Permite ao admin validar o resultado sem sair do backoffice.
 
-## 4. Integração com Outros Módulos
+### 5. Campos técnicos em popover/drawer
 
-Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
+Mover "Key", "Condicional" e "Tipo" para um popover "Configurações avançadas" acessível por um botão de engrenagem em cada pergunta. O fluxo principal fica limpo: label + opções.
 
-- Financeiro → "Aprovação de pagamento"
-- Contratos → "Revisão jurídica"
-- DP → "Solicitação de contratação"
+## Mudanças Técnicas
 
-Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
+### `OnboardingConfigTab.tsx`
 
----
+- **Step1Config**: Substituir layout empilhado por `Tabs` com 3 abas (Perguntas, Pontuação, Preview)
+- **QuestionsEditor**: Cada pergunta vira um card colapsável. Linha resumo mostra tipo (badge), label, contagem de opções e pontuação máxima. Expansão revela campos de edição
+- **Campos técnicos**: Key, tipo e condicional movidos para um `Popover` acessível por ícone de engrenagem (Settings) no header da pergunta
+- **OptionsEditor**: Manter grid mas com melhor espaçamento e labels mais claros
+- **Preview tab**: Importar componentes de renderização do `Step1Diagnostico` em modo read-only para simular a experiência do usuário final
+- **Seções**: Cada seção mostra resumo (nome, qtd perguntas, score máximo) e expande para editar
 
-## 5. Atualização de Definições
+### Nenhuma mudança no banco de dados
 
-- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
-- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
-- `AppLayout.tsx`: Adicionar ícone de notificações no header
+A estrutura de dados JSON permanece idêntica. Apenas a interface de edição muda.
 
----
+## Arquivos Afetados
 
-## 6. Fluxo Operacional
+- **`src/components/onboarding-guiado/OnboardingConfigTab.tsx`** — Redesign completo do `Step1Config` e `QuestionsEditor`
 
-```text
-Usuário cria solicitação
-  → Sistema gera task vinculada
-  → Responsável recebe notificação (realtime)
-  → Responsável executa (muda status)
-  → Sistema registra histórico
-  → Se necessário → status "Aguardando Aprovação"
-  → Aprovador recebe notificação
-  → Solicitação concluída/rejeitada
-```
-
----
-
-## Ordem de Implementação
-
-1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
-2. Habilitar realtime em `notifications`
-3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
-4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
-5. Criar `RequestFormDialog` e `RequestDetail`
-6. Criar `NotificationCenter` e integrar no `AppLayout`
-7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
-
----
-
-# Onboarding Guiado — Implementação (Fase 1 ✅)
-
-## Status: Implementado
-
-### Tabelas criadas
-- `onboarding_progress` — progresso por organização com JSONB por etapa
-- `onboarding_recommendations` — recomendações automáticas
-
-### RLS
-- Org members: SELECT, INSERT (com user_id check), UPDATE
-- Masters: ALL
-
-### Componentes implementados
-- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
-- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
-- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
-- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
-- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
-- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
-- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
-
-### Rotas
-- `/onboarding-guiado` — Wizard no app
-- `/backoffice/onboarding` — Gestão no backoffice
-
-### Fase 2 (pendente)
-- Integração profunda das etapas 2-8 com módulos existentes
-- Sistema de recomendações automáticas (Etapa 9)
-- Score no dashboard principal
