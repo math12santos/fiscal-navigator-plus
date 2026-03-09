@@ -218,7 +218,7 @@ export function Step4EstruturaFinanceira({ data, onChange }: Props) {
           </div>
         </div>
 
-        <Accordion type="single" collapsible defaultValue="accounts" className="space-y-2">
+        <Accordion type="multiple" defaultValue={["accounts", "centers"]} className="space-y-2">
           {/* ── Plano de Contas ── */}
           <AccordionItem value="accounts" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">

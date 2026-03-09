@@ -305,7 +305,7 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
         </p>
       </div>
 
-      <Accordion type="single" collapsible defaultValue="users" className="space-y-3">
+      <Accordion type="multiple" defaultValue={["companies", "users", "areas"]} className="space-y-3">
         {/* =================== SECTION 1: COMPANIES (only for holdings) =================== */}
         {isHolding && (
         <AccordionItem value="companies" className="border border-border rounded-lg px-4">
