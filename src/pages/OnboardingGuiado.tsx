@@ -149,7 +149,25 @@ export default function OnboardingGuiado() {
               onChange={(d) => updateStepData(4, d)}
             />
           )}
-          {currentStep >= 5 && currentStep <= 9 && shellStepData && (
+          {currentStep === 5 && (
+            <Step5Contratos
+              data={getStepData(5)}
+              onChange={(d) => updateStepData(5, d)}
+            />
+          )}
+          {currentStep === 6 && (
+            <Step6Planejamento
+              data={getStepData(6)}
+              onChange={(d) => updateStepData(6, d)}
+            />
+          )}
+          {currentStep === 7 && (
+            <Step7Rotinas
+              data={getStepData(7)}
+              onChange={(d) => updateStepData(7, d)}
+            />
+          )}
+          {currentStep >= 8 && currentStep <= 9 && shellStepData && (
             <StepShell {...shellStepData} />
           )}
         </div>
