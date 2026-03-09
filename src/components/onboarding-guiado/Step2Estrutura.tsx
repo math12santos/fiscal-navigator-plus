@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization, Organization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
