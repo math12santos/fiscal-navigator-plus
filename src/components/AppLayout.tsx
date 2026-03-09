@@ -28,6 +28,7 @@ import { ScopeIndicator } from "@/components/ScopeIndicator";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
