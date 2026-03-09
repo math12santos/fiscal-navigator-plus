@@ -3,14 +3,14 @@ import { KPICard } from "@/components/KPICard";
 import {
   DollarSign, TrendingUp, Wallet, PiggyBank, Building2, Plus,
   FileText, Users, AlertTriangle, Shield, Clock, Handshake,
+  BarChart3, PieChart as PieChartIcon, TrendingDown,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, BarChart, Bar, Legend,
+  PieChart, Pie, Cell, BarChart, Bar, Legend, LineChart, Line,
 } from "recharts";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { useGroupTotals } from "@/hooks/useGroupTotals";
@@ -26,7 +26,7 @@ const shortMonth = (d: Date) => format(d, "MMM", { locale: ptBR }).replace(".", 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload) return null;
   return (
-    <div className="glass-card p-3 text-xs space-y-1">
+    <div className="bg-card border border-border rounded-lg p-3 text-xs space-y-1 shadow-lg">
       <p className="font-medium text-foreground">{label}</p>
       {payload.map((p: any, i: number) => (
         <p key={i} style={{ color: p.color }}>
@@ -70,7 +70,6 @@ export default function Dashboard() {
     [isPerCompany, groupTotals]
   );
 
-  // Previous vs current month (memoized to avoid re-renders)
   const prevMonthStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
   const prevMonthEnd = useMemo(() => endOfMonth(subMonths(now, 1)), [now]);
   const curMonthStart = useMemo(() => startOfMonth(now), [now]);
@@ -121,6 +120,7 @@ export default function Dashboard() {
       month: shortMonth(new Date(key + "-01")),
       receita: v.receita,
       despesas: v.despesas,
+      resultado: v.receita - v.despesas,
       dp: v.dp,
     }));
   }, [entries]);
@@ -148,7 +148,7 @@ export default function Dashboard() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Dashboard Financeiro" description="Bem-vindo ao Colli FinCore" />
-        <div className="glass-card p-8 flex flex-col items-center gap-4 text-center">
+        <div className="bg-card border border-border rounded-xl p-8 flex flex-col items-center gap-4 text-center">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
             <Building2 className="h-7 w-7 text-primary" />
           </div>
@@ -172,152 +172,153 @@ export default function Dashboard() {
     return <Shield className="h-4 w-4 text-primary shrink-0" />;
   };
 
+  const runwayAlertLevel = runway <= 3 && runway !== Infinity ? "critical" : runway <= 6 && runway !== Infinity ? "warning" : "healthy";
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in">
+      {/* HEADER */}
       <PageHeader
         title="Dashboard Financeiro"
-        description={currentOrg ? `Visão consolidada — ${currentOrg.name}` : "Visão consolidada da saúde financeira"}
+        description={currentOrg ? `Visão consolidada — ${currentOrg.name}` : "Visão consolidada da empresa ou holding"}
       />
 
-      {/* KPIs Principais */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Receita Mensal"
-          value={formatCurrency(currentMonth.entradas)}
-          change={pctChange(currentMonth.entradas, previousMonth.entradas)}
-          subtitle="vs mês anterior"
-          icon={<DollarSign size={20} />}
-          groupShare={share(currentMonth.entradas, groupTotals?.entradas ?? 0)}
-        />
-        <KPICard
-          title="Despesas Mensais"
-          value={formatCurrency(currentMonth.saidas)}
-          change={pctChange(currentMonth.saidas, previousMonth.saidas)}
-          subtitle="vs mês anterior"
-          icon={<TrendingUp size={20} />}
-          groupShare={share(currentMonth.saidas, groupTotals?.saidas ?? 0)}
-        />
-        <KPICard
-          title="Resultado Mensal"
-          value={formatCurrency(currentMonth.lucro)}
-          change={pctChange(currentMonth.lucro, previousMonth.lucro)}
-          subtitle="vs mês anterior"
-          icon={<PiggyBank size={20} />}
-          groupShare={share(Math.abs(currentMonth.lucro), Math.abs(groupTotals?.saldo ?? 0))}
-        />
-        <KPICard
-          title="Saldo Período"
-          value={formatCurrency(cashflowTotals.saldo)}
-          change={0}
-          subtitle="últimos 6 meses"
-          icon={<Wallet size={20} />}
-          groupShare={share(cashflowTotals.saldo, groupTotals?.saldo ?? 0)}
-        />
-      </div>
-
-      {/* Cards de Contexto */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="glass-card p-5 animate-slide-up">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contratos Ativos</p>
-                {isPerCompany && groupTotals && groupTotals.contractsCount > 0 && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
-                    {((activeContractsCount / groupTotals.contractsCount) * 100).toFixed(1)}% do grupo
-                  </span>
-                )}
-              </div>
-              <p className="text-2xl font-bold text-foreground">{activeContractsCount}</p>
-              <p className="text-xs text-muted-foreground">{formatCurrency(monthlyContractValue)}/mês</p>
-              {isPerCompany && groupTotals && groupTotals.contractsCount > 0 && (
-                <div className="w-full bg-muted/50 rounded-full h-1 mt-1">
-                  <div className="bg-primary/60 h-1 rounded-full transition-all duration-500" style={{ width: `${Math.min((activeContractsCount / groupTotals.contractsCount) * 100, 100)}%` }} />
-                </div>
-              )}
-            </div>
-            <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
-              <FileText size={20} />
-            </div>
-          </div>
+      {/* SEÇÃO 1 — KPIs PRINCIPAIS (Linha 1) */}
+      <section className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPICard
+            title="Receita Mensal"
+            value={formatCurrency(currentMonth.entradas)}
+            change={pctChange(currentMonth.entradas, previousMonth.entradas)}
+            subtitle="vs mês anterior"
+            icon={<TrendingUp size={20} />}
+            groupShare={share(currentMonth.entradas, groupTotals?.entradas ?? 0)}
+          />
+          <KPICard
+            title="Despesas Mensais"
+            value={formatCurrency(currentMonth.saidas)}
+            change={pctChange(currentMonth.saidas, previousMonth.saidas)}
+            subtitle="vs mês anterior"
+            icon={<TrendingDown size={20} />}
+            groupShare={share(currentMonth.saidas, groupTotals?.saidas ?? 0)}
+          />
+          <KPICard
+            title="Resultado Mensal"
+            value={formatCurrency(currentMonth.lucro)}
+            change={pctChange(currentMonth.lucro, previousMonth.lucro)}
+            subtitle="vs mês anterior"
+            icon={<PiggyBank size={20} />}
+            groupShare={share(Math.abs(currentMonth.lucro), Math.abs(groupTotals?.saldo ?? 0))}
+          />
+          <KPICard
+            title="Saldo do Período"
+            value={formatCurrency(cashflowTotals.saldo)}
+            change={0}
+            subtitle="últimos 6 meses"
+            icon={<Wallet size={20} />}
+            groupShare={share(cashflowTotals.saldo, groupTotals?.saldo ?? 0)}
+          />
         </div>
 
-        <div className="glass-card p-5 animate-slide-up">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Custo Folha</p>
-                {isPerCompany && groupTotals && groupTotals.payrollTotal > 0 && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
-                    {((avgMonthlyPayroll / groupTotals.payrollTotal) * 100).toFixed(1)}% do grupo
-                  </span>
-                )}
-              </div>
-              <p className="text-2xl font-bold text-foreground">{formatCurrency(avgMonthlyPayroll)}</p>
-              <p className="text-xs text-muted-foreground">mensal estimado</p>
-              {isPerCompany && groupTotals && groupTotals.payrollTotal > 0 && (
-                <div className="w-full bg-muted/50 rounded-full h-1 mt-1">
-                  <div className="bg-primary/60 h-1 rounded-full transition-all duration-500" style={{ width: `${Math.min((avgMonthlyPayroll / groupTotals.payrollTotal) * 100, 100)}%` }} />
-                </div>
-              )}
-            </div>
-            <div className="rounded-lg bg-accent/10 p-2.5 text-accent-foreground">
-              <Users size={20} />
-            </div>
-          </div>
+        {/* KPIs PRINCIPAIS (Linha 2) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPICard
+            title="Contratos Ativos"
+            value={String(activeContractsCount)}
+            subtitle={`${formatCurrency(monthlyContractValue)}/mês`}
+            icon={<FileText size={20} />}
+            groupShare={isPerCompany && groupTotals ? (activeContractsCount / groupTotals.contractsCount) * 100 : undefined}
+          />
+          <KPICard
+            title="Custo de Folha"
+            value={formatCurrency(avgMonthlyPayroll)}
+            subtitle="mensal estimado"
+            icon={<Users size={20} />}
+            groupShare={isPerCompany && groupTotals && groupTotals.payrollTotal > 0 ? (avgMonthlyPayroll / groupTotals.payrollTotal) * 100 : undefined}
+          />
+          <KPICard
+            title="Passivos"
+            value={formatCurrency(liabilityTotals.total)}
+            subtitle={contingenciasProvaveis > 0 ? `${formatCurrency(contingenciasProvaveis)} prováveis` : "Sem contingências"}
+            icon={<Shield size={20} />}
+            groupShare={isPerCompany && groupTotals && groupTotals.liabilitiesTotal > 0 ? (liabilityTotals.total / groupTotals.liabilitiesTotal) * 100 : undefined}
+          />
+          <KPICard
+            title="Runway"
+            value={runway === Infinity ? "∞" : `${runway} meses`}
+            subtitle={`burn: ${formatCurrency(monthlyBurn)}/mês`}
+            icon={<AlertTriangle size={20} />}
+          />
         </div>
+      </section>
 
-        <div className="glass-card p-5 animate-slide-up">
+      {/* SEÇÃO 2 — INDICADORES CRÍTICOS */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Passivos Highlight */}
+        <div className={`rounded-xl border p-5 transition-all ${
+          liabilityTotals.total > 0
+            ? "bg-[hsl(30,100%,97%)] border-[hsl(30,80%,88%)] dark:bg-warning/5 dark:border-warning/20"
+            : "bg-card border-border"
+        }`}>
           <div className="flex items-start justify-between">
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Passivos</p>
-                {isPerCompany && groupTotals && groupTotals.liabilitiesTotal > 0 && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
-                    {((liabilityTotals.total / groupTotals.liabilitiesTotal) * 100).toFixed(1)}% do grupo
-                  </span>
-                )}
+                <div className="h-8 w-8 rounded-lg bg-warning/15 flex items-center justify-center">
+                  <Shield size={16} className="text-warning" />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Passivos & Contingências</p>
               </div>
               <p className="text-2xl font-bold text-foreground">{formatCurrency(liabilityTotals.total)}</p>
               <p className="text-xs text-muted-foreground">
-                {contingenciasProvaveis > 0 ? `${formatCurrency(contingenciasProvaveis)} prováveis` : "Sem contingências"}
+                {contingenciasProvaveis > 0
+                  ? `${formatCurrency(contingenciasProvaveis)} em contingências prováveis`
+                  : "Nenhuma contingência provável registrada"}
               </p>
-              {isPerCompany && groupTotals && groupTotals.liabilitiesTotal > 0 && (
-                <div className="w-full bg-muted/50 rounded-full h-1 mt-1">
-                  <div className="bg-primary/60 h-1 rounded-full transition-all duration-500" style={{ width: `${Math.min((liabilityTotals.total / groupTotals.liabilitiesTotal) * 100, 100)}%` }} />
-                </div>
-              )}
-            </div>
-            <div className="rounded-lg bg-destructive/10 p-2.5 text-destructive">
-              <Shield size={20} />
             </div>
           </div>
         </div>
 
-        <div className="glass-card p-5 animate-slide-up">
+        {/* Runway Highlight */}
+        <div className={`rounded-xl border p-5 transition-all ${
+          runwayAlertLevel === "critical"
+            ? "bg-destructive/5 border-destructive/20"
+            : runwayAlertLevel === "warning"
+            ? "bg-[hsl(30,100%,97%)] border-[hsl(30,80%,88%)] dark:bg-warning/5 dark:border-warning/20"
+            : "bg-[hsl(174,60%,97%)] border-[hsl(174,50%,88%)] dark:bg-primary/5 dark:border-primary/20"
+        }`}>
           <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Runway</p>
-              <p className={`text-2xl font-bold ${runway <= 3 && runway !== Infinity ? "text-destructive" : "text-success"}`}>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
+                  runwayAlertLevel === "critical" ? "bg-destructive/15" : runwayAlertLevel === "warning" ? "bg-warning/15" : "bg-primary/15"
+                }`}>
+                  <AlertTriangle size={16} className={
+                    runwayAlertLevel === "critical" ? "text-destructive" : runwayAlertLevel === "warning" ? "text-warning" : "text-primary"
+                  } />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runway Estimado</p>
+              </div>
+              <p className={`text-2xl font-bold ${
+                runwayAlertLevel === "critical" ? "text-destructive" : runwayAlertLevel === "warning" ? "text-warning" : "text-foreground"
+              }`}>
                 {runway === Infinity ? "∞" : `${runway} meses`}
               </p>
               <p className="text-xs text-muted-foreground">
-                burn: {formatCurrency(monthlyBurn)}/mês
+                Burn rate: {formatCurrency(monthlyBurn)}/mês · Saldo: {formatCurrency(cashflowTotals.saldo)}
               </p>
-            </div>
-            <div className={`rounded-lg p-2.5 ${runway <= 3 && runway !== Infinity ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>
-              <AlertTriangle size={20} />
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* CRM Pipeline Card */}
+      {/* CRM Pipeline (condicional) */}
       {crmWeightedValue > 0 && (
-        <div className="glass-card p-5 animate-slide-up cursor-pointer hover:border-primary/30 transition-colors" onClick={() => navigate("/crm")}>
+        <div
+          className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:border-primary/30 transition-colors"
+          onClick={() => navigate("/crm")}
+        >
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pipeline CRM</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pipeline CRM</p>
               <p className="text-2xl font-bold text-foreground">{formatCurrency(crmWeightedValue)}</p>
               <p className="text-xs text-muted-foreground">receita ponderada em pipeline</p>
             </div>
@@ -330,7 +331,7 @@ export default function Dashboard() {
 
       {/* Alertas Inteligentes */}
       {alerts.length > 0 && (
-        <div className="glass-card p-5 space-y-3">
+        <section className="bg-card border border-border rounded-xl p-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">Alertas</h3>
           <div className="space-y-2">
             {alerts.map((alert, i) => (
@@ -352,49 +353,58 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {noData && (
-        <div className="glass-card p-6 text-center text-muted-foreground text-sm">
+        <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground text-sm">
           Nenhum lançamento encontrado. Cadastre contratos ou lançamentos no Fluxo de Caixa para ver dados aqui.
         </div>
       )}
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Revenue vs Expenses */}
-        <div className="lg:col-span-2 glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Receita vs Despesas</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+      {/* SEÇÃO 3 — ANÁLISE FINANCEIRA (2 colunas: 70/30) */}
+      <section className="grid grid-cols-1 lg:grid-cols-10 gap-4">
+        {/* Receita vs Despesas — Coluna principal (70%) */}
+        <div className="lg:col-span-7 bg-card border border-border rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-5">
+            <BarChart3 size={16} className="text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">Receita vs Despesas</h3>
+            <span className="text-xs text-muted-foreground ml-auto">Últimos 6 meses</span>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={monthlyData} barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                 tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)}
+                axisLine={false}
+                tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="receita" name="Receita" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="despesas" name="Despesas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="receita" name="Receita" fill="hsl(var(--success))" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="despesas" name="Despesas" fill="hsl(var(--destructive))" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Expense Breakdown */}
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Despesas por Categoria</h3>
+        {/* Despesas por Categoria — Coluna lateral (30%) */}
+        <div className="lg:col-span-3 bg-card border border-border rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-5">
+            <PieChartIcon size={16} className="text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">Despesas por Categoria</h3>
+          </div>
           {expenseByCategory.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={220}>
+              <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
                     data={expenseByCategory}
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
+                    innerRadius={50}
+                    outerRadius={80}
                     paddingAngle={3}
                     dataKey="value"
                   >
@@ -405,14 +415,14 @@ export default function Dashboard() {
                   <Tooltip formatter={(v: number) => formatCurrency(v)} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="space-y-2 mt-2">
+              <div className="space-y-2 mt-3">
                 {expenseByCategory.map((cat) => (
                   <div key={cat.name} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: cat.fill }} />
-                      <span className="text-muted-foreground">{cat.name}</span>
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.fill }} />
+                      <span className="text-muted-foreground truncate">{cat.name}</span>
                     </div>
-                    <span className="font-medium text-foreground">{formatCurrency(cat.value)}</span>
+                    <span className="font-medium text-foreground ml-2">{formatCurrency(cat.value)}</span>
                   </div>
                 ))}
               </div>
@@ -423,24 +433,30 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-      </div>
+      </section>
 
-      {/* Revenue Trend */}
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Evolução da Receita</h3>
-        <ResponsiveContainer width="100%" height={220}>
+      {/* SEÇÃO 4 — EVOLUÇÃO */}
+      <section className="bg-card border border-border rounded-xl p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <TrendingUp size={16} className="text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-foreground">Evolução da Receita</h3>
+          <span className="text-xs text-muted-foreground ml-auto">Tendência nos últimos 6 meses</span>
+        </div>
+        <ResponsiveContainer width="100%" height={240}>
           <AreaChart data={monthlyData}>
             <defs>
               <linearGradient id="receitaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3} />
+                <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.25} />
                 <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} axisLine={false} tickLine={false} />
             <YAxis
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
               tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)}
+              axisLine={false}
+              tickLine={false}
             />
             <Tooltip content={<CustomTooltip />} />
             <Area
@@ -449,11 +465,11 @@ export default function Dashboard() {
               name="Receita"
               stroke="hsl(var(--success))"
               fill="url(#receitaGradient)"
-              strokeWidth={2}
+              strokeWidth={2.5}
             />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
+      </section>
     </div>
   );
 }
