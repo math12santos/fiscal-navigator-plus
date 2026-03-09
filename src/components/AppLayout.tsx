@@ -104,7 +104,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
         {/* Footer */}
         {!collapsed && (
-          <div className="border-t border-border/50 p-4 space-y-3">
+          <div className="border-t border-sidebar-border p-4 space-y-3">
             {isMaster && (
               <button
                 onClick={() => navigate("/backoffice")}
