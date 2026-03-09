@@ -106,33 +106,42 @@ export function Step1Diagnostico({ data, onChange }: Props) {
         <p className="text-muted-foreground mt-1">Avalie o nível de maturidade financeira da sua empresa</p>
       </div>
 
-      {sections.map((section: any) => {
-        const Icon = ICON_MAP[section.icon] || FileText;
-        return (
-          <Card key={section.key}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Icon size={18} className="text-primary" /> {section.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {section.questions.map((q: any) => (
-                <div key={q.key} className="space-y-2">
-                  <Label>{q.label}</Label>
-                  <RadioGroup value={answers[q.key] || ""} onValueChange={(v) => set(q.key, v)}>
-                    {q.options.map((opt: any, oIdx: number) => (
-                      <div key={oIdx} className="flex items-center gap-2">
-                        <RadioGroupItem value={opt.value} id={`${q.key}-${opt.value}`} />
-                        <Label htmlFor={`${q.key}-${opt.value}`}>{opt.label}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
+      <Accordion type="single" collapsible defaultValue={sections[0]?.key} className="space-y-3">
+        {sections.map((section: any) => {
+          const Icon = ICON_MAP[section.icon] || FileText;
+          const answeredCount = section.questions.filter((q: any) => answers[q.key]).length;
+          return (
+            <AccordionItem key={section.key} value={section.key} className="border rounded-lg px-4">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Icon size={18} className="text-primary" />
+                  <span className="font-medium">{section.label}</span>
+                  <Badge variant={answeredCount === section.questions.length ? "default" : "secondary"}>
+                    {answeredCount}/{section.questions.length}
+                  </Badge>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        );
-      })}
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 py-1">
+                  {section.questions.map((q: any) => (
+                    <div key={q.key} className="space-y-2">
+                      <Label>{q.label}</Label>
+                      <RadioGroup value={answers[q.key] || ""} onValueChange={(v) => set(q.key, v)}>
+                        {q.options.map((opt: any, oIdx: number) => (
+                          <div key={oIdx} className="flex items-center gap-2">
+                            <RadioGroupItem value={opt.value} id={`${q.key}-${opt.value}`} />
+                            <Label htmlFor={`${q.key}-${opt.value}`}>{opt.label}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
 
       {Object.keys(answers).length >= 3 && (
         <Card className="border-primary/30 bg-primary/5">
