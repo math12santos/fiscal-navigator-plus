@@ -1,165 +1,60 @@
-# Plano: Módulo de Gestão de Tarefas por Solicitações
 
-## Visão Geral
 
-Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
+# Diagnóstico de Integração do Onboarding Guiado
 
----
+## Situacao Atual
 
-## 1. Estrutura de Dados (Migrações)
+Existem **dois fluxos de onboarding separados** que nao estao conectados entre si:
 
-### Tabela `requests` (Solicitações)
+1. **Onboarding Obrigatório** (`/onboarding`): Senha → Criar Empresa → Selecionar Módulos → marca `onboarding_completed = true` → redireciona para `/`
+2. **Onboarding Guiado** (`/onboarding-guiado`): 10 etapas de implantação financeira → ao concluir, apenas faz `navigate("/")` sem marcar nada
 
-```text
-id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
-area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
-due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
-created_at, updated_at
-```
+## Lacunas Identificadas
 
-### Tabela `request_tasks` (Tarefas geradas)
+### 1. Rota desprotegida
+`/onboarding-guiado` nao tem guard de autenticação. Qualquer visitante pode acessar a URL diretamente.
 
-```text
-id, request_id (FK), organization_id, assigned_to, status, due_date,
-created_by, executed_by, approved_by, created_at, updated_at
-```
+### 2. Nenhum ponto de entrada no app
+Nao existe link, botao ou redirecionamento que leve o usuario ao `/onboarding-guiado`. O fluxo obrigatório termina em `OnboardingModules` e vai direto para `/`. O sidebar (`AppLayout`) tambem nao tem link.
 
-### Tabela `request_comments` (Comentarios/Historico)
+### 3. Conclusão do Onboarding Guiado nao persiste estado final
+`handleFinish` apenas navega para `/` com um toast. Nao:
+- Marca `onboarding_completed = true` na org (caso se torne o fluxo principal)
+- Nem marca `status = "concluido"` no `onboarding_progress`
 
-```text
-id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
-old_value, new_value, created_at
-```
-
-### Tabela `request_attachments`
-
-```text
-id, request_id (FK), user_id, file_name, file_path, created_at
-```
-
-### Tabela `notifications`
-
-```text
-id, organization_id, user_id (destinatario), title, body, type, priority,
-reference_type (request/task), reference_id, read, read_at, created_at
-```
-
-RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
-
-Habilitar realtime em `notifications` para push instantâneo.
+### 4. Relação entre os dois fluxos indefinida
+Nao esta claro se o Guiado substitui o Obrigatório ou se e complementar (pos-onboarding).
 
 ---
 
-## 2. Componentes e Páginas
+## Proposta de Integração
 
-### Página `Tarefas.tsx` (reescrita completa)
+### Decisao de arquitetura: Guiado como etapa pos-onboarding obrigatório
 
-Três abas controladas por permissões (`getAllowedTabs`):
+O fluxo obrigatório (senha + empresa + módulos) continua existindo. Apos ele, o usuario e direcionado ao Onboarding Guiado como etapa de implantação.
 
+### Mudanças
 
-| Aba            | Key              | Conteúdo                                                                                  |
-| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
-| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
-| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
+**1. Proteger a rota `/onboarding-guiado`**
+Em `App.tsx`, envolver a rota com verificação de auth (como `OnboardingRoute` faz).
 
+**2. Adicionar ponto de entrada**
+- No `Dashboard`, exibir um banner/card quando `onboarding_progress.status !== "concluido"` convidando a continuar o onboarding guiado
+- No sidebar (`AppLayout`), adicionar item contextual "Onboarding" quando o status nao for concluido
 
-### Dialog `RequestFormDialog.tsx`
+**3. Redirecionar apos OnboardingModules**
+Apos selecionar módulos (fim do onboarding obrigatório), redirecionar para `/onboarding-guiado` em vez de `/`.
 
-Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
+**4. Finalização do Guiado**
+No `handleFinish` de `OnboardingGuiado.tsx`:
+- Chamar `finishOnboarding()` do hook (já existe, marca `status: "concluido"`)
+- Garantir que `onboarding_completed = true` ja foi marcado (pelo fluxo obrigatório)
 
-### Componente `RequestDetail.tsx`
+### Arquivos afetados
 
-Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
+- `src/App.tsx` — proteger rota `/onboarding-guiado`
+- `src/pages/OnboardingModules.tsx` — redirecionar para `/onboarding-guiado` apos concluir
+- `src/pages/OnboardingGuiado.tsx` — chamar `finishOnboarding()` no `handleFinish`
+- `src/pages/Dashboard.tsx` — banner de continuidade do onboarding guiado
+- `src/components/AppLayout.tsx` — item "Onboarding" condicional no sidebar
 
-### Central de Notificações `NotificationCenter.tsx`
-
-Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
-
----
-
-## 3. Hooks
-
-- `useRequests.ts` — CRUD de solicitações com filtros
-- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
-- `useRequestComments.ts` — Comentários e histórico
-- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
-
----
-
-## 4. Integração com Outros Módulos
-
-Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
-
-- Financeiro → "Aprovação de pagamento"
-- Contratos → "Revisão jurídica"
-- DP → "Solicitação de contratação"
-
-Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
-
----
-
-## 5. Atualização de Definições
-
-- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
-- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
-- `AppLayout.tsx`: Adicionar ícone de notificações no header
-
----
-
-## 6. Fluxo Operacional
-
-```text
-Usuário cria solicitação
-  → Sistema gera task vinculada
-  → Responsável recebe notificação (realtime)
-  → Responsável executa (muda status)
-  → Sistema registra histórico
-  → Se necessário → status "Aguardando Aprovação"
-  → Aprovador recebe notificação
-  → Solicitação concluída/rejeitada
-```
-
----
-
-## Ordem de Implementação
-
-1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
-2. Habilitar realtime em `notifications`
-3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
-4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
-5. Criar `RequestFormDialog` e `RequestDetail`
-6. Criar `NotificationCenter` e integrar no `AppLayout`
-7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
-
----
-
-# Onboarding Guiado — Implementação (Fase 1 ✅)
-
-## Status: Implementado
-
-### Tabelas criadas
-- `onboarding_progress` — progresso por organização com JSONB por etapa
-- `onboarding_recommendations` — recomendações automáticas
-
-### RLS
-- Org members: SELECT, INSERT (com user_id check), UPDATE
-- Masters: ALL
-
-### Componentes implementados
-- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
-- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
-- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
-- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
-- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
-- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
-- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
-
-### Rotas
-- `/onboarding-guiado` — Wizard no app
-- `/backoffice/onboarding` — Gestão no backoffice
-
-### Fase 2 (pendente)
-- Integração profunda das etapas 2-8 com módulos existentes
-- Sistema de recomendações automáticas (Etapa 9)
-- Score no dashboard principal
