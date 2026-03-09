@@ -41,6 +41,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function Dashboard() {
   const { currentOrg, organizations } = useOrganization();
+  const { isHolding } = useHolding();
   const navigate = useNavigate();
   const { progress: onboardingProgress, loading: onboardingLoading } = useOnboardingProgress();
 
