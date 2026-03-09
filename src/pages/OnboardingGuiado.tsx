@@ -42,7 +42,7 @@ export default function OnboardingGuiado() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { currentOrg } = useOrganization();
-  const { progress, loading, initProgress, updateStepData, completeStep, goToStep, saveProgress } =
+  const { progress, loading, initProgress, updateStepData, completeStep, goToStep, saveProgress, finishOnboarding } =
     useOnboardingProgress();
   const { getStepConfig, isLoading: configLoading } = useOnboardingConfig();
 
