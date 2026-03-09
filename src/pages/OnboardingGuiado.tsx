@@ -7,6 +7,7 @@ import { useOnboardingConfig } from "@/hooks/useOnboardingConfig";
 import { OnboardingProgressBar } from "@/components/onboarding-guiado/OnboardingProgressBar";
 import { Step1Diagnostico } from "@/components/onboarding-guiado/Step1Diagnostico";
 import { Step2Estrutura } from "@/components/onboarding-guiado/Step2Estrutura";
+import { Step3Integracoes } from "@/components/onboarding-guiado/Step3Integracoes";
 import { Step10Score } from "@/components/onboarding-guiado/Step10Score";
 import { StepShell } from "@/components/onboarding-guiado/StepShell";
 import { Button } from "@/components/ui/button";
@@ -132,7 +133,13 @@ export default function OnboardingGuiado() {
               onChange={(d) => updateStepData(2, d)}
             />
           )}
-          {currentStep >= 3 && currentStep <= 9 && shellStepData && (
+          {currentStep === 3 && (
+            <Step3Integracoes
+              data={getStepData(3)}
+              onChange={(d) => updateStepData(3, d)}
+            />
+          )}
+          {currentStep >= 4 && currentStep <= 9 && shellStepData && (
             <StepShell {...shellStepData} />
           )}
         </div>

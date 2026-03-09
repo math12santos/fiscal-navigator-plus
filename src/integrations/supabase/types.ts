@@ -1379,6 +1379,94 @@ export type Database = {
           },
         ]
       }
+      data_import_rows: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          import_id: string
+          mapped_data: Json | null
+          raw_data: Json
+          row_index: number
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          import_id: string
+          mapped_data?: Json | null
+          raw_data?: Json
+          row_index: number
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          import_id?: string
+          mapped_data?: Json | null
+          raw_data?: Json
+          row_index?: number
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_import_rows_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_imports: {
+        Row: {
+          column_mapping: Json
+          created_at: string | null
+          file_name: string
+          id: string
+          imported_at: string | null
+          organization_id: string
+          row_count: number | null
+          source_type: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          column_mapping?: Json
+          created_at?: string | null
+          file_name: string
+          id?: string
+          imported_at?: string | null
+          organization_id: string
+          row_count?: number | null
+          source_type?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          column_mapping?: Json
+          created_at?: string | null
+          file_name?: string
+          id?: string
+          imported_at?: string | null
+          organization_id?: string
+          row_count?: number | null
+          source_type?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_imports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dp_benefits: {
         Row: {
           active: boolean
