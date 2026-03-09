@@ -3,7 +3,7 @@ import { KPICard } from "@/components/KPICard";
 import {
   DollarSign, TrendingUp, Wallet, PiggyBank, Building2, Plus,
   FileText, Users, AlertTriangle, Shield, Clock, Handshake,
-  BarChart3, PieChart as PieChartIcon, TrendingDown,
+  BarChart3, PieChart as PieChartIcon, TrendingDown, Rocket,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { useGroupTotals } from "@/hooks/useGroupTotals";
+import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useMemo, useCallback } from "react";
 import { startOfMonth, subMonths, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
