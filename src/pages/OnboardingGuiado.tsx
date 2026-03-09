@@ -133,7 +133,13 @@ export default function OnboardingGuiado() {
               onChange={(d) => updateStepData(2, d)}
             />
           )}
-          {currentStep >= 3 && currentStep <= 9 && shellStepData && (
+          {currentStep === 3 && (
+            <Step3Integracoes
+              data={getStepData(3)}
+              onChange={(d) => updateStepData(3, d)}
+            />
+          )}
+          {currentStep >= 4 && currentStep <= 9 && shellStepData && (
             <StepShell {...shellStepData} />
           )}
         </div>
