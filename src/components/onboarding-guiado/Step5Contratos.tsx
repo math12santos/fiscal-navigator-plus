@@ -114,7 +114,7 @@ export function Step5Contratos({ data, onChange }: Props) {
           </div>
         </div>
 
-        <Accordion type="multiple" defaultValue={["contracts"]} className="space-y-2">
+        <Accordion type="single" collapsible defaultValue="contracts" className="space-y-2">
           <AccordionItem value="contracts" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-2">
