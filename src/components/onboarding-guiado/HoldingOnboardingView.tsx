@@ -18,9 +18,11 @@ interface SubOnboardingStatus {
 export function HoldingOnboardingView() {
   const navigate = useNavigate();
   const { subsidiaryOrgs, isLoading: holdingLoading } = useHolding();
-  const { setCurrentOrg } = useOrganization();
+  const { currentOrg, setCurrentOrg } = useOrganization();
+  const qc = useQueryClient();
   const [statuses, setStatuses] = useState<SubOnboardingStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   useEffect(() => {
     if (holdingLoading || subsidiaryOrgs.length === 0) {
