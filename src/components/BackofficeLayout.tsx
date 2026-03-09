@@ -11,6 +11,7 @@ import {
   ChevronRight,
   LogOut,
   LayoutDashboard,
+  Rocket,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
