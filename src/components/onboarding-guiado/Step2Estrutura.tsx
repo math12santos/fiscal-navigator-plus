@@ -41,6 +41,7 @@ import {
   Crown,
   Info,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Step2EstruturaProps {
   data: Record<string, any>;

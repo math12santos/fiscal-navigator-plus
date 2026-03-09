@@ -15,6 +15,7 @@ import {
 import {
   Upload, FileSpreadsheet, Building2, Plug, CheckCircle2, Loader2, X, Eye,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Step3Props {
   data: Record<string, any>;

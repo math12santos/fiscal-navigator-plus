@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import {
   Target, ClipboardList, TrendingUp, Shield, Plus, Sparkles, Loader2,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Props {
   data: Record<string, any>;

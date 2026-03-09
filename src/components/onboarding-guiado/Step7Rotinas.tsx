@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarCheck, Clock, CalendarDays, Calendar } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Props {
   data: Record<string, any>;

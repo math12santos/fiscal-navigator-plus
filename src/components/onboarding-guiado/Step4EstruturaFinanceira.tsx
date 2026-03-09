@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   BookOpen, FolderTree, Plus, Sparkles, Loader2, ChevronRight,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {

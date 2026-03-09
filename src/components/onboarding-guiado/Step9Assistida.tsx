@@ -10,6 +10,7 @@ import { ptBR } from "date-fns/locale";
 import {
   CalendarIcon, Lightbulb, Bell, BarChart3, FileCheck, ClipboardList, CheckCircle2, PlayCircle,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Props {
   data: Record<string, any>;

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   CheckCircle2, Circle, LayoutDashboard, BarChart3, Wallet, Target, Users, Rocket,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Props {
   data: Record<string, any>;
