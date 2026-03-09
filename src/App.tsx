@@ -203,9 +203,7 @@ const App = () => (
               <Routes>
                 <Route path="/auth" element={<AuthRoute />} />
                 <Route path="/onboarding" element={<OnboardingRoute />} />
-                <Route path="/onboarding-guiado" element={
-                  <Suspense fallback={<LoadingFallback />}><OnboardingGuiado /></Suspense>
-                } />
+                <Route path="/onboarding-guiado" element={<GuidedOnboardingRoute />} />
                 <Route path="/backoffice/*" element={<BackofficeRoutes />} />
                 <Route path="/*" element={<ProtectedRoutes />} />
               </Routes>
