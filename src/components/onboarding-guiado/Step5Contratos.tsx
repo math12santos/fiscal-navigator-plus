@@ -104,15 +104,12 @@ export function Step5Contratos({ data, onChange }: Props) {
   return (
     <Card>
       <CardContent className="pt-6 space-y-2">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="rounded-lg bg-primary/10 p-2">
-            <FileText className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Cadastro de Contratos</h2>
-            <p className="text-sm text-muted-foreground">Registre contratos que impactam o fluxo de caixa</p>
-          </div>
-        </div>
+        <StepHeader
+          stepNumber={5}
+          fallbackTitle="Cadastro de Contratos"
+          fallbackDescription="Registre contratos que impactam o fluxo de caixa"
+          fallbackIcon={FileText}
+        />
 
         <Accordion type="multiple" defaultValue={["contracts"]} className="space-y-2">
           <AccordionItem value="contracts" className="border rounded-lg px-4">
