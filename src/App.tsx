@@ -34,6 +34,8 @@ const BackofficeUsers = lazy(() => import("@/pages/BackofficeUsers"));
 const BackofficeAudit = lazy(() => import("@/pages/BackofficeAudit"));
 const BackofficeConfig = lazy(() => import("@/pages/BackofficeConfig"));
 const BackofficeSystem = lazy(() => import("@/pages/BackofficeSystem"));
+const BackofficeOnboarding = lazy(() => import("@/pages/BackofficeOnboarding"));
+const OnboardingGuiado = lazy(() => import("@/pages/OnboardingGuiado"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const ModuleMaintenanceGuard = lazy(() => import("@/components/ModuleMaintenanceGuard"));
