@@ -45,14 +45,14 @@ export default function OnboardingGuiado() {
   const { user } = useAuth();
   const { currentOrg } = useOrganization();
   const { isHolding, isLoading: holdingLoading } = useHolding();
+  const { progress, loading, initProgress, updateStepData, completeStep, goToStep, saveProgress, finishOnboarding } =
+    useOnboardingProgress();
+  const { getStepConfig, isLoading: configLoading } = useOnboardingConfig();
 
   // If current org is a holding, show subsidiary selection view
   if (isHolding) {
     return <HoldingOnboardingView />;
   }
-  const { progress, loading, initProgress, updateStepData, completeStep, goToStep, saveProgress, finishOnboarding } =
-    useOnboardingProgress();
-  const { getStepConfig, isLoading: configLoading } = useOnboardingConfig();
 
   useEffect(() => {
     if (!loading && !progress && user && currentOrg) {
