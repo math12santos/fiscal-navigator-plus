@@ -366,10 +366,9 @@ export default function Dashboard() {
       <section className="grid grid-cols-1 lg:grid-cols-10 gap-4">
         {/* Receita vs Despesas — Coluna principal (70%) */}
         <div className="lg:col-span-7 bg-card border border-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <BarChart3 size={16} className="text-muted-foreground" />
+          <div className="mb-5">
             <h3 className="text-sm font-semibold text-foreground">Receita vs Despesas</h3>
-            <span className="text-xs text-muted-foreground ml-auto">Últimos 6 meses</span>
+            <p className="text-xs text-muted-foreground mt-0.5">Acompanhamento financeiro dos últimos 6 meses</p>
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={monthlyData}>
