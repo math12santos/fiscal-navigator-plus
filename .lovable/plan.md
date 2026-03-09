@@ -1,165 +1,84 @@
-# Plano: Módulo de Gestão de Tarefas por Solicitações
+# Etapas 5, 6 e 7 do Onboarding Guiado
 
-## Visão Geral
+## Objetivo
 
-Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
-
----
-
-## 1. Estrutura de Dados (Migrações)
-
-### Tabela `requests` (Solicitações)
-
-```text
-id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
-area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
-due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
-created_at, updated_at
-```
-
-### Tabela `request_tasks` (Tarefas geradas)
-
-```text
-id, request_id (FK), organization_id, assigned_to, status, due_date,
-created_by, executed_by, approved_by, created_at, updated_at
-```
-
-### Tabela `request_comments` (Comentarios/Historico)
-
-```text
-id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
-old_value, new_value, created_at
-```
-
-### Tabela `request_attachments`
-
-```text
-id, request_id (FK), user_id, file_name, file_path, created_at
-```
-
-### Tabela `notifications`
-
-```text
-id, organization_id, user_id (destinatario), title, body, type, priority,
-reference_type (request/task), reference_id, read, read_at, created_at
-```
-
-RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
-
-Habilitar realtime em `notifications` para push instantâneo.
+Substituir os placeholders `StepShell` das etapas 5, 6 e 7 por componentes funcionais que usam hooks existentes. Sem mudanças no banco de dados.
 
 ---
 
-## 2. Componentes e Páginas
+## Etapa 5 — Cadastro de Contratos
 
-### Página `Tarefas.tsx` (reescrita completa)
+**Componente**: `src/components/onboarding-guiado/Step5Contratos.tsx`
 
-Três abas controladas por permissões (`getAllowedTabs`):
+Usa `useContracts()` existente.
 
-
-| Aba            | Key              | Conteúdo                                                                                  |
-| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
-| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
-| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
-
-
-### Dialog `RequestFormDialog.tsx`
-
-Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
-
-### Componente `RequestDetail.tsx`
-
-Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
-
-### Central de Notificações `NotificationCenter.tsx`
-
-Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
+- Lista contratos cadastrados (nome, tipo, valor, status) em tabela simples
+- Badge com contagem total
+- Formulário inline simplificado para criar contrato rápido:
+  - Nome, Tipo (receita/despesa/investimento), Valor, Recorrência, Data início
+- Botão para abrir o formulário completo (`ContractFormDialog` existente) para contratos mais detalhados
+- Sincroniza `contracts_data` no progress: `{ contracts_count: N, total_valor: X }`
 
 ---
 
-## 3. Hooks
+## Etapa 6 — Planejamento Financeiro
 
-- `useRequests.ts` — CRUD de solicitações com filtros
-- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
-- `useRequestComments.ts` — Comentários e histórico
-- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
+**Componente**: `src/components/onboarding-guiado/Step6Planejamento.tsx`
 
----
+Usa `useBudget()` e `usePlanningScenarios()` existentes.
 
-## 4. Integração com Outros Módulos
+### Seção 1: Orçamento
 
-Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
+- Lista versões de orçamento existentes
+- Botão para criar versão rápida (nome, período, status draft)
+- Badge com contagem
 
-- Financeiro → "Aprovação de pagamento"
-- Contratos → "Revisão jurídica"
-- DP → "Solicitação de contratação"
+### Seção 2: Cenários
 
-Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
+- Lista cenários existentes (nome, tipo: base/conservador/otimista)
+- Botão para criar cenário rápido com defaults (nome, tipo, variações)
+- Badge com contagem
 
----
+### Seção 3: Configurações de Liquidez
 
-## 5. Atualização de Definições
+- Usa `usePlanningConfig()` existente
+- Campos: saldo mínimo, colchão de liquidez, alerta de runway (meses)
+- Salva via upsert
 
-- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
-- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
-- `AppLayout.tsx`: Adicionar ícone de notificações no header
-
----
-
-## 6. Fluxo Operacional
-
-```text
-Usuário cria solicitação
-  → Sistema gera task vinculada
-  → Responsável recebe notificação (realtime)
-  → Responsável executa (muda status)
-  → Sistema registra histórico
-  → Se necessário → status "Aguardando Aprovação"
-  → Aprovador recebe notificação
-  → Solicitação concluída/rejeitada
-```
+Sincroniza `planning_data`: `{ budget_versions_count: N, scenarios_count: N, config_set: true/false }`
 
 ---
 
-## Ordem de Implementação
+## Etapa 7 — Rotinas Financeiras
 
-1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
-2. Habilitar realtime em `notifications`
-3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
-4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
-5. Criar `RequestFormDialog` e `RequestDetail`
-6. Criar `NotificationCenter` e integrar no `AppLayout`
-7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
+**Componente**: `src/components/onboarding-guiado/Step7Rotinas.tsx`
+
+Etapa de configuração de rotinas sugeridas. Sem tabela nova — salva checklist no JSONB `routines_data` do `onboarding_progress`.
+
+- 3 seções (Accordion): Diárias, Semanais, Mensais
+- Cada seção tem checklist de rotinas sugeridas com checkbox
+- O usuário marca quais rotinas pretende adotar
+- Agenda de rotina integrada ao Google Calendar
+- Dados salvos: `{ daily: ["conciliacao", "saldo"], weekly: ["fluxo_caixa"], monthly: ["dre", "fechamento"] }`
+
+Rotinas sugeridas pré-definidas:
+
+- **Diárias**: Conciliação bancária, Atualização de saldo, Conferência de recebimentos, Aprovação de pagamentos
+- **Semanais**: Revisão de fluxo de caixa, Análise de inadimplência, Pré Aprovação de pagamentos
+- **Mensais**: Fechamento financeiro, DRE gerencial, Revisão de contratos, Análise de desvio orçamentário, Reunião Alinhamento
+- Trimestrais: Reunião de alinhamento
 
 ---
 
-# Onboarding Guiado — Implementação (Fase 1 ✅)
+## Integração no Wizard
 
-## Status: Implementado
+`**src/pages/OnboardingGuiado.tsx**`:
 
-### Tabelas criadas
-- `onboarding_progress` — progresso por organização com JSONB por etapa
-- `onboarding_recommendations` — recomendações automáticas
+- Importar Step5, Step6, Step7
+- Render para `currentStep === 5`, `6`, `7`
+- StepShell apenas para steps 8 e 9
 
-### RLS
-- Org members: SELECT, INSERT (com user_id check), UPDATE
-- Masters: ALL
+## Arquivos
 
-### Componentes implementados
-- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
-- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
-- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
-- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
-- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
-- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
-- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
-
-### Rotas
-- `/onboarding-guiado` — Wizard no app
-- `/backoffice/onboarding` — Gestão no backoffice
-
-### Fase 2 (pendente)
-- Integração profunda das etapas 2-8 com módulos existentes
-- Sistema de recomendações automáticas (Etapa 9)
-- Score no dashboard principal
+- **Novo**: `Step5Contratos.tsx`, `Step6Planejamento.tsx`, `Step7Rotinas.tsx`
+- **Editado**: `OnboardingGuiado.tsx` (imports + render)
