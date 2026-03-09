@@ -306,7 +306,8 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
       </div>
 
       <Accordion type="multiple" defaultValue={["companies", "users", "areas"]} className="space-y-3">
-        {/* =================== SECTION 1: COMPANIES =================== */}
+        {/* =================== SECTION 1: COMPANIES (only for holdings) =================== */}
+        {isHolding && (
         <AccordionItem value="companies" className="border border-border rounded-lg px-4">
           <AccordionTrigger className="hover:no-underline py-4">
             <div className="flex items-center gap-3">
@@ -398,6 +399,7 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
             )}
           </AccordionContent>
         </AccordionItem>
+        )}
 
         {/* =================== SECTION 2: USERS =================== */}
         <AccordionItem value="users" className="border border-border rounded-lg px-4">
