@@ -258,8 +258,12 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
     if (!name.trim() || !user || !orgId) return;
     setSavingAreaName(name);
     try {
-      const existingCodes = costCenters.map((c) => c.code);
-      const nextNum = existingCodes.length + 1;
+      const areaNums = costCenters
+        .map((c) => c.code)
+        .filter((c) => c.startsWith("AREA-"))
+        .map((c) => parseInt(c.replace("AREA-", ""), 10))
+        .filter((n) => !isNaN(n));
+      const nextNum = areaNums.length > 0 ? Math.max(...areaNums) + 1 : 1;
       const code = `AREA-${String(nextNum).padStart(2, "0")}`;
 
       await createCenter.mutateAsync({
