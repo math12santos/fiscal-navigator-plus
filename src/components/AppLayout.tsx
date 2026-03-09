@@ -57,25 +57,25 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex flex-col border-r border-border/50 bg-sidebar transition-all duration-300",
+          "flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300",
           collapsed ? "w-16" : "w-60"
         )}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-border/50 px-4">
+        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
           {!collapsed && (
             <span className="text-lg font-bold gradient-text tracking-tight">Colli FinCore</span>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            className="rounded-md p-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
           >
             {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
         </div>
 
         {/* Org Selector */}
-        <div className="border-b border-border/50 p-2 space-y-2">
+        <div className="border-b border-sidebar-border p-2 space-y-2">
           <OrgSelector collapsed={collapsed} />
           {!collapsed && <ScopeIndicator />}
         </div>
@@ -104,7 +104,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
         {/* Footer */}
         {!collapsed && (
-          <div className="border-t border-border/50 p-4 space-y-3">
+          <div className="border-t border-sidebar-border p-4 space-y-3">
             {isMaster && (
               <button
                 onClick={() => navigate("/backoffice")}
@@ -113,17 +113,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 <ShieldCheck size={14} /> Voltar ao BackOffice
               </button>
             )}
-            <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
+            <div className="text-xs text-sidebar-foreground/70 truncate">{user?.email}</div>
             <button
               onClick={signOut}
-              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors w-full"
+              className="flex items-center gap-2 text-xs text-sidebar-foreground/70 hover:text-destructive transition-colors w-full"
             >
               <LogOut size={14} /> Sair
             </button>
           </div>
         )}
         {collapsed && isMaster && (
-          <div className="border-t border-border/50 p-2 flex justify-center">
+          <div className="border-t border-sidebar-border p-2 flex justify-center">
             <button
               onClick={() => navigate("/backoffice")}
               className="rounded-md p-1.5 text-primary hover:bg-primary/10 transition-colors"
