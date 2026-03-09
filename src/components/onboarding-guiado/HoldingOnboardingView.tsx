@@ -97,7 +97,7 @@ export function HoldingOnboardingView() {
 
         {subsidiaryOrgs.length === 0 ? (
           <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground text-sm">
-            Nenhuma subsidiária vinculada a esta holding. Vincule empresas pelo painel administrativo.
+            Nenhuma subsidiária vinculada a esta holding. Adicione uma empresa para começar.
           </div>
         ) : (
           <div className="space-y-3">
@@ -129,11 +129,27 @@ export function HoldingOnboardingView() {
           </div>
         )}
 
-        <div className="flex justify-center">
+        <div className="flex items-center justify-center gap-3">
           <Button variant="ghost" onClick={() => navigate("/")}>
             Voltar ao Dashboard
           </Button>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus size={16} className="mr-1" />
+            Adicionar Empresa
+          </Button>
         </div>
+
+        {currentOrg && (
+          <CreateSubsidiaryDialog
+            open={showCreateDialog}
+            onOpenChange={setShowCreateDialog}
+            holdingId={currentOrg.id}
+            onCreated={() => {
+              qc.invalidateQueries({ queryKey: ["holding_subsidiaries"] });
+              qc.invalidateQueries({ queryKey: ["organization_holdings"] });
+            }}
+          />
+        )}
       </div>
     </div>
   );
