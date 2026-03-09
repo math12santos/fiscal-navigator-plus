@@ -72,20 +72,17 @@ export function Step7Rotinas({ data, onChange }: Props) {
   return (
     <Card>
       <CardContent className="pt-6 space-y-2">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="rounded-lg bg-primary/10 p-2">
-            <CalendarCheck className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Rotinas Financeiras</h2>
-            <p className="text-sm text-muted-foreground">
-              Selecione as rotinas que pretende adotar no dia a dia
-              <Badge variant="secondary" className="ml-2">{totalSelected} selecionadas</Badge>
-            </p>
-          </div>
+        <StepHeader
+          stepNumber={7}
+          fallbackTitle="Rotinas Financeiras"
+          fallbackDescription="Selecione as rotinas que pretende adotar no dia a dia"
+          fallbackIcon={CalendarCheck}
+        />
+        <div className="mb-3">
+          <Badge variant="secondary">{totalSelected} selecionadas</Badge>
         </div>
 
-        <Accordion type="multiple" defaultValue={SECTIONS.map((s) => s.key)} className="space-y-2">
+        <Accordion type="single" collapsible defaultValue="daily" className="space-y-2">
           {SECTIONS.map((section) => {
             const selected: string[] = data[section.key] || [];
             const Icon = section.icon;
