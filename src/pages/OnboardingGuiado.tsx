@@ -2,7 +2,9 @@ import { useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
+import { HoldingOnboardingView } from "@/components/onboarding-guiado/HoldingOnboardingView";
 import { useOnboardingConfig } from "@/hooks/useOnboardingConfig";
 import { OnboardingProgressBar } from "@/components/onboarding-guiado/OnboardingProgressBar";
 import { Step1Diagnostico } from "@/components/onboarding-guiado/Step1Diagnostico";
@@ -42,15 +44,16 @@ export default function OnboardingGuiado() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { currentOrg } = useOrganization();
+  const { isHolding, isLoading: holdingLoading } = useHolding();
   const { progress, loading, initProgress, updateStepData, completeStep, goToStep, saveProgress, finishOnboarding } =
     useOnboardingProgress();
   const { getStepConfig, isLoading: configLoading } = useOnboardingConfig();
 
   useEffect(() => {
-    if (!loading && !progress && user && currentOrg) {
+    if (!isHolding && !loading && !progress && user && currentOrg) {
       initProgress();
     }
-  }, [loading, progress, user, currentOrg]);
+  }, [isHolding, loading, progress, user, currentOrg]);
 
   const currentStep = progress?.current_step ?? 1;
   const completedSteps = progress?.completed_steps ?? [];
@@ -104,7 +107,12 @@ export default function OnboardingGuiado() {
     navigate("/");
   }, [navigate, finishOnboarding, getStepData]);
 
-  if (loading || configLoading) {
+  // If current org is a holding, show subsidiary selection view
+  if (isHolding) {
+    return <HoldingOnboardingView />;
+  }
+
+  if (loading || configLoading || holdingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
