@@ -1,165 +1,110 @@
-# Plano: Módulo de Gestão de Tarefas por Solicitações
 
-## Visão Geral
 
-Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
+# Etapa 3 — Integrações (Upload de Planilhas com DE/PARA)
 
----
+## Objetivo
 
-## 1. Estrutura de Dados (Migrações)
+Substituir o placeholder da Etapa 3 por um componente funcional que permite:
+1. **Upload de planilhas** (CSV/XLSX) com dados financeiros
+2. **Mapeamento DE/PARA** — o usuário associa colunas da planilha a campos do sistema (conta, valor, data, descrição, centro de custo)
+3. **Preview dos dados mapeados** antes de confirmar importação
+4. **Importação real** dos dados para a tabela de lançamentos financeiros
 
-### Tabela `requests` (Solicitações)
+Bancos e ERPs ficam como placeholders visuais (Fase 2). Apenas o upload manual é funcional.
 
-```text
-id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
-area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
-due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
-created_at, updated_at
+## Database
+
+### Nova tabela `data_imports`
+
+Registra cada importação feita, com metadados e mapeamento usado.
+
+```sql
+CREATE TABLE public.data_imports (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  file_name text NOT NULL,
+  source_type text NOT NULL DEFAULT 'spreadsheet', -- spreadsheet, ofx, api
+  row_count integer DEFAULT 0,
+  column_mapping jsonb NOT NULL DEFAULT '{}',
+  status text NOT NULL DEFAULT 'pending', -- pending, mapped, imported, failed
+  imported_at timestamptz,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.data_imports ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Members can manage imports" ON public.data_imports
+  FOR ALL TO authenticated USING (is_org_member(auth.uid(), organization_id));
 ```
 
-### Tabela `request_tasks` (Tarefas geradas)
+### Nova tabela `data_import_rows`
 
-```text
-id, request_id (FK), organization_id, assigned_to, status, due_date,
-created_by, executed_by, approved_by, created_at, updated_at
+Armazena as linhas brutas importadas + dados mapeados.
+
+```sql
+CREATE TABLE public.data_import_rows (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  import_id uuid NOT NULL REFERENCES data_imports(id) ON DELETE CASCADE,
+  row_index integer NOT NULL,
+  raw_data jsonb NOT NULL DEFAULT '{}',
+  mapped_data jsonb DEFAULT '{}',
+  status text DEFAULT 'pending', -- pending, valid, error
+  error_message text,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.data_import_rows ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Members can manage import rows" ON public.data_import_rows
+  FOR ALL TO authenticated USING (
+    EXISTS (SELECT 1 FROM data_imports di WHERE di.id = import_id AND is_org_member(auth.uid(), di.organization_id))
+  );
 ```
 
-### Tabela `request_comments` (Comentarios/Historico)
+## Componente Principal
 
-```text
-id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
-old_value, new_value, created_at
+### `src/components/onboarding-guiado/Step3Integracoes.tsx`
+
+Layout com 3 seções:
+
+#### Seção 1: Fontes Disponíveis (visual/informativa)
+- Cards para Bancos, ERPs com badge "Em breve"
+- Card "Importação Manual" como ativo e clicável
+
+#### Seção 2: Upload de Planilha (funcional)
+- Área de drag & drop / file input para CSV
+- Parse client-side com leitura de headers
+- Mostra preview das primeiras 5 linhas
+
+#### Seção 3: Mapeamento DE/PARA
+- Para cada coluna detectada na planilha, um `<Select>` com os campos-alvo:
+  - `data` (Data)
+  - `descricao` (Descrição)
+  - `valor` (Valor)
+  - `tipo` (Receita/Despesa)
+  - `conta` (Conta — plano de contas)
+  - `centro_custo` (Centro de Custo)
+  - `ignorar` (Ignorar coluna)
+- Botão "Confirmar Mapeamento" salva em `data_imports` + `data_import_rows`
+- Preview tabela com dados mapeados
+- Botão "Importar" muda status para `imported`
+
+O parsing de CSV será feito client-side (split por delimitador). Sem dependência externa.
+
+## Integração no Wizard
+
+**`OnboardingGuiado.tsx`**: Renderizar `Step3Integracoes` quando `currentStep === 3`.
+
+## Dados salvos no `integrations_data`
+
+```json
+{
+  "imports_count": 1,
+  "total_rows_imported": 150,
+  "last_import_date": "2026-03-09"
+}
 ```
 
-### Tabela `request_attachments`
+## Arquivos
 
-```text
-id, request_id (FK), user_id, file_name, file_path, created_at
-```
+- **Migration**: `data_imports` + `data_import_rows` tables + RLS
+- **Novo**: `src/components/onboarding-guiado/Step3Integracoes.tsx`
+- **Editado**: `src/pages/OnboardingGuiado.tsx` (render step 3)
 
-### Tabela `notifications`
-
-```text
-id, organization_id, user_id (destinatario), title, body, type, priority,
-reference_type (request/task), reference_id, read, read_at, created_at
-```
-
-RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
-
-Habilitar realtime em `notifications` para push instantâneo.
-
----
-
-## 2. Componentes e Páginas
-
-### Página `Tarefas.tsx` (reescrita completa)
-
-Três abas controladas por permissões (`getAllowedTabs`):
-
-
-| Aba            | Key              | Conteúdo                                                                                  |
-| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
-| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
-| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
-
-
-### Dialog `RequestFormDialog.tsx`
-
-Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
-
-### Componente `RequestDetail.tsx`
-
-Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
-
-### Central de Notificações `NotificationCenter.tsx`
-
-Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
-
----
-
-## 3. Hooks
-
-- `useRequests.ts` — CRUD de solicitações com filtros
-- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
-- `useRequestComments.ts` — Comentários e histórico
-- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
-
----
-
-## 4. Integração com Outros Módulos
-
-Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
-
-- Financeiro → "Aprovação de pagamento"
-- Contratos → "Revisão jurídica"
-- DP → "Solicitação de contratação"
-
-Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
-
----
-
-## 5. Atualização de Definições
-
-- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
-- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
-- `AppLayout.tsx`: Adicionar ícone de notificações no header
-
----
-
-## 6. Fluxo Operacional
-
-```text
-Usuário cria solicitação
-  → Sistema gera task vinculada
-  → Responsável recebe notificação (realtime)
-  → Responsável executa (muda status)
-  → Sistema registra histórico
-  → Se necessário → status "Aguardando Aprovação"
-  → Aprovador recebe notificação
-  → Solicitação concluída/rejeitada
-```
-
----
-
-## Ordem de Implementação
-
-1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
-2. Habilitar realtime em `notifications`
-3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
-4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
-5. Criar `RequestFormDialog` e `RequestDetail`
-6. Criar `NotificationCenter` e integrar no `AppLayout`
-7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
-
----
-
-# Onboarding Guiado — Implementação (Fase 1 ✅)
-
-## Status: Implementado
-
-### Tabelas criadas
-- `onboarding_progress` — progresso por organização com JSONB por etapa
-- `onboarding_recommendations` — recomendações automáticas
-
-### RLS
-- Org members: SELECT, INSERT (com user_id check), UPDATE
-- Masters: ALL
-
-### Componentes implementados
-- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
-- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
-- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
-- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
-- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
-- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
-- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
-
-### Rotas
-- `/onboarding-guiado` — Wizard no app
-- `/backoffice/onboarding` — Gestão no backoffice
-
-### Fase 2 (pendente)
-- Integração profunda das etapas 2-8 com módulos existentes
-- Sistema de recomendações automáticas (Etapa 9)
-- Score no dashboard principal
