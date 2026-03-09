@@ -145,6 +145,7 @@ export function HoldingOnboardingView() {
             onOpenChange={setShowCreateDialog}
             holdingId={currentOrg.id}
             onCreated={() => {
+              qc.invalidateQueries({ queryKey: ["is_holding", currentOrg?.id] });
               qc.invalidateQueries({ queryKey: ["holding_subsidiaries"] });
               qc.invalidateQueries({ queryKey: ["organization_holdings"] });
             }}
