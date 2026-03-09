@@ -118,6 +118,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               {!collapsed && <span>Onboarding</span>}
             </Link>
           )}
+        </nav>
 
         {/* Footer */}
         {!collapsed && (
