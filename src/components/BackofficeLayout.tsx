@@ -23,6 +23,7 @@ const navItems = [
   { path: "/backoffice/usuarios", label: "Usuários", icon: Users },
   { path: "/backoffice/sistema", label: "Sistema", icon: Wrench },
   { path: "/backoffice/auditoria", label: "Auditoria", icon: Activity },
+  { path: "/backoffice/onboarding", label: "Onboarding", icon: Rocket },
   { path: "/backoffice/config", label: "Configurações", icon: Settings },
 ];
 
