@@ -2329,6 +2329,30 @@ export type Database = {
           },
         ]
       }
+      onboarding_step_config: {
+        Row: {
+          config: Json
+          id: string
+          step_number: number
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          config?: Json
+          id?: string
+          step_number: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          config?: Json
+          id?: string
+          step_number?: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       organization_holdings: {
         Row: {
           created_at: string
