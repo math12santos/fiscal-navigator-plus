@@ -1,67 +1,165 @@
-# Etapa 2 — Estrutura da Empresa (Implementação Real)
+# Plano: Módulo de Gestão de Tarefas por Solicitações
 
-## Objetivo
+## Visão Geral
 
-Substituir o placeholder `StepShell` da etapa 2 por um componente funcional com 3 seções que criam dados reais no sistema:
+Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
 
-1. **Empresas do Grupo** — Listar empresas existentes da org atual + criar novas empresas (subsidiárias) vinculadas automaticamente via `organization_holdings`
-2. **Usuários Principais** — Listar membros existentes da org + convidar novos via a edge function `create-user` (mesmo fluxo do `CreateUserDialog`)
-3. **Áreas Organizacionais** — Cadastrar centros de custo do tipo "área" usando a tabela `cost_centers` existente (ex: Financeiro, Comercial, Operações)
+---
 
-Sem mudanças no banco de dados. Todas as tabelas necessárias já existem.
+## 1. Estrutura de Dados (Migrações)
 
-## Componente Principal
+### Tabela `requests` (Solicitações)
 
-`**src/components/onboarding-guiado/Step2Estrutura.tsx**`
-
-Layout com 3 cards/seções colapsáveis (Accordion):
-
-### Seção 1: Empresas do Grupo
-
-- Tabela com empresas já vinculadas (query `organization_holdings` + `organizations`)
-- Empresa atual mostrada como "principal"
-- Botão "Adicionar Empresa" abre formulário inline com: nome, tipo documento (CPF/CNPJ), número do documento
-- Segmento da Empresa (necessário verificar estrutura de dados para implementar a análise por segmento de emrpesa em todo o sistema)
-- Ao salvar: insere em `organizations` + `organization_members` (owner = user atual) + `organization_holdings` (holding = org atual, subsidiary = nova org)
-- Badge com contagem de empresas
-
-### Seção 2: Usuários Principais
-
-- Tabela com membros atuais da org (query `organization_members` + `profiles`)
-- Botão "Convidar Usuário" abre formulário inline: nome, email, senha, cargo, role
-- Usa edge function `create-user` (mesmo do CreateUserDialog) para criar conta + vincular à org
-- Roles disponíveis: owner, admin, member, viewer
-
-### Seção 3: Áreas Organizacionais
-
-- Lista de centros de custo existentes da org (query `cost_centers`)
-- Botão "Adicionar Área" com input de nome
-- Ao salvar: insere em `cost_centers` com `organization_id` e `user_id`
-- Sugestões pré-definidas (Financeiro, Comercial, Operações, RH, TI, Administrativo) como chips clicáveis para criação rápida
-
-## Integração no Wizard
-
-`**src/pages/OnboardingGuiado.tsx**`
-
-- Importar `Step2Estrutura`
-- No render: quando `currentStep === 2`, renderizar `Step2Estrutura` ao invés do `StepShell`
-- Passar `currentOrg` e callbacks necessários
-
-## Dados salvos no `structure_data`
-
-Ao avançar ou salvar, o `structure_data` no `onboarding_progress` é atualizado com um resumo:
-
-```json
-{
-  "companies_count": 3,
-  "members_count": 5,
-  "areas_count": 4
-}
+```text
+id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
+area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
+due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
+created_at, updated_at
 ```
 
-Isso permite ao Step 10 (Score) avaliar a completude desta etapa.
+### Tabela `request_tasks` (Tarefas geradas)
 
-## Arquivos
+```text
+id, request_id (FK), organization_id, assigned_to, status, due_date,
+created_by, executed_by, approved_by, created_at, updated_at
+```
 
-- **Novo**: `src/components/onboarding-guiado/Step2Estrutura.tsx`
-- **Editado**: `src/pages/OnboardingGuiado.tsx` (render step 2)
+### Tabela `request_comments` (Comentarios/Historico)
+
+```text
+id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
+old_value, new_value, created_at
+```
+
+### Tabela `request_attachments`
+
+```text
+id, request_id (FK), user_id, file_name, file_path, created_at
+```
+
+### Tabela `notifications`
+
+```text
+id, organization_id, user_id (destinatario), title, body, type, priority,
+reference_type (request/task), reference_id, read, read_at, created_at
+```
+
+RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
+
+Habilitar realtime em `notifications` para push instantâneo.
+
+---
+
+## 2. Componentes e Páginas
+
+### Página `Tarefas.tsx` (reescrita completa)
+
+Três abas controladas por permissões (`getAllowedTabs`):
+
+
+| Aba            | Key              | Conteúdo                                                                                  |
+| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
+| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
+| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
+
+
+### Dialog `RequestFormDialog.tsx`
+
+Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
+
+### Componente `RequestDetail.tsx`
+
+Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
+
+### Central de Notificações `NotificationCenter.tsx`
+
+Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
+
+---
+
+## 3. Hooks
+
+- `useRequests.ts` — CRUD de solicitações com filtros
+- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
+- `useRequestComments.ts` — Comentários e histórico
+- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
+
+---
+
+## 4. Integração com Outros Módulos
+
+Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
+
+- Financeiro → "Aprovação de pagamento"
+- Contratos → "Revisão jurídica"
+- DP → "Solicitação de contratação"
+
+Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
+
+---
+
+## 5. Atualização de Definições
+
+- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
+- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
+- `AppLayout.tsx`: Adicionar ícone de notificações no header
+
+---
+
+## 6. Fluxo Operacional
+
+```text
+Usuário cria solicitação
+  → Sistema gera task vinculada
+  → Responsável recebe notificação (realtime)
+  → Responsável executa (muda status)
+  → Sistema registra histórico
+  → Se necessário → status "Aguardando Aprovação"
+  → Aprovador recebe notificação
+  → Solicitação concluída/rejeitada
+```
+
+---
+
+## Ordem de Implementação
+
+1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
+2. Habilitar realtime em `notifications`
+3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
+4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
+5. Criar `RequestFormDialog` e `RequestDetail`
+6. Criar `NotificationCenter` e integrar no `AppLayout`
+7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
+
+---
+
+# Onboarding Guiado — Implementação (Fase 1 ✅)
+
+## Status: Implementado
+
+### Tabelas criadas
+- `onboarding_progress` — progresso por organização com JSONB por etapa
+- `onboarding_recommendations` — recomendações automáticas
+
+### RLS
+- Org members: SELECT, INSERT (com user_id check), UPDATE
+- Masters: ALL
+
+### Componentes implementados
+- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
+- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
+- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
+- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
+- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
+- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
+- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
+
+### Rotas
+- `/onboarding-guiado` — Wizard no app
+- `/backoffice/onboarding` — Gestão no backoffice
+
+### Fase 2 (pendente)
+- Integração profunda das etapas 2-8 com módulos existentes
+- Sistema de recomendações automáticas (Etapa 9)
+- Score no dashboard principal
