@@ -83,6 +83,16 @@ export default function OnboardingGuiado() {
     if (currentStep < 10) await goToStep(currentStep + 1);
   }, [currentStep, goToStep]);
 
+  const getStepData = useCallback((step: number) => {
+    if (!progress) return {};
+    const keys: Record<number, string> = {
+      1: "diagnosis_answers", 2: "structure_data", 3: "integrations_data",
+      4: "financial_structure_data", 5: "contracts_data", 6: "planning_data",
+      7: "routines_data", 10: "score_dimensions",
+    };
+    return (progress as any)[keys[step]] || {};
+  }, [progress]);
+
   const handleFinish = useCallback(async () => {
     const dimensions = getStepData(10);
     const scores = Object.values(dimensions).filter((v) => typeof v === "number") as number[];
@@ -93,16 +103,6 @@ export default function OnboardingGuiado() {
     toast({ title: "Onboarding concluído!", description: "Seu cockpit financeiro está pronto." });
     navigate("/");
   }, [navigate, finishOnboarding, getStepData]);
-
-  const getStepData = (step: number) => {
-    if (!progress) return {};
-    const keys: Record<number, string> = {
-      1: "diagnosis_answers", 2: "structure_data", 3: "integrations_data",
-      4: "financial_structure_data", 5: "contracts_data", 6: "planning_data",
-      7: "routines_data", 10: "score_dimensions",
-    };
-    return (progress as any)[keys[step]] || {};
-  };
 
   if (loading || configLoading) {
     return (
