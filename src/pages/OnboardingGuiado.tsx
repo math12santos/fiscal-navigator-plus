@@ -7,6 +7,7 @@ import { useOnboardingConfig } from "@/hooks/useOnboardingConfig";
 import { OnboardingProgressBar } from "@/components/onboarding-guiado/OnboardingProgressBar";
 import { Step1Diagnostico } from "@/components/onboarding-guiado/Step1Diagnostico";
 import { Step2Estrutura } from "@/components/onboarding-guiado/Step2Estrutura";
+import { Step3Integracoes } from "@/components/onboarding-guiado/Step3Integracoes";
 import { Step10Score } from "@/components/onboarding-guiado/Step10Score";
 import { StepShell } from "@/components/onboarding-guiado/StepShell";
 import { Button } from "@/components/ui/button";
