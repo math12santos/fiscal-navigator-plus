@@ -66,6 +66,7 @@ const AREA_SUGGESTIONS = [
 export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
   const { user } = useAuth();
   const { currentOrg, refetch: refetchOrgs } = useOrganization();
+  const { isHolding } = useHolding();
   const { costCenters, isLoading: centersLoading, create: createCenter } = useCostCenters();
   const { toast } = useToast();
   const qc = useQueryClient();
