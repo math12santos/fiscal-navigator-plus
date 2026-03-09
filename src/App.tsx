@@ -9,9 +9,24 @@ import { HoldingProvider } from "@/contexts/HoldingContext";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+/** Retry dynamic imports on failure (stale chunk after deploy) */
+function lazyRetry(factory: () => Promise<{ default: React.ComponentType<any> }>) {
+  return lazy(() =>
+    factory().catch(() => {
+      // Force reload once to get fresh chunks
+      const key = "chunk_reload";
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        window.location.reload();
+      }
+      return factory();
+    })
+  );
+}
+
 // Lazy-loaded layouts
-const AppLayout = lazy(() => import("@/components/AppLayout"));
-const BackofficeLayout = lazy(() => import("@/components/BackofficeLayout"));
+const AppLayout = lazyRetry(() => import("@/components/AppLayout"));
+const BackofficeLayout = lazyRetry(() => import("@/components/BackofficeLayout"));
 
 // Lazy-loaded pages
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
