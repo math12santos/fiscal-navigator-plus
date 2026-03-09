@@ -42,7 +42,7 @@ export default function OnboardingGuiado() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { currentOrg } = useOrganization();
-  const { progress, loading, initProgress, updateStepData, completeStep, goToStep, saveProgress } =
+  const { progress, loading, initProgress, updateStepData, completeStep, goToStep, saveProgress, finishOnboarding } =
     useOnboardingProgress();
   const { getStepConfig, isLoading: configLoading } = useOnboardingConfig();
 
@@ -83,12 +83,7 @@ export default function OnboardingGuiado() {
     if (currentStep < 10) await goToStep(currentStep + 1);
   }, [currentStep, goToStep]);
 
-  const handleFinish = useCallback(async () => {
-    toast({ title: "Onboarding concluído!", description: "Seu cockpit financeiro está pronto." });
-    navigate("/");
-  }, [navigate]);
-
-  const getStepData = (step: number) => {
+  const getStepData = useCallback((step: number) => {
     if (!progress) return {};
     const keys: Record<number, string> = {
       1: "diagnosis_answers", 2: "structure_data", 3: "integrations_data",
@@ -96,7 +91,18 @@ export default function OnboardingGuiado() {
       7: "routines_data", 10: "score_dimensions",
     };
     return (progress as any)[keys[step]] || {};
-  };
+  }, [progress]);
+
+  const handleFinish = useCallback(async () => {
+    const dimensions = getStepData(10);
+    const scores = Object.values(dimensions).filter((v) => typeof v === "number") as number[];
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    const levels = ["iniciante", "básico", "intermediário", "avançado", "excelência"];
+    const maturityScore = levels[Math.min(Math.floor(avgScore / 20), 4)] || "iniciante";
+    await finishOnboarding(maturityScore, dimensions as Record<string, number>);
+    toast({ title: "Onboarding concluído!", description: "Seu cockpit financeiro está pronto." });
+    navigate("/");
+  }, [navigate, finishOnboarding, getStepData]);
 
   if (loading || configLoading) {
     return (

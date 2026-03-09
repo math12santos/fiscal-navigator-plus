@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Users,
   Handshake,
+  Rocket,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ import { ScopeIndicator } from "@/components/ScopeIndicator";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
@@ -49,6 +51,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const { signOut, user } = useAuth();
   const { canAccessModule, isMaster } = useUserPermissions();
+  const { progress: onboardingProgress, loading: onboardingLoading } = useOnboardingProgress();
+  const showOnboardingLink = !onboardingLoading && (!onboardingProgress || onboardingProgress.status !== "concluido");
 
   const visibleNavItems = navItems.filter((item) => canAccessModule(item.module));
 
@@ -100,6 +104,20 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          {showOnboardingLink && (
+            <Link
+              to="/onboarding-guiado"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/onboarding-guiado"
+                  ? "bg-primary/10 text-primary glow-primary"
+                  : "text-primary/80 hover:bg-primary/5 hover:text-primary"
+              )}
+            >
+              <Rocket size={18} />
+              {!collapsed && <span>Onboarding</span>}
+            </Link>
+          )}
         </nav>
 
         {/* Footer */}
