@@ -12,8 +12,9 @@ import { Step4EstruturaFinanceira } from "@/components/onboarding-guiado/Step4Es
 import { Step5Contratos } from "@/components/onboarding-guiado/Step5Contratos";
 import { Step6Planejamento } from "@/components/onboarding-guiado/Step6Planejamento";
 import { Step7Rotinas } from "@/components/onboarding-guiado/Step7Rotinas";
+import { Step8Cockpit } from "@/components/onboarding-guiado/Step8Cockpit";
+import { Step9Assistida } from "@/components/onboarding-guiado/Step9Assistida";
 import { Step10Score } from "@/components/onboarding-guiado/Step10Score";
-import { StepShell } from "@/components/onboarding-guiado/StepShell";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, SkipForward, CheckCircle2, Loader2 } from "lucide-react";
 import {
