@@ -33,15 +33,12 @@ export function Step8Cockpit({ completedSteps, onActivate, cockpitActivated }: P
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <LayoutDashboard size={24} className="text-primary" />
-          Ativação do Cockpit
-        </h2>
-        <p className="text-muted-foreground mt-1">
-          Libere os dashboards financeiros do seu cockpit de gestão.
-        </p>
-      </div>
+      <StepHeader
+        stepNumber={8}
+        fallbackTitle="Ativação do Cockpit"
+        fallbackDescription="Libere os dashboards financeiros do seu cockpit de gestão."
+        fallbackIcon={LayoutDashboard}
+      />
 
       {/* Readiness checklist */}
       <Card>
