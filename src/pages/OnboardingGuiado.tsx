@@ -9,6 +9,9 @@ import { Step1Diagnostico } from "@/components/onboarding-guiado/Step1Diagnostic
 import { Step2Estrutura } from "@/components/onboarding-guiado/Step2Estrutura";
 import { Step3Integracoes } from "@/components/onboarding-guiado/Step3Integracoes";
 import { Step4EstruturaFinanceira } from "@/components/onboarding-guiado/Step4EstruturaFinanceira";
+import { Step5Contratos } from "@/components/onboarding-guiado/Step5Contratos";
+import { Step6Planejamento } from "@/components/onboarding-guiado/Step6Planejamento";
+import { Step7Rotinas } from "@/components/onboarding-guiado/Step7Rotinas";
 import { Step10Score } from "@/components/onboarding-guiado/Step10Score";
 import { StepShell } from "@/components/onboarding-guiado/StepShell";
 import { Button } from "@/components/ui/button";
