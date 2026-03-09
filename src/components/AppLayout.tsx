@@ -123,7 +123,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </div>
         )}
         {collapsed && isMaster && (
-          <div className="border-t border-border/50 p-2 flex justify-center">
+          <div className="border-t border-sidebar-border p-2 flex justify-center">
             <button
               onClick={() => navigate("/backoffice")}
               className="rounded-md p-1.5 text-primary hover:bg-primary/10 transition-colors"
