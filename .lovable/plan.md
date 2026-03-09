@@ -1,75 +1,165 @@
+# Plano: Módulo de Gestão de Tarefas por Solicitações
 
+## Visão Geral
 
-# Atualizar Diagnóstico Completo — DB + Fallback + Score 100pts
+Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
 
-## Situação Atual
+---
 
-O banco de dados (step 1 em `onboarding_step_config`) contém perguntas antigas em todas as 4 seções. O fallback no código também está incompleto para Maturidade, Sistema e Tecnologia. Ambos precisam ser atualizados simultaneamente.
+## 1. Estrutura de Dados (Migrações)
 
-## Distribuição de Pontuação (100 pontos total)
+### Tabela `requests` (Solicitações)
 
 ```text
-Estrutura Societária ........... 20 pts
-Maturidade Financeira .......... 40 pts  (4 subseções)
-Sistema Financeiro ............. 25 pts
-Tecnologia ..................... 15 pts
-─────────────────────────────────────────
-Total ......................... 100 pts
+id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
+area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
+due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
+created_at, updated_at
 ```
 
-## Mudanças Necessárias
+### Tabela `request_tasks` (Tarefas geradas)
 
-### 1. Atualizar registro no banco (`onboarding_step_config` step 1)
+```text
+id, request_id (FK), organization_id, assigned_to, status, due_date,
+created_by, executed_by, approved_by, created_at, updated_at
+```
 
-Usar a ferramenta de inserção/update para substituir o JSON `config` com todas as perguntas detalhadas:
+### Tabela `request_comments` (Comentarios/Historico)
 
-**Estrutura (20 pts)** — 9 perguntas já definidas (faturamento, segmento, sócios, distribuição, responsável, cargo, equipe, bancos, contas bancárias). Sem mudança nas perguntas, apenas garantir que os pontos somem até ~20.
+```text
+id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
+old_value, new_value, created_at
+```
 
-**Maturidade Financeira (40 pts)** — 10 perguntas em 4 subseções:
-- Controle de Caixa: fluxo de caixa (0-3), projeção (0-3), DRE gerencial (0-3), análise pela gestão (0-3)
-- Gestão de Despesas: classificação (0-3), centro de custo (0-2)
-- Gestão de Receitas: previsibilidade (0-2), monitoramento recorrente (0-2)
-- Gestão de Inadimplência: existência (0-3), sentimento (0-2)
+### Tabela `request_attachments`
 
-**Sistema Financeiro (25 pts)** — 5 perguntas:
-- Usa ERP (0-2), qual ERP (condicional, 0 pts — contextual), contas a pagar (0-3), contas a receber (0-3), conciliação bancária (0-4)
+```text
+id, request_id (FK), user_id, file_name, file_path, created_at
+```
 
-**Tecnologia (15 pts)** — 4 perguntas:
-- Importação extratos (0-2), integração entre sistemas (0-3), dashboard (0-3), indicadores (0-2)
+### Tabela `notifications`
 
-**Thresholds de maturidade** recalibrados para escala 0-100:
-- Nível 1 (0-20): Controle básico
-- Nível 2 (21-40): Financeiro estruturado
-- Nível 3 (41-60): Controladoria
-- Nível 4 (61-80): Governança financeira
-- Nível 5 (81-100): Gestão orientada por dados
+```text
+id, organization_id, user_id (destinatario), title, body, type, priority,
+reference_type (request/task), reference_id, read, read_at, created_at
+```
 
-### 2. Atualizar `Step1Diagnostico.tsx`
+RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
 
-- Atualizar `FALLBACK_SECTIONS` para espelhar exatamente o novo JSON do banco (as 4 seções completas com todas as perguntas)
-- Atualizar `FALLBACK_THRESHOLDS` para escala 0-100
-- Adicionar lógica condicional para "Qual ERP?" (condicional: `usa_erp === "sim"`)
-- Atualizar `COMPLEXITY_THRESHOLDS` por seção com ranges proporcionais ao peso de cada seção
-- Exibir score individual por seção **e** score total consolidado no card final
+Habilitar realtime em `notifications` para push instantâneo.
 
-### 3. Atualizar `OnboardingConfigTab.tsx`
+---
 
-- Nenhuma mudança estrutural necessária — o editor já suporta `type`, `conditional`, e `complexity_thresholds`
-- Os novos dados aparecerão automaticamente quando o banco for atualizado
+## 2. Componentes e Páginas
 
-## Problemas Potenciais
+### Página `Tarefas.tsx` (reescrita completa)
 
-1. **Respostas antigas incompatíveis**: Usuários que já responderam o diagnóstico antigo terão keys que não existem mais (`num_empresas`, `tem_holding`, etc.). O código já ignora keys desconhecidas, então não quebra — mas o progresso anterior será "resetado" visualmente.
+Três abas controladas por permissões (`getAllowedTabs`):
 
-2. **Score desbalanceado na Estrutura**: A pergunta `qtd_contas_bancarias` (number_input) pode gerar pontuação muito alta sozinha (ex: 15 contas = 25 pts). Precisamos ajustar o cap dessa pergunta ou redistribuir os pontos da seção Estrutura para que o total real fique próximo de 20.
 
-3. **Thresholds por seção vs global**: O `COMPLEXITY_THRESHOLDS` atual é genérico (0-3, 4-6, 7-9, 10+). Com pesos diferentes por seção (20, 40, 25, 15), cada seção precisa de thresholds proporcionais — ou usamos percentual (0-25%, 25-50%, 50-75%, 75-100% do máximo da seção).
+| Aba            | Key              | Conteúdo                                                                                  |
+| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
+| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
+| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
 
-4. **Tipo `select_input` para ERP**: A pergunta "Qual ERP?" precisa de um tipo `select_input` (lista de opções + campo "Outro"). O componente já suporta esse tipo.
 
-## Arquivos Afetados
+### Dialog `RequestFormDialog.tsx`
 
-- **Banco de dados**: UPDATE no registro `onboarding_step_config` onde `step_number = 1`
-- **`src/components/onboarding-guiado/Step1Diagnostico.tsx`**: Fallback sections, thresholds, e lógica de score por seção
-- **`.lovable/plan.md`**: Atualizar documentação do diagnóstico
+Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
 
+### Componente `RequestDetail.tsx`
+
+Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
+
+### Central de Notificações `NotificationCenter.tsx`
+
+Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
+
+---
+
+## 3. Hooks
+
+- `useRequests.ts` — CRUD de solicitações com filtros
+- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
+- `useRequestComments.ts` — Comentários e histórico
+- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
+
+---
+
+## 4. Integração com Outros Módulos
+
+Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
+
+- Financeiro → "Aprovação de pagamento"
+- Contratos → "Revisão jurídica"
+- DP → "Solicitação de contratação"
+
+Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
+
+---
+
+## 5. Atualização de Definições
+
+- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
+- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
+- `AppLayout.tsx`: Adicionar ícone de notificações no header
+
+---
+
+## 6. Fluxo Operacional
+
+```text
+Usuário cria solicitação
+  → Sistema gera task vinculada
+  → Responsável recebe notificação (realtime)
+  → Responsável executa (muda status)
+  → Sistema registra histórico
+  → Se necessário → status "Aguardando Aprovação"
+  → Aprovador recebe notificação
+  → Solicitação concluída/rejeitada
+```
+
+---
+
+## Ordem de Implementação
+
+1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
+2. Habilitar realtime em `notifications`
+3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
+4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
+5. Criar `RequestFormDialog` e `RequestDetail`
+6. Criar `NotificationCenter` e integrar no `AppLayout`
+7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
+
+---
+
+# Onboarding Guiado — Implementação (Fase 1 ✅)
+
+## Status: Implementado
+
+### Tabelas criadas
+- `onboarding_progress` — progresso por organização com JSONB por etapa
+- `onboarding_recommendations` — recomendações automáticas
+
+### RLS
+- Org members: SELECT, INSERT (com user_id check), UPDATE
+- Masters: ALL
+
+### Componentes implementados
+- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
+- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
+- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
+- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
+- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
+- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
+- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
+
+### Rotas
+- `/onboarding-guiado` — Wizard no app
+- `/backoffice/onboarding` — Gestão no backoffice
+
+### Fase 2 (pendente)
+- Integração profunda das etapas 2-8 com módulos existentes
+- Sistema de recomendações automáticas (Etapa 9)
+- Score no dashboard principal

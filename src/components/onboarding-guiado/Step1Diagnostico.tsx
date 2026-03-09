@@ -8,6 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Loader2, Building2, BarChart3, FileText, Cpu, Target, Wallet, Plug, CalendarCheck, LayoutDashboard, Lightbulb, ShieldCheck, Trophy, Database, TrendingUp } from "lucide-react";
 import { useOnboardingConfig } from "@/hooks/useOnboardingConfig";
 import { type LucideIcon } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface Props {
   data: Record<string, any>;
@@ -20,17 +21,16 @@ const ICON_MAP: Record<string, LucideIcon> = {
 
 const SEGMENTO_OPTIONS = ["Comércio", "Serviços", "Indústria", "Tecnologia", "Outro"];
 
-// Scoring for contas bancárias: 1 point per account, +2 per account above 5
+// Scoring for contas bancárias: 1 point per account, capped at 5 pts max
 function calcContasBancariasScore(val: string): number {
   const n = parseInt(val, 10);
   if (isNaN(n) || n <= 0) return 0;
-  if (n <= 5) return n;
-  return 5 + (n - 5) * 2;
+  return Math.min(n, 5);
 }
 
 const FALLBACK_SECTIONS = [
   {
-    key: "estrutura", label: "Estrutura Societária e Porte", icon: "Building2", order: 0,
+    key: "estrutura", label: "Estrutura Societária e Porte", icon: "Building2", order: 0, max_points: 20,
     questions: [
       {
         key: "faturamento_mensal", label: "Faturamento médio mensal", type: "radio",
@@ -64,7 +64,7 @@ const FALLBACK_SECTIONS = [
       {
         key: "responsavel_financeiro", label: "Existe responsável formal pelo financeiro?", type: "radio",
         options: [
-          { value: "sim", label: "Sim", points: 0 },
+          { value: "sim", label: "Sim", points: 1 },
           { value: "nao", label: "Não", points: 0 },
         ],
       },
@@ -89,9 +89,9 @@ const FALLBACK_SECTIONS = [
       {
         key: "qtd_bancos", label: "Quantos bancos a empresa utiliza?", type: "radio",
         options: [
-          { value: "1", label: "1", points: 0 },
-          { value: "2-3", label: "2 a 3", points: 1 },
-          { value: "4+", label: "4 ou mais", points: 4 },
+          { value: "1", label: "1", points: 1 },
+          { value: "2-3", label: "2 a 3", points: 2 },
+          { value: "4+", label: "4 ou mais", points: 3 },
         ],
       },
       {
@@ -101,43 +101,147 @@ const FALLBACK_SECTIONS = [
     ],
   },
   {
-    key: "maturidade", label: "Maturidade do Financeiro", icon: "BarChart3", order: 1,
+    key: "maturidade", label: "Maturidade Financeira", icon: "BarChart3", order: 1, max_points: 40,
     questions: [
-      { key: "controle_caixa", label: "Como o fluxo de caixa é controlado atualmente?", type: "radio", options: [{ value: "nenhum", label: "Sem controle", points: 0 }, { value: "planilha", label: "Planilha", points: 1 }, { value: "erp", label: "ERP", points: 2 }] },
+      { key: "controle_caixa", label: "Como o fluxo de caixa é controlado?", type: "radio", options: [
+        { value: "nenhum", label: "Não existe controle", points: 0 },
+        { value: "planilha", label: "Planilha simples", points: 1 },
+        { value: "sistema", label: "Sistema financeiro", points: 2 },
+        { value: "erp", label: "ERP", points: 3 },
+      ]},
+      { key: "projecao_caixa", label: "Existe projeção de fluxo de caixa?", type: "radio", options: [
+        { value: "nao", label: "Não existe", points: 0 },
+        { value: "30d", label: "Até 30 dias", points: 1 },
+        { value: "90d", label: "Até 90 dias", points: 2 },
+        { value: "12m", label: "12 meses", points: 3 },
+      ]},
+      { key: "dre_gerencial", label: "A empresa possui DRE Gerencial?", type: "radio", options: [
+        { value: "nao", label: "Não", points: 0 },
+        { value: "anual", label: "Sim, anual", points: 1 },
+        { value: "trimestral", label: "Sim, trimestral", points: 2 },
+        { value: "mensal", label: "Sim, mensal", points: 3 },
+      ]},
+      { key: "analise_gestao", label: "Os resultados são analisados pela Gestão?", type: "radio", options: [
+        { value: "nao", label: "Não", points: 0 },
+        { value: "ocasionalmente", label: "Ocasionalmente", points: 1 },
+        { value: "mensalmente", label: "Mensalmente", points: 2 },
+        { value: "semanalmente", label: "Semanalmente", points: 3 },
+      ]},
+      { key: "classificacao_despesas", label: "As despesas são classificadas?", type: "radio", options: [
+        { value: "nao", label: "Não", points: 0 },
+        { value: "parcial", label: "Parcialmente", points: 1 },
+        { value: "categoria", label: "Sim, por categoria", points: 2 },
+        { value: "plano_contas", label: "Sim, por plano de contas completo", points: 3 },
+      ]},
+      { key: "centro_custo", label: "Existe controle por centro de custo?", type: "radio", options: [
+        { value: "nao", label: "Não", points: 0 },
+        { value: "parcial", label: "Parcial", points: 1 },
+        { value: "sim", label: "Sim", points: 2 },
+      ]},
+      { key: "previsibilidade_receita", label: "Existe previsibilidade de Receita?", type: "radio", options: [
+        { value: "baixa", label: "Baixa (vendas pontuais)", points: 0 },
+        { value: "parcial", label: "Parcial", points: 1 },
+        { value: "alta", label: "Alta (contratos recorrentes)", points: 2 },
+      ]},
+      { key: "monitoramento_recorrencia", label: "Receitas recorrentes são monitoradas?", type: "radio", options: [
+        { value: "nao", label: "Não", points: 0 },
+        { value: "parcial", label: "Parcial", points: 1 },
+        { value: "sim", label: "Sim", points: 2 },
+      ]},
+      { key: "gestao_inadimplencia", label: "Existe Gestão de Inadimplência?", type: "radio", options: [
+        { value: "nao", label: "Não", points: 0 },
+        { value: "parcial", label: "Parcial", points: 1 },
+        { value: "sim_interna", label: "Sim, interna", points: 2 },
+        { value: "sim_terceirizada", label: "Sim, terceirizada", points: 3 },
+      ]},
+      { key: "nivel_inadimplencia", label: "Qual o sentimento em relação ao nível de Inadimplência observado?", type: "radio", options: [
+        { value: "baixo", label: "Baixo", points: 2 },
+        { value: "medio", label: "Médio", points: 1 },
+        { value: "alto", label: "Alto", points: 0 },
+      ]},
     ],
   },
   {
-    key: "sistema", label: "Sistema Financeiro", icon: "FileText", order: 2,
+    key: "sistema", label: "Sistema Financeiro", icon: "FileText", order: 2, max_points: 25,
     questions: [
-      { key: "auditoria", label: "Existe processo de auditoria dos pagamentos?", type: "radio", options: [{ value: "sim", label: "Sim", points: 2 }, { value: "nao", label: "Não", points: 0 }] },
-      { key: "dre", label: "Existe DRE gerencial mensal?", type: "radio", options: [{ value: "nao", label: "Não existe controle", points: 0 }, { value: "gerencial", label: "Sim, DRE gerencial", points: 2 }, { value: "integrada", label: "Sim, integrada à DRE contábil", points: 3 }] },
+      { key: "usa_erp", label: "A empresa utiliza ERP?", type: "radio", options: [
+        { value: "sim", label: "Sim", points: 2 },
+        { value: "nao", label: "Não", points: 0 },
+      ]},
+      { key: "qual_erp", label: "Qual ERP?", type: "select_input", conditional: { key: "usa_erp", value: "sim" }, options: [
+        { value: "conta_azul", label: "Conta Azul", points: 0 },
+        { value: "omie", label: "Omie", points: 0 },
+        { value: "bling", label: "Bling", points: 0 },
+        { value: "sap", label: "SAP", points: 0 },
+        { value: "totvs", label: "TOTVS", points: 0 },
+        { value: "outro", label: "Outro", points: 0 },
+      ]},
+      { key: "contas_pagar", label: "Contas a pagar são controladas em:", type: "radio", options: [
+        { value: "nenhum", label: "Não existe controle", points: 0 },
+        { value: "planilha", label: "Planilha", points: 1 },
+        { value: "sistema", label: "Sistema financeiro (DDA do banco)", points: 2 },
+        { value: "erp", label: "ERP", points: 3 },
+      ]},
+      { key: "contas_receber", label: "Contas a receber são controladas em:", type: "radio", options: [
+        { value: "nenhum", label: "Não existe controle", points: 0 },
+        { value: "planilha", label: "Planilha", points: 1 },
+        { value: "sistema", label: "Sistema financeiro (App de Cobrança ou Banco)", points: 2 },
+        { value: "erp", label: "ERP", points: 3 },
+      ]},
+      { key: "conciliacao_bancaria", label: "Conciliação bancária é feita?", type: "radio", options: [
+        { value: "nunca", label: "Nunca", points: 0 },
+        { value: "eventualmente", label: "Eventualmente", points: 1 },
+        { value: "contabilidade", label: "Somente pela contabilidade", points: 2 },
+        { value: "mensalmente", label: "Mensalmente", points: 3 },
+        { value: "diariamente", label: "Diariamente", points: 4 },
+      ]},
     ],
   },
   {
-    key: "tecnologia", label: "Tecnologia", icon: "Cpu", order: 3,
+    key: "tecnologia", label: "Tecnologia", icon: "Cpu", order: 3, max_points: 15,
     questions: [
-      { key: "usa_erp", label: "Utiliza algum ERP?", type: "radio", options: [{ value: "sim", label: "Sim", points: 1 }, { value: "nao", label: "Não", points: 0 }] },
+      { key: "importacao_extratos", label: "Como os extratos bancários são importados?", type: "radio", options: [
+        { value: "nao_importados", label: "Não são importados", points: 0 },
+        { value: "manualmente", label: "Manualmente", points: 1 },
+        { value: "automaticamente", label: "Automaticamente", points: 2 },
+      ]},
+      { key: "integracao_sistemas", label: "Dados financeiros são integrados entre os sistemas?", type: "radio", options: [
+        { value: "nao", label: "Não", points: 0 },
+        { value: "parcialmente", label: "Parcialmente", points: 1 },
+        { value: "sim", label: "Sim", points: 3 },
+      ]},
+      { key: "dashboard_financeiro", label: "A empresa utiliza Dashboard financeiro?", type: "radio", options: [
+        { value: "nao", label: "Não", points: 0 },
+        { value: "planilhas", label: "Planilhas e relatórios manuais", points: 1 },
+        { value: "bi", label: "BI", points: 2 },
+        { value: "sistema", label: "Sistema", points: 3 },
+      ]},
+      { key: "indicadores_financeiros", label: "Existem Indicadores Financeiros Monitorados?", type: "radio", options: [
+        { value: "nao", label: "Não", points: 0 },
+        { value: "alguns", label: "Alguns", points: 1 },
+        { value: "sim", label: "Sim, vários", points: 2 },
+      ]},
     ],
   },
 ];
 
 const FALLBACK_THRESHOLDS = [
-  { level: 1, label: "Controle básico", min_score: 0, max_score: 2 },
-  { level: 2, label: "Financeiro estruturado", min_score: 3, max_score: 4 },
-  { level: 3, label: "Controladoria", min_score: 5, max_score: 6 },
-  { level: 4, label: "Governança financeira", min_score: 7, max_score: 8 },
-  { level: 5, label: "Gestão orientada por dados", min_score: 9, max_score: 99 },
+  { level: 1, label: "Controle básico", min_score: 0, max_score: 20 },
+  { level: 2, label: "Financeiro estruturado", min_score: 21, max_score: 40 },
+  { level: 3, label: "Controladoria", min_score: 41, max_score: 60 },
+  { level: 4, label: "Governança financeira", min_score: 61, max_score: 80 },
+  { level: 5, label: "Gestão orientada por dados", min_score: 81, max_score: 100 },
 ];
 
-const COMPLEXITY_THRESHOLDS = [
-  { min: 0, max: 3, label: "Baixa", color: "text-green-600 border-green-400 bg-green-50" },
-  { min: 4, max: 6, label: "Média", color: "text-yellow-600 border-yellow-400 bg-yellow-50" },
-  { min: 7, max: 9, label: "Alta", color: "text-orange-600 border-orange-400 bg-orange-50" },
-  { min: 10, max: 999, label: "Muito Alta", color: "text-red-600 border-red-400 bg-red-50" },
+const FALLBACK_COMPLEXITY_THRESHOLDS = [
+  { min: 0, max: 25, label: "Baixa", color: "text-green-600 border-green-400 bg-green-50" },
+  { min: 26, max: 50, label: "Média", color: "text-yellow-600 border-yellow-400 bg-yellow-50" },
+  { min: 51, max: 75, label: "Alta", color: "text-orange-600 border-orange-400 bg-orange-50" },
+  { min: 76, max: 100, label: "Muito Alta", color: "text-red-600 border-red-400 bg-red-50" },
 ];
 
-function getComplexityBadge(score: number) {
-  const t = COMPLEXITY_THRESHOLDS.find((th) => score >= th.min && score <= th.max) || COMPLEXITY_THRESHOLDS[0];
+function getComplexityBadge(pct: number, complexityThresholds: any[]) {
+  const t = complexityThresholds.find((th) => pct >= th.min && pct <= th.max) || complexityThresholds[0];
   return t;
 }
 
@@ -157,6 +261,20 @@ function calcSectionScore(section: any, answers: Record<string, string>): number
   return score;
 }
 
+function calcSectionMaxPoints(section: any): number {
+  if (section.max_points) return section.max_points;
+  let max = 0;
+  for (const q of section.questions) {
+    if (q.type === "number_input" || q.key === "qtd_contas_bancarias") {
+      max += 5;
+    } else {
+      const maxOpt = Math.max(...(q.options?.map((o: any) => o.points ?? 0) || [0]));
+      max += maxOpt;
+    }
+  }
+  return max;
+}
+
 export function Step1Diagnostico({ data, onChange }: Props) {
   const { getStepConfig, isLoading } = useOnboardingConfig();
   const [answers, setAnswers] = useState<Record<string, string>>(data?.answers || {});
@@ -167,17 +285,34 @@ export function Step1Diagnostico({ data, onChange }: Props) {
     return [...s].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
   }, [stepConfig]);
   const thresholds = useMemo(() => stepConfig?.thresholds || FALLBACK_THRESHOLDS, [stepConfig]);
+  const complexityThresholds = useMemo(() => stepConfig?.complexity_thresholds || FALLBACK_COMPLEXITY_THRESHOLDS, [stepConfig]);
+
+  const sectionScores = useMemo(() => {
+    const scores: Record<string, { score: number; max: number; pct: number }> = {};
+    for (const section of sections) {
+      const score = calcSectionScore(section, answers);
+      const max = calcSectionMaxPoints(section);
+      scores[section.key] = { score, max, pct: max > 0 ? Math.round((score / max) * 100) : 0 };
+    }
+    return scores;
+  }, [answers, sections]);
+
+  const totalScore = useMemo(() => {
+    return Object.values(sectionScores).reduce((sum, s) => sum + s.score, 0);
+  }, [sectionScores]);
+
+  const totalMax = useMemo(() => {
+    return Object.values(sectionScores).reduce((sum, s) => sum + s.max, 0);
+  }, [sectionScores]);
+
+  const totalPct = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
 
   const maturityLevel = useMemo(() => {
-    let score = 0;
-    for (const section of sections) {
-      score += calcSectionScore(section, answers);
-    }
     for (const t of [...thresholds].sort((a: any, b: any) => b.level - a.level)) {
-      if (score >= t.min_score) return t.level;
+      if (totalPct >= t.min_score) return t.level;
     }
     return 1;
-  }, [answers, sections, thresholds]);
+  }, [totalPct, thresholds]);
 
   const maturityLabel = useMemo(() => {
     const t = thresholds.find((th: any) => th.level === maturityLevel);
@@ -185,7 +320,7 @@ export function Step1Diagnostico({ data, onChange }: Props) {
   }, [maturityLevel, thresholds]);
 
   useEffect(() => {
-    onChange({ answers, maturity_level: maturityLevel });
+    onChange({ answers, maturity_level: maturityLevel, total_score: totalScore, total_pct: totalPct });
   }, [answers]);
 
   const set = (key: string, val: string) => setAnswers((prev) => ({ ...prev, [key]: val }));
@@ -193,6 +328,8 @@ export function Step1Diagnostico({ data, onChange }: Props) {
   if (isLoading) {
     return <div className="flex items-center justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
+
+  const answeredKeys = Object.keys(answers).filter(k => answers[k]);
 
   return (
     <div className="space-y-6">
@@ -208,8 +345,8 @@ export function Step1Diagnostico({ data, onChange }: Props) {
             !q.conditional || answers[q.conditional.key] === q.conditional.value
           );
           const answeredCount = visibleQuestions.filter((q: any) => answers[q.key]).length;
-          const sectionScore = calcSectionScore(section, answers);
-          const complexity = getComplexityBadge(sectionScore);
+          const ss = sectionScores[section.key] || { score: 0, max: 0, pct: 0 };
+          const complexity = getComplexityBadge(ss.pct, complexityThresholds);
 
           return (
             <AccordionItem key={section.key} value={section.key} className="border rounded-lg px-4">
@@ -220,9 +357,9 @@ export function Step1Diagnostico({ data, onChange }: Props) {
                   <Badge variant={answeredCount === visibleQuestions.length && answeredCount > 0 ? "default" : "secondary"}>
                     {answeredCount}/{visibleQuestions.length}
                   </Badge>
-                  {answeredCount > 0 && sectionScore > 0 && (
+                  {answeredCount > 0 && ss.score > 0 && (
                     <Badge variant="outline" className={complexity.color}>
-                      {complexity.label}
+                      {ss.score}/{ss.max} pts — {complexity.label}
                     </Badge>
                   )}
                 </div>
@@ -230,12 +367,10 @@ export function Step1Diagnostico({ data, onChange }: Props) {
               <AccordionContent>
                 <div className="space-y-5 py-1">
                   {section.questions.map((q: any) => {
-                    // Conditional visibility
                     if (q.conditional && answers[q.conditional.key] !== q.conditional.value) {
                       return null;
                     }
 
-                    // Number input (contas bancárias)
                     if (q.type === "number_input") {
                       return (
                         <div key={q.key} className="space-y-2">
@@ -251,14 +386,13 @@ export function Step1Diagnostico({ data, onChange }: Props) {
                           />
                           {answers[q.key] && parseInt(answers[q.key]) > 0 && (
                             <p className="text-xs text-muted-foreground">
-                              Score: {calcContasBancariasScore(answers[q.key])} ponto(s)
+                              Score: {calcContasBancariasScore(answers[q.key])} ponto(s) (máx. 5)
                             </p>
                           )}
                         </div>
                       );
                     }
 
-                    // Select with free input (segmento)
                     if (q.type === "select_input") {
                       return (
                         <div key={q.key} className="space-y-2">
@@ -281,9 +415,9 @@ export function Step1Diagnostico({ data, onChange }: Props) {
                           </div>
                           {answers[q.key] === "outro" && (
                             <Input
-                              placeholder="Especifique o segmento"
-                              value={answers["segmento_outro"] || ""}
-                              onChange={(e) => set("segmento_outro", e.target.value)}
+                              placeholder="Especifique"
+                              value={answers[`${q.key}_outro`] || ""}
+                              onChange={(e) => set(`${q.key}_outro`, e.target.value)}
                               className="mt-2 max-w-[300px]"
                             />
                           )}
@@ -291,7 +425,6 @@ export function Step1Diagnostico({ data, onChange }: Props) {
                       );
                     }
 
-                    // Default: radio
                     return (
                       <div key={q.key} className="space-y-2">
                         <Label>{q.label}</Label>
@@ -307,19 +440,19 @@ export function Step1Diagnostico({ data, onChange }: Props) {
                     );
                   })}
 
-                  {/* Section complexity score card */}
-                  {answeredCount >= 2 && sectionScore > 0 && (
+                  {answeredCount >= 2 && ss.score > 0 && (
                     <Card className={`border mt-4 ${complexity.color}`}>
                       <CardContent className="py-3 px-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <TrendingUp size={16} />
-                            <span className="text-sm font-medium">Complexidade da {section.label}</span>
+                            <span className="text-sm font-medium">{section.label}</span>
                           </div>
                           <Badge variant="outline" className={complexity.color}>
-                            {sectionScore} pts — {complexity.label}
+                            {ss.score}/{ss.max} pts — {complexity.label}
                           </Badge>
                         </div>
+                        <Progress value={ss.pct} className="mt-2 h-2" />
                       </CardContent>
                     </Card>
                   )}
@@ -330,15 +463,34 @@ export function Step1Diagnostico({ data, onChange }: Props) {
         })}
       </Accordion>
 
-      {Object.keys(answers).length >= 3 && (
+      {answeredKeys.length >= 5 && (
         <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+          <CardContent className="pt-6 space-y-4">
+            {/* Section breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {sections.map((section: any) => {
+                const ss = sectionScores[section.key] || { score: 0, max: 0, pct: 0 };
+                const Icon = ICON_MAP[section.icon] || FileText;
+                return (
+                  <div key={section.key} className="text-center space-y-1">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                      <Icon size={14} />
+                      <span className="text-xs">{section.label}</span>
+                    </div>
+                    <p className="text-lg font-bold text-foreground">{ss.score}<span className="text-sm font-normal text-muted-foreground">/{ss.max}</span></p>
+                    <Progress value={ss.pct} className="h-1.5" />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="border-t pt-4 flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Nível de Maturidade Estimado</p>
+                <p className="text-sm text-muted-foreground">Score Total — Nível de Maturidade</p>
                 <p className="text-xl font-bold text-foreground">
                   Nível {maturityLevel} — {maturityLabel}
                 </p>
+                <p className="text-sm text-muted-foreground mt-1">{totalScore} de {totalMax} pontos ({totalPct}%)</p>
               </div>
               <Badge variant="outline" className="text-lg px-4 py-2 border-primary text-primary">
                 {maturityLevel}/5
