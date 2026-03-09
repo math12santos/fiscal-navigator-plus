@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import {
   Target, ClipboardList, TrendingUp, Shield, Plus, Sparkles, Loader2,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Props {
   data: Record<string, any>;
@@ -94,17 +95,14 @@ export function Step6Planejamento({ data, onChange }: Props) {
   return (
     <Card>
       <CardContent className="pt-6 space-y-2">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="rounded-lg bg-primary/10 p-2">
-            <Target className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Planejamento Financeiro</h2>
-            <p className="text-sm text-muted-foreground">Configure orçamento, cenários e parâmetros de liquidez</p>
-          </div>
-        </div>
+        <StepHeader
+          stepNumber={6}
+          fallbackTitle="Planejamento Financeiro"
+          fallbackDescription="Configure orçamento, cenários e parâmetros de liquidez"
+          fallbackIcon={Target}
+        />
 
-        <Accordion type="multiple" defaultValue={["budget", "scenarios", "liquidity"]} className="space-y-2">
+        <Accordion type="single" collapsible defaultValue="budget" className="space-y-2">
           {/* ── Orçamento ── */}
           <AccordionItem value="budget" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">

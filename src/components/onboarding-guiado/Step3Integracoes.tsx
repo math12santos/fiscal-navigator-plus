@@ -15,6 +15,7 @@ import {
 import {
   Upload, FileSpreadsheet, Building2, Plug, CheckCircle2, Loader2, X, Eye,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Step3Props {
   data: Record<string, any>;
@@ -218,12 +219,12 @@ export function Step3Integracoes({ data, onChange }: Step3Props) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Integrações</h2>
-        <p className="text-muted-foreground mt-1">
-          Conecte fontes de dados ao sistema. Comece importando planilhas.
-        </p>
-      </div>
+      <StepHeader
+        stepNumber={3}
+        fallbackTitle="Integrações"
+        fallbackDescription="Conecte fontes de dados ao sistema. Comece importando planilhas."
+        fallbackIcon={Plug}
+      />
 
       {/* Source cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

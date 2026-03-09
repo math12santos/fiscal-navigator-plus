@@ -10,6 +10,7 @@ import { ptBR } from "date-fns/locale";
 import {
   CalendarIcon, Lightbulb, Bell, BarChart3, FileCheck, ClipboardList, CheckCircle2, PlayCircle,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Props {
   data: Record<string, any>;
@@ -42,15 +43,12 @@ export function Step9Assistida({ assistedStartDate, onStart }: Props) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Lightbulb size={24} className="text-primary" />
-          Operação Assistida
-        </h2>
-        <p className="text-muted-foreground mt-1">
-          Configure o acompanhamento inteligente nos primeiros 90 dias.
-        </p>
-      </div>
+      <StepHeader
+        stepNumber={9}
+        fallbackTitle="Operação Assistida"
+        fallbackDescription="Configure o acompanhamento inteligente nos primeiros 90 dias."
+        fallbackIcon={Lightbulb}
+      />
 
       {/* Explanation */}
       <Card>

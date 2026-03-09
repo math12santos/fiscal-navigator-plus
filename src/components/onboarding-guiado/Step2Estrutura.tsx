@@ -41,6 +41,7 @@ import {
   Crown,
   Info,
 } from "lucide-react";
+import { StepHeader } from "./StepHeader";
 
 interface Step2EstruturaProps {
   data: Record<string, any>;
@@ -298,14 +299,14 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
 
   return (
     <div className="space-y-2">
-      <div className="mb-4">
-        <h2 className="text-2xl font-bold text-foreground">Estrutura da Empresa</h2>
-        <p className="text-muted-foreground mt-1">
-          Configure a estrutura organizacional do grupo: empresas, usuários e áreas.
-        </p>
-      </div>
+      <StepHeader
+        stepNumber={2}
+        fallbackTitle="Estrutura da Empresa"
+        fallbackDescription="Configure a estrutura organizacional do grupo: empresas, usuários e áreas."
+        fallbackIcon={Building2}
+      />
 
-      <Accordion type="multiple" defaultValue={["companies", "users", "areas"]} className="space-y-3">
+      <Accordion type="single" collapsible defaultValue="users" className="space-y-3">
         {/* =================== SECTION 1: COMPANIES (only for holdings) =================== */}
         {isHolding && (
         <AccordionItem value="companies" className="border border-border rounded-lg px-4">
