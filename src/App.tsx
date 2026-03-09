@@ -156,6 +156,7 @@ function BackofficeRoutes() {
           <Route path="/auditoria" element={<Suspense fallback={<LoadingFallback />}><BackofficeAudit /></Suspense>} />
           <Route path="/config" element={<Suspense fallback={<LoadingFallback />}><BackofficeConfig /></Suspense>} />
           <Route path="/empresa/:orgId" element={<Suspense fallback={<LoadingFallback />}><BackofficeCompany /></Suspense>} />
+          <Route path="/onboarding" element={<Suspense fallback={<LoadingFallback />}><BackofficeOnboarding /></Suspense>} />
           <Route path="*" element={<Suspense fallback={<LoadingFallback />}><NotFound /></Suspense>} />
         </Routes>
       </BackofficeLayout>
