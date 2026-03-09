@@ -372,20 +372,43 @@ export default function Dashboard() {
             <span className="text-xs text-muted-foreground ml-auto">Últimos 6 meses</span>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyData} barGap={4}>
+            <AreaChart data={monthlyData}>
+              <defs>
+                <linearGradient id="gradReceita" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
+                </linearGradient>
+                <linearGradient id="gradDespesas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)}
+                tickFormatter={(v) => v >= 1000000 ? `R$ ${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `R$ ${(v / 1000).toFixed(0)}k` : `R$ ${v}`}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="receita" name="Receita" fill="hsl(var(--success))" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="despesas" name="Despesas" fill="hsl(var(--destructive))" radius={[6, 6, 0, 0]} />
-            </BarChart>
+              <Area
+                type="monotone"
+                dataKey="receita"
+                name="Receita"
+                stroke="hsl(var(--primary))"
+                fill="url(#gradReceita)"
+                strokeWidth={2.5}
+              />
+              <Area
+                type="monotone"
+                dataKey="despesas"
+                name="Despesas"
+                stroke="hsl(var(--destructive))"
+                fill="url(#gradDespesas)"
+                strokeWidth={2}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
 
