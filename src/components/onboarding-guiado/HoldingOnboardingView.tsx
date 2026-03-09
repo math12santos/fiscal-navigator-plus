@@ -5,7 +5,9 @@ import { useHolding } from "@/contexts/HoldingContext";
 import { useOrganization, Organization } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, ArrowRight, CheckCircle2, Clock, Circle, Loader2 } from "lucide-react";
+import { Building2, ArrowRight, CheckCircle2, Clock, Circle, Loader2, Plus } from "lucide-react";
+import { CreateSubsidiaryDialog } from "./CreateSubsidiaryDialog";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SubOnboardingStatus {
   org: Organization;
