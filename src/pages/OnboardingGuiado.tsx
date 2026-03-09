@@ -49,16 +49,11 @@ export default function OnboardingGuiado() {
     useOnboardingProgress();
   const { getStepConfig, isLoading: configLoading } = useOnboardingConfig();
 
-  // If current org is a holding, show subsidiary selection view
-  if (isHolding) {
-    return <HoldingOnboardingView />;
-  }
-
   useEffect(() => {
-    if (!loading && !progress && user && currentOrg) {
+    if (!isHolding && !loading && !progress && user && currentOrg) {
       initProgress();
     }
-  }, [loading, progress, user, currentOrg]);
+  }, [isHolding, loading, progress, user, currentOrg]);
 
   const currentStep = progress?.current_step ?? 1;
   const completedSteps = progress?.completed_steps ?? [];
