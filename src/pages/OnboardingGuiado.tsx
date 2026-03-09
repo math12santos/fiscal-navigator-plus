@@ -126,7 +126,13 @@ export default function OnboardingGuiado() {
           {currentStep === 10 && (
             <Step10Score data={getStepData(10)} completedSteps={completedSteps} onChange={(d) => updateStepData(10, d)} />
           )}
-          {currentStep >= 2 && currentStep <= 9 && shellStepData && (
+          {currentStep === 2 && (
+            <Step2Estrutura
+              data={getStepData(2)}
+              onChange={(d) => updateStepData(2, d)}
+            />
+          )}
+          {currentStep >= 3 && currentStep <= 9 && shellStepData && (
             <StepShell {...shellStepData} />
           )}
         </div>
