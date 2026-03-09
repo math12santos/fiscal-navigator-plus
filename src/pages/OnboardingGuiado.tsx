@@ -168,8 +168,20 @@ export default function OnboardingGuiado() {
               onChange={(d) => updateStepData(7, d)}
             />
           )}
-          {currentStep >= 8 && currentStep <= 9 && shellStepData && (
-            <StepShell {...shellStepData} />
+          {currentStep === 8 && (
+            <Step8Cockpit
+              data={getStepData(8)}
+              completedSteps={completedSteps}
+              cockpitActivated={progress?.cockpit_activated ?? false}
+              onActivate={() => saveProgress({ cockpit_activated: true })}
+            />
+          )}
+          {currentStep === 9 && (
+            <Step9Assistida
+              data={getStepData(9)}
+              assistedStartDate={progress?.assisted_start_date ?? null}
+              onStart={(date) => saveProgress({ assisted_start_date: date })}
+            />
           )}
         </div>
 
