@@ -10,6 +10,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, Legend, LineChart, Line,
 } from "recharts";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
