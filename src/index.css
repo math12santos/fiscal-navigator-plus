@@ -134,13 +134,17 @@
 
 @layer utilities {
   .glass-card {
-    @apply bg-card backdrop-blur-xl border border-border rounded-xl;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    @apply bg-card border border-border rounded-xl;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 
   .dark .glass-card {
-    @apply bg-card/60 border-border/40;
+    @apply bg-card/60 backdrop-blur-xl border-border/40;
     box-shadow: none;
+  }
+
+  .content-layer {
+    @apply bg-secondary rounded-2xl;
   }
 
   .gradient-text {
