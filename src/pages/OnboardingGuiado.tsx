@@ -107,6 +107,11 @@ export default function OnboardingGuiado() {
     navigate("/");
   }, [navigate, finishOnboarding, getStepData]);
 
+  // If current org is a holding, show subsidiary selection view
+  if (isHolding) {
+    return <HoldingOnboardingView />;
+  }
+
   if (loading || configLoading || holdingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
