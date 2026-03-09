@@ -116,7 +116,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <div className="text-xs text-sidebar-foreground/70 truncate">{user?.email}</div>
             <button
               onClick={signOut}
-              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors w-full"
+              className="flex items-center gap-2 text-xs text-sidebar-foreground/70 hover:text-destructive transition-colors w-full"
             >
               <LogOut size={14} /> Sair
             </button>
