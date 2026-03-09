@@ -5,7 +5,9 @@ import { useHolding } from "@/contexts/HoldingContext";
 import { useOrganization, Organization } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, ArrowRight, CheckCircle2, Clock, Circle, Loader2 } from "lucide-react";
+import { Building2, ArrowRight, CheckCircle2, Clock, Circle, Loader2, Plus } from "lucide-react";
+import { CreateSubsidiaryDialog } from "./CreateSubsidiaryDialog";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SubOnboardingStatus {
   org: Organization;
@@ -16,9 +18,11 @@ interface SubOnboardingStatus {
 export function HoldingOnboardingView() {
   const navigate = useNavigate();
   const { subsidiaryOrgs, isLoading: holdingLoading } = useHolding();
-  const { setCurrentOrg } = useOrganization();
+  const { currentOrg, setCurrentOrg } = useOrganization();
+  const qc = useQueryClient();
   const [statuses, setStatuses] = useState<SubOnboardingStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   useEffect(() => {
     if (holdingLoading || subsidiaryOrgs.length === 0) {
@@ -93,7 +97,7 @@ export function HoldingOnboardingView() {
 
         {subsidiaryOrgs.length === 0 ? (
           <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground text-sm">
-            Nenhuma subsidiária vinculada a esta holding. Vincule empresas pelo painel administrativo.
+            Nenhuma subsidiária vinculada a esta holding. Adicione uma empresa para começar.
           </div>
         ) : (
           <div className="space-y-3">
@@ -125,11 +129,27 @@ export function HoldingOnboardingView() {
           </div>
         )}
 
-        <div className="flex justify-center">
+        <div className="flex items-center justify-center gap-3">
           <Button variant="ghost" onClick={() => navigate("/")}>
             Voltar ao Dashboard
           </Button>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus size={16} className="mr-1" />
+            Adicionar Empresa
+          </Button>
         </div>
+
+        {currentOrg && (
+          <CreateSubsidiaryDialog
+            open={showCreateDialog}
+            onOpenChange={setShowCreateDialog}
+            holdingId={currentOrg.id}
+            onCreated={() => {
+              qc.invalidateQueries({ queryKey: ["holding_subsidiaries"] });
+              qc.invalidateQueries({ queryKey: ["organization_holdings"] });
+            }}
+          />
+        )}
       </div>
     </div>
   );
