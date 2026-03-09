@@ -11,6 +11,7 @@ import {
   ChevronRight,
   LogOut,
   LayoutDashboard,
+  Rocket,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const navItems = [
   { path: "/backoffice/usuarios", label: "Usuários", icon: Users },
   { path: "/backoffice/sistema", label: "Sistema", icon: Wrench },
   { path: "/backoffice/auditoria", label: "Auditoria", icon: Activity },
+  { path: "/backoffice/onboarding", label: "Onboarding", icon: Rocket },
   { path: "/backoffice/config", label: "Configurações", icon: Settings },
 ];
 

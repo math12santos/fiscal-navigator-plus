@@ -34,6 +34,8 @@ const BackofficeUsers = lazy(() => import("@/pages/BackofficeUsers"));
 const BackofficeAudit = lazy(() => import("@/pages/BackofficeAudit"));
 const BackofficeConfig = lazy(() => import("@/pages/BackofficeConfig"));
 const BackofficeSystem = lazy(() => import("@/pages/BackofficeSystem"));
+const BackofficeOnboarding = lazy(() => import("@/pages/BackofficeOnboarding"));
+const OnboardingGuiado = lazy(() => import("@/pages/OnboardingGuiado"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const ModuleMaintenanceGuard = lazy(() => import("@/components/ModuleMaintenanceGuard"));
@@ -154,6 +156,7 @@ function BackofficeRoutes() {
           <Route path="/auditoria" element={<Suspense fallback={<LoadingFallback />}><BackofficeAudit /></Suspense>} />
           <Route path="/config" element={<Suspense fallback={<LoadingFallback />}><BackofficeConfig /></Suspense>} />
           <Route path="/empresa/:orgId" element={<Suspense fallback={<LoadingFallback />}><BackofficeCompany /></Suspense>} />
+          <Route path="/onboarding" element={<Suspense fallback={<LoadingFallback />}><BackofficeOnboarding /></Suspense>} />
           <Route path="*" element={<Suspense fallback={<LoadingFallback />}><NotFound /></Suspense>} />
         </Routes>
       </BackofficeLayout>
@@ -200,6 +203,9 @@ const App = () => (
               <Routes>
                 <Route path="/auth" element={<AuthRoute />} />
                 <Route path="/onboarding" element={<OnboardingRoute />} />
+                <Route path="/onboarding-guiado" element={
+                  <Suspense fallback={<LoadingFallback />}><OnboardingGuiado /></Suspense>
+                } />
                 <Route path="/backoffice/*" element={<BackofficeRoutes />} />
                 <Route path="/*" element={<ProtectedRoutes />} />
               </Routes>
