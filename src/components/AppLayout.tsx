@@ -104,7 +104,20 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-        </nav>
+          {showOnboardingLink && (
+            <Link
+              to="/onboarding-guiado"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/onboarding-guiado"
+                  ? "bg-primary/10 text-primary glow-primary"
+                  : "text-primary/80 hover:bg-primary/5 hover:text-primary"
+              )}
+            >
+              <Rocket size={18} />
+              {!collapsed && <span>Onboarding</span>}
+            </Link>
+          )}
 
         {/* Footer */}
         {!collapsed && (

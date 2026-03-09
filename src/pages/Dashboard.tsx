@@ -178,6 +178,28 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* BANNER ONBOARDING GUIADO */}
+      {!onboardingLoading && (!onboardingProgress || onboardingProgress.status !== "concluido") && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+              <Rocket size={20} className="text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Implantação Financeira</p>
+              <p className="text-xs text-muted-foreground">
+                {onboardingProgress
+                  ? `Etapa ${onboardingProgress.current_step} de 10 — Continue a configuração do seu cockpit financeiro`
+                  : "Configure seu cockpit financeiro com o onboarding guiado"}
+              </p>
+            </div>
+          </div>
+          <Button size="sm" onClick={() => navigate("/onboarding-guiado")}>
+            {onboardingProgress ? "Continuar" : "Iniciar"}
+          </Button>
+        </div>
+      )}
+
       {/* HEADER */}
       <PageHeader
         title="Dashboard Financeiro"
