@@ -57,18 +57,18 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex flex-col border-r border-border/50 bg-sidebar transition-all duration-300",
+          "flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300",
           collapsed ? "w-16" : "w-60"
         )}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-border/50 px-4">
+        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
           {!collapsed && (
             <span className="text-lg font-bold gradient-text tracking-tight">Colli FinCore</span>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            className="rounded-md p-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
           >
             {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
