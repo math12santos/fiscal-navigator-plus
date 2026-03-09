@@ -75,7 +75,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Org Selector */}
-        <div className="border-b border-border/50 p-2 space-y-2">
+        <div className="border-b border-sidebar-border p-2 space-y-2">
           <OrgSelector collapsed={collapsed} />
           {!collapsed && <ScopeIndicator />}
         </div>
