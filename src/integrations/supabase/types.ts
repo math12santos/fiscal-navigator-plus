@@ -2211,6 +2211,124 @@ export type Database = {
           },
         ]
       }
+      onboarding_progress: {
+        Row: {
+          assisted_start_date: string | null
+          cockpit_activated: boolean | null
+          completed_at: string | null
+          completed_steps: number[]
+          contracts_data: Json | null
+          current_step: number
+          diagnosis_answers: Json | null
+          financial_structure_data: Json | null
+          id: string
+          integrations_data: Json | null
+          maturity_level: number | null
+          maturity_score: string | null
+          organization_id: string
+          planning_data: Json | null
+          routines_data: Json | null
+          score_dimensions: Json | null
+          started_at: string | null
+          status: string
+          structure_data: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          assisted_start_date?: string | null
+          cockpit_activated?: boolean | null
+          completed_at?: string | null
+          completed_steps?: number[]
+          contracts_data?: Json | null
+          current_step?: number
+          diagnosis_answers?: Json | null
+          financial_structure_data?: Json | null
+          id?: string
+          integrations_data?: Json | null
+          maturity_level?: number | null
+          maturity_score?: string | null
+          organization_id: string
+          planning_data?: Json | null
+          routines_data?: Json | null
+          score_dimensions?: Json | null
+          started_at?: string | null
+          status?: string
+          structure_data?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          assisted_start_date?: string | null
+          cockpit_activated?: boolean | null
+          completed_at?: string | null
+          completed_steps?: number[]
+          contracts_data?: Json | null
+          current_step?: number
+          diagnosis_answers?: Json | null
+          financial_structure_data?: Json | null
+          id?: string
+          integrations_data?: Json | null
+          maturity_level?: number | null
+          maturity_score?: string | null
+          organization_id?: string
+          planning_data?: Json | null
+          routines_data?: Json | null
+          score_dimensions?: Json | null
+          started_at?: string | null
+          status?: string
+          structure_data?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_progress_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_recommendations: {
+        Row: {
+          category: string
+          created_at: string | null
+          dismissed: boolean | null
+          id: string
+          message: string
+          organization_id: string
+          priority: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string | null
+          dismissed?: boolean | null
+          id?: string
+          message: string
+          organization_id: string
+          priority?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          dismissed?: boolean | null
+          id?: string
+          message?: string
+          organization_id?: string
+          priority?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_recommendations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_holdings: {
         Row: {
           created_at: string
