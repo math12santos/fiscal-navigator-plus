@@ -6,8 +6,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DropdownMenuTrigger } from
+"@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -31,12 +31,12 @@ export default function OrgSelector({ collapsed }: OrgSelectorProps) {
       <Button
         variant="ghost"
         className="w-full justify-start px-3 h-auto py-2 text-sm text-muted-foreground"
-        onClick={() => navigate("/nova-empresa")}
-      >
+        onClick={() => navigate("/nova-empresa")}>
+        
         <Plus size={16} className="mr-2 shrink-0" />
         {!collapsed && "Cadastrar Empresa"}
-      </Button>
-    );
+      </Button>);
+
   }
 
   if (collapsed) {
@@ -48,26 +48,26 @@ export default function OrgSelector({ collapsed }: OrgSelectorProps) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="start" className="w-64">
-          {organizations.map((org) => (
-            <DropdownMenuItem
-              key={org.id}
-              onClick={() => setCurrentOrg(org)}
-              className="flex items-center justify-between"
-            >
+          {organizations.map((org) =>
+          <DropdownMenuItem
+            key={org.id}
+            onClick={() => setCurrentOrg(org)}
+            className="flex items-center justify-between">
+            
               <div>
                 <div className="font-medium text-sm">{org.name}</div>
                 <div className="text-xs text-muted-foreground">{formatDoc(org.document_type, org.document_number)}</div>
               </div>
               {org.id === currentOrg.id && <Check size={14} className="text-primary" />}
             </DropdownMenuItem>
-          ))}
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => navigate("/nova-empresa")}>
             <Plus size={14} className="mr-2" /> Nova Empresa
           </DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
-    );
+      </DropdownMenu>);
+
   }
 
   return (
@@ -77,7 +77,7 @@ export default function OrgSelector({ collapsed }: OrgSelectorProps) {
           <div className="flex items-center gap-2 min-w-0">
             <Building2 size={16} className="text-primary shrink-0" />
             <div className="text-left min-w-0">
-              <div className="text-sm font-medium truncate">{currentOrg.name}</div>
+              <div className="text-sm font-medium truncate text-primary">{currentOrg.name}</div>
               <div className="text-[10px] text-muted-foreground">
                 {currentOrg.document_type}: {formatDoc(currentOrg.document_type, currentOrg.document_number)}
               </div>
@@ -87,12 +87,12 @@ export default function OrgSelector({ collapsed }: OrgSelectorProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        {organizations.map((org) => (
-          <DropdownMenuItem
-            key={org.id}
-            onClick={() => setCurrentOrg(org)}
-            className={cn("flex items-center justify-between", org.id === currentOrg.id && "bg-secondary/50")}
-          >
+        {organizations.map((org) =>
+        <DropdownMenuItem
+          key={org.id}
+          onClick={() => setCurrentOrg(org)}
+          className={cn("flex items-center justify-between", org.id === currentOrg.id && "bg-secondary/50")}>
+          
             <div>
               <div className="font-medium text-sm">{org.name}</div>
               <div className="text-xs text-muted-foreground">
@@ -101,12 +101,12 @@ export default function OrgSelector({ collapsed }: OrgSelectorProps) {
             </div>
             {org.id === currentOrg.id && <Check size={14} className="text-primary" />}
           </DropdownMenuItem>
-        ))}
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate("/nova-empresa")}>
           <Plus size={14} className="mr-2" /> Nova Empresa
         </DropdownMenuItem>
       </DropdownMenuContent>
-    </DropdownMenu>
-  );
+    </DropdownMenu>);
+
 }
