@@ -124,9 +124,9 @@ export default function Planejamento() {
 
       {/* Tabs */}
       <Tabs defaultValue={allowedTabs[0]?.key || "visao-geral"} className="space-y-4">
-        <TabsList className={cn("grid w-full", `grid-cols-${allowedTabs.length}`)}>
+        <TabsList className="flex w-full flex-wrap">
           {allowedTabs.map((t) => (
-            <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
+            <TabsTrigger key={t.key} value={t.key} className="flex-1 min-w-[100px]">{t.label}</TabsTrigger>
           ))}
         </TabsList>
 
