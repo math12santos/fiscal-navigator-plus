@@ -100,7 +100,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         setCurrentRole(mem?.role ?? null);
       }
     } catch (err) {
-      console.error("Error fetching organizations:", err);
+      if (import.meta.env.DEV) {
+        console.error("Error fetching organizations:", err);
+      }
     } finally {
       setLoading(false);
     }

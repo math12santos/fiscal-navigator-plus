@@ -21,7 +21,9 @@ export function useAuditLog() {
         user_id: user.id,
         ...entry,
       });
-      if (error) console.error("Audit log error:", error);
+      if (error && import.meta.env.DEV) {
+        console.error("Audit log error:", error);
+      }
     },
   });
 
