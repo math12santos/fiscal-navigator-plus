@@ -195,6 +195,7 @@ export function useUserPermissions() {
     isLoading: isLoading || orgModulesLoading || ccPermLoading,
     isMaster,
     isOwner,
+    isBackofficeUser,
     hasFullAccess,
     canAccessModule,
     canAccessTab,
