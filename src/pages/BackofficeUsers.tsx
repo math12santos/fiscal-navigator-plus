@@ -304,14 +304,25 @@ export default function BackofficeUsers() {
                       </Popover>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={profile?.active !== false ? "default" : "secondary"}>
-                        {profile?.active !== false ? "Ativo" : "Inativo"}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={profile?.active !== false ? "default" : "secondary"}>
+                          {profile?.active !== false ? "Ativo" : "Inativo"}
+                        </Badge>
+                        {boUserMap[u.userId] && (
+                          <Badge variant="outline" className="text-[10px] gap-0.5 border-primary/40 text-primary">
+                            <ShieldCheck size={10} />
+                            {boUserMap[u.userId].role === "backoffice_admin" ? "Admin BPO" : boUserMap[u.userId].role === "auditor" ? "Auditor" : "Operador"}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(u)} title="Editar usuário">
                           <Edit2 size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setBoDialogUser(u)} title="Backoffice BPO">
+                          <ShieldCheck size={14} />
                         </Button>
                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteUserTarget(u)} title="Excluir usuário">
                           <Trash2 size={14} />
