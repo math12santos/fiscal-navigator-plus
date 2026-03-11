@@ -45,11 +45,14 @@ export default function BackofficeUsers() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data: orgs = [] } = useBackofficeOrgs();
+  const { data: backofficeUsers = [] } = useBackofficeUsersList();
+  const { upsertBackofficeUser, removeBackofficeUser, assignOrgAccess, removeOrgAccess } = useManageBackofficeUsers();
   const [search, setSearch] = useState("");
   const [orgFilter, setOrgFilter] = useState("__all__");
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [deleteUserTarget, setDeleteUserTarget] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
+  const [boDialogUser, setBoDialogUser] = useState<any>(null);
 
   const handleDeleteUser = async () => {
     if (!deleteUserTarget) return;
