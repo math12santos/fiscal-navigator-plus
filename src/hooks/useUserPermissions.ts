@@ -50,10 +50,39 @@ export function useUserPermissions() {
     staleTime: 60_000,
   });
 
+  // Check if user is a backoffice operator with access to this org
+  const { data: isBackofficeUser = false } = useQuery({
+    queryKey: ["is_backoffice", user?.id, orgId],
+    queryFn: async () => {
+      if (!user) return false;
+      const { data } = await supabase
+        .from("backoffice_users" as any)
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (!data) return false;
+      const role = (data as any).role;
+      // master/backoffice_admin have access to all orgs
+      if (role === "master" || role === "backoffice_admin") return true;
+      // operators need specific org access
+      if (!orgId) return false;
+      const { data: access } = await supabase
+        .from("backoffice_organization_access" as any)
+        .select("organization_id")
+        .eq("user_id", user.id)
+        .eq("organization_id", orgId)
+        .maybeSingle();
+      return !!access;
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
   // Owners and admins always have full access
   const isOwner = currentRole === "owner";
   const isAdmin = currentRole === "admin";
-  const hasFullAccess = isMaster || isOwner || isAdmin;
+  const hasFullAccess = isMaster || isOwner || isAdmin || isBackofficeUser;
 
   // Inline cost center access (avoid circular dep with useUserDataScope)
   const { data: ccAccessIds = [] } = useQuery({
