@@ -13,7 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Plus, Edit2, Trash2, Building2 } from "lucide-react";
+import { Search, Plus, Edit2, Trash2, Building2, ShieldCheck } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
