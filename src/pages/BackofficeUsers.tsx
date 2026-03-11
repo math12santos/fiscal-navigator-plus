@@ -122,6 +122,18 @@ export default function BackofficeUsers() {
     return map;
   }, [orgs]);
 
+  const boUserMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    backofficeUsers.forEach((bu: any) => { map[bu.user_id] = bu; });
+    return map;
+  }, [backofficeUsers]);
+
+  const BO_ROLES = [
+    { value: "backoffice_operator", label: "Operador" },
+    { value: "backoffice_admin", label: "Admin BPO" },
+    { value: "auditor", label: "Auditor" },
+  ];
+
   // Build a unique user list with their memberships
   const userList = useMemo(() => {
     const grouped: Record<string, { userId: string; memberships: any[] }> = {};
