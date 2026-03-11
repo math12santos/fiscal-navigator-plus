@@ -420,6 +420,125 @@ export default function BackofficeUsers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Backoffice BPO Dialog */}
+      {boDialogUser && (
+        <BackofficeUserDialog
+          userId={boDialogUser.userId}
+          userName={profileMap[boDialogUser.userId]?.full_name || "Sem nome"}
+          currentBo={boUserMap[boDialogUser.userId]}
+          boRoles={BO_ROLES}
+          orgs={orgs}
+          orgMap={orgMap}
+          onClose={() => setBoDialogUser(null)}
+          onUpsert={(role) => upsertBackofficeUser.mutateAsync({ userId: boDialogUser.userId, role })}
+          onRemove={() => removeBackofficeUser.mutateAsync({ userId: boDialogUser.userId }).then(() => setBoDialogUser(null))}
+          onAssignOrg={(orgId) => assignOrgAccess.mutateAsync({ userId: boDialogUser.userId, orgId })}
+          onRemoveOrg={(orgId) => removeOrgAccess.mutateAsync({ userId: boDialogUser.userId, orgId })}
+        />
+      )}
     </div>
+  );
+}
+
+function BackofficeUserDialog({
+  userId, userName, currentBo, boRoles, orgs, orgMap, onClose, onUpsert, onRemove, onAssignOrg, onRemoveOrg,
+}: {
+  userId: string;
+  userName: string;
+  currentBo: any;
+  boRoles: { value: string; label: string }[];
+  orgs: any[];
+  orgMap: Record<string, string>;
+  onClose: () => void;
+  onUpsert: (role: string) => Promise<void>;
+  onRemove: () => Promise<void>;
+  onAssignOrg: (orgId: string) => Promise<void>;
+  onRemoveOrg: (orgId: string) => Promise<void>;
+}) {
+  const [role, setRole] = useState(currentBo?.role || "backoffice_operator");
+  const [saving, setSaving] = useState(false);
+  const { data: orgAccess = [], refetch } = useBackofficeOrgAccess(currentBo ? userId : undefined);
+  const { toast } = useToast();
+  const accessOrgIds = new Set(orgAccess.map((a: any) => a.organization_id));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onUpsert(role);
+      toast({ title: "Operador BPO atualizado" });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleOrg = async (orgId: string, checked: boolean) => {
+    try {
+      if (checked) {
+        await onAssignOrg(orgId);
+      } else {
+        await onRemoveOrg(orgId);
+      }
+      refetch();
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck size={18} className="text-primary" />
+            Acesso BackOffice — {userName}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label>Papel BackOffice</Label>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {boRoles.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button onClick={handleSave} disabled={saving} className="w-full">
+            {currentBo ? "Atualizar Papel" : "Ativar como Operador BPO"}
+          </Button>
+
+          {currentBo && role === "backoffice_operator" && (
+            <div className="space-y-2">
+              <Label>Organizações atribuídas</Label>
+              <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+                {orgs.map((org) => (
+                  <label key={org.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={accessOrgIds.has(org.id)}
+                      onCheckedChange={(checked) => handleToggleOrg(org.id, !!checked)}
+                    />
+                    <span className="truncate">{org.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {currentBo && (
+            <Button variant="destructive" size="sm" className="w-full" onClick={onRemove}>
+              Remover acesso BackOffice
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
