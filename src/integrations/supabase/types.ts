@@ -17,6 +17,7 @@ export type Database = {
       audit_log: {
         Row: {
           action: string
+          actor_type: string
           created_at: string
           entity_id: string
           entity_type: string
@@ -28,6 +29,7 @@ export type Database = {
         }
         Insert: {
           action: string
+          actor_type?: string
           created_at?: string
           entity_id: string
           entity_type: string
@@ -39,6 +41,7 @@ export type Database = {
         }
         Update: {
           action?: string
+          actor_type?: string
           created_at?: string
           entity_id?: string
           entity_type?: string
@@ -57,6 +60,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      backoffice_organization_access: {
+        Row: {
+          created_at: string
+          organization_id: string
+          scope: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          organization_id: string
+          scope?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          organization_id?: string
+          scope?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backoffice_organization_access_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "backoffice_organization_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "backoffice_users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      backoffice_users: {
+        Row: {
+          created_at: string
+          is_active: boolean
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          is_active?: boolean
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          is_active?: boolean
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       budget_lines: {
         Row: {
@@ -3563,12 +3623,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_backoffice_operator_to_org: {
+        Args: { _org_id: string; _target_user_id: string }
+        Returns: undefined
+      }
+      change_org_member_role: {
+        Args: { _new_role: string; _org_id: string; _target_user_id: string }
+        Returns: undefined
+      }
       check_linked_transactions: { Args: { p_user_id: string }; Returns: Json }
       get_all_subsidiary_ids: {
         Args: { p_holding_id: string }
         Returns: string[]
       }
       get_user_org_ids: { Args: { p_user_id: string }; Returns: string[] }
+      has_backoffice_org_access: { Args: { _org_id: string }; Returns: boolean }
+      has_backoffice_role: { Args: { _roles: string[] }; Returns: boolean }
       has_module_access: {
         Args: {
           p_module: string
@@ -3589,10 +3659,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      invite_org_member: {
+        Args: { _org_id: string; _role: string; _user_id: string }
+        Returns: undefined
+      }
+      is_backoffice: { Args: never; Returns: boolean }
       is_holding: { Args: { p_org_id: string }; Returns: boolean }
       is_org_member: {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean
+      }
+      remove_org_member: {
+        Args: { _org_id: string; _target_user_id: string }
+        Returns: undefined
       }
     }
     Enums: {

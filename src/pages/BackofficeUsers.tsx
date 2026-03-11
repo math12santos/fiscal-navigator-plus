@@ -13,7 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Plus, Edit2, Trash2, Building2 } from "lucide-react";
+import { Search, Plus, Edit2, Trash2, Building2, ShieldCheck } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,12 +24,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useBackofficeOrgs } from "@/hooks/useBackoffice";
+import { useBackofficeOrgs, useBackofficeUsers as useBackofficeUsersList, useManageBackofficeUsers, useBackofficeOrgAccess } from "@/hooks/useBackoffice";
 import { CreateUserDialog } from "@/components/CreateUserDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Shield } from "lucide-react";
 
 const ROLES = [
   { value: "owner", label: "Admin" },
@@ -43,11 +45,14 @@ export default function BackofficeUsers() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data: orgs = [] } = useBackofficeOrgs();
+  const { data: backofficeUsers = [] } = useBackofficeUsersList();
+  const { upsertBackofficeUser, removeBackofficeUser, assignOrgAccess, removeOrgAccess } = useManageBackofficeUsers();
   const [search, setSearch] = useState("");
   const [orgFilter, setOrgFilter] = useState("__all__");
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [deleteUserTarget, setDeleteUserTarget] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
+  const [boDialogUser, setBoDialogUser] = useState<any>(null);
 
   const handleDeleteUser = async () => {
     if (!deleteUserTarget) return;
@@ -116,6 +121,18 @@ export default function BackofficeUsers() {
     orgs.forEach((o) => { map[o.id] = o.name; });
     return map;
   }, [orgs]);
+
+  const boUserMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    backofficeUsers.forEach((bu: any) => { map[bu.user_id] = bu; });
+    return map;
+  }, [backofficeUsers]);
+
+  const BO_ROLES = [
+    { value: "backoffice_operator", label: "Operador" },
+    { value: "backoffice_admin", label: "Admin BPO" },
+    { value: "auditor", label: "Auditor" },
+  ];
 
   // Build a unique user list with their memberships
   const userList = useMemo(() => {
@@ -287,14 +304,25 @@ export default function BackofficeUsers() {
                       </Popover>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={profile?.active !== false ? "default" : "secondary"}>
-                        {profile?.active !== false ? "Ativo" : "Inativo"}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={profile?.active !== false ? "default" : "secondary"}>
+                          {profile?.active !== false ? "Ativo" : "Inativo"}
+                        </Badge>
+                        {boUserMap[u.userId] && (
+                          <Badge variant="outline" className="text-[10px] gap-0.5 border-primary/40 text-primary">
+                            <ShieldCheck size={10} />
+                            {boUserMap[u.userId].role === "backoffice_admin" ? "Admin BPO" : boUserMap[u.userId].role === "auditor" ? "Auditor" : "Operador"}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(u)} title="Editar usuário">
                           <Edit2 size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setBoDialogUser(u)} title="Backoffice BPO">
+                          <ShieldCheck size={14} />
                         </Button>
                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteUserTarget(u)} title="Excluir usuário">
                           <Trash2 size={14} />
@@ -392,6 +420,125 @@ export default function BackofficeUsers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Backoffice BPO Dialog */}
+      {boDialogUser && (
+        <BackofficeUserDialog
+          userId={boDialogUser.userId}
+          userName={profileMap[boDialogUser.userId]?.full_name || "Sem nome"}
+          currentBo={boUserMap[boDialogUser.userId]}
+          boRoles={BO_ROLES}
+          orgs={orgs}
+          orgMap={orgMap}
+          onClose={() => setBoDialogUser(null)}
+          onUpsert={(role) => upsertBackofficeUser.mutateAsync({ userId: boDialogUser.userId, role })}
+          onRemove={() => removeBackofficeUser.mutateAsync({ userId: boDialogUser.userId }).then(() => setBoDialogUser(null))}
+          onAssignOrg={(orgId) => assignOrgAccess.mutateAsync({ userId: boDialogUser.userId, orgId })}
+          onRemoveOrg={(orgId) => removeOrgAccess.mutateAsync({ userId: boDialogUser.userId, orgId })}
+        />
+      )}
     </div>
+  );
+}
+
+function BackofficeUserDialog({
+  userId, userName, currentBo, boRoles, orgs, orgMap, onClose, onUpsert, onRemove, onAssignOrg, onRemoveOrg,
+}: {
+  userId: string;
+  userName: string;
+  currentBo: any;
+  boRoles: { value: string; label: string }[];
+  orgs: any[];
+  orgMap: Record<string, string>;
+  onClose: () => void;
+  onUpsert: (role: string) => Promise<void>;
+  onRemove: () => Promise<void>;
+  onAssignOrg: (orgId: string) => Promise<void>;
+  onRemoveOrg: (orgId: string) => Promise<void>;
+}) {
+  const [role, setRole] = useState(currentBo?.role || "backoffice_operator");
+  const [saving, setSaving] = useState(false);
+  const { data: orgAccess = [], refetch } = useBackofficeOrgAccess(currentBo ? userId : undefined);
+  const { toast } = useToast();
+  const accessOrgIds = new Set(orgAccess.map((a: any) => a.organization_id));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onUpsert(role);
+      toast({ title: "Operador BPO atualizado" });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleOrg = async (orgId: string, checked: boolean) => {
+    try {
+      if (checked) {
+        await onAssignOrg(orgId);
+      } else {
+        await onRemoveOrg(orgId);
+      }
+      refetch();
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck size={18} className="text-primary" />
+            Acesso BackOffice — {userName}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label>Papel BackOffice</Label>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {boRoles.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button onClick={handleSave} disabled={saving} className="w-full">
+            {currentBo ? "Atualizar Papel" : "Ativar como Operador BPO"}
+          </Button>
+
+          {currentBo && role === "backoffice_operator" && (
+            <div className="space-y-2">
+              <Label>Organizações atribuídas</Label>
+              <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+                {orgs.map((org) => (
+                  <label key={org.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={accessOrgIds.has(org.id)}
+                      onCheckedChange={(checked) => handleToggleOrg(org.id, !!checked)}
+                    />
+                    <span className="truncate">{org.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {currentBo && (
+            <Button variant="destructive" size="sm" className="w-full" onClick={onRemove}>
+              Remover acesso BackOffice
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -343,3 +343,85 @@ export function useManageUserRoles() {
 
   return { addRole, removeRole };
 }
+
+// Backoffice users management
+export function useBackofficeUsers() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["backoffice_users"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("backoffice_users" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!user,
+  });
+}
+
+export function useBackofficeOrgAccess(userId?: string) {
+  return useQuery({
+    queryKey: ["backoffice_org_access", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("backoffice_organization_access" as any)
+        .select("*")
+        .eq("user_id", userId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!userId,
+  });
+}
+
+export function useManageBackofficeUsers() {
+  const qc = useQueryClient();
+
+  const upsertBackofficeUser = useMutation({
+    mutationFn: async ({ userId, role, isActive }: { userId: string; role: string; isActive?: boolean }) => {
+      const { error } = await supabase
+        .from("backoffice_users" as any)
+        .upsert({ user_id: userId, role, is_active: isActive ?? true } as any, { onConflict: "user_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["backoffice_users"] }),
+  });
+
+  const removeBackofficeUser = useMutation({
+    mutationFn: async ({ userId }: { userId: string }) => {
+      const { error } = await supabase
+        .from("backoffice_users" as any)
+        .delete()
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["backoffice_users"] }),
+  });
+
+  const assignOrgAccess = useMutation({
+    mutationFn: async ({ userId, orgId }: { userId: string; orgId: string }) => {
+      const { error } = await supabase.rpc("assign_backoffice_operator_to_org" as any, {
+        _target_user_id: userId,
+        _org_id: orgId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["backoffice_org_access", v.userId] }),
+  });
+
+  const removeOrgAccess = useMutation({
+    mutationFn: async ({ userId, orgId }: { userId: string; orgId: string }) => {
+      const { error } = await supabase
+        .from("backoffice_organization_access" as any)
+        .delete()
+        .eq("user_id", userId)
+        .eq("organization_id", orgId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["backoffice_org_access", v.userId] }),
+  });
+
+  return { upsertBackofficeUser, removeBackofficeUser, assignOrgAccess, removeOrgAccess };
+}
