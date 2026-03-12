@@ -253,10 +253,36 @@ export default function GroupingConfigTab() {
             {loadingRules ? (
               <div className="text-center py-8 text-muted-foreground">Carregando...</div>
             ) : filteredRules.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground space-y-2">
-                <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm">Nenhuma regra encontrada.</p>
-              </div>
+              ruleFilterMacrogroup !== "__all__" || ruleFilterField !== "__all__" || ruleFilterStatus !== "__all__" ? (
+                <div className="text-center py-8 text-muted-foreground space-y-2">
+                  <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                  <p className="text-sm">Nenhuma regra encontrada com os filtros aplicados.</p>
+                </div>
+              ) : (
+                <div className="p-4 space-y-3">
+                  <p className="text-xs text-muted-foreground text-center mb-3">
+                    Exemplos de como regras podem classificar seus lançamentos automaticamente:
+                  </p>
+                  {[
+                    { field: "Categoria", op: "é igual a", value: "Benefícios", dest: "Benefícios" },
+                    { field: "Fornecedor", op: "contém", value: "CPFL", dest: "Energia" },
+                    { field: "Descrição", op: "contém", value: "aluguel", dest: "Aluguel" },
+                  ].map((ex, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-dashed bg-muted/20">
+                      <Badge variant="secondary" className="text-[10px] shrink-0">{ex.field}</Badge>
+                      <Badge variant="outline" className="text-[10px] shrink-0">{ex.op}</Badge>
+                      <span className="text-xs font-mono text-muted-foreground">"{ex.value}"</span>
+                      <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <Badge className="text-[10px] shrink-0">{ex.dest}</Badge>
+                    </div>
+                  ))}
+                  <div className="text-center pt-2">
+                    <Button size="sm" onClick={() => { setEditingRule(null); setDialogOpen(true); }}>
+                      <Plus size={14} /> Criar sua primeira regra
+                    </Button>
+                  </div>
+                </div>
+              )
             ) : (
               <div className="max-h-[500px] overflow-auto">
                 <Table>
