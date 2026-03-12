@@ -20,6 +20,8 @@ interface Props {
     conta: string | null;
     tipo_conta: string;
     pix_key: string | null;
+    saldo_atual: number;
+    limite_credito: number;
   }) => Promise<void>;
   isPending: boolean;
 }

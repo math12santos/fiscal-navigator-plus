@@ -17,6 +17,8 @@ export interface BankAccount {
   pix_key: string | null;
   active: boolean;
   created_at: string;
+  saldo_atual: number;
+  limite_credito: number;
 }
 
 export function useBankAccounts() {
