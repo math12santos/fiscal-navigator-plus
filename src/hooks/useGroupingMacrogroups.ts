@@ -33,7 +33,7 @@ export interface GroupingGroup {
 export type MacrogroupInput = Pick<GroupingMacrogroup, "name" | "icon" | "color" | "order_index" | "enabled">;
 export type GroupInput = Pick<GroupingGroup, "macrogroup_id" | "name" | "order_index" | "enabled">;
 
-const DEFAULT_SEED: { name: string; icon: string; color: string; groups: string[] }[] = [
+export const DEFAULT_SEED: { name: string; icon: string; color: string; groups: string[] }[] = [
   { name: "Pessoal e RH", icon: "Users", color: "#6366f1", groups: ["Folha", "Pró-labore", "Encargos", "Benefícios", "VT", "Férias", "13º Salário", "Rescisões", "RPA"] },
   { name: "Infraestrutura", icon: "Building2", color: "#8b5cf6", groups: ["Aluguel", "Condomínio", "Água", "Energia", "Internet", "Telefonia", "Limpeza", "Produtos de Limpeza"] },
   { name: "Tecnologia e Sistemas", icon: "Monitor", color: "#06b6d4", groups: ["Software/SaaS", "Hospedagem/Cloud", "Suporte TI", "Equipamentos"] },
@@ -191,7 +191,47 @@ export function useGroupingMacrogroups() {
     onSuccess: () => invalidateAll(),
   });
 
-  // ── Seed defaults ──
+  // ── Seed single macrogroup ──
+  const seedSingleMacrogroup = useMutation({
+    mutationFn: async (seedIndex: number) => {
+      const s = DEFAULT_SEED[seedIndex];
+      if (!s) throw new Error("Invalid seed index");
+      const { data: mg, error: mgErr } = await supabase
+        .from("grouping_macrogroups" as any)
+        .insert({
+          organization_id: orgId!,
+          user_id: user!.id,
+          name: s.name,
+          icon: s.icon,
+          color: s.color,
+          order_index: macrogroups.length + seedIndex,
+          enabled: true,
+        })
+        .select()
+        .single();
+      if (mgErr) throw mgErr;
+
+      const groupInserts = s.groups.map((g, j) => ({
+        macrogroup_id: (mg as any).id,
+        organization_id: orgId!,
+        user_id: user!.id,
+        name: g,
+        order_index: j,
+        enabled: true,
+      }));
+      const { error: gErr } = await supabase
+        .from("grouping_groups" as any)
+        .insert(groupInserts);
+      if (gErr) throw gErr;
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Macrogrupo ativado com sucesso" });
+    },
+    onError: () => toast({ title: "Erro ao ativar macrogrupo", variant: "destructive" }),
+  });
+
+  // ── Seed all defaults ──
   const seedDefaults = useMutation({
     mutationFn: async () => {
       for (let i = 0; i < DEFAULT_SEED.length; i++) {
@@ -264,6 +304,7 @@ export function useGroupingMacrogroups() {
     deleteGroup,
     toggleGroup,
     seedDefaults,
+    seedSingleMacrogroup,
   };
 }
 

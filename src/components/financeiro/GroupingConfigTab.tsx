@@ -253,10 +253,36 @@ export default function GroupingConfigTab() {
             {loadingRules ? (
               <div className="text-center py-8 text-muted-foreground">Carregando...</div>
             ) : filteredRules.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground space-y-2">
-                <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm">Nenhuma regra encontrada.</p>
-              </div>
+              ruleFilterMacrogroup !== "__all__" || ruleFilterField !== "__all__" || ruleFilterStatus !== "__all__" ? (
+                <div className="text-center py-8 text-muted-foreground space-y-2">
+                  <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                  <p className="text-sm">Nenhuma regra encontrada com os filtros aplicados.</p>
+                </div>
+              ) : (
+                <div className="p-4 space-y-3">
+                  <p className="text-xs text-muted-foreground text-center mb-3">
+                    Exemplos de como regras podem classificar seus lançamentos automaticamente:
+                  </p>
+                  {[
+                    { field: "Categoria", op: "é igual a", value: "Benefícios", dest: "Benefícios" },
+                    { field: "Fornecedor", op: "contém", value: "CPFL", dest: "Energia" },
+                    { field: "Descrição", op: "contém", value: "aluguel", dest: "Aluguel" },
+                  ].map((ex, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-dashed bg-muted/20">
+                      <Badge variant="secondary" className="text-[10px] shrink-0">{ex.field}</Badge>
+                      <Badge variant="outline" className="text-[10px] shrink-0">{ex.op}</Badge>
+                      <span className="text-xs font-mono text-muted-foreground">"{ex.value}"</span>
+                      <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <Badge className="text-[10px] shrink-0">{ex.dest}</Badge>
+                    </div>
+                  ))}
+                  <div className="text-center pt-2">
+                    <Button size="sm" onClick={() => { setEditingRule(null); setDialogOpen(true); }}>
+                      <Plus size={14} /> Criar sua primeira regra
+                    </Button>
+                  </div>
+                </div>
+              )
             ) : (
               <div className="max-h-[500px] overflow-auto">
                 <Table>
@@ -366,48 +392,78 @@ export default function GroupingConfigTab() {
         </CardContent>
       </Card>
 
-      {/* ════════ ZONA 4 — Saneamento ════════ */}
-      <Card className={unclassifiedEntries.length > 0 ? "border-destructive/30" : ""}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+      {/* ════════ ZONA 4 — Saneamento (2 cards) ════════ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Card 1 — Status */}
+        <Card className={unclassifiedEntries.length > 0 ? "border-destructive/30" : ""}>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-3">
               <AlertCircle className="h-4 w-4 text-destructive" />
-              Não Classificados / Revisão Necessária
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              {unclassifiedEntries.length > 0 && (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => setShowUnclassified(!showUnclassified)}>
-                    <FileText size={14} /> {showUnclassified ? "Ocultar" : "Ver"} Lançamentos
-                  </Button>
-                  <Button size="sm" onClick={() => {
-                    // Pre-fill simulation with unclassified entries
-                    setSimSelectedEntries(unclassifiedEntries.slice(0, 20).map((e) => e.id));
-                  }}>
-                    <FlaskConical size={14} /> Testar Regras
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => { setEditingRule(null); setDialogOpen(true); }}>
-                    <Plus size={14} /> Criar Regra
-                  </Button>
-                </>
-              )}
+              <span className="text-sm font-semibold">Não Classificados</span>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-6 text-sm">
-            <div>
-              <span className="text-muted-foreground">Quantidade: </span>
-              <span className="font-semibold">{unclassifiedEntries.length}</span>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Grupo destino</span>
+                <Badge variant="outline" className="text-xs">Não Classificado</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Quantidade</span>
+                <span className="text-lg font-bold">{unclassifiedEntries.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Valor total</span>
+                <span className="text-sm font-semibold">{fmt.format(unclassifiedTotal)}</span>
+              </div>
             </div>
-            <div>
-              <span className="text-muted-foreground">Valor total: </span>
-              <span className="font-semibold">{fmt.format(unclassifiedTotal)}</span>
-            </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {showUnclassified && unclassifiedEntries.length > 0 && (
-            <div className="mt-4 max-h-[300px] overflow-auto">
+        {/* Card 2 — Ações */}
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Layers className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Ações de Saneamento</span>
+            </div>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => setShowUnclassified(!showUnclassified)}
+                disabled={unclassifiedEntries.length === 0}
+              >
+                <FileText size={14} /> {showUnclassified ? "Ocultar Lançamentos" : "Revisar Agora"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => { setEditingRule(null); setDialogOpen(true); }}
+              >
+                <Plus size={14} /> Criar Regra
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => {
+                  setSimSelectedEntries(unclassifiedEntries.slice(0, 20).map((e) => e.id));
+                }}
+                disabled={unclassifiedEntries.length === 0}
+              >
+                <FlaskConical size={14} /> Testar Regras
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Unclassified entries table (expandable) */}
+      {showUnclassified && unclassifiedEntries.length > 0 && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="max-h-[300px] overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -429,9 +485,9 @@ export default function GroupingConfigTab() {
                 </TableBody>
               </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Simulation Entry Picker Dialog ── */}
       <Dialog open={simDialogOpen} onOpenChange={setSimDialogOpen}>
