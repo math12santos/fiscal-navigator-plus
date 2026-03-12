@@ -193,7 +193,7 @@ export function AgingListTab() {
         const subMap = new Map<string, any[]>();
         let hasSubGroups = false;
         for (const e of items) {
-          const subKey = getSubGroupKey(e, source);
+          const subKey = getSubGroupKey(e);
           if (subKey) {
             if (!subMap.has(subKey)) subMap.set(subKey, []);
             subMap.get(subKey)!.push(e);
