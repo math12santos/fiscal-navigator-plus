@@ -16,31 +16,74 @@ export interface GroupingRule {
   min_items: number;
   enabled: boolean;
   priority: number;
+  group_id: string | null;
+  operator: string;
+  match_keyword: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export type GroupingRuleInput = Omit<GroupingRule, "id" | "created_at" | "updated_at" | "organization_id" | "user_id">;
 
-const MATCH_FIELD_LABELS: Record<string, string> = {
-  categoria: "Categoria",
-  source: "Fonte",
-  entity_id: "Fornecedor",
-};
+export const MATCH_FIELD_OPTIONS = [
+  { value: "categoria", label: "Categoria" },
+  { value: "source", label: "Fonte" },
+  { value: "entity_id", label: "Fornecedor" },
+  { value: "descricao", label: "Descrição" },
+  { value: "cost_center_id", label: "Centro de Custo" },
+];
 
-const SUB_GROUP_FIELD_LABELS: Record<string, string> = {
-  dp_sub_category: "Subcategoria DP",
-  entity_id: "Fornecedor/Entidade",
-};
+export const OPERATOR_OPTIONS = [
+  { value: "equals", label: "É igual a" },
+  { value: "contains", label: "Contém" },
+  { value: "starts_with", label: "Começa com" },
+  { value: "in_list", label: "Está na lista" },
+];
 
-export const MATCH_FIELD_OPTIONS = Object.entries(MATCH_FIELD_LABELS).map(([value, label]) => ({ value, label }));
-export const SUB_GROUP_FIELD_OPTIONS = Object.entries(SUB_GROUP_FIELD_LABELS).map(([value, label]) => ({ value, label }));
+export const SOURCE_OPTIONS = [
+  { value: "dp", label: "Pessoal/DP" },
+  { value: "contrato", label: "Contratos" },
+  { value: "manual", label: "Manual" },
+];
+
+export const SUB_GROUP_FIELD_OPTIONS = [
+  { value: "dp_sub_category", label: "Subcategoria DP" },
+  { value: "entity_id", label: "Fornecedor/Entidade" },
+];
 
 /** Default rules used as fallback when no DB rules exist */
 const DEFAULT_RULES: Omit<GroupingRule, "id" | "created_at" | "updated_at" | "organization_id" | "user_id">[] = [
-  { name: "Pessoal", match_field: "source", match_value: "dp", sub_group_field: "dp_sub_category", min_items: 2, enabled: true, priority: 10 },
-  { name: "Contratos", match_field: "source", match_value: "contrato", sub_group_field: "entity_id", min_items: 2, enabled: true, priority: 5 },
+  { name: "Pessoal", match_field: "source", match_value: "dp", sub_group_field: "dp_sub_category", min_items: 2, enabled: true, priority: 10, group_id: null, operator: "equals", match_keyword: null },
+  { name: "Contratos", match_field: "source", match_value: "contrato", sub_group_field: "entity_id", min_items: 2, enabled: true, priority: 5, group_id: null, operator: "equals", match_keyword: null },
 ];
+
+/** Evaluate if a rule matches an entry */
+function evaluateRule(rule: GroupingRule | typeof DEFAULT_RULES[0], entry: any): boolean {
+  const op = rule.operator || "equals";
+  const fieldValue = String(entry[rule.match_field] ?? "");
+  const matchVal = rule.match_value ?? "";
+
+  // Keyword match for descricao field
+  if (rule.match_field === "descricao" && rule.match_keyword) {
+    const desc = fieldValue.toLowerCase();
+    const keyword = rule.match_keyword.toLowerCase();
+    switch (op) {
+      case "contains": return desc.includes(keyword);
+      case "starts_with": return desc.startsWith(keyword);
+      case "equals": return desc === keyword;
+      case "in_list": return keyword.split(",").map(s => s.trim().toLowerCase()).includes(desc);
+      default: return false;
+    }
+  }
+
+  switch (op) {
+    case "equals": return fieldValue === matchVal;
+    case "contains": return fieldValue.toLowerCase().includes(matchVal.toLowerCase());
+    case "starts_with": return fieldValue.toLowerCase().startsWith(matchVal.toLowerCase());
+    case "in_list": return matchVal.split(",").map(s => s.trim()).includes(fieldValue);
+    default: return fieldValue === matchVal;
+  }
+}
 
 export function useGroupingRules() {
   const { currentOrg } = useOrganization();
@@ -73,8 +116,7 @@ export function useGroupingRules() {
   /** Finds the matching rule for a given entry */
   const getMatchingRule = (entry: any): GroupingRule | null => {
     for (const rule of activeRules) {
-      const fieldValue = entry[rule.match_field];
-      if (fieldValue === rule.match_value) return rule;
+      if (evaluateRule(rule, entry)) return rule as GroupingRule;
     }
     return null;
   };
@@ -83,7 +125,7 @@ export function useGroupingRules() {
   const getGroupLabel = (entry: any): string => {
     const rule = getMatchingRule(entry);
     if (rule) return rule.name;
-    return entry.categoria || entry.source || "Outros";
+    return entry.categoria || entry.source || "Não Classificado";
   };
 
   /** Returns the sub-group key for an entry, or null if no sub-grouping */
@@ -106,9 +148,15 @@ export function useGroupingRules() {
     return rule?.min_items ?? 2;
   };
 
-  /** Checks if an entry should be groupable (matches any active rule OR fallback) */
+  /** Checks if an entry should be groupable */
   const isGroupable = (entry: any): boolean => {
     return !!getMatchingRule(entry);
+  };
+
+  /** Returns the group_id for an entry (for macrogroup→group resolution) */
+  const getGroupId = (entry: any): string | null => {
+    const rule = getMatchingRule(entry);
+    return rule?.group_id ?? null;
   };
 
   // CRUD mutations
@@ -197,12 +245,12 @@ export function useGroupingRules() {
     remove,
     toggleEnabled,
     seedDefaults,
-    // Matcher functions for consumers
     getGroupLabel,
     getSubGroupKey,
     getSubGroupLabel,
     getMinItems,
     isGroupable,
     getMatchingRule,
+    getGroupId,
   };
 }
