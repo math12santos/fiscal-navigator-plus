@@ -92,7 +92,7 @@ export function ContasAPagar() {
         tipo="saida"
         onSave={async (input) => { await create.mutateAsync(input); }}
         isPending={create.isPending}
-        defaultValues={prefill}
+        initial={prefill}
       />
     </div>
   );
