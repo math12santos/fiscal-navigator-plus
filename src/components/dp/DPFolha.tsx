@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Calculator, Lock } from "lucide-react";
 import { useEmployees, usePayrollRuns, usePayrollItems, useMutatePayroll, useDPConfig, calcINSSEmpregado, calcIRRF, calcEncargosPatronais } from "@/hooks/useDP";
+import { getBusinessDays } from "@/hooks/usePayrollProjections";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
