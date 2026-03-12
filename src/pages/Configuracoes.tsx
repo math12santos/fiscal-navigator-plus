@@ -130,6 +130,11 @@ export default function Configuracoes() {
   const { log } = useAuditLog();
   const { toast } = useToast();
 
+  // Grouping Rules
+  const { rules: groupingRules, isLoading: loadingGroupingRules, create: createGroupingRule, update: updateGroupingRule, remove: removeGroupingRule, toggleEnabled: toggleGroupingRule, seedDefaults: seedGroupingDefaults } = useGroupingRules();
+  const [groupingDialogOpen, setGroupingDialogOpen] = useState(false);
+  const [editingGroupingRule, setEditingGroupingRule] = useState<GroupingRule | null>(null);
+
   const handleSeedFresh = async () => {
     await deleteAllAccounts();
     await deleteAllCenters();
