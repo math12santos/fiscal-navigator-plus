@@ -22,8 +22,22 @@ interface AgingBucket {
   icon: React.ReactNode;
 }
 
+const GROUPABLE_SOURCES = ["dp"];
+
 export function AgingListTab() {
   const { entries, isLoading } = useFinanceiro("saida");
+  const { holdingMode } = useHolding();
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const today = new Date();
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
   const { holdingMode } = useHolding();
   const today = new Date();
 
