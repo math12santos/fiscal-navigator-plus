@@ -11,6 +11,7 @@ import { useHolding } from "@/contexts/HoldingContext";
 import { Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGroupingRules } from "@/hooks/useGroupingRules";
+import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
