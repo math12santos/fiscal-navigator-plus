@@ -207,6 +207,9 @@ export default function GroupingConfigTab() {
         </Card>
       </div>
 
+      {/* ════════ Propagação Holding ════════ */}
+      <GroupingPropagation />
+
       {/* ════════ ZONA 2 — 2 Colunas ════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Coluna Esquerda — Macrogrupos & Grupos */}
