@@ -267,8 +267,3 @@ export function useGroupingMacrogroups() {
   };
 }
 
-function useMemo<T>(fn: () => T, deps: any[]): T {
-  // This is a simple implementation; React's useMemo is imported at the top
-  // We need to use React's useMemo instead
-  return fn();
-}
