@@ -502,14 +502,3 @@ export default function Configuracoes() {
     </div>
   );
 }
-              } else {
-                createGroupingRule.mutate(data, { onSuccess: () => setGroupingDialogOpen(false) });
-              }
-            }}
-            isLoading={createGroupingRule.isPending || updateGroupingRule.isPending}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
