@@ -25,7 +25,10 @@ interface BenefitRow {
 }
 
 const SUB_CATEGORY_LABELS: Record<string, string> = {
-  folha: "Folha de Pagamento",
+  salario_liquido: "Salário Líquido",
+  encargos_fgts: "FGTS",
+  encargos_inss: "INSS / GPS",
+  encargos_irrf: "IRRF",
   vt: "Vale Transporte",
   beneficios: "Benefícios",
   provisoes: "Provisões (13º + Férias)",
