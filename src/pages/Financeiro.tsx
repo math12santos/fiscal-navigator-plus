@@ -4,10 +4,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { ContasAPagar } from "@/components/financeiro/ContasAPagar";
 import { ContasAReceber } from "@/components/financeiro/ContasAReceber";
+import { ContasBancariasTab } from "@/components/financeiro/ContasBancariasTab";
+import { AgingListTab } from "@/components/financeiro/AgingListTab";
 
 const ALL_TABS = [
   { key: "pagar", label: "Contas a Pagar" },
   { key: "receber", label: "Contas a Receber" },
+  { key: "aging", label: "Aging List" },
+  { key: "contas-bancarias", label: "Contas Bancárias" },
 ];
 
 export default function Financeiro() {
@@ -27,7 +31,7 @@ export default function Financeiro() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Financeiro"
-        description="Gestão de contas a pagar e contas a receber"
+        description="Gestão de contas a pagar, receber, aging list e contas bancárias"
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -37,14 +41,16 @@ export default function Financeiro() {
           ))}
         </TabsList>
         {allowedTabs.some((t) => t.key === "pagar") && (
-          <TabsContent value="pagar">
-            <ContasAPagar />
-          </TabsContent>
+          <TabsContent value="pagar"><ContasAPagar /></TabsContent>
         )}
         {allowedTabs.some((t) => t.key === "receber") && (
-          <TabsContent value="receber">
-            <ContasAReceber />
-          </TabsContent>
+          <TabsContent value="receber"><ContasAReceber /></TabsContent>
+        )}
+        {allowedTabs.some((t) => t.key === "aging") && (
+          <TabsContent value="aging"><AgingListTab /></TabsContent>
+        )}
+        {allowedTabs.some((t) => t.key === "contas-bancarias") && (
+          <TabsContent value="contas-bancarias"><ContasBancariasTab /></TabsContent>
         )}
       </Tabs>
     </div>

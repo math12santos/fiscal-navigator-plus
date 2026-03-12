@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
+import { useHolding } from "@/contexts/HoldingContext";
 
 export interface BankAccount {
   id: string;
@@ -24,17 +25,25 @@ export function useBankAccounts() {
   const orgId = currentOrg?.id;
   const qc = useQueryClient();
   const { toast } = useToast();
-  const key = ["bank_accounts", orgId];
+  const { holdingMode, activeOrgIds } = useHolding();
+  const key = ["bank_accounts", holdingMode ? activeOrgIds : orgId];
 
   const { data: bankAccounts = [], isLoading } = useQuery({
     queryKey: key,
     enabled: !!user && !!orgId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("bank_accounts" as any)
         .select("*")
-        .eq("organization_id", orgId!)
         .order("nome");
+
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else if (orgId) {
+        q = q.eq("organization_id", orgId);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
       return data as unknown as BankAccount[];
     },
@@ -42,15 +51,17 @@ export function useBankAccounts() {
 
   const create = useMutation({
     mutationFn: async (input: Partial<BankAccount>) => {
+      // Use provided organization_id (for holding creating in subsidiary) or default to current
+      const targetOrgId = input.organization_id || orgId;
       const { error } = await supabase.from("bank_accounts" as any).insert({
         ...input,
         user_id: user!.id,
-        organization_id: orgId,
+        organization_id: targetOrgId,
       } as any);
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: key });
+      qc.invalidateQueries({ queryKey: ["bank_accounts"] });
       toast({ title: "Conta bancária cadastrada" });
     },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
@@ -62,7 +73,7 @@ export function useBankAccounts() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: key });
+      qc.invalidateQueries({ queryKey: ["bank_accounts"] });
       toast({ title: "Conta bancária atualizada" });
     },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
@@ -74,7 +85,7 @@ export function useBankAccounts() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: key });
+      qc.invalidateQueries({ queryKey: ["bank_accounts"] });
       toast({ title: "Conta bancária removida" });
     },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),

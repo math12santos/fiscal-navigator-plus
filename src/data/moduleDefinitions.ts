@@ -16,6 +16,8 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     tabs: [
       { key: "pagar", label: "Contas a Pagar" },
       { key: "receber", label: "Contas a Receber" },
+      { key: "aging", label: "Aging List" },
+      { key: "contas-bancarias", label: "Contas Bancárias" },
     ],
   },
   { key: "fluxo-caixa", label: "Fluxo de Caixa" },
