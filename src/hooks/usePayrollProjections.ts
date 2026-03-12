@@ -1,8 +1,17 @@
 import { useMemo } from "react";
-import { format, addMonths, startOfMonth, isAfter, isBefore } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, isAfter, isBefore, eachDayOfInterval, getDay } from "date-fns";
 import { useEmployees, useDPConfig, calcINSSEmpregado, calcIRRF } from "@/hooks/useDP";
 import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
+
+/** Count Mon–Fri business days in a given month */
+export function getBusinessDays(monthStart: Date): number {
+  const interval = { start: startOfMonth(monthStart), end: endOfMonth(monthStart) };
+  return eachDayOfInterval(interval).filter((d) => {
+    const day = getDay(d);
+    return day >= 1 && day <= 5;
+  }).length;
+}
 
 interface EmployeeRow {
   id: string;
@@ -90,7 +99,16 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         const inssEmp = calcINSSEmpregado(salary);
         const baseIRRF = salary - inssEmp;
         const irrf = calcIRRF(baseIRRF);
-        const netSalary = salary - inssEmp - irrf;
+
+        // VT discount (6% of salary, capped at VT gross cost)
+        const businessDays = getBusinessDays(cursor);
+        let vtDesconto = 0;
+        if (emp.vt_ativo && emp.vt_diario > 0) {
+          const vtBrutoCalc = Number(emp.vt_diario) * businessDays;
+          vtDesconto = Math.min(salary * vtDescontoPct, vtBrutoCalc);
+        }
+
+        const netSalary = salary - inssEmp - irrf - vtDesconto;
         const fgtsVal = salary * fgtsPct;
         const inssPatronalVal = salary * inssPatronalPct;
         const ratVal = salary * ratPct;
@@ -99,8 +117,9 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
 
         const base = { contract_id: null, contract_installment_id: null, tipo: "saida" as const, categoria: "Pessoal", valor_realizado: null, data_prevista: monthDate, data_realizada: null, status: "previsto", account_id: null, cost_center_id: emp.cost_center_id ?? null, entity_id: null, source: "dp", created_at: now, updated_at: now };
 
-        // 1. Salário Líquido
-        entries.push({ ...base, id: `proj-dp-sal-${emp.id}-${monthKey}`, descricao: `Salário Líquido — ${emp.name}`, valor_previsto: Math.round(netSalary * 100) / 100, notes: `Base: ${salary.toFixed(0)} | INSS Emp: ${inssEmp.toFixed(0)} | IRRF: ${irrf.toFixed(0)} | Líquido: ${netSalary.toFixed(0)}`, dp_sub_category: "salario_liquido" });
+        // 1. Salário Líquido (includes VT discount deduction)
+        const salNotes = `Base: ${salary.toFixed(0)} | INSS Emp: ${inssEmp.toFixed(0)} | IRRF: ${irrf.toFixed(0)}${vtDesconto > 0 ? ` | VT Desc: ${vtDesconto.toFixed(0)}` : ""} | Líquido: ${netSalary.toFixed(0)}`;
+        entries.push({ ...base, id: `proj-dp-sal-${emp.id}-${monthKey}`, descricao: `Salário Líquido — ${emp.name}`, valor_previsto: Math.round(netSalary * 100) / 100, notes: salNotes, dp_sub_category: "salario_liquido" });
 
         // 2. FGTS
         if (fgtsVal > 0) {
@@ -117,32 +136,19 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           entries.push({ ...base, id: `proj-dp-irrf-${emp.id}-${monthKey}`, descricao: `IRRF — ${emp.name}`, valor_previsto: Math.round(irrf * 100) / 100, notes: `Base cálculo: ${baseIRRF.toFixed(0)}`, dp_sub_category: "encargos_irrf" });
         }
 
-        // VT
+        // VT (dynamic business days)
         if (emp.vt_ativo && emp.vt_diario > 0) {
-          const vtBruto = Number(emp.vt_diario) * 22;
-          const vtDesconto = salary * vtDescontoPct;
-          const vtNet = Math.max(0, vtBruto - vtDesconto);
+          const vtBruto = Number(emp.vt_diario) * businessDays;
+          const vtDescontoVal = Math.min(salary * vtDescontoPct, vtBruto);
+          const vtNet = Math.max(0, vtBruto - vtDescontoVal);
           if (vtNet > 0) {
             entries.push({
+              ...base,
               id: `proj-dp-vt-${emp.id}-${monthKey}`,
-              contract_id: null,
-              contract_installment_id: null,
-              tipo: "saida",
-              categoria: "Pessoal",
               descricao: `VT — ${emp.name}`,
-              valor_previsto: vtNet,
-              valor_realizado: null,
-              data_prevista: monthDate,
-              data_realizada: null,
-              status: "previsto",
-              account_id: null,
-              cost_center_id: emp.cost_center_id ?? null,
-              entity_id: null,
-              notes: null,
-              source: "dp",
+              valor_previsto: Math.round(vtNet * 100) / 100,
+              notes: `${businessDays} dias úteis × R$${Number(emp.vt_diario).toFixed(2)} = ${vtBruto.toFixed(0)} | Desc 6%: ${vtDescontoVal.toFixed(0)} | Líq: ${vtNet.toFixed(0)}`,
               dp_sub_category: "vt",
-              created_at: now,
-              updated_at: now,
             });
           }
         }

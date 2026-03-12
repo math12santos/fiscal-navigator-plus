@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Calculator, Lock } from "lucide-react";
 import { useEmployees, usePayrollRuns, usePayrollItems, useMutatePayroll, useDPConfig, calcINSSEmpregado, calcIRRF, calcEncargosPatronais } from "@/hooks/useDP";
+import { getBusinessDays } from "@/hooks/usePayrollProjections";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -43,7 +44,9 @@ export default function DPFolha() {
       const inssEmp = calcINSSEmpregado(salario);
       const baseIRRF = salario - inssEmp;
       const irrf = calcIRRF(baseIRRF);
-      const vtDesconto = salario * ((dpConfig?.vt_desconto_pct ?? 6) / 100);
+      const businessDays = getBusinessDays(new Date());
+      const vtBruto = Number(emp.vt_diario || 0) * businessDays;
+      const vtDesconto = emp.vt_ativo ? Math.min(salario * ((dpConfig?.vt_desconto_pct ?? 6) / 100), vtBruto) : 0;
       const enc = calcEncargosPatronais(salario, dpConfig);
 
       const bruto = salario;
