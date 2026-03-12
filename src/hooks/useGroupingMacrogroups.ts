@@ -304,6 +304,7 @@ export function useGroupingMacrogroups() {
     deleteGroup,
     toggleGroup,
     seedDefaults,
+    seedSingleMacrogroup,
   };
 }
 
