@@ -3737,13 +3737,21 @@ export type Database = {
       }
       requests: {
         Row: {
+          account_id: string | null
           area_responsavel: string | null
           assigned_to: string | null
+          cashflow_entry_id: string | null
+          classified_at: string | null
+          classified_by: string | null
+          competencia: string | null
           cost_center_id: string | null
           created_at: string
+          data_vencimento: string | null
           description: string | null
           due_date: string | null
+          entity_id: string | null
           id: string
+          justificativa: string | null
           organization_id: string
           priority: string
           reference_id: string | null
@@ -3755,13 +3763,21 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           area_responsavel?: string | null
           assigned_to?: string | null
+          cashflow_entry_id?: string | null
+          classified_at?: string | null
+          classified_by?: string | null
+          competencia?: string | null
           cost_center_id?: string | null
           created_at?: string
+          data_vencimento?: string | null
           description?: string | null
           due_date?: string | null
+          entity_id?: string | null
           id?: string
+          justificativa?: string | null
           organization_id: string
           priority?: string
           reference_id?: string | null
@@ -3773,13 +3789,21 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           area_responsavel?: string | null
           assigned_to?: string | null
+          cashflow_entry_id?: string | null
+          classified_at?: string | null
+          classified_by?: string | null
+          competencia?: string | null
           cost_center_id?: string | null
           created_at?: string
+          data_vencimento?: string | null
           description?: string | null
           due_date?: string | null
+          entity_id?: string | null
           id?: string
+          justificativa?: string | null
           organization_id?: string
           priority?: string
           reference_id?: string | null
@@ -3792,10 +3816,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "requests_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requests_cashflow_entry_id_fkey"
+            columns: ["cashflow_entry_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_entries"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "requests_cost_center_id_fkey"
             columns: ["cost_center_id"]
             isOneToOne: false
             referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requests_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
             referencedColumns: ["id"]
           },
           {
