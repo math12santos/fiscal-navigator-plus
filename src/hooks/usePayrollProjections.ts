@@ -25,9 +25,15 @@ interface BenefitRow {
   dp_benefits: { name: string; type: string; default_value: number } | null;
 }
 
+const SUB_CATEGORY_LABELS: Record<string, string> = {
+  folha: "Folha de Pagamento",
+  vt: "Vale Transporte",
+  beneficios: "Benefícios",
+  provisoes: "Provisões (13º + Férias)",
+};
+
 /**
- * Generate payroll projections as virtual CashFlowEntry items.
- * Mirrors the contract-projection pattern in useCashFlow.
+ * Generate payroll projections as virtual CashFlowEntry items — one per employee per sub-category.
  */
 export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
   const employeesQuery = useEmployees();
@@ -60,142 +66,129 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
       );
     }
 
-    const entries: Omit<CashFlowEntry, "user_id" | "organization_id">[] = [];
+    const entries: (Omit<CashFlowEntry, "user_id" | "organization_id"> & { dp_sub_category?: string })[] = [];
     const activeEmployees = employees.filter((e) => e.status === "ativo");
+    const now = new Date().toISOString();
 
     let cursor = startOfMonth(rangeFrom);
     while (!isAfter(cursor, rangeTo)) {
       const monthKey = format(cursor, "yyyy-MM");
       const monthDate = format(cursor, "yyyy-MM-dd");
-
-      // Aggregate all employee costs for this month
-      let totalFolha = 0;
-      let totalEncargos = 0;
-      let totalVT = 0;
-      let totalBeneficios = 0;
-      let totalProvisoes = 0;
+      const monthLabel = format(cursor, "MM/yyyy");
 
       for (const emp of activeEmployees) {
-        // Check if employee is active in this month
         const admDate = new Date(emp.admission_date);
-        if (isAfter(startOfMonth(admDate), cursor)) continue; // not yet hired
+        if (isAfter(startOfMonth(admDate), cursor)) continue;
         if (emp.dismissal_date) {
           const disDate = new Date(emp.dismissal_date);
-          if (isBefore(disDate, cursor)) continue; // already dismissed
+          if (isBefore(disDate, cursor)) continue;
         }
 
         const salary = Number(emp.salary_base);
+        const encargos = salary * (inssPatronalPct + ratPct + fgtsPct + terceirosPct);
 
-        // Base salary
-        totalFolha += salary;
-
-        // Employer charges
-        totalEncargos += salary * (inssPatronalPct + ratPct + fgtsPct + terceirosPct);
-
-        // VT (net cost = VT_diario * 22 - 6% of salary)
-        if (emp.vt_ativo && emp.vt_diario > 0) {
-          const vtBruto = Number(emp.vt_diario) * 22;
-          const vtDesconto = salary * vtDescontoPct;
-          totalVT += Math.max(0, vtBruto - vtDesconto);
-        }
-
-        // Benefits
-        totalBeneficios += benefitsByEmployee.get(emp.id) ?? 0;
-
-        // Provisions (13th + vacation)
-        totalProvisoes += salary * (provisao13Pct + provisaoFeriasPct);
-      }
-
-      const totalMensal = totalFolha + totalEncargos + totalVT + totalBeneficios + totalProvisoes;
-
-      if (totalMensal > 0) {
+        // Folha (salary + charges)
         entries.push({
-          id: `proj-dp-folha-${monthKey}`,
+          id: `proj-dp-folha-${emp.id}-${monthKey}`,
           contract_id: null,
           contract_installment_id: null,
           tipo: "saida",
           categoria: "Pessoal",
-          descricao: `Folha de Pagamento — ${format(cursor, "MM/yyyy")}`,
-          valor_previsto: totalFolha + totalEncargos,
+          descricao: `Salário — ${emp.name}`,
+          valor_previsto: salary + encargos,
           valor_realizado: null,
           data_prevista: monthDate,
           data_realizada: null,
           status: "previsto",
           account_id: null,
-          cost_center_id: null,
+          cost_center_id: emp.cost_center_id ?? null,
           entity_id: null,
-          notes: `Salários: ${totalFolha.toFixed(0)} | Encargos: ${totalEncargos.toFixed(0)}`,
+          notes: `Base: ${salary.toFixed(0)} | Encargos: ${encargos.toFixed(0)}`,
           source: "dp",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          dp_sub_category: "folha",
+          created_at: now,
+          updated_at: now,
         });
 
-        if (totalVT > 0) {
+        // VT
+        if (emp.vt_ativo && emp.vt_diario > 0) {
+          const vtBruto = Number(emp.vt_diario) * 22;
+          const vtDesconto = salary * vtDescontoPct;
+          const vtNet = Math.max(0, vtBruto - vtDesconto);
+          if (vtNet > 0) {
+            entries.push({
+              id: `proj-dp-vt-${emp.id}-${monthKey}`,
+              contract_id: null,
+              contract_installment_id: null,
+              tipo: "saida",
+              categoria: "Pessoal",
+              descricao: `VT — ${emp.name}`,
+              valor_previsto: vtNet,
+              valor_realizado: null,
+              data_prevista: monthDate,
+              data_realizada: null,
+              status: "previsto",
+              account_id: null,
+              cost_center_id: emp.cost_center_id ?? null,
+              entity_id: null,
+              notes: null,
+              source: "dp",
+              dp_sub_category: "vt",
+              created_at: now,
+              updated_at: now,
+            });
+          }
+        }
+
+        // Benefits
+        const empBenefits = benefitsByEmployee.get(emp.id) ?? 0;
+        if (empBenefits > 0) {
           entries.push({
-            id: `proj-dp-vt-${monthKey}`,
+            id: `proj-dp-beneficios-${emp.id}-${monthKey}`,
             contract_id: null,
             contract_installment_id: null,
             tipo: "saida",
             categoria: "Pessoal",
-            descricao: `Vale Transporte — ${format(cursor, "MM/yyyy")}`,
-            valor_previsto: totalVT,
+            descricao: `Benefícios — ${emp.name}`,
+            valor_previsto: empBenefits,
             valor_realizado: null,
             data_prevista: monthDate,
             data_realizada: null,
             status: "previsto",
             account_id: null,
-            cost_center_id: null,
+            cost_center_id: emp.cost_center_id ?? null,
             entity_id: null,
             notes: null,
             source: "dp",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            dp_sub_category: "beneficios",
+            created_at: now,
+            updated_at: now,
           });
         }
 
-        if (totalBeneficios > 0) {
+        // Provisions (13th + vacation)
+        const provisoes = salary * (provisao13Pct + provisaoFeriasPct);
+        if (provisoes > 0) {
           entries.push({
-            id: `proj-dp-beneficios-${monthKey}`,
+            id: `proj-dp-provisoes-${emp.id}-${monthKey}`,
             contract_id: null,
             contract_installment_id: null,
             tipo: "saida",
             categoria: "Pessoal",
-            descricao: `Benefícios — ${format(cursor, "MM/yyyy")}`,
-            valor_previsto: totalBeneficios,
+            descricao: `Provisões — ${emp.name}`,
+            valor_previsto: provisoes,
             valor_realizado: null,
             data_prevista: monthDate,
             data_realizada: null,
             status: "previsto",
             account_id: null,
-            cost_center_id: null,
+            cost_center_id: emp.cost_center_id ?? null,
             entity_id: null,
             notes: null,
             source: "dp",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-        }
-
-        if (totalProvisoes > 0) {
-          entries.push({
-            id: `proj-dp-provisoes-${monthKey}`,
-            contract_id: null,
-            contract_installment_id: null,
-            tipo: "saida",
-            categoria: "Pessoal",
-            descricao: `Provisões (13º + Férias) — ${format(cursor, "MM/yyyy")}`,
-            valor_previsto: totalProvisoes,
-            valor_realizado: null,
-            data_prevista: monthDate,
-            data_realizada: null,
-            status: "previsto",
-            account_id: null,
-            cost_center_id: null,
-            entity_id: null,
-            notes: null,
-            source: "dp",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            dp_sub_category: "provisoes",
+            created_at: now,
+            updated_at: now,
           });
         }
       }
@@ -206,7 +199,6 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
     return entries;
   }, [employees, config, employeeBenefits, rangeFrom, rangeTo]);
 
-  // Monthly totals for summary
   const monthlyPayrollTotal = useMemo(() => {
     return projections.reduce((sum, p) => sum + Number(p.valor_previsto), 0);
   }, [projections]);
@@ -229,3 +221,5 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
     isLoading: employeesQuery.isLoading || dpConfigQuery.isLoading,
   };
 }
+
+export { SUB_CATEGORY_LABELS };
