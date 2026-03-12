@@ -3604,7 +3604,10 @@ export type Database = {
           created_at: string
           file_name: string
           file_path: string
+          file_size: number
+          file_type: string
           id: string
+          organization_id: string | null
           request_id: string
           user_id: string
         }
@@ -3612,7 +3615,10 @@ export type Database = {
           created_at?: string
           file_name: string
           file_path: string
+          file_size?: number
+          file_type?: string
           id?: string
+          organization_id?: string | null
           request_id: string
           user_id: string
         }
@@ -3620,11 +3626,21 @@ export type Database = {
           created_at?: string
           file_name?: string
           file_path?: string
+          file_size?: number
+          file_type?: string
           id?: string
+          organization_id?: string | null
           request_id?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "request_attachments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "request_attachments_request_id_fkey"
             columns: ["request_id"]
