@@ -163,3 +163,33 @@ Usuário cria solicitação
 - Integração profunda das etapas 2-8 com módulos existentes
 - Sistema de recomendações automáticas (Etapa 9)
 - Score no dashboard principal
+
+---
+
+# Configurador de Regras de Aglutinação — Fase 1 (MVP) ✅
+
+## Status: Implementado
+
+### Tabelas criadas
+- `grouping_macrogroups` — Macrogrupos hierárquicos com nome, ícone, cor, ordem, enabled
+- `grouping_groups` — Grupos dentro de macrogrupos com FK para macrogroup_id
+- `grouping_rules` alterada — Adicionadas colunas `group_id`, `operator`, `match_keyword`
+
+### RLS
+- Org members: SELECT, INSERT, UPDATE, DELETE em ambas tabelas
+
+### Hooks implementados
+- `src/hooks/useGroupingMacrogroups.ts` — CRUD macrogrupos + grupos + seed de 10 macrogrupos padrão
+- `src/hooks/useGroupingRules.ts` — Refatorado com operadores (equals, contains, starts_with, in_list), match por keyword/descrição, group_id targeting, fallback "Não Classificado"
+
+### Componentes implementados
+- `src/components/financeiro/GroupingMacrogroupManager.tsx` — UI colapsável de macrogrupos/grupos com CRUD inline, toggle ativo/inativo, botão "Gerar Padrão"
+- `src/components/financeiro/GroupingRuleDialog.tsx` — Refatorado com operador, campo dinâmico (select por tipo), grupo destino, keyword input para descrição
+- `src/pages/Configuracoes.tsx` — Aba Aglutinação com 3 blocos: Macrogrupos, Regras de Classificação, Fallback
+
+### Seed padrão (10 macrogrupos)
+- Pessoal e RH, Infraestrutura, Tecnologia e Sistemas, Fornecedores Operacionais, Serviços Profissionais, Tributário, Financeiro, Contratos, Patrimonial/Investimentos, Despesas Eventuais
+
+### Integração
+- AgingListTab e FinanceiroTable integrados com o novo sistema de regras (operadores avançados, group_id)
+- Fallback automático para "Não Classificado" em entradas sem match
