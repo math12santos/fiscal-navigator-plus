@@ -136,8 +136,29 @@ export default function Configuracoes() {
 
   // Grouping Rules
   const { rules: groupingRules, isLoading: loadingGroupingRules, create: createGroupingRule, update: updateGroupingRule, remove: removeGroupingRule, toggleEnabled: toggleGroupingRule, seedDefaults: seedGroupingDefaults } = useGroupingRules();
+  const { groupOptions } = useGroupingMacrogroups();
   const [groupingDialogOpen, setGroupingDialogOpen] = useState(false);
   const [editingGroupingRule, setEditingGroupingRule] = useState<GroupingRule | null>(null);
+
+  // Dynamic options for rule dialog
+  const { entries: saidaEntries } = useFinanceiro("saida");
+  const { entries: entradaEntries } = useFinanceiro("entrada");
+
+  const categoryOptions = useMemo(() => {
+    const cats = new Set<string>();
+    [...saidaEntries, ...entradaEntries].forEach((e) => {
+      if (e.categoria) cats.add(e.categoria);
+    });
+    return Array.from(cats).sort().map((c) => ({ value: c, label: c }));
+  }, [saidaEntries, entradaEntries]);
+
+  const entityOptions = useMemo(() => {
+    return entities.filter((e) => e.active).map((e) => ({ value: e.id, label: e.name }));
+  }, [entities]);
+
+  const costCenterOpts = useMemo(() => {
+    return costCenters.filter((c) => c.active).map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }));
+  }, [costCenters]);
 
   const handleSeedFresh = async () => {
     await deleteAllAccounts();
