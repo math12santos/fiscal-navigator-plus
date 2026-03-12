@@ -9,7 +9,7 @@ import { useGroupingMacrogroups, type GroupingMacrogroup, type GroupingGroup } f
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-export default function GroupingMacrogroupManager() {
+export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCountByGroup?: Map<string, number> }) {
   const {
     macrogroups, groups, isLoading,
     getGroupsForMacrogroup,
@@ -111,6 +111,11 @@ export default function GroupingMacrogroupManager() {
                   <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: mg.color }} />
                   <span className="font-medium text-sm flex-1">{mg.name}</span>
                   <Badge variant="secondary" className="text-xs">{mgGroups.length} grupo(s)</Badge>
+                  {ruleCountByGroup && (
+                    <Badge variant="outline" className="text-xs">
+                      {mgGroups.reduce((s, g) => s + (ruleCountByGroup.get(g.id) ?? 0), 0)} regra(s)
+                    </Badge>
+                  )}
                   <Switch
                     checked={mg.enabled}
                     onCheckedChange={(checked) => toggleMacrogroup.mutate({ id: mg.id, enabled: checked })}
@@ -128,6 +133,9 @@ export default function GroupingMacrogroupManager() {
                     {mgGroups.map((g) => (
                       <div key={g.id} className="flex items-center gap-2 px-3 py-1.5 rounded border border-dashed bg-muted/30">
                         <span className="text-sm flex-1">{g.name}</span>
+                        {ruleCountByGroup && (
+                          <Badge variant="outline" className="text-[10px]">{ruleCountByGroup.get(g.id) ?? 0} regra(s)</Badge>
+                        )}
                         <Switch
                           checked={g.enabled}
                           onCheckedChange={(checked) => toggleGroup.mutate({ id: g.id, enabled: checked })}

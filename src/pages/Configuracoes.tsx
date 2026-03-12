@@ -28,11 +28,7 @@ import { useEntities, Entity } from "@/hooks/useEntities";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { useToast } from "@/hooks/use-toast";
-import { useGroupingRules, type GroupingRule, type GroupingRuleInput, MATCH_FIELD_OPTIONS, OPERATOR_OPTIONS } from "@/hooks/useGroupingRules";
-import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
-import { useFinanceiro } from "@/hooks/useFinanceiro";
-import GroupingRuleDialog from "@/components/financeiro/GroupingRuleDialog";
-import GroupingMacrogroupManager from "@/components/financeiro/GroupingMacrogroupManager";
+import GroupingConfigTab from "@/components/financeiro/GroupingConfigTab";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -134,31 +130,6 @@ export default function Configuracoes() {
   const { log } = useAuditLog();
   const { toast } = useToast();
 
-  // Grouping Rules
-  const { rules: groupingRules, isLoading: loadingGroupingRules, create: createGroupingRule, update: updateGroupingRule, remove: removeGroupingRule, toggleEnabled: toggleGroupingRule, seedDefaults: seedGroupingDefaults } = useGroupingRules();
-  const { groupOptions } = useGroupingMacrogroups();
-  const [groupingDialogOpen, setGroupingDialogOpen] = useState(false);
-  const [editingGroupingRule, setEditingGroupingRule] = useState<GroupingRule | null>(null);
-
-  // Dynamic options for rule dialog
-  const { entries: saidaEntries } = useFinanceiro("saida");
-  const { entries: entradaEntries } = useFinanceiro("entrada");
-
-  const categoryOptions = useMemo(() => {
-    const cats = new Set<string>();
-    [...saidaEntries, ...entradaEntries].forEach((e) => {
-      if (e.categoria) cats.add(e.categoria);
-    });
-    return Array.from(cats).sort().map((c) => ({ value: c, label: c }));
-  }, [saidaEntries, entradaEntries]);
-
-  const entityOptions = useMemo(() => {
-    return entities.filter((e) => e.active).map((e) => ({ value: e.id, label: e.name }));
-  }, [entities]);
-
-  const costCenterOpts = useMemo(() => {
-    return costCenters.filter((c) => c.active).map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }));
-  }, [costCenters]);
 
   const handleSeedFresh = async () => {
     await deleteAllAccounts();
@@ -383,120 +354,8 @@ export default function Configuracoes() {
         </TabsContent>
 
         {/* ===== AGLUTINAÇÃO ===== */}
-        <TabsContent value="grouping" className="space-y-6">
-          <p className="text-sm text-muted-foreground">
-            Configure macrogrupos, grupos e regras que definem como lançamentos são agrupados no Aging List e no Financeiro.
-          </p>
-
-          {/* Bloco 1 — Macrogrupos e Grupos */}
-          <Card>
-            <CardContent className="pt-6">
-              <GroupingMacrogroupManager />
-            </CardContent>
-          </Card>
-
-          {/* Bloco 2 — Regras de Classificação */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold">Regras de Classificação</CardTitle>
-                <Button size="sm" onClick={() => { setEditingGroupingRule(null); setGroupingDialogOpen(true); }}>
-                  <Plus size={14} /> Nova Regra
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loadingGroupingRules ? (
-                <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-              ) : groupingRules.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground space-y-2">
-                  <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                  <p>Nenhuma regra configurada.</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Condição</TableHead>
-                      <TableHead>Grupo Destino</TableHead>
-                      <TableHead className="text-center">Prioridade</TableHead>
-                      <TableHead className="text-center">Ativo</TableHead>
-                      <TableHead className="w-20">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {groupingRules.map((r) => {
-                      const fieldLabel = MATCH_FIELD_OPTIONS.find((o) => o.value === r.match_field)?.label ?? r.match_field;
-                      const opLabel = OPERATOR_OPTIONS.find((o) => o.value === r.operator)?.label ?? r.operator;
-                      const valDisplay = r.match_field === "descricao" ? (r.match_keyword ?? "") : r.match_value;
-                      const groupLabel = r.group_id ? (groupOptions.find((o) => o.value === r.group_id)?.label ?? "—") : "—";
-
-                      return (
-                        <TableRow key={r.id} className={!r.enabled ? "opacity-50" : ""}>
-                          <TableCell className="font-medium">{r.name}</TableCell>
-                          <TableCell className="text-xs">
-                            <span className="text-muted-foreground">{fieldLabel}</span>{" "}
-                            <Badge variant="outline" className="text-xs">{opLabel}</Badge>{" "}
-                            <span className="font-mono">{valDisplay}</span>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{groupLabel}</TableCell>
-                          <TableCell className="text-center">{r.priority}</TableCell>
-                          <TableCell className="text-center">
-                            <Switch
-                              checked={r.enabled}
-                              onCheckedChange={(checked) => toggleGroupingRule.mutate({ id: r.id, enabled: checked })}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingGroupingRule(r); setGroupingDialogOpen(true); }}>
-                                <Edit2 size={13} />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeGroupingRule.mutate(r.id)}>
-                                <Trash2 size={13} className="text-muted-foreground hover:text-destructive" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Bloco 3 — Fallback */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <Layers className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Comportamento Padrão (Fallback)</p>
-                  <p className="text-xs text-muted-foreground">Lançamentos que não correspondem a nenhuma regra são agrupados como <strong>"Não Classificado"</strong>.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <GroupingRuleDialog
-            open={groupingDialogOpen}
-            onOpenChange={setGroupingDialogOpen}
-            rule={editingGroupingRule}
-            categoryOptions={categoryOptions}
-            entityOptions={entityOptions}
-            costCenterOptions={costCenterOpts}
-            groupOptions={groupOptions}
-            onSubmit={(data) => {
-              if (data.id) {
-                updateGroupingRule.mutate(data as any, { onSuccess: () => setGroupingDialogOpen(false) });
-              } else {
-                createGroupingRule.mutate(data, { onSuccess: () => setGroupingDialogOpen(false) });
-              }
-            }}
-            isLoading={createGroupingRule.isPending || updateGroupingRule.isPending}
-          />
+        <TabsContent value="grouping">
+          <GroupingConfigTab />
         </TabsContent>
       </Tabs>
     </div>
