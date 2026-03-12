@@ -313,6 +313,7 @@ export type Database = {
           descricao: string
           documento: string | null
           entity_id: string | null
+          expense_request_id: string | null
           forma_pagamento: string | null
           id: string
           impacto_fluxo_caixa: boolean | null
@@ -356,6 +357,7 @@ export type Database = {
           descricao: string
           documento?: string | null
           entity_id?: string | null
+          expense_request_id?: string | null
           forma_pagamento?: string | null
           id?: string
           impacto_fluxo_caixa?: boolean | null
@@ -399,6 +401,7 @@ export type Database = {
           descricao?: string
           documento?: string | null
           entity_id?: string | null
+          expense_request_id?: string | null
           forma_pagamento?: string | null
           id?: string
           impacto_fluxo_caixa?: boolean | null
@@ -470,6 +473,13 @@ export type Database = {
             columns: ["entity_id"]
             isOneToOne: false
             referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_expense_request_id_fkey"
+            columns: ["expense_request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
             referencedColumns: ["id"]
           },
           {
