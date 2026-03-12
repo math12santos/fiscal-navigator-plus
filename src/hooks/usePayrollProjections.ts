@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { format, addMonths, startOfMonth, isAfter, isBefore } from "date-fns";
-import { useEmployees } from "@/hooks/useDP";
-import { useDPConfig } from "@/hooks/useDP";
+import { useEmployees, useDPConfig, calcINSSEmpregado, calcIRRF } from "@/hooks/useDP";
 import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
 
