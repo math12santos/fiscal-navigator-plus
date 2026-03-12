@@ -2324,15 +2324,116 @@ export type Database = {
           },
         ]
       }
-      grouping_rules: {
+      grouping_groups: {
         Row: {
           created_at: string
           enabled: boolean
           id: string
+          macrogroup_id: string
+          name: string
+          order_index: number
+          organization_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          macrogroup_id: string
+          name: string
+          order_index?: number
+          organization_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          macrogroup_id?: string
+          name?: string
+          order_index?: number
+          organization_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grouping_groups_macrogroup_id_fkey"
+            columns: ["macrogroup_id"]
+            isOneToOne: false
+            referencedRelation: "grouping_macrogroups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grouping_groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grouping_macrogroups: {
+        Row: {
+          color: string | null
+          created_at: string
+          enabled: boolean
+          icon: string | null
+          id: string
+          name: string
+          order_index: number
+          organization_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          enabled?: boolean
+          icon?: string | null
+          id?: string
+          name: string
+          order_index?: number
+          organization_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          enabled?: boolean
+          icon?: string | null
+          id?: string
+          name?: string
+          order_index?: number
+          organization_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grouping_macrogroups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grouping_rules: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          group_id: string | null
+          id: string
           match_field: string
+          match_keyword: string | null
           match_value: string
           min_items: number
           name: string
+          operator: string
           organization_id: string
           priority: number
           sub_group_field: string | null
@@ -2342,11 +2443,14 @@ export type Database = {
         Insert: {
           created_at?: string
           enabled?: boolean
+          group_id?: string | null
           id?: string
           match_field?: string
+          match_keyword?: string | null
           match_value: string
           min_items?: number
           name: string
+          operator?: string
           organization_id: string
           priority?: number
           sub_group_field?: string | null
@@ -2356,11 +2460,14 @@ export type Database = {
         Update: {
           created_at?: string
           enabled?: boolean
+          group_id?: string | null
           id?: string
           match_field?: string
+          match_keyword?: string | null
           match_value?: string
           min_items?: number
           name?: string
+          operator?: string
           organization_id?: string
           priority?: number
           sub_group_field?: string | null
@@ -2368,6 +2475,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "grouping_rules_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "grouping_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "grouping_rules_organization_id_fkey"
             columns: ["organization_id"]
