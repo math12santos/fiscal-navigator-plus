@@ -28,6 +28,7 @@ export function AgingListTab() {
   const { entries: saidaEntries, isLoading: saidaLoading } = useFinanceiro("saida");
   const { entries: entradaEntries, isLoading: entradaLoading } = useFinanceiro("entrada");
   const { bankAccounts, isLoading: bankLoading } = useBankAccounts();
+  const { getGroupLabel, getSubGroupKey, getSubGroupLabel } = useGroupingRules();
   const { holdingMode } = useHolding();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedSubGroups, setExpandedSubGroups] = useState<Set<string>>(new Set());
