@@ -31,6 +31,7 @@ export function AgingListTab() {
   const { bankAccounts, isLoading: bankLoading } = useBankAccounts();
   const { getGroupLabel, getSubGroupKey, getSubGroupLabel, getGroupId } = useGroupingRules();
   const { macrogroups, groups } = useGroupingMacrogroups();
+  const { holdingMode } = useHolding();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedSubGroups, setExpandedSubGroups] = useState<Set<string>>(new Set());
   const today = new Date();
