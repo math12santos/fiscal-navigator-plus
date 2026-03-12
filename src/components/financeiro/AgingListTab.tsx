@@ -5,13 +5,14 @@ import { KPICard } from "@/components/KPICard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Clock, AlertTriangle, CalendarClock, CheckCircle, ChevronRight, ChevronDown, Layers, TrendingUp, Landmark, Wallet, ShieldCheck } from "lucide-react";
+import { Loader2, Clock, AlertTriangle, CalendarClock, CheckCircle, ChevronRight, ChevronDown, Layers, TrendingUp, Landmark, Wallet, ShieldCheck, FolderOpen } from "lucide-react";
 import { differenceInDays, format, parseISO } from "date-fns";
 import { useHolding } from "@/contexts/HoldingContext";
 import { Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGroupingRules } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
+import { buildHierarchy } from "@/lib/groupingHierarchy";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -29,26 +30,17 @@ export function AgingListTab() {
   const { entries: saidaEntries, isLoading: saidaLoading } = useFinanceiro("saida");
   const { entries: entradaEntries, isLoading: entradaLoading } = useFinanceiro("entrada");
   const { bankAccounts, isLoading: bankLoading } = useBankAccounts();
-  const { getGroupLabel, getSubGroupKey, getSubGroupLabel, getGroupId } = useGroupingRules();
+  const { getMatchingRule, getGroupLabel } = useGroupingRules();
   const { macrogroups, groups } = useGroupingMacrogroups();
   const { holdingMode } = useHolding();
+  const [expandedMacrogroups, setExpandedMacrogroups] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [expandedSubGroups, setExpandedSubGroups] = useState<Set<string>>(new Set());
   const today = new Date();
 
   const isLoading = saidaLoading || entradaLoading || bankLoading;
 
-  const toggleGroup = (key: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const toggleSubGroup = (key: string) => {
-    setExpandedSubGroups((prev) => {
+  const toggle = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, key: string) => {
+    setter((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -69,7 +61,7 @@ export function AgingListTab() {
     for (const e of pending) {
       const dueDate = parseISO((e as any).data_vencimento || e.data_prevista);
       const days = differenceInDays(dueDate, today);
-      if (days < 0) continue; // overdue receivables excluded from forecast
+      if (days < 0) continue;
       if (days <= 7) ar7.push(e);
       else if (days <= 15) ar15.push(e);
       else if (days <= 30) ar30.push(e);
@@ -170,99 +162,98 @@ export function AgingListTab() {
     );
   };
 
-  /** Build grouped rows for a bucket */
+  /** Build 3-level grouped rows for a bucket */
   const renderBucketRows = (b: AgingBucket) => {
-    // Group all entries by categoria/source within the bucket
-    const grouped = new Map<string, any[]>();
+    if (b.entries.length === 0) return [];
 
-    for (const e of b.entries) {
-      const label = getGroupLabel(e);
-      const key = `aging-${b.label}-${label}`;
-      if (!grouped.has(key)) grouped.set(key, []);
-      grouped.get(key)!.push(e);
-    }
+    const hierarchy = buildHierarchy(
+      b.entries, getMatchingRule, getGroupLabel, groups, macrogroups
+    );
 
     const rows: React.ReactNode[] = [];
 
-    for (const [key, items] of grouped) {
-      if (items.length >= 2) {
-        const totalVal = items.reduce((s: number, e: any) => s + Number(e.valor_previsto), 0);
-        const label = getGroupLabel(items[0]);
-        const isExpanded = expandedGroups.has(key);
-        const source = items[0].source;
+    for (const mgBucket of hierarchy) {
+      const mgKey = `aging-${b.label}-mg-${mgBucket.info.macrogroupId}`;
+      const isMgExpanded = expandedMacrogroups.has(mgKey);
+      const mgGroups = Array.from(mgBucket.groups.values());
+      const hasSingleGroup = mgGroups.length === 1;
 
-        // Determine if sub-grouping applies
-        const subMap = new Map<string, any[]>();
-        let hasSubGroups = false;
-        for (const e of items) {
-          const subKey = getSubGroupKey(e);
-          if (subKey) {
-            if (!subMap.has(subKey)) subMap.set(subKey, []);
-            subMap.get(subKey)!.push(e);
-            hasSubGroups = true;
-          }
+      // Level 0 — Macrogroup header
+      rows.push(
+        <TableRow
+          key={mgKey}
+          className="cursor-pointer hover:bg-muted/50 font-semibold"
+          onClick={() => toggle(setExpandedMacrogroups, mgKey)}
+        >
+          <TableCell>
+            <div className="flex items-center gap-2">
+              {isMgExpanded
+                ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: mgBucket.info.macrogroupColor }}
+              />
+              {mgBucket.info.macrogroupName}
+              <Badge variant="secondary" className="text-xs font-normal">
+                {mgBucket.entries.length} itens
+              </Badge>
+            </div>
+          </TableCell>
+          <TableCell>—</TableCell>
+          <TableCell><Badge variant="destructive">{b.range}</Badge></TableCell>
+          <TableCell className="text-right font-bold">{fmt(mgBucket.total)}</TableCell>
+          {holdingMode && <TableCell>—</TableCell>}
+          <TableCell><Badge variant="secondary" className="text-xs">{b.range}</Badge></TableCell>
+        </TableRow>
+      );
+
+      if (!isMgExpanded) continue;
+
+      // If only one group, skip group level and show entries directly
+      if (hasSingleGroup) {
+        for (const entry of mgGroups[0].entries) {
+          rows.push(renderEntry(entry, b, 1));
         }
-        hasSubGroups = hasSubGroups && subMap.size > 1;
+        continue;
+      }
+
+      // Level 1 — Group headers
+      for (const grpBucket of mgGroups) {
+        const grpKey = `${mgKey}__${grpBucket.info.groupId}`;
+        const isGrpExpanded = expandedGroups.has(grpKey);
 
         rows.push(
-          <TableRow key={key} className="cursor-pointer hover:bg-muted/50 font-medium" onClick={() => toggleGroup(key)}>
-            <TableCell>
+          <TableRow
+            key={grpKey}
+            className="cursor-pointer hover:bg-muted/40 bg-muted/30"
+            onClick={(ev) => { ev.stopPropagation(); toggle(setExpandedGroups, grpKey); }}
+          >
+            <TableCell className="pl-8">
               <div className="flex items-center gap-2">
-                {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                {label}
-                <Badge variant="secondary" className="text-xs font-normal">{items.length} itens</Badge>
+                {isGrpExpanded
+                  ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                {grpBucket.info.groupName}
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {grpBucket.entries.length}
+                </Badge>
               </div>
             </TableCell>
             <TableCell>—</TableCell>
-            <TableCell><Badge variant="destructive">{b.range}</Badge></TableCell>
-            <TableCell className="text-right font-bold">{fmt(totalVal)}</TableCell>
-            {holdingMode && <TableCell>—</TableCell>}
-            <TableCell><Badge variant="secondary" className="text-xs">{b.range}</Badge></TableCell>
+            <TableCell />
+            <TableCell className="text-right font-semibold">{fmt(grpBucket.total)}</TableCell>
+            {holdingMode && <TableCell />}
+            <TableCell />
           </TableRow>
         );
 
-        if (isExpanded && hasSubGroups) {
-          for (const [subKey, subEntries] of subMap) {
-            const sgKey = `${key}__${subKey}`;
-            const sgTotal = subEntries.reduce((s: number, e: any) => s + Number(e.valor_previsto), 0);
-            const isSubExpanded = expandedSubGroups.has(sgKey);
-
-            rows.push(
-              <TableRow
-                key={sgKey}
-                className="cursor-pointer hover:bg-muted/40 bg-muted/30"
-                onClick={(ev) => { ev.stopPropagation(); toggleSubGroup(sgKey); }}
-              >
-                <TableCell className="pl-10">
-                  <div className="flex items-center gap-2">
-                    {isSubExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                    {getSubGroupLabel(subKey, source, subEntries)}
-                    <Badge variant="secondary" className="text-xs font-normal">{subEntries.length}</Badge>
-                  </div>
-                </TableCell>
-                <TableCell>—</TableCell>
-                <TableCell></TableCell>
-                <TableCell className="text-right font-semibold">{fmt(sgTotal)}</TableCell>
-                {holdingMode && <TableCell></TableCell>}
-                <TableCell></TableCell>
-              </TableRow>
-            );
-
-            if (isSubExpanded) {
-              for (const e of subEntries) {
-                rows.push(renderEntry(e, b, 2));
-              }
-            }
+        // Level 2 — Individual entries
+        if (isGrpExpanded) {
+          for (const entry of grpBucket.entries) {
+            rows.push(renderEntry(entry, b, 2));
           }
-        } else if (isExpanded) {
-          for (const e of items) {
-            rows.push(renderEntry(e, b, 1));
-          }
-        }
-      } else {
-        for (const e of items) {
-          rows.push(renderEntry(e, b));
         }
       }
     }

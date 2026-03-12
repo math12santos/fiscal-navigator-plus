@@ -12,9 +12,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, Layers } from "lucide-react";
+import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, Layers, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGroupingRules } from "@/hooks/useGroupingRules";
+import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
+import { buildHierarchy } from "@/lib/groupingHierarchy";
 import type { FinanceiroEntry } from "@/hooks/useFinanceiro";
 
 const fmt = (v: number) =>
@@ -28,37 +30,6 @@ const statusConfig: Record<string, { icon: typeof Circle; class: string; label: 
   cancelado: { icon: Circle, class: "text-destructive", label: "Cancelado" },
 };
 
-
-/* ── Types ── */
-
-interface SubGroup {
-  key: string;
-  label: string;
-  entries: FinanceiroEntry[];
-  totalPrevisto: number;
-  totalRealizado: number;
-}
-
-interface GroupedRow {
-  type: "group";
-  key: string;
-  label: string;
-  entries: FinanceiroEntry[];
-  subGroups: SubGroup[];
-  totalPrevisto: number;
-  totalRealizado: number;
-  month: string;
-  status: string;
-  source: string;
-}
-
-interface SingleRow {
-  type: "single";
-  entry: FinanceiroEntry;
-}
-
-type DisplayRow = GroupedRow | SingleRow;
-
 interface Props {
   entries: FinanceiroEntry[];
   tipo: "saida" | "entrada";
@@ -68,16 +39,17 @@ interface Props {
 }
 
 export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDeleting }: Props) {
-  const { isGroupable, getGroupLabel, getSubGroupKey, getSubGroupLabel, getMinItems, getGroupId } = useGroupingRules();
+  const { getMatchingRule, getGroupLabel, getMinItems } = useGroupingRules();
+  const { macrogroups, groups } = useGroupingMacrogroups();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [payEntry, setPayEntry] = useState<FinanceiroEntry | null>(null);
   const [payDate, setPayDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [payValue, setPayValue] = useState(0);
+  const [expandedMacrogroups, setExpandedMacrogroups] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [expandedSubGroups, setExpandedSubGroups] = useState<Set<string>>(new Set());
 
-  const toggleGroup = (key: string) => {
-    setExpandedGroups((prev) => {
+  const toggle = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, key: string) => {
+    setter((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -85,93 +57,43 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     });
   };
 
-  const toggleSubGroup = (key: string) => {
-    setExpandedSubGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const displayRows = useMemo<DisplayRow[]>(() => {
-    const groups = new Map<string, FinanceiroEntry[]>();
-    const singles: FinanceiroEntry[] = [];
-
+  // Group entries by month first, then build hierarchy within each month
+  const monthlyHierarchy = useMemo(() => {
+    // Group by month
+    const byMonth = new Map<string, FinanceiroEntry[]>();
     for (const e of entries) {
-      if (isGroupable(e)) {
-        const month = format(new Date(e.data_prevista), "yyyy-MM");
-        const label = getGroupLabel(e);
-        const key = `${label}-${month}`;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key)!.push(e);
-      } else {
-        singles.push(e);
-      }
+      const month = format(new Date(e.data_prevista), "yyyy-MM");
+      if (!byMonth.has(month)) byMonth.set(month, []);
+      byMonth.get(month)!.push(e);
     }
 
-    const rows: DisplayRow[] = [];
+    const result: { month: string; monthLabel: string; hierarchy: ReturnType<typeof buildHierarchy>; singles: FinanceiroEntry[] }[] = [];
 
-    for (const [key, groupEntries] of groups) {
-      const minItems = getMinItems(groupEntries[0]);
-      if (groupEntries.length >= minItems) {
-        const month = format(new Date(groupEntries[0].data_prevista), "MM/yyyy");
-        const cat = getGroupLabel(groupEntries[0]);
-        const totalPrevisto = groupEntries.reduce((s, e) => s + Number(e.valor_previsto), 0);
-        const totalRealizado = groupEntries.reduce((s, e) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0);
-        const allPaid = groupEntries.every((e) => e.status === "pago" || e.status === "recebido");
-        const somePaid = groupEntries.some((e) => e.status === "pago" || e.status === "recebido");
+    for (const [month, monthEntries] of byMonth) {
+      const monthLabel = format(new Date(month + "-01"), "MM/yyyy");
 
-        // Build sub-groups using dynamic sub_group_field
-        const subMap = new Map<string, FinanceiroEntry[]>();
-        for (const e of groupEntries) {
-          const subCat = getSubGroupKey(e) ?? "other";
-          if (!subMap.has(subCat)) subMap.set(subCat, []);
-          subMap.get(subCat)!.push(e);
+      // Build hierarchy for groupable entries within this month
+      const hierarchy = buildHierarchy(
+        monthEntries, getMatchingRule, getGroupLabel, groups, macrogroups
+      );
+
+      // Filter: macrogroups with too few items become singles
+      const singles: FinanceiroEntry[] = [];
+      const filteredHierarchy = hierarchy.filter((mgBucket) => {
+        const minItems = mgBucket.entries.length > 0 ? getMinItems(mgBucket.entries[0]) : 2;
+        if (mgBucket.entries.length < minItems) {
+          singles.push(...mgBucket.entries);
+          return false;
         }
+        return true;
+      });
 
-        const subGroups: SubGroup[] = [];
-        for (const [subKey, subEntries] of subMap) {
-          subGroups.push({
-            key: `${key}__${subKey}`,
-            label: getSubGroupLabel(subKey, groupEntries[0].source, subEntries),
-            entries: subEntries,
-            totalPrevisto: subEntries.reduce((s, e) => s + Number(e.valor_previsto), 0),
-            totalRealizado: subEntries.reduce((s, e) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0),
-          });
-        }
-
-        subGroups.sort((a, b) => a.label.localeCompare(b.label));
-
-        rows.push({
-          type: "group",
-          key,
-          label: `${cat} — ${month}`,
-          entries: groupEntries,
-          subGroups,
-          totalPrevisto,
-          totalRealizado,
-          month,
-          status: allPaid ? (tipo === "entrada" ? "recebido" : "pago") : somePaid ? "confirmado" : "previsto",
-          source: groupEntries[0].source,
-        });
-      } else {
-        singles.push(...groupEntries);
-      }
+      result.push({ month, monthLabel, hierarchy: filteredHierarchy, singles });
     }
 
-    for (const e of singles) {
-      rows.push({ type: "single", entry: e });
-    }
-
-    rows.sort((a, b) => {
-      const dateA = a.type === "group" ? a.entries[0].data_prevista : a.entry.data_prevista;
-      const dateB = b.type === "group" ? b.entries[0].data_prevista : b.entry.data_prevista;
-      return dateA.localeCompare(dateB);
-    });
-
-    return rows;
-  }, [entries, tipo]);
+    result.sort((a, b) => a.month.localeCompare(b.month));
+    return result;
+  }, [entries, macrogroups, groups, getMatchingRule, getGroupLabel, getMinItems]);
 
   const openPay = (e: FinanceiroEntry) => {
     setPayEntry(e);
@@ -272,100 +194,131 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
             </TableRow>
           </TableHeader>
           <TableBody>
-            {displayRows.map((row) => {
-              if (row.type === "single") {
-                return renderEntryRow(row.entry);
-              }
+            {monthlyHierarchy.flatMap(({ month, monthLabel, hierarchy, singles }) => {
+              const rows: React.ReactNode[] = [];
 
-              const isExpanded = expandedGroups.has(row.key);
-              const sc = statusConfig[row.status] ?? statusConfig.previsto;
-              const Icon = sc.icon;
-              const hasSubGroups = row.subGroups.length > 1;
+              for (const mgBucket of hierarchy) {
+                const mgKey = `ft-${month}-mg-${mgBucket.info.macrogroupId}`;
+                const isMgExpanded = expandedMacrogroups.has(mgKey);
+                const mgGroups = Array.from(mgBucket.groups.values());
+                const hasSingleGroup = mgGroups.length === 1;
 
-              return (
-                <>{/* Level 0: main group */}
+                const totalPrevisto = mgBucket.entries.reduce((s, e) => s + Number(e.valor_previsto), 0);
+                const totalRealizado = mgBucket.entries.reduce((s, e) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0);
+                const allPaid = mgBucket.entries.every((e: any) => e.status === "pago" || e.status === "recebido");
+                const somePaid = mgBucket.entries.some((e: any) => e.status === "pago" || e.status === "recebido");
+                const status = allPaid ? (tipo === "entrada" ? "recebido" : "pago") : somePaid ? "confirmado" : "previsto";
+                const sc = statusConfig[status] ?? statusConfig.previsto;
+                const StatusIcon = sc.icon;
+
+                // Level 0 — Macrogroup header
+                rows.push(
                   <TableRow
-                    key={row.key}
-                    className="cursor-pointer hover:bg-muted/50 font-medium"
-                    onClick={() => toggleGroup(row.key)}
+                    key={mgKey}
+                    className="cursor-pointer hover:bg-muted/50 font-semibold"
+                    onClick={() => toggle(setExpandedMacrogroups, mgKey)}
                   >
                     <TableCell className="whitespace-nowrap text-sm">
                       <div className="flex items-center gap-1.5">
-                        {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                        {row.month}
+                        {isMgExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                        {monthLabel}
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-2">
-                        <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                        {row.label}
+                        <span
+                          className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: mgBucket.info.macrogroupColor }}
+                        />
+                        {mgBucket.info.macrogroupName}
                         <Badge variant="secondary" className="text-xs font-normal">
-                          {row.entries.length} itens
+                          {mgBucket.entries.length} itens
                         </Badge>
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">—</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs capitalize">{row.entries[0].categoria ?? "—"}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm font-bold">{fmt(row.totalPrevisto)}</TableCell>
+                    <TableCell />
+                    <TableCell className="text-right font-mono text-sm font-bold">{fmt(totalPrevisto)}</TableCell>
                     <TableCell className="text-right font-mono text-sm font-bold">
-                      {row.totalRealizado > 0 ? fmt(row.totalRealizado) : "—"}
+                      {totalRealizado > 0 ? fmt(totalRealizado) : "—"}
                     </TableCell>
                     <TableCell>
                       <span className={cn("flex items-center gap-1 text-xs", sc.class)}>
-                        <Icon size={14} />
+                        <StatusIcon size={14} />
                         {sc.label}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground capitalize">{row.source}</TableCell>
-                    <TableCell></TableCell>
+                    <TableCell className="text-xs text-muted-foreground capitalize">
+                      {mgBucket.entries[0]?.source ?? "—"}
+                    </TableCell>
+                    <TableCell />
                   </TableRow>
+                );
 
-                  {/* Level 1: sub-groups (only when expanded and multiple sub-categories) */}
-                  {isExpanded && hasSubGroups && row.subGroups.map((sg) => {
-                    const isSubExpanded = expandedSubGroups.has(sg.key);
-                    return (
-                      <>{/* Sub-group header */}
-                        <TableRow
-                          key={sg.key}
-                          className="cursor-pointer hover:bg-muted/40 bg-muted/30"
-                          onClick={(e) => { e.stopPropagation(); toggleSubGroup(sg.key); }}
-                        >
-                          <TableCell className="pl-10 whitespace-nowrap text-sm">
-                            <div className="flex items-center gap-1.5">
-                              {isSubExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <div className="flex items-center gap-2">
-                              {sg.label}
-                              <Badge variant="secondary" className="text-xs font-normal">
-                                {sg.entries.length}
-                              </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">—</TableCell>
-                          <TableCell></TableCell>
-                          <TableCell className="text-right font-mono text-sm font-semibold">{fmt(sg.totalPrevisto)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm font-semibold">
-                            {sg.totalRealizado > 0 ? fmt(sg.totalRealizado) : "—"}
-                          </TableCell>
-                          <TableCell></TableCell>
-                          <TableCell></TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
+                if (!isMgExpanded) continue;
 
-                        {/* Level 2: individual entries */}
-                        {isSubExpanded && sg.entries.map((e) => renderEntryRow(e, 2))}
-                      </>
-                    );
-                  })}
+                // If single group, skip group level
+                if (hasSingleGroup) {
+                  for (const entry of mgGroups[0].entries) {
+                    rows.push(renderEntryRow(entry, 1));
+                  }
+                  continue;
+                }
 
-                  {/* If only 1 sub-group, expand directly to entries */}
-                  {isExpanded && !hasSubGroups && row.entries.map((e) => renderEntryRow(e, 1))}
-                </>
-              );
+                // Level 1 — Group headers
+                for (const grpBucket of mgGroups) {
+                  const grpKey = `${mgKey}__${grpBucket.info.groupId}`;
+                  const isGrpExpanded = expandedGroups.has(grpKey);
+                  const grpTotalPrevisto = grpBucket.entries.reduce((s: number, e: any) => s + Number(e.valor_previsto), 0);
+                  const grpTotalRealizado = grpBucket.entries.reduce((s: number, e: any) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0);
+
+                  rows.push(
+                    <TableRow
+                      key={grpKey}
+                      className="cursor-pointer hover:bg-muted/40 bg-muted/30"
+                      onClick={(ev) => { ev.stopPropagation(); toggle(setExpandedGroups, grpKey); }}
+                    >
+                      <TableCell className="pl-8 whitespace-nowrap text-sm">
+                        <div className="flex items-center gap-1.5">
+                          {isGrpExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <div className="flex items-center gap-2">
+                          <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                          {grpBucket.info.groupName}
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            {grpBucket.entries.length}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">—</TableCell>
+                      <TableCell />
+                      <TableCell className="text-right font-mono text-sm font-semibold">{fmt(grpTotalPrevisto)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm font-semibold">
+                        {grpTotalRealizado > 0 ? fmt(grpTotalRealizado) : "—"}
+                      </TableCell>
+                      <TableCell />
+                      <TableCell />
+                      <TableCell />
+                    </TableRow>
+                  );
+
+                  // Level 2 — Individual entries
+                  if (isGrpExpanded) {
+                    for (const entry of grpBucket.entries) {
+                      rows.push(renderEntryRow(entry, 2));
+                    }
+                  }
+                }
+              }
+
+              // Singles (entries below minItems threshold)
+              for (const e of singles) {
+                rows.push(renderEntryRow(e));
+              }
+
+              return rows;
             })}
           </TableBody>
         </Table>
