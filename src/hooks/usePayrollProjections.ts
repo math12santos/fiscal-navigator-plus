@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { format, addMonths, startOfMonth, isAfter, isBefore } from "date-fns";
-import { useEmployees } from "@/hooks/useDP";
-import { useDPConfig } from "@/hooks/useDP";
+import { useEmployees, useDPConfig, calcINSSEmpregado, calcIRRF } from "@/hooks/useDP";
 import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
 
@@ -26,7 +25,10 @@ interface BenefitRow {
 }
 
 const SUB_CATEGORY_LABELS: Record<string, string> = {
-  folha: "Folha de Pagamento",
+  salario_liquido: "Salário Líquido",
+  encargos_fgts: "FGTS",
+  encargos_inss: "INSS / GPS",
+  encargos_irrf: "IRRF",
   vt: "Vale Transporte",
   beneficios: "Benefícios",
   provisoes: "Provisões (13º + Férias)",
@@ -85,30 +87,35 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         }
 
         const salary = Number(emp.salary_base);
-        const encargos = salary * (inssPatronalPct + ratPct + fgtsPct + terceirosPct);
+        const inssEmp = calcINSSEmpregado(salary);
+        const baseIRRF = salary - inssEmp;
+        const irrf = calcIRRF(baseIRRF);
+        const netSalary = salary - inssEmp - irrf;
+        const fgtsVal = salary * fgtsPct;
+        const inssPatronalVal = salary * inssPatronalPct;
+        const ratVal = salary * ratPct;
+        const terceirosVal = salary * terceirosPct;
+        const gpsTotal = inssPatronalVal + inssEmp + ratVal + terceirosVal;
 
-        // Folha (salary + charges)
-        entries.push({
-          id: `proj-dp-folha-${emp.id}-${monthKey}`,
-          contract_id: null,
-          contract_installment_id: null,
-          tipo: "saida",
-          categoria: "Pessoal",
-          descricao: `Salário — ${emp.name}`,
-          valor_previsto: salary + encargos,
-          valor_realizado: null,
-          data_prevista: monthDate,
-          data_realizada: null,
-          status: "previsto",
-          account_id: null,
-          cost_center_id: emp.cost_center_id ?? null,
-          entity_id: null,
-          notes: `Base: ${salary.toFixed(0)} | Encargos: ${encargos.toFixed(0)}`,
-          source: "dp",
-          dp_sub_category: "folha",
-          created_at: now,
-          updated_at: now,
-        });
+        const base = { contract_id: null, contract_installment_id: null, tipo: "saida" as const, categoria: "Pessoal", valor_realizado: null, data_prevista: monthDate, data_realizada: null, status: "previsto", account_id: null, cost_center_id: emp.cost_center_id ?? null, entity_id: null, source: "dp", created_at: now, updated_at: now };
+
+        // 1. Salário Líquido
+        entries.push({ ...base, id: `proj-dp-sal-${emp.id}-${monthKey}`, descricao: `Salário Líquido — ${emp.name}`, valor_previsto: Math.round(netSalary * 100) / 100, notes: `Base: ${salary.toFixed(0)} | INSS Emp: ${inssEmp.toFixed(0)} | IRRF: ${irrf.toFixed(0)} | Líquido: ${netSalary.toFixed(0)}`, dp_sub_category: "salario_liquido" });
+
+        // 2. FGTS
+        if (fgtsVal > 0) {
+          entries.push({ ...base, id: `proj-dp-fgts-${emp.id}-${monthKey}`, descricao: `FGTS — ${emp.name}`, valor_previsto: Math.round(fgtsVal * 100) / 100, notes: `${(fgtsPct * 100).toFixed(1)}% s/ ${salary.toFixed(0)}`, dp_sub_category: "encargos_fgts" });
+        }
+
+        // 3. GPS / INSS
+        if (gpsTotal > 0) {
+          entries.push({ ...base, id: `proj-dp-inss-${emp.id}-${monthKey}`, descricao: `INSS / GPS — ${emp.name}`, valor_previsto: Math.round(gpsTotal * 100) / 100, notes: `Patronal: ${inssPatronalVal.toFixed(0)} | Emp: ${inssEmp.toFixed(0)} | RAT: ${ratVal.toFixed(0)} | 3os: ${terceirosVal.toFixed(0)}`, dp_sub_category: "encargos_inss" });
+        }
+
+        // 4. IRRF
+        if (irrf > 0) {
+          entries.push({ ...base, id: `proj-dp-irrf-${emp.id}-${monthKey}`, descricao: `IRRF — ${emp.name}`, valor_previsto: Math.round(irrf * 100) / 100, notes: `Base cálculo: ${baseIRRF.toFixed(0)}`, dp_sub_category: "encargos_irrf" });
+        }
 
         // VT
         if (emp.vt_ativo && emp.vt_diario > 0) {
