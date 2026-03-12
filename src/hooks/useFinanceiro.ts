@@ -7,9 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useHolding } from "@/contexts/HoldingContext";
 import { useUserDataScope } from "@/hooks/useUserDataScope";
 import { useContracts, Contract } from "@/hooks/useContracts";
-import { format, addMonths } from "date-fns";
+import { format, addMonths, startOfMonth } from "date-fns";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
 import { isRecurringCashflow, generateProjectionsFromContract } from "@/lib/contractProjections";
+import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 
 export interface FinanceiroEntry extends CashFlowEntry {}
 
