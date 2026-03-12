@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit2, Power, Wand2, Users, ShoppingBag } from "lucide-react";
+import { Plus, Search, Edit2, Power, Wand2, Users, ShoppingBag, Layers, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import AccountTreeView from "@/components/AccountTreeView";
 import ChartOfAccountsFormDialog from "@/components/ChartOfAccountsFormDialog";
