@@ -139,7 +139,7 @@ export function AgingListTab() {
               <TableBody>
                 {buckets.slice(0, 4).flatMap((b) =>
                   b.entries.map((e: any) => {
-                    const dueDate = parseISO(e.data_vencimento || e.data_prevista);
+                    const dueDate = parseISO((e as any).data_vencimento || e.data_prevista);
                     const days = Math.abs(differenceInDays(dueDate, today));
                     return (
                       <TableRow key={e.id}>
