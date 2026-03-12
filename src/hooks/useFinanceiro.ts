@@ -29,6 +29,27 @@ export interface FinanceiroInput {
   source: string;
   contract_id: string | null;
   contract_installment_id: string | null;
+  // New fields
+  documento: string | null;
+  tipo_documento: string | null;
+  tipo_despesa: string | null;
+  subcategoria_id: string | null;
+  valor_bruto: number;
+  valor_desconto: number;
+  valor_juros_multa: number;
+  competencia: string | null;
+  data_vencimento: string | null;
+  data_prevista_pagamento: string | null;
+  natureza_contabil: string | null;
+  impacto_fluxo_caixa: boolean;
+  impacto_orcamento: boolean;
+  afeta_caixa_no_vencimento: boolean;
+  conta_contabil_ref: string | null;
+  forma_pagamento: string | null;
+  conta_bancaria_id: string | null;
+  num_parcelas: number | null;
+  recorrencia: string | null;
+  conciliacao_id: string | null;
 }
 
 /**
