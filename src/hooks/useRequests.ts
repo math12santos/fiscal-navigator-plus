@@ -20,6 +20,15 @@ export interface Request {
   status: string;
   created_at: string;
   updated_at: string;
+  // Governance fields
+  entity_id: string | null;
+  account_id: string | null;
+  competencia: string | null;
+  data_vencimento: string | null;
+  justificativa: string | null;
+  classified_by: string | null;
+  classified_at: string | null;
+  cashflow_entry_id: string | null;
 }
 
 export interface RequestTask {
