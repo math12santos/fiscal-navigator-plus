@@ -14,7 +14,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SUB_CATEGORY_LABELS } from "@/hooks/usePayrollProjections";
+import { useGroupingRules } from "@/hooks/useGroupingRules";
 import type { FinanceiroEntry } from "@/hooks/useFinanceiro";
 
 const fmt = (v: number) =>
