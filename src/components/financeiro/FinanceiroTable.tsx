@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,8 +12,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Clock, Circle, Trash2, Loader2, Banknote, ChevronRight, ChevronDown, Layers } from "lucide-react";
+import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SUB_CATEGORY_LABELS } from "@/hooks/usePayrollProjections";
 import type { FinanceiroEntry } from "@/hooks/useFinanceiro";
 
 const fmt = (v: number) =>
@@ -28,15 +28,25 @@ const statusConfig: Record<string, { icon: typeof Circle; class: string; label: 
   cancelado: { icon: Circle, class: "text-destructive", label: "Cancelado" },
 };
 
-// Categories that should be grouped into expandable rows
 const GROUPABLE_CATEGORIES = ["Pessoal"];
 const GROUPABLE_SOURCES = ["dp"];
+
+/* ── Types ── */
+
+interface SubGroup {
+  key: string;
+  label: string;
+  entries: FinanceiroEntry[];
+  totalPrevisto: number;
+  totalRealizado: number;
+}
 
 interface GroupedRow {
   type: "group";
   key: string;
   label: string;
   entries: FinanceiroEntry[];
+  subGroups: SubGroup[];
   totalPrevisto: number;
   totalRealizado: number;
   month: string;
@@ -65,6 +75,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
   const [payDate, setPayDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [payValue, setPayValue] = useState(0);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedSubGroups, setExpandedSubGroups] = useState<Set<string>>(new Set());
 
   const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => {
@@ -75,7 +86,15 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     });
   };
 
-  // Build display rows: group eligible entries, keep the rest as singles
+  const toggleSubGroup = (key: string) => {
+    setExpandedSubGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const displayRows = useMemo<DisplayRow[]>(() => {
     const groups = new Map<string, FinanceiroEntry[]>();
     const singles: FinanceiroEntry[] = [];
@@ -97,11 +116,8 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
 
     const rows: DisplayRow[] = [];
 
-    // Convert groups with 2+ entries into GroupedRows; singles stay as-is
-    const usedGroupKeys = new Set<string>();
     for (const [key, groupEntries] of groups) {
       if (groupEntries.length >= 2) {
-        usedGroupKeys.add(key);
         const month = format(new Date(groupEntries[0].data_prevista), "MM/yyyy");
         const cat = groupEntries[0].categoria ?? "Pessoal";
         const totalPrevisto = groupEntries.reduce((s, e) => s + Number(e.valor_previsto), 0);
@@ -109,11 +125,34 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
         const allPaid = groupEntries.every((e) => e.status === "pago" || e.status === "recebido");
         const somePaid = groupEntries.some((e) => e.status === "pago" || e.status === "recebido");
 
+        // Build sub-groups by dp_sub_category
+        const subMap = new Map<string, FinanceiroEntry[]>();
+        for (const e of groupEntries) {
+          const subCat = (e as any).dp_sub_category ?? "other";
+          if (!subMap.has(subCat)) subMap.set(subCat, []);
+          subMap.get(subCat)!.push(e);
+        }
+
+        const subGroups: SubGroup[] = [];
+        for (const [subKey, subEntries] of subMap) {
+          subGroups.push({
+            key: `${key}__${subKey}`,
+            label: SUB_CATEGORY_LABELS[subKey] ?? subKey,
+            entries: subEntries,
+            totalPrevisto: subEntries.reduce((s, e) => s + Number(e.valor_previsto), 0),
+            totalRealizado: subEntries.reduce((s, e) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0),
+          });
+        }
+
+        // Sort sub-groups by label
+        subGroups.sort((a, b) => a.label.localeCompare(b.label));
+
         rows.push({
           type: "group",
           key,
           label: `${cat} — ${month}`,
           entries: groupEntries,
+          subGroups,
           totalPrevisto,
           totalRealizado,
           month,
@@ -121,17 +160,14 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
           source: groupEntries[0].source,
         });
       } else {
-        // Single entry in group → treat as regular
         singles.push(...groupEntries);
       }
     }
 
-    // Add singles
     for (const e of singles) {
       rows.push({ type: "single", entry: e });
     }
 
-    // Sort by date
     rows.sort((a, b) => {
       const dateA = a.type === "group" ? a.entries[0].data_prevista : a.entry.data_prevista;
       const dateB = b.type === "group" ? b.entries[0].data_prevista : b.entry.data_prevista;
@@ -171,7 +207,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     );
   }
 
-  const renderEntryRow = (e: FinanceiroEntry, indent = false) => {
+  const renderEntryRow = (e: FinanceiroEntry, indent = 0) => {
     const isProjected = e.id.startsWith("proj-");
     const sc = statusConfig[e.status] ?? statusConfig.previsto;
     const Icon = sc.icon;
@@ -179,8 +215,8 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     const isManual = e.source === "manual";
 
     return (
-      <TableRow key={e.id} className={cn(isProjected && "opacity-80", indent && "bg-muted/30")}>
-        <TableCell className={cn("whitespace-nowrap text-sm", indent && "pl-10")}>
+      <TableRow key={e.id} className={cn(isProjected && "opacity-80", indent > 0 && "bg-muted/30", indent > 1 && "bg-muted/15")}>
+        <TableCell className={cn("whitespace-nowrap text-sm", indent === 1 && "pl-10", indent === 2 && "pl-16")}>
           {format(new Date((e as any).data_vencimento || e.data_prevista), "dd/MM/yyyy")}
         </TableCell>
         <TableCell className="text-sm max-w-[200px] truncate">{e.descricao}</TableCell>
@@ -206,20 +242,13 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
         <TableCell>
           <div className="flex items-center gap-1">
             {isPending && (
-              <Button
-                variant="ghost" size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => openPay(e)}
-              >
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => openPay(e)}>
                 <Banknote size={14} />
                 {actionLabel}
               </Button>
             )}
             {isManual && !isProjected && (
-              <Button
-                variant="ghost" size="icon" className="h-7 w-7"
-                onClick={() => setDeleteId(e.id)}
-              >
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDeleteId(e.id)}>
                 <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
               </Button>
             )}
@@ -252,13 +281,13 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
                 return renderEntryRow(row.entry);
               }
 
-              // Group row
               const isExpanded = expandedGroups.has(row.key);
               const sc = statusConfig[row.status] ?? statusConfig.previsto;
               const Icon = sc.icon;
+              const hasSubGroups = row.subGroups.length > 1;
 
               return (
-                <>
+                <>{/* Level 0: main group */}
                   <TableRow
                     key={row.key}
                     className="cursor-pointer hover:bg-muted/50 font-medium"
@@ -296,7 +325,49 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
                     <TableCell className="text-xs text-muted-foreground capitalize">{row.source}</TableCell>
                     <TableCell></TableCell>
                   </TableRow>
-                  {isExpanded && row.entries.map((e) => renderEntryRow(e, true))}
+
+                  {/* Level 1: sub-groups (only when expanded and multiple sub-categories) */}
+                  {isExpanded && hasSubGroups && row.subGroups.map((sg) => {
+                    const isSubExpanded = expandedSubGroups.has(sg.key);
+                    return (
+                      <>{/* Sub-group header */}
+                        <TableRow
+                          key={sg.key}
+                          className="cursor-pointer hover:bg-muted/40 bg-muted/30"
+                          onClick={(e) => { e.stopPropagation(); toggleSubGroup(sg.key); }}
+                        >
+                          <TableCell className="pl-10 whitespace-nowrap text-sm">
+                            <div className="flex items-center gap-1.5">
+                              {isSubExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <div className="flex items-center gap-2">
+                              {sg.label}
+                              <Badge variant="secondary" className="text-xs font-normal">
+                                {sg.entries.length}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">—</TableCell>
+                          <TableCell></TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold">{fmt(sg.totalPrevisto)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold">
+                            {sg.totalRealizado > 0 ? fmt(sg.totalRealizado) : "—"}
+                          </TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+
+                        {/* Level 2: individual entries */}
+                        {isSubExpanded && sg.entries.map((e) => renderEntryRow(e, 2))}
+                      </>
+                    );
+                  })}
+
+                  {/* If only 1 sub-group, expand directly to entries */}
+                  {isExpanded && !hasSubGroups && row.entries.map((e) => renderEntryRow(e, 1))}
                 </>
               );
             })}

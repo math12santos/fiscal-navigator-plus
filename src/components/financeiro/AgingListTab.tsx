@@ -9,6 +9,7 @@ import { differenceInDays, format, parseISO } from "date-fns";
 import { useHolding } from "@/contexts/HoldingContext";
 import { Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SUB_CATEGORY_LABELS } from "@/hooks/usePayrollProjections";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -28,6 +29,7 @@ export function AgingListTab() {
   const { entries, isLoading } = useFinanceiro("saida");
   const { holdingMode } = useHolding();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedSubGroups, setExpandedSubGroups] = useState<Set<string>>(new Set());
   const today = new Date();
 
   const toggleGroup = (key: string) => {
@@ -39,8 +41,16 @@ export function AgingListTab() {
     });
   };
 
+  const toggleSubGroup = (key: string) => {
+    setExpandedSubGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const buckets = useMemo<AgingBucket[]>(() => {
-    // Only pending entries (not paid, not projected DP/payroll)
     const pending = entries.filter(
       (e) => e.status === "previsto" || e.status === "confirmado"
     );
@@ -90,26 +100,140 @@ export function AgingListTab() {
     return <div className="flex justify-center py-12"><Loader2 className="animate-spin" /></div>;
   }
 
+  /** Render a single entry row */
+  const renderEntry = (e: any, b: AgingBucket, indent = 0) => {
+    const dueDate = parseISO((e as any).data_vencimento || e.data_prevista);
+    const days = Math.abs(differenceInDays(dueDate, today));
+    return (
+      <TableRow key={e.id} className={cn(indent > 0 && "bg-muted/30", indent > 1 && "bg-muted/15")}>
+        <TableCell className={cn("font-medium max-w-[200px] truncate", indent === 1 && "pl-10", indent === 2 && "pl-16")}>
+          {e.descricao}
+        </TableCell>
+        <TableCell>{format(dueDate, "dd/MM/yyyy")}</TableCell>
+        <TableCell><Badge variant="destructive">{days}d</Badge></TableCell>
+        <TableCell className="text-right font-medium">{fmt(Number(e.valor_previsto))}</TableCell>
+        {holdingMode && (
+          <TableCell>
+            <Badge variant="outline" className="text-xs">
+              <Building2 className="h-3 w-3 mr-1" />
+              {e.organization_id?.slice(0, 8)}
+            </Badge>
+          </TableCell>
+        )}
+        <TableCell><Badge variant="secondary" className="text-xs">{b.range}</Badge></TableCell>
+      </TableRow>
+    );
+  };
+
+  /** Build grouped rows for a bucket */
+  const renderBucketRows = (b: AgingBucket) => {
+    const grouped = new Map<string, any[]>();
+    const singles: any[] = [];
+
+    for (const e of b.entries) {
+      if (GROUPABLE_SOURCES.includes(e.source) || e.categoria === "Pessoal") {
+        const month = format(new Date(e.data_prevista), "yyyy-MM");
+        const key = `aging-${b.label}-${e.categoria ?? e.source}-${month}`;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(e);
+      } else {
+        singles.push(e);
+      }
+    }
+
+    const rows: React.ReactNode[] = [];
+
+    for (const [key, items] of grouped) {
+      if (items.length >= 2) {
+        const totalVal = items.reduce((s: number, e: any) => s + Number(e.valor_previsto), 0);
+        const cat = items[0].categoria ?? "Pessoal";
+        const month = format(new Date(items[0].data_prevista), "MM/yyyy");
+        const isExpanded = expandedGroups.has(key);
+
+        // Build sub-groups
+        const subMap = new Map<string, any[]>();
+        for (const e of items) {
+          const subCat = e.dp_sub_category ?? "other";
+          if (!subMap.has(subCat)) subMap.set(subCat, []);
+          subMap.get(subCat)!.push(e);
+        }
+        const hasSubGroups = subMap.size > 1;
+
+        rows.push(
+          <TableRow key={key} className="cursor-pointer hover:bg-muted/50 font-medium" onClick={() => toggleGroup(key)}>
+            <TableCell>
+              <div className="flex items-center gap-2">
+                {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                {cat} — {month}
+                <Badge variant="secondary" className="text-xs font-normal">{items.length} itens</Badge>
+              </div>
+            </TableCell>
+            <TableCell>—</TableCell>
+            <TableCell><Badge variant="destructive">{b.range}</Badge></TableCell>
+            <TableCell className="text-right font-bold">{fmt(totalVal)}</TableCell>
+            {holdingMode && <TableCell>—</TableCell>}
+            <TableCell><Badge variant="secondary" className="text-xs">{b.range}</Badge></TableCell>
+          </TableRow>
+        );
+
+        if (isExpanded && hasSubGroups) {
+          for (const [subKey, subEntries] of subMap) {
+            const sgKey = `${key}__${subKey}`;
+            const sgTotal = subEntries.reduce((s: number, e: any) => s + Number(e.valor_previsto), 0);
+            const isSubExpanded = expandedSubGroups.has(sgKey);
+
+            rows.push(
+              <TableRow
+                key={sgKey}
+                className="cursor-pointer hover:bg-muted/40 bg-muted/30"
+                onClick={(ev) => { ev.stopPropagation(); toggleSubGroup(sgKey); }}
+              >
+                <TableCell className="pl-10">
+                  <div className="flex items-center gap-2">
+                    {isSubExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                    {SUB_CATEGORY_LABELS[subKey] ?? subKey}
+                    <Badge variant="secondary" className="text-xs font-normal">{subEntries.length}</Badge>
+                  </div>
+                </TableCell>
+                <TableCell>—</TableCell>
+                <TableCell></TableCell>
+                <TableCell className="text-right font-semibold">{fmt(sgTotal)}</TableCell>
+                {holdingMode && <TableCell></TableCell>}
+                <TableCell></TableCell>
+              </TableRow>
+            );
+
+            if (isSubExpanded) {
+              for (const e of subEntries) {
+                rows.push(renderEntry(e, b, 2));
+              }
+            }
+          }
+        } else if (isExpanded && !hasSubGroups) {
+          for (const e of items) {
+            rows.push(renderEntry(e, b, 1));
+          }
+        }
+      } else {
+        singles.push(...items);
+      }
+    }
+
+    for (const e of singles) {
+      rows.push(renderEntry(e, b));
+    }
+
+    return rows;
+  };
+
   return (
     <div className="space-y-6">
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KPICard
-          title="Total Vencido"
-          value={fmt(totalOverdue)}
-          icon={<AlertTriangle size={20} />}
-          subtitle={`${countOverdue} título(s)`}
-        />
-        <KPICard
-          title="A Vencer"
-          value={fmt(totalDue)}
-          icon={<CalendarClock size={20} />}
-        />
-        <KPICard
-          title="Total Pendente"
-          value={fmt(totalOverdue + totalDue)}
-          icon={<Clock size={20} />}
-        />
+        <KPICard title="Total Vencido" value={fmt(totalOverdue)} icon={<AlertTriangle size={20} />} subtitle={`${countOverdue} título(s)`} />
+        <KPICard title="A Vencer" value={fmt(totalDue)} icon={<CalendarClock size={20} />} />
+        <KPICard title="Total Pendente" value={fmt(totalOverdue + totalDue)} icon={<Clock size={20} />} />
       </div>
 
       {/* Aging buckets */}
@@ -128,7 +252,7 @@ export function AgingListTab() {
         ))}
       </div>
 
-      {/* Detail table for overdue items */}
+      {/* Detail table */}
       {countOverdue > 0 && (
         <Card>
           <CardHeader className="py-3">
@@ -150,103 +274,7 @@ export function AgingListTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {buckets.slice(0, 4).flatMap((b) => {
-                  // Group DP/Pessoal entries within each bucket
-                  const grouped = new Map<string, any[]>();
-                  const singles: any[] = [];
-
-                  for (const e of b.entries) {
-                    if (GROUPABLE_SOURCES.includes(e.source) || (e.categoria === "Pessoal")) {
-                      const month = format(new Date(e.data_prevista), "yyyy-MM");
-                      const key = `aging-${b.label}-${e.categoria ?? e.source}-${month}`;
-                      if (!grouped.has(key)) grouped.set(key, []);
-                      grouped.get(key)!.push(e);
-                    } else {
-                      singles.push(e);
-                    }
-                  }
-
-                  const rows: React.ReactNode[] = [];
-
-                  // Render grouped rows
-                  for (const [key, items] of grouped) {
-                    if (items.length >= 2) {
-                      const totalVal = items.reduce((s: number, e: any) => s + Number(e.valor_previsto), 0);
-                      const cat = items[0].categoria ?? "Pessoal";
-                      const month = format(new Date(items[0].data_prevista), "MM/yyyy");
-                      const isExpanded = expandedGroups.has(key);
-
-                      rows.push(
-                        <TableRow key={key} className="cursor-pointer hover:bg-muted/50 font-medium" onClick={() => toggleGroup(key)}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                              {cat} — {month}
-                              <Badge variant="secondary" className="text-xs font-normal">{items.length} itens</Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell>—</TableCell>
-                          <TableCell><Badge variant="destructive">{b.range}</Badge></TableCell>
-                          <TableCell className="text-right font-bold">{fmt(totalVal)}</TableCell>
-                          {holdingMode && <TableCell>—</TableCell>}
-                          <TableCell><Badge variant="secondary" className="text-xs">{b.range}</Badge></TableCell>
-                        </TableRow>
-                      );
-
-                      if (isExpanded) {
-                        for (const e of items) {
-                          const dueDate = parseISO((e as any).data_vencimento || e.data_prevista);
-                          const days = Math.abs(differenceInDays(dueDate, today));
-                          rows.push(
-                            <TableRow key={e.id} className="bg-muted/30">
-                              <TableCell className="pl-10 font-medium max-w-[200px] truncate">{e.descricao}</TableCell>
-                              <TableCell>{format(dueDate, "dd/MM/yyyy")}</TableCell>
-                              <TableCell><Badge variant="destructive">{days}d</Badge></TableCell>
-                              <TableCell className="text-right font-medium">{fmt(Number(e.valor_previsto))}</TableCell>
-                              {holdingMode && (
-                                <TableCell>
-                                  <Badge variant="outline" className="text-xs">
-                                    <Building2 className="h-3 w-3 mr-1" />
-                                    {e.organization_id?.slice(0, 8)}
-                                  </Badge>
-                                </TableCell>
-                              )}
-                              <TableCell><Badge variant="secondary" className="text-xs">{b.range}</Badge></TableCell>
-                            </TableRow>
-                          );
-                        }
-                      }
-                    } else {
-                      singles.push(...items);
-                    }
-                  }
-
-                  // Render singles
-                  for (const e of singles) {
-                    const dueDate = parseISO((e as any).data_vencimento || e.data_prevista);
-                    const days = Math.abs(differenceInDays(dueDate, today));
-                    rows.push(
-                      <TableRow key={e.id}>
-                        <TableCell className="font-medium max-w-[200px] truncate">{e.descricao}</TableCell>
-                        <TableCell>{format(dueDate, "dd/MM/yyyy")}</TableCell>
-                        <TableCell><Badge variant="destructive">{days}d</Badge></TableCell>
-                        <TableCell className="text-right font-medium">{fmt(Number(e.valor_previsto))}</TableCell>
-                        {holdingMode && (
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              <Building2 className="h-3 w-3 mr-1" />
-                              {e.organization_id?.slice(0, 8)}
-                            </Badge>
-                          </TableCell>
-                        )}
-                        <TableCell><Badge variant="secondary" className="text-xs">{b.range}</Badge></TableCell>
-                      </TableRow>
-                    );
-                  }
-
-                  return rows;
-                })}
+                {buckets.slice(0, 4).flatMap((b) => renderBucketRows(b))}
               </TableBody>
             </Table>
           </CardContent>
