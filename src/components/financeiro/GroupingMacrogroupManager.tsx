@@ -133,6 +133,9 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
                     {mgGroups.map((g) => (
                       <div key={g.id} className="flex items-center gap-2 px-3 py-1.5 rounded border border-dashed bg-muted/30">
                         <span className="text-sm flex-1">{g.name}</span>
+                        {ruleCountByGroup && (
+                          <Badge variant="outline" className="text-[10px]">{ruleCountByGroup.get(g.id) ?? 0} regra(s)</Badge>
+                        )}
                         <Switch
                           checked={g.enabled}
                           onCheckedChange={(checked) => toggleGroup.mutate({ id: g.id, enabled: checked })}
