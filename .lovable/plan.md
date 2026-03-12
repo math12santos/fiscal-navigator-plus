@@ -1,165 +1,97 @@
-# Plano: Módulo de Gestão de Tarefas por Solicitações
+# Configurador de Regras de Aglutinação — Fase 1 (MVP)
 
-## Visão Geral
+O documento descreve um motor completo de visualização operacional. A implementação será faseada. Esta é a **Fase 1** conforme o próprio documento sugere.
 
-Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
+## O que muda em relação ao modelo atual
 
----
+O modelo atual é muito simples: uma regra faz match de **um campo** contra **um valor exato** e opcionalmente sub-agrupa por outro campo. O novo modelo introduz:
 
-## 1. Estrutura de Dados (Migrações)
+1. **Macrogrupos e Grupos hierárquicos** — estrutura pai/filho para organizar regras
+2. **Múltiplas condições por regra** — com operadores (igual, contém, começa com, está em lista)
+3. **Regra por palavra-chave na descrição** — não apenas por campo exato
+4. **Fallback obrigatório** — entradas sem match vão para "Não Classificado"
+5. **Seed de macrogrupos padrão** — 10 macrogrupos pré-configurados com subgrupos
 
-### Tabela `requests` (Solicitações)
+## Arquitetura de Dados
 
-```text
-id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
-area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
-due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
-created_at, updated_at
-```
+### Novas tabelas (migração SQL)
 
-### Tabela `request_tasks` (Tarefas geradas)
+`**grouping_macrogroups**` — Macrogrupos (Pessoal e RH, Infraestrutura, Tributário, etc.)
 
-```text
-id, request_id (FK), organization_id, assigned_to, status, due_date,
-created_by, executed_by, approved_by, created_at, updated_at
-```
+- `id`, `organization_id`, `name`, `icon`, `color`, `order_index`, `enabled`
 
-### Tabela `request_comments` (Comentarios/Historico)
+`**grouping_groups**` — Grupos dentro de macrogrupos (Folha, Benefícios, Aluguel, etc.)
 
-```text
-id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
-old_value, new_value, created_at
-```
+- `id`, `macrogroup_id` (FK), `organization_id`, `name`, `order_index`, `enabled`
 
-### Tabela `request_attachments`
+**Refatorar `grouping_rules**` — Regras agora apontam para um grupo destino:
 
-```text
-id, request_id (FK), user_id, file_name, file_path, created_at
-```
+- Adicionar colunas: `group_id` (FK para `grouping_groups`), `operator` (text, default `equals`), `match_keyword` (text, para busca por descrição)
+- O campo `match_field` ganha novos valores possíveis: `descricao`, `cost_center_id`
+- Operadores suportados na Fase 1: `equals`, `contains`, `starts_with`, `in_list`
 
-### Tabela `notifications`
+### Seed de macrogrupos padrão
 
-```text
-id, organization_id, user_id (destinatario), title, body, type, priority,
-reference_type (request/task), reference_id, read, read_at, created_at
-```
+Ao clicar "Gerar Padrão", criar os 10 macrogrupos do documento com seus subgrupos:
 
-RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
+- Pessoal e RH (Folha, Pró-labore, Encargos, Benefícios, VT, Férias, 13º, Rescisões, RPA)
+- Infraestrutura (Aluguel, Condomínio, Água, Energia, Internet, Telefonia, Limpeza, Produtos de Limpeza)
+- Tecnologia e Sistemas, Fornecedores Operacionais, Serviços Profissionais, Tributário, Financeiro, Contratos, Patrimonial/Investimentos, Despesas Eventuais
 
-Habilitar realtime em `notifications` para push instantâneo.
+## Nova Interface — Aba "Aglutinação" em `/configuracoes`
 
----
+Substituir a tela atual (tabela simples de regras) por **3 blocos**:
 
-## 2. Componentes e Páginas
+### Bloco 1 — Macrogrupos e Grupos
 
-### Página `Tarefas.tsx` (reescrita completa)
+- Lista colapsável de macrogrupos com seus grupos filhos
+- CRUD inline: adicionar/editar/excluir macrogrupo e grupo
+- Toggle ativo/inativo
+- Botão de Criar Macro-Grupo para criação manual
+- Botão "Gerar Padrão" para popular com os 10 macrogrupos
 
-Três abas controladas por permissões (`getAllowedTabs`):
+### Bloco 2 — Regras de Classificação
+
+- Tabela de regras com colunas: Nome, Condição (campo + operador + valor), Grupo Destino, Prioridade, Status
+- Dialog de criação/edição com:
+  - Nome da regra
+  - Campo (`categoria`, `fornecedor`, `descrição`, `source`, `centro de custo`)
+  - Operador (`é igual a`, `contém`, `começa com`, `está em lista`)
+  - Fonte — **select dinâmico** conforme campo selecionado (categorias existentes, entidades, centros de custo) não utilizar texto livre apenas sugerir novas fontes. 
+  - Grupo destino — select dos grupos cadastrados
+  - Prioridade numérica
+
+### Bloco 3 — Fallback
+
+- Configuração do comportamento padrão: "Não Classificado" / "Revisão Necessária"
+- Entradas sem match aparecem nesse grupo na Aging List
+
+## Hook `useGroupingRules` — Refatoração
+
+- Novo hook `useGroupingMacrogroups` para CRUD de macrogrupos e grupos
+- Refatorar `useGroupingRules` para:
+  - Suportar operadores (`equals`, `contains`, `starts_with`, `in_list`)
+  - Match por `descricao` com keyword
+  - Retornar o macrogrupo/grupo destino ao invés de um label simples
+  - Fallback para "Não Classificado" quando nenhuma regra faz match
+
+## Consumo no AgingListTab e FinanceiroTable
+
+- Agrupar por **Macrogrupo → Grupo → Entrada** (3 níveis colapsáveis)
+- Macrogrupo mostra total e contagem
+- Grupo mostra total e contagem
+- Entradas sem match vão para macrogrupo "Não Classificado"
+
+## Arquivos
 
 
-| Aba            | Key              | Conteúdo                                                                                  |
-| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
-| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
-| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
-
-
-### Dialog `RequestFormDialog.tsx`
-
-Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
-
-### Componente `RequestDetail.tsx`
-
-Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
-
-### Central de Notificações `NotificationCenter.tsx`
-
-Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
-
----
-
-## 3. Hooks
-
-- `useRequests.ts` — CRUD de solicitações com filtros
-- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
-- `useRequestComments.ts` — Comentários e histórico
-- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
-
----
-
-## 4. Integração com Outros Módulos
-
-Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
-
-- Financeiro → "Aprovação de pagamento"
-- Contratos → "Revisão jurídica"
-- DP → "Solicitação de contratação"
-
-Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
-
----
-
-## 5. Atualização de Definições
-
-- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
-- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
-- `AppLayout.tsx`: Adicionar ícone de notificações no header
-
----
-
-## 6. Fluxo Operacional
-
-```text
-Usuário cria solicitação
-  → Sistema gera task vinculada
-  → Responsável recebe notificação (realtime)
-  → Responsável executa (muda status)
-  → Sistema registra histórico
-  → Se necessário → status "Aguardando Aprovação"
-  → Aprovador recebe notificação
-  → Solicitação concluída/rejeitada
-```
-
----
-
-## Ordem de Implementação
-
-1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
-2. Habilitar realtime em `notifications`
-3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
-4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
-5. Criar `RequestFormDialog` e `RequestDetail`
-6. Criar `NotificationCenter` e integrar no `AppLayout`
-7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
-
----
-
-# Onboarding Guiado — Implementação (Fase 1 ✅)
-
-## Status: Implementado
-
-### Tabelas criadas
-- `onboarding_progress` — progresso por organização com JSONB por etapa
-- `onboarding_recommendations` — recomendações automáticas
-
-### RLS
-- Org members: SELECT, INSERT (com user_id check), UPDATE
-- Masters: ALL
-
-### Componentes implementados
-- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
-- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
-- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
-- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
-- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
-- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
-- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
-
-### Rotas
-- `/onboarding-guiado` — Wizard no app
-- `/backoffice/onboarding` — Gestão no backoffice
-
-### Fase 2 (pendente)
-- Integração profunda das etapas 2-8 com módulos existentes
-- Sistema de recomendações automáticas (Etapa 9)
-- Score no dashboard principal
+| Arquivo                                                   | Ação                                                                      |
+| --------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Migration SQL                                             | Criar `grouping_macrogroups`, `grouping_groups`; alterar `grouping_rules` |
+| `src/hooks/useGroupingMacrogroups.ts`                     | Novo — CRUD macrogrupos + grupos                                          |
+| `src/hooks/useGroupingRules.ts`                           | Refatorar — operadores, grupo destino, fallback                           |
+| `src/components/financeiro/GroupingRuleDialog.tsx`        | Refatorar — operador, campo dinâmico, grupo destino                       |
+| `src/components/financeiro/GroupingMacrogroupManager.tsx` | Novo — UI de macrogrupos/grupos                                           |
+| `src/pages/Configuracoes.tsx`                             | Refatorar aba Aglutinação com 3 blocos                                    |
+| `src/components/financeiro/AgingListTab.tsx`              | 3 níveis: macrogrupo → grupo → entrada                                    |
+| `src/components/financeiro/FinanceiroTable.tsx`           | Mesma lógica de 3 níveis                                                  |
