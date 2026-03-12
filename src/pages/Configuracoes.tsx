@@ -37,6 +37,7 @@ const ALL_TABS = [
   { key: "cost-centers", label: "Centros de Custo" },
   { key: "entities", label: "Fornecedores / Clientes" },
   { key: "products", label: "Produtos / Serviços" },
+  { key: "grouping", label: "Aglutinação" },
 ];
 
 const ACCOUNT_TYPES = [
