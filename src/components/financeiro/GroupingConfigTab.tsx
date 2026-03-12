@@ -19,6 +19,7 @@ import { useEntities } from "@/hooks/useEntities";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import GroupingRuleDialog from "@/components/financeiro/GroupingRuleDialog";
 import GroupingMacrogroupManager from "@/components/financeiro/GroupingMacrogroupManager";
+import GroupingPropagation from "@/components/financeiro/GroupingPropagation";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 
 const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
@@ -205,6 +206,9 @@ export default function GroupingConfigTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ════════ Propagação Holding ════════ */}
+      <GroupingPropagation />
 
       {/* ════════ ZONA 2 — 2 Colunas ════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
