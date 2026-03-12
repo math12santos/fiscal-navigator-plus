@@ -1,165 +1,74 @@
-# Plano: Módulo de Gestão de Tarefas por Solicitações
 
-## Visão Geral
 
-Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
+# Configuração de Regras de Aglutinação
 
----
+## Objetivo
 
-## 1. Estrutura de Dados (Migrações)
+Criar uma aba "Aglutinação" dentro da página de Configurações (`/configuracoes`) para permitir que o usuário gerencie regras de agrupamento de forma visual e persistente. Essas regras serão consumidas pelo Aging List e pelo FinanceiroTable.
 
-### Tabela `requests` (Solicitações)
+## Arquitetura
 
-```text
-id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
-area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
-due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
-created_at, updated_at
+### 1. Tabela no banco: `grouping_rules`
+
+```sql
+CREATE TABLE public.grouping_rules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL,                    -- ex: "Pessoal", "Impostos"
+  match_field text NOT NULL DEFAULT 'categoria', -- 'categoria' | 'source' | 'entity_id'
+  match_value text NOT NULL,             -- valor a comparar (ex: "Pessoal", "dp", uuid de entity)
+  sub_group_field text,                  -- campo para sub-agrupamento: 'dp_sub_category' | 'entity_id' | null
+  min_items int NOT NULL DEFAULT 2,      -- threshold mínimo para aglutinar
+  enabled boolean NOT NULL DEFAULT true,
+  priority int NOT NULL DEFAULT 0,       -- ordem de aplicação
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
 ```
 
-### Tabela `request_tasks` (Tarefas geradas)
+RLS: membros da organização podem ler/gravar suas regras.
 
-```text
-id, request_id (FK), organization_id, assigned_to, status, due_date,
-created_by, executed_by, approved_by, created_at, updated_at
-```
+### 2. Seed de regras padrão
 
-### Tabela `request_comments` (Comentarios/Historico)
+Ao criar a tabela, popular com as regras que já existem hardcoded:
+- Pessoal (match_field=source, match_value=dp, sub_group_field=dp_sub_category)
+- Contratos (match_field=source, match_value=contrato, sub_group_field=entity_id)
 
-```text
-id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
-old_value, new_value, created_at
-```
+### 3. Hook: `useGroupingRules`
 
-### Tabela `request_attachments`
+- CRUD na tabela `grouping_rules` filtrado por `organization_id`
+- Expõe função `getGroupConfig(entry)` que retorna a regra aplicável a uma entrada
+- Fallback: se nenhuma regra bate e há 2+ itens com mesma categoria, aglutinar sem sub-grupo
 
-```text
-id, request_id (FK), user_id, file_name, file_path, created_at
-```
+### 4. Aba na página Configurações
 
-### Tabela `notifications`
+Adicionar tab "Aglutinação" em `src/pages/Configuracoes.tsx`:
+- Tabela listando regras existentes (nome, campo de match, valor, sub-agrupamento, min itens, ativo/inativo)
+- Botão "Nova Regra" abre dialog com formulário:
+  - Nome da regra
+  - Campo de agrupamento (select: Categoria, Fonte, Fornecedor)
+  - Valor (input ou select dependendo do campo)
+  - Campo de sub-agrupamento (opcional, select)
+  - Mínimo de itens (number input, default 2)
+  - Prioridade (number)
+- Edição inline e toggle ativo/inativo
 
-```text
-id, organization_id, user_id (destinatario), title, body, type, priority,
-reference_type (request/task), reference_id, read, read_at, created_at
-```
+### 5. Consumir regras no AgingListTab e FinanceiroTable
 
-RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
+Substituir lógica hardcoded de `getGroupLabel`, `getSubGroupKey`, `GROUPABLE_CATEGORIES`, `GROUPABLE_SOURCES` pelo hook `useGroupingRules`:
+- Para cada entrada, verificar se alguma regra ativa faz match
+- Se sim, usar `name` como label do grupo e `sub_group_field` para o nível 2
+- Se não, manter comportamento fallback (aglutina por categoria se 2+ itens)
 
-Habilitar realtime em `notifications` para push instantâneo.
+## Arquivos
 
----
+| Arquivo | Ação |
+|---------|------|
+| Migration SQL | Criar tabela `grouping_rules` + seed + RLS |
+| `src/hooks/useGroupingRules.ts` | Novo hook CRUD + matcher |
+| `src/components/financeiro/GroupingRuleDialog.tsx` | Dialog de criação/edição de regra |
+| `src/pages/Configuracoes.tsx` | Adicionar tab "Aglutinação" |
+| `src/components/financeiro/AgingListTab.tsx` | Consumir regras do hook |
+| `src/components/financeiro/FinanceiroTable.tsx` | Consumir regras do hook |
 
-## 2. Componentes e Páginas
-
-### Página `Tarefas.tsx` (reescrita completa)
-
-Três abas controladas por permissões (`getAllowedTabs`):
-
-
-| Aba            | Key              | Conteúdo                                                                                  |
-| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
-| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
-| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
-
-
-### Dialog `RequestFormDialog.tsx`
-
-Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
-
-### Componente `RequestDetail.tsx`
-
-Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
-
-### Central de Notificações `NotificationCenter.tsx`
-
-Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
-
----
-
-## 3. Hooks
-
-- `useRequests.ts` — CRUD de solicitações com filtros
-- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
-- `useRequestComments.ts` — Comentários e histórico
-- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
-
----
-
-## 4. Integração com Outros Módulos
-
-Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
-
-- Financeiro → "Aprovação de pagamento"
-- Contratos → "Revisão jurídica"
-- DP → "Solicitação de contratação"
-
-Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
-
----
-
-## 5. Atualização de Definições
-
-- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
-- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
-- `AppLayout.tsx`: Adicionar ícone de notificações no header
-
----
-
-## 6. Fluxo Operacional
-
-```text
-Usuário cria solicitação
-  → Sistema gera task vinculada
-  → Responsável recebe notificação (realtime)
-  → Responsável executa (muda status)
-  → Sistema registra histórico
-  → Se necessário → status "Aguardando Aprovação"
-  → Aprovador recebe notificação
-  → Solicitação concluída/rejeitada
-```
-
----
-
-## Ordem de Implementação
-
-1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
-2. Habilitar realtime em `notifications`
-3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
-4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
-5. Criar `RequestFormDialog` e `RequestDetail`
-6. Criar `NotificationCenter` e integrar no `AppLayout`
-7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
-
----
-
-# Onboarding Guiado — Implementação (Fase 1 ✅)
-
-## Status: Implementado
-
-### Tabelas criadas
-- `onboarding_progress` — progresso por organização com JSONB por etapa
-- `onboarding_recommendations` — recomendações automáticas
-
-### RLS
-- Org members: SELECT, INSERT (com user_id check), UPDATE
-- Masters: ALL
-
-### Componentes implementados
-- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
-- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
-- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
-- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
-- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
-- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
-- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
-
-### Rotas
-- `/onboarding-guiado` — Wizard no app
-- `/backoffice/onboarding` — Gestão no backoffice
-
-### Fase 2 (pendente)
-- Integração profunda das etapas 2-8 com módulos existentes
-- Sistema de recomendações automáticas (Etapa 9)
-- Score no dashboard principal
