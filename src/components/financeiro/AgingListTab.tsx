@@ -11,6 +11,7 @@ import { useHolding } from "@/contexts/HoldingContext";
 import { Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGroupingRules } from "@/hooks/useGroupingRules";
+import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -28,7 +29,8 @@ export function AgingListTab() {
   const { entries: saidaEntries, isLoading: saidaLoading } = useFinanceiro("saida");
   const { entries: entradaEntries, isLoading: entradaLoading } = useFinanceiro("entrada");
   const { bankAccounts, isLoading: bankLoading } = useBankAccounts();
-  const { getGroupLabel, getSubGroupKey, getSubGroupLabel } = useGroupingRules();
+  const { getGroupLabel, getSubGroupKey, getSubGroupLabel, getGroupId } = useGroupingRules();
+  const { macrogroups, groups } = useGroupingMacrogroups();
   const { holdingMode } = useHolding();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedSubGroups, setExpandedSubGroups] = useState<Set<string>>(new Set());
