@@ -99,13 +99,10 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     const singles: FinanceiroEntry[] = [];
 
     for (const e of entries) {
-      const isGroupable =
-        GROUPABLE_CATEGORIES.includes(e.categoria ?? "") ||
-        GROUPABLE_SOURCES.includes(e.source);
-
-      if (isGroupable) {
+      if (isGroupable(e)) {
         const month = format(new Date(e.data_prevista), "yyyy-MM");
-        const key = `${e.categoria ?? e.source}-${month}`;
+        const label = getGroupLabel(e);
+        const key = `${label}-${month}`;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(e);
       } else {
