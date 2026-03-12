@@ -111,6 +111,11 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
                   <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: mg.color }} />
                   <span className="font-medium text-sm flex-1">{mg.name}</span>
                   <Badge variant="secondary" className="text-xs">{mgGroups.length} grupo(s)</Badge>
+                  {ruleCountByGroup && (
+                    <Badge variant="outline" className="text-xs">
+                      {mgGroups.reduce((s, g) => s + (ruleCountByGroup.get(g.id) ?? 0), 0)} regra(s)
+                    </Badge>
+                  )}
                   <Switch
                     checked={mg.enabled}
                     onCheckedChange={(checked) => toggleMacrogroup.mutate({ id: mg.id, enabled: checked })}
