@@ -78,9 +78,10 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Data</TableHead>
+              <TableHead>Vencimento</TableHead>
               <TableHead>Descrição</TableHead>
-              <TableHead>Categoria</TableHead>
+              <TableHead>Documento</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead className="text-right">Previsto</TableHead>
               <TableHead className="text-right">Realizado</TableHead>
               <TableHead>Status</TableHead>
