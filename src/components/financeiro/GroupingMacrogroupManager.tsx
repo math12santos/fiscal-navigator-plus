@@ -9,7 +9,7 @@ import { useGroupingMacrogroups, type GroupingMacrogroup, type GroupingGroup } f
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-export default function GroupingMacrogroupManager() {
+export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCountByGroup?: Map<string, number> }) {
   const {
     macrogroups, groups, isLoading,
     getGroupsForMacrogroup,
