@@ -113,7 +113,16 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
     enabled: !!user && !!orgId && contracts.length > 0,
   });
 
-  // Merge materialized + projected installments
+  // Payroll projections (only for saida)
+  const now = new Date();
+  const rangeFrom = now;
+  const rangeTo = addMonths(now, 12);
+  const { payrollProjections } = usePayrollProjections(
+    tipo === "saida" ? rangeFrom : undefined,
+    tipo === "saida" ? rangeTo : undefined
+  );
+
+  // Merge materialized + projected installments + payroll
   const allEntries = useMemo(() => {
     const materialized = entriesQuery.data ?? [];
     const materializedInstKeys = new Set(
@@ -125,6 +134,12 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
       materialized
         .filter((e) => e.contract_id && e.source === "contrato")
         .map((e) => `${e.contract_id}-${e.data_prevista}`)
+    );
+    // De-dup payroll: check materialized DP entries by month
+    const materializedDPMonths = new Set(
+      materialized
+        .filter((e) => e.source === "dp")
+        .map((e) => format(new Date(e.data_prevista), "yyyy-MM"))
     );
 
     const contractMap = new Map(contracts.map((c) => [c.id, c]));
@@ -159,10 +174,6 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
       });
 
     // 2. Recurring contract projections (today → +12 months)
-    const now = new Date();
-    const rangeFrom = now;
-    const rangeTo = addMonths(now, 12);
-
     const recurringProjections = contracts
       .filter((c) => {
         const isTipo = tipo === "entrada"
@@ -181,10 +192,18 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
           } as FinanceiroEntry));
       });
 
-    const merged = [...materialized, ...installments, ...recurringProjections];
+    // 3. Payroll projections (de-duped against materialized DP entries)
+    const dpProjections = tipo === "saida"
+      ? (payrollProjections as FinanceiroEntry[]).filter((p) => {
+          const month = format(new Date(p.data_prevista), "yyyy-MM");
+          return !materializedDPMonths.has(month);
+        })
+      : [];
+
+    const merged = [...materialized, ...installments, ...recurringProjections, ...dpProjections];
     merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
     return filterByScope(merged);
-  }, [entriesQuery.data, installmentsQuery.data, contracts, tipo, orgId, filterByScope]);
+  }, [entriesQuery.data, installmentsQuery.data, contracts, tipo, orgId, filterByScope, payrollProjections]);
 
   // Totals
   const totals = useMemo(() => {
