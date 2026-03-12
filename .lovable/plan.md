@@ -1,165 +1,140 @@
-# Plano: Módulo de Gestão de Tarefas por Solicitações
+# Reformulação do Formulário de Despesas (Contas a Pagar)
 
-## Visão Geral
+## Resumo
 
-Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
+O formulário atual de cadastro de despesas é simplificado demais. O pedido exige uma reformulação completa em 4 seções com novos campos, integrações com plano de contas, fornecedores (entities), rateio entre centros de custo, parcelamento, formas de pagamento, contas bancárias, e projeção automática de despesas fixas/recorrentes no fluxo de caixa.
 
----
+## Escopo da Implementação
 
-## 1. Estrutura de Dados (Migrações)
+### Fase 1 — Migração de Banco de Dados
 
-### Tabela `requests` (Solicitações)
-
-```text
-id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
-area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
-due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
-created_at, updated_at
-```
-
-### Tabela `request_tasks` (Tarefas geradas)
-
-```text
-id, request_id (FK), organization_id, assigned_to, status, due_date,
-created_by, executed_by, approved_by, created_at, updated_at
-```
-
-### Tabela `request_comments` (Comentarios/Historico)
-
-```text
-id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
-old_value, new_value, created_at
-```
-
-### Tabela `request_attachments`
-
-```text
-id, request_id (FK), user_id, file_name, file_path, created_at
-```
-
-### Tabela `notifications`
-
-```text
-id, organization_id, user_id (destinatario), title, body, type, priority,
-reference_type (request/task), reference_id, read, read_at, created_at
-```
-
-RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
-
-Habilitar realtime em `notifications` para push instantâneo.
-
----
-
-## 2. Componentes e Páginas
-
-### Página `Tarefas.tsx` (reescrita completa)
-
-Três abas controladas por permissões (`getAllowedTabs`):
+Adicionar novas colunas à tabela `cashflow_entries`:
 
 
-| Aba            | Key              | Conteúdo                                                                                  |
-| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
-| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
-| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
+| Campo                       | Tipo                      | Descrição                                                                                   |
+| --------------------------- | ------------------------- | ------------------------------------------------------------------------------------------- |
+| `documento`                 | text                      | Nº da NF, fatura, recibo, DARF, guia                                                        |
+| `tipo_despesa`              | text                      | fixa, variável, eventual, recorrente, investimento, impostos, distribuição de lucro, outros |
+| `subcategoria_id`           | uuid FK→chart_of_accounts | Subcategoria do plano de contas                                                             |
+| `valor_bruto`               | numeric                   | Valor bruto                                                                                 |
+| `valor_desconto`            | numeric default 0         | Descontos                                                                                   |
+| `valor_juros_multa`         | numeric default 0         | Juros e multa                                                                               |
+| `competencia`               | text                      | Formato mm/yy                                                                               |
+| `data_vencimento`           | date                      | Data de vencimento                                                                          |
+| `data_prevista_pagamento`   | date                      | Data prevista de pagamento                                                                  |
+| `natureza_contabil`         | text                      | operacional, administrativa, comercial, financeira, tributária, patrimonial                 |
+| `impacto_fluxo_caixa`       | boolean default true      | Impacta fluxo de caixa                                                                      |
+| `impacto_orcamento`         | boolean default true      | Impacta orçamento                                                                           |
+| `afeta_caixa_no_vencimento` | boolean default true      | Quando afetar o caixa                                                                       |
+| `conta_contabil_ref`        | text                      | Conta contábil referencial                                                                  |
+| `forma_pagamento`           | text                      | PIX, boleto, TED, etc.                                                                      |
+| `conta_bancaria_id`         | uuid FK→bank_accounts     | Conta bancária pagadora                                                                     |
+| `num_parcelas`              | int                       | Nº de parcelas                                                                              |
+| `acordo_id`                 | uuid                      | ID do acordo (para aglutinação)                                                             |
+| `conciliacao_id`            | text                      | ID da conciliação bancária                                                                  |
+| `recorrencia`               | text                      | mensal, semanal, etc. (para projeção)                                                       |
 
 
-### Dialog `RequestFormDialog.tsx`
+Criar tabela `bank_accounts`:
 
-Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
+- id, organization_id, user_id, nome, banco, agencia, conta, tipo_conta, pix_key, active, created_at
 
-### Componente `RequestDetail.tsx`
+Criar tabela `payment_methods`:
 
-Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
+- id, organization_id, name, active, is_default, created_at
 
-### Central de Notificações `NotificationCenter.tsx`
+Criar tabela `expense_cost_center_splits` (para rateio):
 
-Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
+- id, cashflow_entry_id FK, cost_center_id FK, percentual numeric, valor numeric, created_at
 
----
+Criar tabela `supplier_agreements` (para aglutinação de despesas):
 
-## 3. Hooks
+- id, organization_id, entity_id FK, descricao, valor_total, status, data_acordo, created_at
 
-- `useRequests.ts` — CRUD de solicitações com filtros
-- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
-- `useRequestComments.ts` — Comentários e histórico
-- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
+### Fase 2 — Reformulação do Formulário (UI)
 
----
+Substituir `FinanceiroEntryDialog` por um dialog com **4 abas** (Accordion ou Tabs):
 
-## 4. Integração com Outros Módulos
+**Aba 1 — Identificação**
 
-Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
+- Nome (descricao)
+- Documento (NF, fatura, etc.)
+- Tipo de documento: nota fiscal, fatura, recibo, contrato n°, Darf, Guia
+- Fornecedor → Select buscável de entities (type="fornecedor"), com botão "+" para cadastro inline via EntityFormDialog
+- Tipo → fixa, variável, eventual, recorrente, investimento, impostos, distribuição de lucro, outros
+- Categoria principal → Select do plano de contas (nível 2, contas sintéticas)
+- Subcategoria → Select filtrado pelo pai selecionado (nível 3, contas analíticas)
+- Empresa/Unidade → Auto-preenchida no modo empresa; Select no modo holding (activeOrgIds)
+- Centro de Custo → Select de cost_centers
 
-- Financeiro → "Aprovação de pagamento"
-- Contratos → "Revisão jurídica"
-- DP → "Solicitação de contratação"
+**Aba 2 — Dados Financeiros**
 
-Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
+- Valor Bruto, Descontos, Juros/Multa
+- Valor Líquido (calculado automaticamente: bruto - desconto + juros)
+- Competência (mm/yy)
+- Data de Vencimento
+- Data Prevista de Pagamento
+- Data Efetiva de Pagamento (readonly, vinculada ao botão "Pagar")
 
----
+**Aba 3 — Natureza Contábil**
 
-## 5. Atualização de Definições
+- Classificação no plano de contas (account_id)
+- Natureza: operacional, administrativa, comercial, financeira, tributária, patrimonial
+- Impacto no fluxo de caixa: Switch sim/não
+- Impacto em orçamento: Switch sim/não
+- Afeta caixa no vencimento: Switch
+- Rateio entre centros de custo (tabela dinâmica com % e valor absoluto)
+- Conta contábil referencial (text input)
 
-- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
-- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
-- `AppLayout.tsx`: Adicionar ícone de notificações no header
+**Aba 4 — Pagamento e Liquidação**
 
----
+- Forma de pagamento: Select (PIX, boleto, TED, cartão, débito automático) + opção "outra"
+- Conta bancária pagadora: Select de bank_accounts + botão "+" para cadastrar
+- Parcelamento: Switch → campos de nº parcelas / valor total
+- Status: pendente, agendada, paga, vencida, cancelada, renegociada
+- Conciliação bancária (readonly, exibe vínculo se existir)
 
-## 6. Fluxo Operacional
+### Fase 3 — Hook e Lógica de Negócio
 
-```text
-Usuário cria solicitação
-  → Sistema gera task vinculada
-  → Responsável recebe notificação (realtime)
-  → Responsável executa (muda status)
-  → Sistema registra histórico
-  → Se necessário → status "Aguardando Aprovação"
-  → Aprovador recebe notificação
-  → Solicitação concluída/rejeitada
-```
+**Atualizar `useFinanceiro.ts**`:
 
----
+- Expandir `FinanceiroInput` com todos os novos campos
+- Create mutation: se tipo_despesa = "fixa" ou "recorrente", gerar projeções automáticas (12 meses) no fluxo de caixa
+- Lógica de parcelamento: ao salvar com num_parcelas > 1, criar N registros com data_vencimento incrementada mensalmente
 
-## Ordem de Implementação
+**Criar `useBankAccounts.ts**`: CRUD para contas bancárias
+**Criar `usePaymentMethods.ts**`: CRUD para formas de pagamento
+**Criar `useExpenseSplits.ts**`: CRUD para rateio de centros de custo
+**Criar `useSupplierAgreements.ts**`: Lógica de aglutinação — selecionar despesas de um fornecedor, somar valores, criar acordo, dar baixa nas despesas originais
 
-1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
-2. Habilitar realtime em `notifications`
-3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
-4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
-5. Criar `RequestFormDialog` e `RequestDetail`
-6. Criar `NotificationCenter` e integrar no `AppLayout`
-7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
+### Fase 4 — Componentes Auxiliares
 
----
+- `CostCenterSplitEditor.tsx` — Tabela inline para editar rateio (% ou valor absoluto, com validação de 100%)
+- `BankAccountSelect.tsx` — Select com cadastro inline
+- `SupplierAgreementDialog.tsx` — Wizard para aglutinar despesas de um fornecedor
 
-# Onboarding Guiado — Implementação (Fase 1 ✅)
+### Fase 5 — RLS para novas tabelas
 
-## Status: Implementado
+Aplicar o padrão existente: `is_org_member(org_id) OR has_backoffice_org_access(org_id)` para SELECT/INSERT/UPDATE/DELETE em bank_accounts, payment_methods, expense_cost_center_splits, supplier_agreements.
 
-### Tabelas criadas
-- `onboarding_progress` — progresso por organização com JSONB por etapa
-- `onboarding_recommendations` — recomendações automáticas
+## Arquivos Afetados
 
-### RLS
-- Org members: SELECT, INSERT (com user_id check), UPDATE
-- Masters: ALL
+- **Nova migração SQL** — novas colunas em cashflow_entries + 4 novas tabelas + RLS
+- `**src/components/financeiro/FinanceiroEntryDialog.tsx**` — Reescrita completa com 4 abas
+- `**src/components/financeiro/CostCenterSplitEditor.tsx**` — Novo componente de rateio
+- `**src/components/financeiro/BankAccountSelect.tsx**` — Novo select inline
+- `**src/components/financeiro/SupplierAgreementDialog.tsx**` — Novo dialog de aglutinação
+- `**src/hooks/useFinanceiro.ts**` — Expandir FinanceiroInput e lógica de projeção/parcelamento
+- `**src/hooks/useBankAccounts.ts**` — Novo hook
+- `**src/hooks/usePaymentMethods.ts**` — Novo hook
+- `**src/hooks/useExpenseSplits.ts**` — Novo hook
+- `**src/hooks/useSupplierAgreements.ts**` — Novo hook
+- `**src/components/financeiro/ContasAPagar.tsx**` — Botão de aglutinação
+- `**src/components/financeiro/FinanceiroTable.tsx**` — Colunas adicionais (documento, fornecedor, vencimento)
 
-### Componentes implementados
-- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
-- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
-- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
-- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
-- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
-- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
-- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
+## Observações
 
-### Rotas
-- `/onboarding-guiado` — Wizard no app
-- `/backoffice/onboarding` — Gestão no backoffice
-
-### Fase 2 (pendente)
-- Integração profunda das etapas 2-8 com módulos existentes
-- Sistema de recomendações automáticas (Etapa 9)
-- Score no dashboard principal
+- A lógica de "Fornecedor" reutiliza a tabela `entities` existente (type="fornecedor"), sem criar tabela nova.
+- O campo `valor_previsto` existente será calculado como valor líquido (bruto - desconto + juros) para manter compatibilidade com o fluxo de caixa.
+- Despesas recorrentes usarão a mesma engine de projeção de `contractProjections.ts`, adaptada para despesas avulsas.
+- A conciliação bancária está atualmente em mock — o campo será placeholder para futura integração.
