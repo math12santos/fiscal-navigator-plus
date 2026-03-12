@@ -32,6 +32,8 @@ export function BankAccountFormDialog({ open, onOpenChange, onSave, isPending }:
     conta: "",
     tipo_conta: "corrente",
     pix_key: "",
+    saldo_atual: "",
+    limite_credito: "",
   });
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
