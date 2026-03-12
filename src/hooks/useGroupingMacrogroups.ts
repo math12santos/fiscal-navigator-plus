@@ -33,7 +33,7 @@ export interface GroupingGroup {
 export type MacrogroupInput = Pick<GroupingMacrogroup, "name" | "icon" | "color" | "order_index" | "enabled">;
 export type GroupInput = Pick<GroupingGroup, "macrogroup_id" | "name" | "order_index" | "enabled">;
 
-const DEFAULT_SEED: { name: string; icon: string; color: string; groups: string[] }[] = [
+export const DEFAULT_SEED: { name: string; icon: string; color: string; groups: string[] }[] = [
   { name: "Pessoal e RH", icon: "Users", color: "#6366f1", groups: ["Folha", "Pró-labore", "Encargos", "Benefícios", "VT", "Férias", "13º Salário", "Rescisões", "RPA"] },
   { name: "Infraestrutura", icon: "Building2", color: "#8b5cf6", groups: ["Aluguel", "Condomínio", "Água", "Energia", "Internet", "Telefonia", "Limpeza", "Produtos de Limpeza"] },
   { name: "Tecnologia e Sistemas", icon: "Monitor", color: "#06b6d4", groups: ["Software/SaaS", "Hospedagem/Cloud", "Suporte TI", "Equipamentos"] },
