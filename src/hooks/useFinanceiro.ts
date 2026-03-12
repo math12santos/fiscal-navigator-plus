@@ -206,15 +206,48 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
     return { total_previsto, total_realizado, pendente, count_pendente, total: allEntries.length };
   }, [allEntries]);
 
-  // Create manual entry
+  // Create manual entry (with installment/recurring projection logic)
   const create = useMutation({
     mutationFn: async (input: FinanceiroInput) => {
-      const { error } = await supabase.from("cashflow_entries" as any).insert({
+      // Ensure data_prevista is set from data_vencimento or data_prevista_pagamento
+      const dataPrevista = input.data_prevista || input.data_vencimento || input.data_prevista_pagamento || "";
+      // Calculate valor_previsto as valor liquido if valor_bruto is set
+      const valorPrevisto = input.valor_bruto > 0
+        ? input.valor_bruto - input.valor_desconto + input.valor_juros_multa
+        : input.valor_previsto;
+
+      const baseEntry = {
         ...input,
+        data_prevista: dataPrevista,
+        valor_previsto: valorPrevisto,
         user_id: user!.id,
         organization_id: orgId,
-      } as any);
-      if (error) throw error;
+      };
+
+      // Handle installments: create N records
+      const numParcelas = input.num_parcelas && input.num_parcelas > 1 ? input.num_parcelas : 1;
+      if (numParcelas > 1 && dataPrevista) {
+        const valorParcela = Math.round((valorPrevisto / numParcelas) * 100) / 100;
+        const entries = [];
+        for (let i = 0; i < numParcelas; i++) {
+          const parcelaDate = format(addMonths(new Date(dataPrevista), i), "yyyy-MM-dd");
+          entries.push({
+            ...baseEntry,
+            descricao: `${input.descricao} (${i + 1}/${numParcelas})`,
+            data_prevista: parcelaDate,
+            data_vencimento: parcelaDate,
+            data_prevista_pagamento: parcelaDate,
+            valor_previsto: valorParcela,
+            valor_bruto: valorParcela,
+            num_parcelas: numParcelas,
+          } as any);
+        }
+        const { error } = await supabase.from("cashflow_entries" as any).insert(entries);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("cashflow_entries" as any).insert(baseEntry as any);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       invalidateAll();
