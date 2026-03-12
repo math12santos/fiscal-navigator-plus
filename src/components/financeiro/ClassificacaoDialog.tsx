@@ -9,11 +9,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Tag, FileText } from "lucide-react";
+import { Loader2, Tag, FileText, Sparkles, Paperclip, Download } from "lucide-react";
 import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useEntities } from "@/hooks/useEntities";
+import { useSupplierClassificationHistory } from "@/hooks/useSupplierClassificationHistory";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import type { Request } from "@/hooks/useRequests";
 import type { FinanceiroEntry } from "@/hooks/useFinanceiro";
 
@@ -30,16 +33,37 @@ interface ClassificationData {
   notes: string;
 }
 
+interface Attachment {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** For classifying expense requests */
   request?: Request | null;
-  /** For classifying DP/contract projections */
   projections?: FinanceiroEntry[];
   onConfirmRequest?: (requestId: string, data: ClassificationData) => Promise<void>;
   onConfirmProjections?: (items: { entry: FinanceiroEntry; classification: ClassificationData }[]) => Promise<void>;
   isPending: boolean;
+}
+
+function useRequestAttachments(requestId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["request_attachments", requestId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("request_attachments" as any)
+        .select("id, file_name, file_path, file_type, file_size")
+        .eq("request_id", requestId!);
+      if (error) throw error;
+      return (data ?? []) as unknown as Attachment[];
+    },
+    enabled: !!requestId,
+  });
 }
 
 export function ClassificacaoDialog({
@@ -48,8 +72,15 @@ export function ClassificacaoDialog({
   const { accounts } = useChartOfAccounts();
   const { costCenters } = useCostCenters();
   const { entities } = useEntities();
-
   const analyticalAccounts = accounts.filter((a) => !a.is_synthetic && a.active);
+
+  // Attachments
+  const { data: attachments = [] } = useRequestAttachments(request?.id);
+
+  // Auto-suggestion from supplier history
+  const { suggestedAccountId, suggestedCostCenterId } = useSupplierClassificationHistory(
+    request?.entity_id
+  );
 
   const [form, setForm] = useState<ClassificationData>({
     account_id: "",
@@ -60,6 +91,8 @@ export function ClassificacaoDialog({
     valor_previsto: 0,
     notes: "",
   });
+
+  const [appliedSuggestion, setAppliedSuggestion] = useState(false);
 
   // Pre-fill from request data
   useEffect(() => {
@@ -79,8 +112,29 @@ export function ClassificacaoDialog({
         valor_previsto: estimated,
         notes: "",
       });
+      setAppliedSuggestion(false);
     }
   }, [request]);
+
+  // Apply supplier suggestion if fields are empty
+  useEffect(() => {
+    if (request && !appliedSuggestion) {
+      let changed = false;
+      const updates: Partial<ClassificationData> = {};
+      if (suggestedAccountId && !form.account_id) {
+        updates.account_id = suggestedAccountId;
+        changed = true;
+      }
+      if (suggestedCostCenterId && !form.cost_center_id) {
+        updates.cost_center_id = suggestedCostCenterId;
+        changed = true;
+      }
+      if (changed) {
+        setForm((prev) => ({ ...prev, ...updates }));
+        setAppliedSuggestion(true);
+      }
+    }
+  }, [suggestedAccountId, suggestedCostCenterId, request, appliedSuggestion, form.account_id, form.cost_center_id]);
 
   // Pre-fill from first projection
   useEffect(() => {
@@ -115,7 +169,17 @@ export function ClassificacaoDialog({
     onOpenChange(false);
   };
 
+  const handleDownload = async (attachment: Attachment) => {
+    const { data } = await supabase.storage
+      .from("request-attachments")
+      .createSignedUrl(attachment.file_path, 3600);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, "_blank");
+    }
+  };
+
   const isProjectionMode = !request && projections && projections.length > 0;
+  const hasSuggestion = appliedSuggestion && (suggestedAccountId || suggestedCostCenterId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,6 +222,31 @@ export function ClassificacaoDialog({
                   </div>
                 )}
               </div>
+
+              {/* Attachments list */}
+              {attachments.length > 0 && (
+                <div className="pt-2 border-t mt-2">
+                  <h5 className="text-xs font-semibold text-muted-foreground uppercase mb-1 flex items-center gap-1">
+                    <Paperclip className="h-3 w-3" /> Anexos ({attachments.length})
+                  </h5>
+                  <div className="space-y-1">
+                    {attachments.map((att) => (
+                      <button
+                        key={att.id}
+                        onClick={() => handleDownload(att)}
+                        className="flex items-center gap-2 text-sm w-full text-left hover:bg-muted/50 rounded px-1.5 py-1 transition-colors"
+                      >
+                        <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate flex-1 text-primary hover:underline">{att.file_name}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : ""}
+                        </span>
+                        <Download className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <Separator />
           </>
@@ -186,6 +275,16 @@ export function ClassificacaoDialog({
           </>
         )}
 
+        {/* Suggestion banner */}
+        {hasSuggestion && (
+          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-3 py-2 text-sm">
+            <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+            <span className="text-amber-800 dark:text-amber-200">
+              Classificação pré-preenchida com base no histórico do fornecedor. Revise antes de confirmar.
+            </span>
+          </div>
+        )}
+
         {/* Section 2: Classification (editable) */}
         <div className="space-y-4">
           <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
@@ -193,7 +292,14 @@ export function ClassificacaoDialog({
           </h4>
 
           <div>
-            <Label>Conta Financeira (Plano de Contas) *</Label>
+            <Label>
+              Conta Financeira (Plano de Contas) *
+              {suggestedAccountId && form.account_id === suggestedAccountId && (
+                <Badge variant="secondary" className="ml-2 text-[10px] py-0">
+                  <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
+                </Badge>
+              )}
+            </Label>
             <SearchableSelect
               options={analyticalAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${a.name}` }))}
               value={form.account_id}
@@ -203,7 +309,14 @@ export function ClassificacaoDialog({
           </div>
 
           <div>
-            <Label>Centro de Custo *</Label>
+            <Label>
+              Centro de Custo *
+              {suggestedCostCenterId && form.cost_center_id === suggestedCostCenterId && (
+                <Badge variant="secondary" className="ml-2 text-[10px] py-0">
+                  <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
+                </Badge>
+              )}
+            </Label>
             <SearchableSelect
               options={costCenters.map((cc: any) => ({ value: cc.id, label: `${cc.code} — ${cc.name}` }))}
               value={form.cost_center_id}
