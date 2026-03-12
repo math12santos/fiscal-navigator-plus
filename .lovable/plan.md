@@ -1,109 +1,195 @@
-# Refatoração: Pendências de Classificação → Governança de Despesas
+# Plano: Módulo de Gestão de Tarefas por Solicitações
 
-## Contexto
+## Visão Geral
 
-O documento define que a classificação financeira não deve ser um "preenchimento do zero". Toda despesa deve nascer de uma **Solicitação de Despesa** contextualizada por um departamento, e o Financeiro apenas valida, complementa e gera o título no Contas a Pagar.
+Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
 
-## Mudanças
+---
 
-### 1. Enriquecer a Solicitação de Despesa (ExpenseRequestButton)
+## 1. Estrutura de Dados (Migrações)
 
-Adicionar campos obrigatórios na criação da solicitação:
+### Tabela `requests` (Solicitações)
 
-- Fornecedor (`entity_id`)
-- Categoria inicial (`account_id`)
-- Competência prevista
-- Data de vencimento prevista
-- Justificativa (campo separado do description)
+```text
+id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
+area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
+due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
+created_at, updated_at
+```
 
-O centro de custo já existe. Restringir seleção de centros de custo aos autorizados para o usuário (usando `useCostCenterPermissions`). Preencher automaticamente o centro de custo padrão do usuário quando disponível. Permitir que o financeiro altere centros de custo. 
+### Tabela `request_tasks` (Tarefas geradas)
 
-**Arquivo**: `src/components/financeiro/ExpenseRequestButton.tsx`
+```text
+id, request_id (FK), organization_id, assigned_to, status, due_date,
+created_by, executed_by, approved_by, created_at, updated_at
+```
 
-### 2. Reformular o PendenciasPanel → Painel de Triagem
+### Tabela `request_comments` (Comentarios/Historico)
 
-Substituir o painel atual por um com 4 estágios claros:
+```text
+id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
+old_value, new_value, created_at
+```
 
-- **Aguardando triagem**: solicitações aprovadas sem classificação financeira
-- **Dados incompletos**: solicitações com campos obrigatórios faltando
-- **Prontas para classificação**: solicitações com contexto completo
-- **Projeções DP/Contratos**: pendências automáticas agrupadas por evento mestre
+### Tabela `request_attachments`
 
-Para DP, agrupar projeções por colaborador (ex: "Folha 03/2026 — João") com expansão para ver sub-itens (salário líquido, FGTS, INSS, IRRF).
+```text
+id, request_id (FK), user_id, file_name, file_path, created_at
+```
 
-**Arquivo**: `src/components/financeiro/PendenciasPanel.tsx`
+### Tabela `notifications`
 
-### 3. Novo ClassificacaoDialog (substituir MaterializeDialog para classificação)
+```text
+id, organization_id, user_id (destinatario), title, body, type, priority,
+reference_type (request/task), reference_id, read, read_at, created_at
+```
 
-Ao clicar "Classificar", abrir um drawer/dialog completo que mostra:
+RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
 
-**Seção 1 — Contexto da Solicitação (read-only)**:
+Habilitar realtime em `notifications` para push instantâneo.
 
-- Empresa, departamento, solicitante
-- Fornecedor, descrição, justificativa, anexos
-- Valor previsto, vencimento, competência
+---
 
-**Seção 2 — Classificação Financeira (editável)**:
+## 2. Componentes e Páginas
 
-- Conta financeira final (plano de contas analíticas)
-- Centro de custo (confirmar/ajustar, limitado aos autorizados)
-- Natureza contábil
-- Regra de rateio (se houver)
-- Documento suporte
-- Competência e vencimento (confirmar/ajustar)
-- Valor previsto vs valor realizado
-- Observações internas
+### Página `Tarefas.tsx` (reescrita completa)
 
-**Botão final**: "Classificar e Gerar Título" — materializa a solicitação como entrada real em `cashflow_entries` e atualiza o status da request para `classificada`.
-
-Para projeções DP: mostrar visão consolidada do evento mestre com sub-itens expansíveis, permitindo classificação em batch.
-
-**Arquivo**: `src/components/financeiro/ClassificacaoDialog.tsx` (novo)
-
-### 4. Manter MaterializeDialog como "Valor Executado"
-
-Renomear o dialog atual para `ValorExecutadoDialog` — usado apenas para confirmar valores pagos (double-check da folha no 1º dia útil). Separar conceitualmente da classificação.
-
-**Arquivo**: `src/components/financeiro/MaterializeDialog.tsx` → renomear para `ValorExecutadoDialog.tsx`
-
-### 5. Atualizar ContasAPagar
-
-- Integrar `ClassificacaoDialog` para o fluxo de classificação
-- Integrar `ValorExecutadoDialog` para confirmação de valores executados
-- Reformular `PendingExpenseRequests` para mostrar solicitações com contexto rico e estágios
-- Ao aprovar solicitação → abrir `ClassificacaoDialog` (não o form de nova despesa)
-
-**Arquivo**: `src/components/financeiro/ContasAPagar.tsx`
-
-### 6. Adicionar campos à tabela `requests`
-
-Migração SQL para adicionar:
-
-- `entity_id` (uuid, FK para entities) — fornecedor
-- `account_id` (uuid, FK para chart_of_accounts) — categoria inicial
-- `competencia` (text) — competência prevista
-- `data_vencimento` (date) — vencimento previsto
-- `justificativa` (text) — justificativa separada
-- `classified_by` (uuid) — quem classificou
-- `classified_at` (timestamptz) — quando foi classificado
-- `cashflow_entry_id` (uuid, FK para cashflow_entries) — título gerado
-
-### 7. Regras automáticas
-
-- Sugerir categoria/conta com base no fornecedor selecionado (buscar último lançamento do fornecedor)
-- Herdar classificação anterior para despesas recorrentes
-- Impedir avanço quando campos obrigatórios estiverem vazios
-
-## Arquivos afetados
+Três abas controladas por permissões (`getAllowedTabs`):
 
 
-| Arquivo                                                | Mudança                                                                  |
-| ------------------------------------------------------ | ------------------------------------------------------------------------ |
-| `src/components/financeiro/ExpenseRequestButton.tsx`   | Enriquecer formulário com fornecedor, categoria, competência, vencimento |
-| `src/components/financeiro/PendenciasPanel.tsx`        | Reformular para estágios de triagem + agrupamento DP                     |
-| `src/components/financeiro/ClassificacaoDialog.tsx`    | **Novo** — dialog completo de classificação financeira                   |
-| `src/components/financeiro/MaterializeDialog.tsx`      | Renomear para ValorExecutadoDialog, ajustar textos                       |
-| `src/components/financeiro/ContasAPagar.tsx`           | Integrar novos dialogs, reformular fluxo                                 |
-| `src/components/financeiro/PendingExpenseRequests.tsx` | Mostrar contexto rico das solicitações                                   |
-| `src/hooks/useRequests.ts`                             | Atualizar tipos com novos campos                                         |
-| Migração SQL                                           | Adicionar campos à tabela `requests`                                     |
+| Aba            | Key              | Conteúdo                                                                                  |
+| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
+| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
+| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
+
+
+### Dialog `RequestFormDialog.tsx`
+
+Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
+
+### Componente `RequestDetail.tsx`
+
+Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
+
+### Central de Notificações `NotificationCenter.tsx`
+
+Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
+
+---
+
+## 3. Hooks
+
+- `useRequests.ts` — CRUD de solicitações com filtros
+- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
+- `useRequestComments.ts` — Comentários e histórico
+- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
+
+---
+
+## 4. Integração com Outros Módulos
+
+Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
+
+- Financeiro → "Aprovação de pagamento"
+- Contratos → "Revisão jurídica"
+- DP → "Solicitação de contratação"
+
+Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
+
+---
+
+## 5. Atualização de Definições
+
+- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
+- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
+- `AppLayout.tsx`: Adicionar ícone de notificações no header
+
+---
+
+## 6. Fluxo Operacional
+
+```text
+Usuário cria solicitação
+  → Sistema gera task vinculada
+  → Responsável recebe notificação (realtime)
+  → Responsável executa (muda status)
+  → Sistema registra histórico
+  → Se necessário → status "Aguardando Aprovação"
+  → Aprovador recebe notificação
+  → Solicitação concluída/rejeitada
+```
+
+---
+
+## Ordem de Implementação
+
+1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
+2. Habilitar realtime em `notifications`
+3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
+4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
+5. Criar `RequestFormDialog` e `RequestDetail`
+6. Criar `NotificationCenter` e integrar no `AppLayout`
+7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
+
+---
+
+# Onboarding Guiado — Implementação (Fase 1 ✅)
+
+## Status: Implementado
+
+### Tabelas criadas
+- `onboarding_progress` — progresso por organização com JSONB por etapa
+- `onboarding_recommendations` — recomendações automáticas
+
+### RLS
+- Org members: SELECT, INSERT (com user_id check), UPDATE
+- Masters: ALL
+
+### Componentes implementados
+- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
+- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
+- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
+- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
+- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
+- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
+- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
+
+### Rotas
+- `/onboarding-guiado` — Wizard no app
+- `/backoffice/onboarding` — Gestão no backoffice
+
+### Fase 2 (pendente)
+- Integração profunda das etapas 2-8 com módulos existentes
+- Sistema de recomendações automáticas (Etapa 9)
+- Score no dashboard principal
+
+---
+
+# Configurador de Regras de Aglutinação — Fase 1 (MVP) ✅
+
+## Status: Implementado
+
+### Tabelas criadas
+- `grouping_macrogroups` — Macrogrupos hierárquicos com nome, ícone, cor, ordem, enabled
+- `grouping_groups` — Grupos dentro de macrogrupos com FK para macrogroup_id
+- `grouping_rules` alterada — Adicionadas colunas `group_id`, `operator`, `match_keyword`
+
+### RLS
+- Org members: SELECT, INSERT, UPDATE, DELETE em ambas tabelas
+
+### Hooks implementados
+- `src/hooks/useGroupingMacrogroups.ts` — CRUD macrogrupos + grupos + seed de 10 macrogrupos padrão
+- `src/hooks/useGroupingRules.ts` — Refatorado com operadores (equals, contains, starts_with, in_list), match por keyword/descrição, group_id targeting, fallback "Não Classificado"
+
+### Componentes implementados
+- `src/components/financeiro/GroupingMacrogroupManager.tsx` — UI colapsável de macrogrupos/grupos com CRUD inline, toggle ativo/inativo, botão "Gerar Padrão"
+- `src/components/financeiro/GroupingRuleDialog.tsx` — Refatorado com operador, campo dinâmico (select por tipo), grupo destino, keyword input para descrição
+- `src/pages/Configuracoes.tsx` — Aba Aglutinação com 3 blocos: Macrogrupos, Regras de Classificação, Fallback
+
+### Seed padrão (10 macrogrupos)
+- Pessoal e RH, Infraestrutura, Tecnologia e Sistemas, Fornecedores Operacionais, Serviços Profissionais, Tributário, Financeiro, Contratos, Patrimonial/Investimentos, Despesas Eventuais
+
+### Integração
+- AgingListTab e FinanceiroTable integrados com o novo sistema de regras (operadores avançados, group_id)
+- Fallback automático para "Não Classificado" em entradas sem match
