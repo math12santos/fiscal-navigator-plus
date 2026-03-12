@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Users, FileText, Info } from "lucide-react";
@@ -9,7 +9,7 @@ import type { FinanceiroEntry } from "@/hooks/useFinanceiro";
 
 interface Props {
   entries: FinanceiroEntry[];
-  onClassify?: (prefill: Partial<any>) => void;
+  onClassify?: (projectedEntries: FinanceiroEntry[]) => void;
 }
 
 export function PendenciasPanel({ entries, onClassify }: Props) {
@@ -20,31 +20,31 @@ export function PendenciasPanel({ entries, onClassify }: Props) {
   const monthStart = format(startOfMonth(now), "yyyy-MM");
 
   const pendencies = useMemo(() => {
-    const items: { type: string; label: string; detail: string; prefill: any }[] = [];
+    const items: { type: string; label: string; detail: string; projectedEntries: FinanceiroEntry[] }[] = [];
 
-    // 1. Active employees without materialized DP entry this month
+    // 1. Active employees — check if there are projected DP entries not yet materialized
     const activeEmps = (employees ?? []).filter((e: any) => e.status === "ativo");
-    const materializedDPMonths = new Set(
-      entries
-        .filter((e) => e.source === "dp" && !e.id.startsWith("proj-"))
-        .map((e) => format(new Date(e.data_prevista), "yyyy-MM"))
+    const hasMaterializedDP = entries.some(
+      (e) => e.source === "dp" && !e.id.startsWith("proj-") &&
+        format(new Date(e.data_prevista), "yyyy-MM") === monthStart
     );
 
-    if (activeEmps.length > 0 && !materializedDPMonths.has(monthStart)) {
-      items.push({
-        type: "dp",
-        label: `${activeEmps.length} colaborador(es) ativo(s)`,
-        detail: `Folha de ${format(now, "MM/yyyy")} ainda não classificada no financeiro`,
-        prefill: {
-          descricao: `Folha de Pagamento — ${format(now, "MM/yyyy")}`,
-          categoria: "Pessoal",
-          source: "dp",
-          tipo: "saida",
-        },
-      });
+    if (activeEmps.length > 0 && !hasMaterializedDP) {
+      const dpProjections = entries.filter(
+        (e) => e.source === "dp" && e.id.startsWith("proj-") &&
+          format(new Date(e.data_prevista), "yyyy-MM") === monthStart
+      );
+      if (dpProjections.length > 0) {
+        items.push({
+          type: "dp",
+          label: `${activeEmps.length} colaborador(es) ativo(s)`,
+          detail: `Folha de ${format(now, "MM/yyyy")} — ${dpProjections.length} projeções aguardando classificação`,
+          projectedEntries: dpProjections,
+        });
+      }
     }
 
-    // 2. Active outgoing contracts without any financial entry this month
+    // 2. Active outgoing contracts without materialized entry this month
     const activeContracts = contracts.filter(
       (c) => c.status === "Ativo" && c.impacto_resultado !== "receita"
     );
@@ -57,27 +57,16 @@ export function PendenciasPanel({ entries, onClassify }: Props) {
 
     for (const c of activeContracts) {
       if (!materializedContractIds.has(c.id)) {
-        // Check if there's at least a projected entry for it
-        const hasProjection = entries.some(
+        const contractProjections = entries.filter(
           (e) => e.contract_id === c.id && e.id.startsWith("proj-") &&
             format(new Date(e.data_prevista), "yyyy-MM") === monthStart
         );
-        if (!hasProjection) {
+        if (contractProjections.length > 0) {
           items.push({
             type: "contrato",
             label: c.nome,
             detail: `Contrato ativo sem lançamento em ${format(now, "MM/yyyy")}`,
-            prefill: {
-              descricao: c.nome,
-              contract_id: c.id,
-              entity_id: c.entity_id,
-              cost_center_id: c.cost_center_id,
-              valor_previsto: c.valor,
-              valor_bruto: c.valor,
-              categoria: c.natureza_financeira,
-              source: "contrato",
-              tipo: "saida",
-            },
+            projectedEntries: contractProjections,
           });
         }
       }
@@ -103,9 +92,9 @@ export function PendenciasPanel({ entries, onClassify }: Props) {
                   <span className="text-muted-foreground ml-1">— {p.detail}</span>
                 </span>
               </div>
-              {onClassify && (
-                <Button size="sm" variant="outline" onClick={() => onClassify(p.prefill)}>
-                  Classificar
+              {onClassify && p.projectedEntries.length > 0 && (
+                <Button size="sm" variant="outline" onClick={() => onClassify(p.projectedEntries)}>
+                  Classificar ({p.projectedEntries.length})
                 </Button>
               )}
             </li>
