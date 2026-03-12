@@ -126,9 +126,11 @@ export type Database = {
           conta: string | null
           created_at: string | null
           id: string
+          limite_credito: number | null
           nome: string
           organization_id: string | null
           pix_key: string | null
+          saldo_atual: number | null
           tipo_conta: string | null
           user_id: string
         }
@@ -139,9 +141,11 @@ export type Database = {
           conta?: string | null
           created_at?: string | null
           id?: string
+          limite_credito?: number | null
           nome: string
           organization_id?: string | null
           pix_key?: string | null
+          saldo_atual?: number | null
           tipo_conta?: string | null
           user_id: string
         }
@@ -152,9 +156,11 @@ export type Database = {
           conta?: string | null
           created_at?: string | null
           id?: string
+          limite_credito?: number | null
           nome?: string
           organization_id?: string | null
           pix_key?: string | null
+          saldo_atual?: number | null
           tipo_conta?: string | null
           user_id?: string
         }
