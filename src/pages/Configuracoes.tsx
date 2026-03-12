@@ -28,6 +28,9 @@ import { useEntities, Entity } from "@/hooks/useEntities";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { useToast } from "@/hooks/use-toast";
+import { useGroupingRules, type GroupingRule, type GroupingRuleInput, MATCH_FIELD_OPTIONS, SUB_GROUP_FIELD_OPTIONS } from "@/hooks/useGroupingRules";
+import GroupingRuleDialog from "@/components/financeiro/GroupingRuleDialog";
+import { Switch } from "@/components/ui/switch";
 
 const ALL_TABS = [
   { key: "accounts", label: "Plano de Contas" },
