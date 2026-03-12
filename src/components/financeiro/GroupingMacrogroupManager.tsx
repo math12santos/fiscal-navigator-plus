@@ -1,14 +1,16 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Plus, Edit2, Trash2, Layers, Check, X, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Edit2, Trash2, Layers, Check, X, Sparkles, GripVertical } from "lucide-react";
 import { useGroupingMacrogroups, DEFAULT_SEED, type GroupingMacrogroup, type GroupingGroup } from "@/hooks/useGroupingMacrogroups";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+
+type DragContext = { type: "macrogroup"; id: string } | { type: "group"; id: string; macrogroupId: string };
 
 export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCountByGroup?: Map<string, number> }) {
   const {
@@ -28,6 +30,10 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
   const [mgIcon, setMgIcon] = useState("Layers");
   const [mgColor, setMgColor] = useState("#6366f1");
   const [gName, setGName] = useState("");
+
+  // Drag state
+  const dragItem = useRef<DragContext | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   // Seeds not yet activated or ignored
   const pendingSeeds = useMemo(() => {
@@ -83,6 +89,90 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
     }
   };
 
+  // ── Drag & Drop handlers for macrogroups ──
+  const handleMgDragStart = useCallback((e: React.DragEvent, mg: GroupingMacrogroup) => {
+    dragItem.current = { type: "macrogroup", id: mg.id };
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", mg.id);
+  }, []);
+
+  const handleMgDragOver = useCallback((e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (dragItem.current?.type !== "macrogroup" || dragItem.current.id === targetId) return;
+    e.dataTransfer.dropEffect = "move";
+    setDragOverId(targetId);
+  }, []);
+
+  const handleMgDrop = useCallback((e: React.DragEvent, targetMg: GroupingMacrogroup) => {
+    e.preventDefault();
+    setDragOverId(null);
+    if (dragItem.current?.type !== "macrogroup") return;
+    const draggedId = dragItem.current.id;
+    if (draggedId === targetMg.id) return;
+
+    const sorted = [...macrogroups].sort((a, b) => a.order_index - b.order_index);
+    const draggedIdx = sorted.findIndex((m) => m.id === draggedId);
+    const targetIdx = sorted.findIndex((m) => m.id === targetMg.id);
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(draggedIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+
+    reordered.forEach((m, i) => {
+      if (m.order_index !== i) {
+        updateMacrogroup.mutate({ id: m.id, order_index: i });
+      }
+    });
+    dragItem.current = null;
+  }, [macrogroups, updateMacrogroup]);
+
+  // ── Drag & Drop handlers for groups ──
+  const handleGDragStart = useCallback((e: React.DragEvent, g: GroupingGroup, macrogroupId: string) => {
+    dragItem.current = { type: "group", id: g.id, macrogroupId };
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", g.id);
+  }, []);
+
+  const handleGDragOver = useCallback((e: React.DragEvent, targetId: string, macrogroupId: string) => {
+    e.preventDefault();
+    if (dragItem.current?.type !== "group") return;
+    if ((dragItem.current as any).macrogroupId !== macrogroupId) return;
+    if (dragItem.current.id === targetId) return;
+    e.dataTransfer.dropEffect = "move";
+    setDragOverId(targetId);
+  }, []);
+
+  const handleGDrop = useCallback((e: React.DragEvent, targetG: GroupingGroup, macrogroupId: string) => {
+    e.preventDefault();
+    setDragOverId(null);
+    if (dragItem.current?.type !== "group") return;
+    if ((dragItem.current as any).macrogroupId !== macrogroupId) return;
+    const draggedId = dragItem.current.id;
+    if (draggedId === targetG.id) return;
+
+    const mgGroups = getGroupsForMacrogroup(macrogroupId).sort((a, b) => a.order_index - b.order_index);
+    const draggedIdx = mgGroups.findIndex((g) => g.id === draggedId);
+    const targetIdx = mgGroups.findIndex((g) => g.id === targetG.id);
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    const reordered = [...mgGroups];
+    const [moved] = reordered.splice(draggedIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+
+    reordered.forEach((g, i) => {
+      if (g.order_index !== i) {
+        updateGroup.mutate({ id: g.id, order_index: i });
+      }
+    });
+    dragItem.current = null;
+  }, [getGroupsForMacrogroup, updateGroup]);
+
+  const handleDragEnd = useCallback(() => {
+    dragItem.current = null;
+    setDragOverId(null);
+  }, []);
+
   if (isLoading) {
     return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
   }
@@ -99,13 +189,24 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
       {/* ── Active macrogroups tree ── */}
       {macrogroups.length > 0 && (
         <div className="space-y-1">
-          {macrogroups.map((mg) => {
-            const mgGroups = getGroupsForMacrogroup(mg.id);
+          {[...macrogroups].sort((a, b) => a.order_index - b.order_index).map((mg) => {
+            const mgGroups = getGroupsForMacrogroup(mg.id).sort((a, b) => a.order_index - b.order_index);
             const isExpanded = expandedIds.has(mg.id);
+            const isDragOver = dragOverId === mg.id;
 
             return (
               <Collapsible key={mg.id} open={isExpanded} onOpenChange={() => toggleExpanded(mg.id)}>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-card hover:bg-muted/50 transition-colors">
+                <div
+                  draggable
+                  onDragStart={(e) => handleMgDragStart(e, mg)}
+                  onDragOver={(e) => handleMgDragOver(e, mg.id)}
+                  onDrop={(e) => handleMgDrop(e, mg)}
+                  onDragEnd={handleDragEnd}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md border bg-card hover:bg-muted/50 transition-colors ${
+                    isDragOver ? "ring-2 ring-primary border-primary" : ""
+                  }`}
+                >
+                  <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
                       {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -133,25 +234,39 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
                 </div>
                 <CollapsibleContent>
                   <div className="ml-8 mt-1 space-y-1">
-                    {mgGroups.map((g) => (
-                      <div key={g.id} className="flex items-center gap-2 px-3 py-1.5 rounded border border-dashed bg-muted/30">
-                        <span className="text-sm flex-1">{g.name}</span>
-                        {ruleCountByGroup && (
-                          <Badge variant="outline" className="text-[10px]">{ruleCountByGroup.get(g.id) ?? 0} regra(s)</Badge>
-                        )}
-                        <Switch
-                          checked={g.enabled}
-                          onCheckedChange={(checked) => toggleGroup.mutate({ id: g.id, enabled: checked })}
-                          className="scale-75"
-                        />
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => openGDialog(mg.id, g)}>
-                          <Edit2 size={11} />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => deleteGroup.mutate(g.id)}>
-                          <Trash2 size={11} className="text-muted-foreground hover:text-destructive" />
-                        </Button>
-                      </div>
-                    ))}
+                    {mgGroups.map((g) => {
+                      const isGDragOver = dragOverId === g.id;
+                      return (
+                        <div
+                          key={g.id}
+                          draggable
+                          onDragStart={(e) => handleGDragStart(e, g, mg.id)}
+                          onDragOver={(e) => handleGDragOver(e, g.id, mg.id)}
+                          onDrop={(e) => handleGDrop(e, g, mg.id)}
+                          onDragEnd={handleDragEnd}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded border border-dashed bg-muted/30 transition-colors ${
+                            isGDragOver ? "ring-2 ring-primary border-primary" : ""
+                          }`}
+                        >
+                          <GripVertical className="h-3.5 w-3.5 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
+                          <span className="text-sm flex-1">{g.name}</span>
+                          {ruleCountByGroup && (
+                            <Badge variant="outline" className="text-[10px]">{ruleCountByGroup.get(g.id) ?? 0} regra(s)</Badge>
+                          )}
+                          <Switch
+                            checked={g.enabled}
+                            onCheckedChange={(checked) => toggleGroup.mutate({ id: g.id, enabled: checked })}
+                            className="scale-75"
+                          />
+                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => openGDialog(mg.id, g)}>
+                            <Edit2 size={11} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => deleteGroup.mutate(g.id)}>
+                            <Trash2 size={11} className="text-muted-foreground hover:text-destructive" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                     <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => openGDialog(mg.id, null)}>
                       <Plus size={12} /> Adicionar Grupo
                     </Button>
