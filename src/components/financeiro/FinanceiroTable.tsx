@@ -113,18 +113,19 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     const rows: DisplayRow[] = [];
 
     for (const [key, groupEntries] of groups) {
-      if (groupEntries.length >= 2) {
+      const minItems = getMinItems(groupEntries[0]);
+      if (groupEntries.length >= minItems) {
         const month = format(new Date(groupEntries[0].data_prevista), "MM/yyyy");
-        const cat = groupEntries[0].categoria ?? "Pessoal";
+        const cat = getGroupLabel(groupEntries[0]);
         const totalPrevisto = groupEntries.reduce((s, e) => s + Number(e.valor_previsto), 0);
         const totalRealizado = groupEntries.reduce((s, e) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0);
         const allPaid = groupEntries.every((e) => e.status === "pago" || e.status === "recebido");
         const somePaid = groupEntries.some((e) => e.status === "pago" || e.status === "recebido");
 
-        // Build sub-groups by dp_sub_category
+        // Build sub-groups using dynamic sub_group_field
         const subMap = new Map<string, FinanceiroEntry[]>();
         for (const e of groupEntries) {
-          const subCat = (e as any).dp_sub_category ?? "other";
+          const subCat = getSubGroupKey(e) ?? "other";
           if (!subMap.has(subCat)) subMap.set(subCat, []);
           subMap.get(subCat)!.push(e);
         }
@@ -133,14 +134,13 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
         for (const [subKey, subEntries] of subMap) {
           subGroups.push({
             key: `${key}__${subKey}`,
-            label: SUB_CATEGORY_LABELS[subKey] ?? subKey,
+            label: getSubGroupLabel(subKey, groupEntries[0].source, subEntries),
             entries: subEntries,
             totalPrevisto: subEntries.reduce((s, e) => s + Number(e.valor_previsto), 0),
             totalRealizado: subEntries.reduce((s, e) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0),
           });
         }
 
-        // Sort sub-groups by label
         subGroups.sort((a, b) => a.label.localeCompare(b.label));
 
         rows.push({
