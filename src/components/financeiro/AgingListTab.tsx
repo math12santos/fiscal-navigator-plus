@@ -24,7 +24,25 @@ interface AgingBucket {
   icon: React.ReactNode;
 }
 
-const GROUPABLE_SOURCES = ["dp"];
+const SOURCE_LABELS: Record<string, string> = {
+  contrato: "Contratos",
+  dp: "Pessoal",
+  manual: "",
+};
+
+const getGroupLabel = (e: any) => e.categoria || SOURCE_LABELS[e.source] || e.source;
+
+const getSubGroupKey = (e: any, source: string): string | null => {
+  if (source === "dp") return e.dp_sub_category ?? "other";
+  if (source === "contrato") return e.entity_id ?? e.contract_id ?? e.descricao;
+  return null;
+};
+
+const getSubGroupLabel = (key: string, source: string, entries: any[]): string => {
+  if (source === "dp") return SUB_CATEGORY_LABELS[key] ?? key;
+  if (source === "contrato") return entries[0]?.descricao ?? key.slice(0, 12);
+  return key;
+};
 
 export function AgingListTab() {
   const { entries: saidaEntries, isLoading: saidaLoading } = useFinanceiro("saida");
@@ -171,18 +189,14 @@ export function AgingListTab() {
 
   /** Build grouped rows for a bucket */
   const renderBucketRows = (b: AgingBucket) => {
+    // Group all entries by categoria/source within the bucket
     const grouped = new Map<string, any[]>();
-    const singles: any[] = [];
 
     for (const e of b.entries) {
-      if (GROUPABLE_SOURCES.includes(e.source) || e.categoria === "Pessoal") {
-        const month = format(new Date(e.data_prevista), "yyyy-MM");
-        const key = `aging-${b.label}-${e.categoria ?? e.source}-${month}`;
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped.get(key)!.push(e);
-      } else {
-        singles.push(e);
-      }
+      const label = getGroupLabel(e);
+      const key = `aging-${b.label}-${label}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(e);
     }
 
     const rows: React.ReactNode[] = [];
@@ -190,17 +204,22 @@ export function AgingListTab() {
     for (const [key, items] of grouped) {
       if (items.length >= 2) {
         const totalVal = items.reduce((s: number, e: any) => s + Number(e.valor_previsto), 0);
-        const cat = items[0].categoria ?? "Pessoal";
-        const month = format(new Date(items[0].data_prevista), "MM/yyyy");
+        const label = getGroupLabel(items[0]);
         const isExpanded = expandedGroups.has(key);
+        const source = items[0].source;
 
+        // Determine if sub-grouping applies
         const subMap = new Map<string, any[]>();
+        let hasSubGroups = false;
         for (const e of items) {
-          const subCat = e.dp_sub_category ?? "other";
-          if (!subMap.has(subCat)) subMap.set(subCat, []);
-          subMap.get(subCat)!.push(e);
+          const subKey = getSubGroupKey(e, source);
+          if (subKey) {
+            if (!subMap.has(subKey)) subMap.set(subKey, []);
+            subMap.get(subKey)!.push(e);
+            hasSubGroups = true;
+          }
         }
-        const hasSubGroups = subMap.size > 1;
+        hasSubGroups = hasSubGroups && subMap.size > 1;
 
         rows.push(
           <TableRow key={key} className="cursor-pointer hover:bg-muted/50 font-medium" onClick={() => toggleGroup(key)}>
@@ -208,7 +227,7 @@ export function AgingListTab() {
               <div className="flex items-center gap-2">
                 {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                 <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                {cat} — {month}
+                {label}
                 <Badge variant="secondary" className="text-xs font-normal">{items.length} itens</Badge>
               </div>
             </TableCell>
@@ -235,7 +254,7 @@ export function AgingListTab() {
                 <TableCell className="pl-10">
                   <div className="flex items-center gap-2">
                     {isSubExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                    {SUB_CATEGORY_LABELS[subKey] ?? subKey}
+                    {getSubGroupLabel(subKey, source, subEntries)}
                     <Badge variant="secondary" className="text-xs font-normal">{subEntries.length}</Badge>
                   </div>
                 </TableCell>
@@ -253,18 +272,16 @@ export function AgingListTab() {
               }
             }
           }
-        } else if (isExpanded && !hasSubGroups) {
+        } else if (isExpanded) {
           for (const e of items) {
             rows.push(renderEntry(e, b, 1));
           }
         }
       } else {
-        singles.push(...items);
+        for (const e of items) {
+          rows.push(renderEntry(e, b));
+        }
       }
-    }
-
-    for (const e of singles) {
-      rows.push(renderEntry(e, b));
     }
 
     return rows;
