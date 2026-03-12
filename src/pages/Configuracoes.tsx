@@ -31,8 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useGroupingRules, type GroupingRule, type GroupingRuleInput, MATCH_FIELD_OPTIONS, OPERATOR_OPTIONS } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
-import GroupingRuleDialog from "@/components/financeiro/GroupingRuleDialog";
-import GroupingMacrogroupManager from "@/components/financeiro/GroupingMacrogroupManager";
+import GroupingConfigTab from "@/components/financeiro/GroupingConfigTab";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
