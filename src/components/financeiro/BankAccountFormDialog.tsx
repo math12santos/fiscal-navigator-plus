@@ -94,6 +94,16 @@ export function BankAccountFormDialog({ open, onOpenChange, onSave, isPending }:
             <Label>Chave PIX</Label>
             <Input value={form.pix_key} onChange={(e) => set("pix_key", e.target.value)} />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Saldo Atual</Label>
+              <Input type="number" value={form.saldo_atual} onChange={(e) => set("saldo_atual", e.target.value)} placeholder="0,00" />
+            </div>
+            <div className="space-y-2">
+              <Label>Limite de Crédito</Label>
+              <Input type="number" value={form.limite_credito} onChange={(e) => set("limite_credito", e.target.value)} placeholder="0,00" />
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
