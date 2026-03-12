@@ -20,6 +20,8 @@ interface Props {
     conta: string | null;
     tipo_conta: string;
     pix_key: string | null;
+    saldo_atual: number;
+    limite_credito: number;
   }) => Promise<void>;
   isPending: boolean;
 }
@@ -32,6 +34,8 @@ export function BankAccountFormDialog({ open, onOpenChange, onSave, isPending }:
     conta: "",
     tipo_conta: "corrente",
     pix_key: "",
+    saldo_atual: "",
+    limite_credito: "",
   });
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
@@ -44,6 +48,8 @@ export function BankAccountFormDialog({ open, onOpenChange, onSave, isPending }:
       conta: form.conta || null,
       tipo_conta: form.tipo_conta,
       pix_key: form.pix_key || null,
+      saldo_atual: form.saldo_atual ? Number(form.saldo_atual) : 0,
+      limite_credito: form.limite_credito ? Number(form.limite_credito) : 0,
     });
   };
 
@@ -89,6 +95,16 @@ export function BankAccountFormDialog({ open, onOpenChange, onSave, isPending }:
           <div className="space-y-2">
             <Label>Chave PIX</Label>
             <Input value={form.pix_key} onChange={(e) => set("pix_key", e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Saldo Atual</Label>
+              <Input type="number" value={form.saldo_atual} onChange={(e) => set("saldo_atual", e.target.value)} placeholder="0,00" />
+            </div>
+            <div className="space-y-2">
+              <Label>Limite de Crédito</Label>
+              <Input type="number" value={form.limite_credito} onChange={(e) => set("limite_credito", e.target.value)} placeholder="0,00" />
+            </div>
           </div>
         </div>
         <DialogFooter>
