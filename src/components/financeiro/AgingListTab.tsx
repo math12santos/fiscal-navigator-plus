@@ -1,13 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { KPICard } from "@/components/KPICard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Clock, AlertTriangle, CalendarClock, CheckCircle } from "lucide-react";
+import { Loader2, Clock, AlertTriangle, CalendarClock, CheckCircle, ChevronRight, ChevronDown, Layers } from "lucide-react";
 import { differenceInDays, format, parseISO } from "date-fns";
 import { useHolding } from "@/contexts/HoldingContext";
 import { Building2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
