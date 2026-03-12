@@ -38,8 +38,6 @@ export function AgingListTab() {
       return next;
     });
   };
-  const { holdingMode } = useHolding();
-  const today = new Date();
 
   const buckets = useMemo<AgingBucket[]>(() => {
     // Only pending entries (not paid, not projected DP/payroll)
