@@ -24,7 +24,25 @@ interface AgingBucket {
   icon: React.ReactNode;
 }
 
-const GROUPABLE_SOURCES = ["dp"];
+const SOURCE_LABELS: Record<string, string> = {
+  contrato: "Contratos",
+  dp: "Pessoal",
+  manual: "",
+};
+
+const getGroupLabel = (e: any) => e.categoria || SOURCE_LABELS[e.source] || e.source;
+
+const getSubGroupKey = (e: any, source: string): string | null => {
+  if (source === "dp") return e.dp_sub_category ?? "other";
+  if (source === "contrato") return e.entity_id ?? e.contract_id ?? e.descricao;
+  return null;
+};
+
+const getSubGroupLabel = (key: string, source: string, entries: any[]): string => {
+  if (source === "dp") return SUB_CATEGORY_LABELS[key] ?? key;
+  if (source === "contrato") return entries[0]?.descricao ?? key.slice(0, 12);
+  return key;
+};
 
 export function AgingListTab() {
   const { entries: saidaEntries, isLoading: saidaLoading } = useFinanceiro("saida");
