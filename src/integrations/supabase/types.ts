@@ -118,6 +118,56 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_accounts: {
+        Row: {
+          active: boolean | null
+          agencia: string | null
+          banco: string | null
+          conta: string | null
+          created_at: string | null
+          id: string
+          nome: string
+          organization_id: string | null
+          pix_key: string | null
+          tipo_conta: string | null
+          user_id: string
+        }
+        Insert: {
+          active?: boolean | null
+          agencia?: string | null
+          banco?: string | null
+          conta?: string | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          organization_id?: string | null
+          pix_key?: string | null
+          tipo_conta?: string | null
+          user_id: string
+        }
+        Update: {
+          active?: boolean | null
+          agencia?: string | null
+          banco?: string | null
+          conta?: string | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          organization_id?: string | null
+          pix_key?: string | null
+          tipo_conta?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_lines: {
         Row: {
           account_id: string | null
@@ -245,67 +295,130 @@ export type Database = {
       cashflow_entries: {
         Row: {
           account_id: string | null
+          acordo_id: string | null
+          afeta_caixa_no_vencimento: boolean | null
           categoria: string | null
+          competencia: string | null
+          conciliacao_id: string | null
+          conta_bancaria_id: string | null
+          conta_contabil_ref: string | null
           contract_id: string | null
           contract_installment_id: string | null
           cost_center_id: string | null
           created_at: string
           data_prevista: string
+          data_prevista_pagamento: string | null
           data_realizada: string | null
+          data_vencimento: string | null
           descricao: string
+          documento: string | null
           entity_id: string | null
+          forma_pagamento: string | null
           id: string
+          impacto_fluxo_caixa: boolean | null
+          impacto_orcamento: boolean | null
+          natureza_contabil: string | null
           notes: string | null
+          num_parcelas: number | null
           organization_id: string | null
+          recorrencia: string | null
           source: string
           status: string
+          subcategoria_id: string | null
           tipo: string
+          tipo_despesa: string | null
+          tipo_documento: string | null
           updated_at: string
           user_id: string
+          valor_bruto: number | null
+          valor_desconto: number | null
+          valor_juros_multa: number | null
           valor_previsto: number
           valor_realizado: number | null
         }
         Insert: {
           account_id?: string | null
+          acordo_id?: string | null
+          afeta_caixa_no_vencimento?: boolean | null
           categoria?: string | null
+          competencia?: string | null
+          conciliacao_id?: string | null
+          conta_bancaria_id?: string | null
+          conta_contabil_ref?: string | null
           contract_id?: string | null
           contract_installment_id?: string | null
           cost_center_id?: string | null
           created_at?: string
           data_prevista: string
+          data_prevista_pagamento?: string | null
           data_realizada?: string | null
+          data_vencimento?: string | null
           descricao: string
+          documento?: string | null
           entity_id?: string | null
+          forma_pagamento?: string | null
           id?: string
+          impacto_fluxo_caixa?: boolean | null
+          impacto_orcamento?: boolean | null
+          natureza_contabil?: string | null
           notes?: string | null
+          num_parcelas?: number | null
           organization_id?: string | null
+          recorrencia?: string | null
           source?: string
           status?: string
+          subcategoria_id?: string | null
           tipo?: string
+          tipo_despesa?: string | null
+          tipo_documento?: string | null
           updated_at?: string
           user_id: string
+          valor_bruto?: number | null
+          valor_desconto?: number | null
+          valor_juros_multa?: number | null
           valor_previsto?: number
           valor_realizado?: number | null
         }
         Update: {
           account_id?: string | null
+          acordo_id?: string | null
+          afeta_caixa_no_vencimento?: boolean | null
           categoria?: string | null
+          competencia?: string | null
+          conciliacao_id?: string | null
+          conta_bancaria_id?: string | null
+          conta_contabil_ref?: string | null
           contract_id?: string | null
           contract_installment_id?: string | null
           cost_center_id?: string | null
           created_at?: string
           data_prevista?: string
+          data_prevista_pagamento?: string | null
           data_realizada?: string | null
+          data_vencimento?: string | null
           descricao?: string
+          documento?: string | null
           entity_id?: string | null
+          forma_pagamento?: string | null
           id?: string
+          impacto_fluxo_caixa?: boolean | null
+          impacto_orcamento?: boolean | null
+          natureza_contabil?: string | null
           notes?: string | null
+          num_parcelas?: number | null
           organization_id?: string | null
+          recorrencia?: string | null
           source?: string
           status?: string
+          subcategoria_id?: string | null
           tipo?: string
+          tipo_despesa?: string | null
+          tipo_documento?: string | null
           updated_at?: string
           user_id?: string
+          valor_bruto?: number | null
+          valor_desconto?: number | null
+          valor_juros_multa?: number | null
           valor_previsto?: number
           valor_realizado?: number | null
         }
@@ -315,6 +428,20 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_acordo_id_fkey"
+            columns: ["acordo_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_agreements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_conta_bancaria_id_fkey"
+            columns: ["conta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -350,6 +477,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_subcategoria_id_fkey"
+            columns: ["subcategoria_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -2094,6 +2228,48 @@ export type Database = {
           },
         ]
       }
+      expense_cost_center_splits: {
+        Row: {
+          cashflow_entry_id: string
+          cost_center_id: string
+          created_at: string | null
+          id: string
+          percentual: number | null
+          valor: number | null
+        }
+        Insert: {
+          cashflow_entry_id: string
+          cost_center_id: string
+          created_at?: string | null
+          id?: string
+          percentual?: number | null
+          valor?: number | null
+        }
+        Update: {
+          cashflow_entry_id?: string
+          cost_center_id?: string
+          created_at?: string | null
+          id?: string
+          percentual?: number | null
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_cost_center_splits_cashflow_entry_id_fkey"
+            columns: ["cashflow_entry_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_cost_center_splits_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fiscal_groups: {
         Row: {
           created_at: string
@@ -2645,6 +2821,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      payment_methods: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          organization_id: string | null
+          user_id: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          organization_id?: string | null
+          user_id: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          organization_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payroll_items: {
         Row: {
@@ -3477,6 +3691,57 @@ export type Database = {
             columns: ["scenario_id"]
             isOneToOne: false
             referencedRelation: "planning_scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_agreements: {
+        Row: {
+          created_at: string | null
+          data_acordo: string | null
+          descricao: string
+          entity_id: string | null
+          id: string
+          organization_id: string | null
+          status: string | null
+          user_id: string
+          valor_total: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_acordo?: string | null
+          descricao: string
+          entity_id?: string | null
+          id?: string
+          organization_id?: string | null
+          status?: string | null
+          user_id: string
+          valor_total?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data_acordo?: string | null
+          descricao?: string
+          entity_id?: string | null
+          id?: string
+          organization_id?: string | null
+          status?: string | null
+          user_id?: string
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_agreements_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_agreements_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
