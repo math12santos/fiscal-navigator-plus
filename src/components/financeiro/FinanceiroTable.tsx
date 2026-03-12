@@ -14,7 +14,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SUB_CATEGORY_LABELS } from "@/hooks/usePayrollProjections";
+import { useGroupingRules } from "@/hooks/useGroupingRules";
 import type { FinanceiroEntry } from "@/hooks/useFinanceiro";
 
 const fmt = (v: number) =>
@@ -28,8 +28,6 @@ const statusConfig: Record<string, { icon: typeof Circle; class: string; label: 
   cancelado: { icon: Circle, class: "text-destructive", label: "Cancelado" },
 };
 
-const GROUPABLE_CATEGORIES = ["Pessoal"];
-const GROUPABLE_SOURCES = ["dp"];
 
 /* ── Types ── */
 
@@ -70,6 +68,7 @@ interface Props {
 }
 
 export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDeleting }: Props) {
+  const { isGroupable, getGroupLabel, getSubGroupKey, getSubGroupLabel, getMinItems } = useGroupingRules();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [payEntry, setPayEntry] = useState<FinanceiroEntry | null>(null);
   const [payDate, setPayDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -100,13 +99,10 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     const singles: FinanceiroEntry[] = [];
 
     for (const e of entries) {
-      const isGroupable =
-        GROUPABLE_CATEGORIES.includes(e.categoria ?? "") ||
-        GROUPABLE_SOURCES.includes(e.source);
-
-      if (isGroupable) {
+      if (isGroupable(e)) {
         const month = format(new Date(e.data_prevista), "yyyy-MM");
-        const key = `${e.categoria ?? e.source}-${month}`;
+        const label = getGroupLabel(e);
+        const key = `${label}-${month}`;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(e);
       } else {
@@ -117,18 +113,19 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     const rows: DisplayRow[] = [];
 
     for (const [key, groupEntries] of groups) {
-      if (groupEntries.length >= 2) {
+      const minItems = getMinItems(groupEntries[0]);
+      if (groupEntries.length >= minItems) {
         const month = format(new Date(groupEntries[0].data_prevista), "MM/yyyy");
-        const cat = groupEntries[0].categoria ?? "Pessoal";
+        const cat = getGroupLabel(groupEntries[0]);
         const totalPrevisto = groupEntries.reduce((s, e) => s + Number(e.valor_previsto), 0);
         const totalRealizado = groupEntries.reduce((s, e) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0);
         const allPaid = groupEntries.every((e) => e.status === "pago" || e.status === "recebido");
         const somePaid = groupEntries.some((e) => e.status === "pago" || e.status === "recebido");
 
-        // Build sub-groups by dp_sub_category
+        // Build sub-groups using dynamic sub_group_field
         const subMap = new Map<string, FinanceiroEntry[]>();
         for (const e of groupEntries) {
-          const subCat = (e as any).dp_sub_category ?? "other";
+          const subCat = getSubGroupKey(e) ?? "other";
           if (!subMap.has(subCat)) subMap.set(subCat, []);
           subMap.get(subCat)!.push(e);
         }
@@ -137,14 +134,13 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
         for (const [subKey, subEntries] of subMap) {
           subGroups.push({
             key: `${key}__${subKey}`,
-            label: SUB_CATEGORY_LABELS[subKey] ?? subKey,
+            label: getSubGroupLabel(subKey, groupEntries[0].source, subEntries),
             entries: subEntries,
             totalPrevisto: subEntries.reduce((s, e) => s + Number(e.valor_previsto), 0),
             totalRealizado: subEntries.reduce((s, e) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0),
           });
         }
 
-        // Sort sub-groups by label
         subGroups.sort((a, b) => a.label.localeCompare(b.label));
 
         rows.push({

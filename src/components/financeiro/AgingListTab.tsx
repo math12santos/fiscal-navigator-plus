@@ -10,7 +10,7 @@ import { differenceInDays, format, parseISO } from "date-fns";
 import { useHolding } from "@/contexts/HoldingContext";
 import { Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SUB_CATEGORY_LABELS } from "@/hooks/usePayrollProjections";
+import { useGroupingRules } from "@/hooks/useGroupingRules";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -24,30 +24,11 @@ interface AgingBucket {
   icon: React.ReactNode;
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  contrato: "Contratos",
-  dp: "Pessoal",
-  manual: "",
-};
-
-const getGroupLabel = (e: any) => e.categoria || SOURCE_LABELS[e.source] || e.source;
-
-const getSubGroupKey = (e: any, source: string): string | null => {
-  if (source === "dp") return e.dp_sub_category ?? "other";
-  if (source === "contrato") return e.entity_id ?? e.contract_id ?? e.descricao;
-  return null;
-};
-
-const getSubGroupLabel = (key: string, source: string, entries: any[]): string => {
-  if (source === "dp") return SUB_CATEGORY_LABELS[key] ?? key;
-  if (source === "contrato") return entries[0]?.descricao ?? key.slice(0, 12);
-  return key;
-};
-
 export function AgingListTab() {
   const { entries: saidaEntries, isLoading: saidaLoading } = useFinanceiro("saida");
   const { entries: entradaEntries, isLoading: entradaLoading } = useFinanceiro("entrada");
   const { bankAccounts, isLoading: bankLoading } = useBankAccounts();
+  const { getGroupLabel, getSubGroupKey, getSubGroupLabel } = useGroupingRules();
   const { holdingMode } = useHolding();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedSubGroups, setExpandedSubGroups] = useState<Set<string>>(new Set());
@@ -212,7 +193,7 @@ export function AgingListTab() {
         const subMap = new Map<string, any[]>();
         let hasSubGroups = false;
         for (const e of items) {
-          const subKey = getSubGroupKey(e, source);
+          const subKey = getSubGroupKey(e);
           if (subKey) {
             if (!subMap.has(subKey)) subMap.set(subKey, []);
             subMap.get(subKey)!.push(e);

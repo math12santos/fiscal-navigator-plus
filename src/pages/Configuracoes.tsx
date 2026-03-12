@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit2, Power, Wand2, Users, ShoppingBag } from "lucide-react";
+import { Plus, Search, Edit2, Power, Wand2, Users, ShoppingBag, Layers, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import AccountTreeView from "@/components/AccountTreeView";
 import ChartOfAccountsFormDialog from "@/components/ChartOfAccountsFormDialog";
@@ -28,12 +28,16 @@ import { useEntities, Entity } from "@/hooks/useEntities";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { useToast } from "@/hooks/use-toast";
+import { useGroupingRules, type GroupingRule, type GroupingRuleInput, MATCH_FIELD_OPTIONS, SUB_GROUP_FIELD_OPTIONS } from "@/hooks/useGroupingRules";
+import GroupingRuleDialog from "@/components/financeiro/GroupingRuleDialog";
+import { Switch } from "@/components/ui/switch";
 
 const ALL_TABS = [
   { key: "accounts", label: "Plano de Contas" },
   { key: "cost-centers", label: "Centros de Custo" },
   { key: "entities", label: "Fornecedores / Clientes" },
   { key: "products", label: "Produtos / Serviços" },
+  { key: "grouping", label: "Aglutinação" },
 ];
 
 const ACCOUNT_TYPES = [
@@ -125,6 +129,11 @@ export default function Configuracoes() {
   const [transferWizardOpen, setTransferWizardOpen] = useState(false);
   const { log } = useAuditLog();
   const { toast } = useToast();
+
+  // Grouping Rules
+  const { rules: groupingRules, isLoading: loadingGroupingRules, create: createGroupingRule, update: updateGroupingRule, remove: removeGroupingRule, toggleEnabled: toggleGroupingRule, seedDefaults: seedGroupingDefaults } = useGroupingRules();
+  const [groupingDialogOpen, setGroupingDialogOpen] = useState(false);
+  const [editingGroupingRule, setEditingGroupingRule] = useState<GroupingRule | null>(null);
 
   const handleSeedFresh = async () => {
     await deleteAllAccounts();
@@ -346,6 +355,100 @@ export default function Configuracoes() {
             )}
           </div>
           <ProductFormDialog open={productDialogOpen} onOpenChange={setProductDialogOpen} product={editingProduct} products={products} accounts={accounts} onSubmit={(data) => { if (editingProduct) { updateProduct.mutate(data, { onSuccess: () => setProductDialogOpen(false) }); } else { createProduct.mutate(data, { onSuccess: () => setProductDialogOpen(false) }); } }} isLoading={createProduct.isPending || updateProduct.isPending} />
+        </TabsContent>
+
+        {/* ===== AGLUTINAÇÃO ===== */}
+        <TabsContent value="grouping" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Regras que definem como lançamentos são agrupados no Aging List e no Financeiro.
+            </p>
+            <div className="flex items-center gap-2">
+              {groupingRules.length === 0 && (
+                <Button variant="outline" onClick={() => seedGroupingDefaults.mutate()}>
+                  <Wand2 size={16} /> Gerar Padrão
+                </Button>
+              )}
+              <Button onClick={() => { setEditingGroupingRule(null); setGroupingDialogOpen(true); }}>
+                <Plus size={16} /> Nova Regra
+              </Button>
+            </div>
+          </div>
+          <div className="glass-card overflow-hidden">
+            {loadingGroupingRules ? (
+              <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+            ) : groupingRules.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground space-y-2">
+                <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                <p>Nenhuma regra configurada. O sistema usará regras padrão.</p>
+                <p className="text-xs">Clique em "Gerar Padrão" para criar as regras iniciais.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Campo</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Sub-agrupamento</TableHead>
+                    <TableHead className="text-center">Mín. Itens</TableHead>
+                    <TableHead className="text-center">Prioridade</TableHead>
+                    <TableHead className="text-center">Ativo</TableHead>
+                    <TableHead className="w-20">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groupingRules.map((r) => (
+                    <TableRow key={r.id} className={!r.enabled ? "opacity-50" : ""}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {MATCH_FIELD_OPTIONS.find((o) => o.value === r.match_field)?.label ?? r.match_field}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{r.match_value}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {r.sub_group_field
+                          ? SUB_GROUP_FIELD_OPTIONS.find((o) => o.value === r.sub_group_field)?.label ?? r.sub_group_field
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-center">{r.min_items}</TableCell>
+                      <TableCell className="text-center">{r.priority}</TableCell>
+                      <TableCell className="text-center">
+                        <Switch
+                          checked={r.enabled}
+                          onCheckedChange={(checked) => toggleGroupingRule.mutate({ id: r.id, enabled: checked })}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingGroupingRule(r); setGroupingDialogOpen(true); }}>
+                            <Edit2 size={13} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeGroupingRule.mutate(r.id)}>
+                            <Trash2 size={13} className="text-muted-foreground hover:text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <GroupingRuleDialog
+            open={groupingDialogOpen}
+            onOpenChange={setGroupingDialogOpen}
+            rule={editingGroupingRule}
+            onSubmit={(data) => {
+              if (data.id) {
+                updateGroupingRule.mutate(data as any, { onSuccess: () => setGroupingDialogOpen(false) });
+              } else {
+                createGroupingRule.mutate(data, { onSuccess: () => setGroupingDialogOpen(false) });
+              }
+            }}
+            isLoading={createGroupingRule.isPending || updateGroupingRule.isPending}
+          />
         </TabsContent>
       </Tabs>
     </div>

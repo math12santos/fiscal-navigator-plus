@@ -2324,6 +2324,59 @@ export type Database = {
           },
         ]
       }
+      grouping_rules: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          match_field: string
+          match_value: string
+          min_items: number
+          name: string
+          organization_id: string
+          priority: number
+          sub_group_field: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          match_field?: string
+          match_value: string
+          min_items?: number
+          name: string
+          organization_id: string
+          priority?: number
+          sub_group_field?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          match_field?: string
+          match_value?: string
+          min_items?: number
+          name?: string
+          organization_id?: string
+          priority?: number
+          sub_group_field?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grouping_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_planning_items: {
         Row: {
           cost_center_id: string | null
