@@ -42,7 +42,7 @@ export function AgingListTab() {
     const future: any[] = [];
 
     for (const e of pending) {
-      const dueDate = parseISO(e.data_vencimento || e.data_prevista);
+      const dueDate = parseISO((e as any).data_vencimento || e.data_prevista);
       const days = differenceInDays(dueDate, today);
 
       if (days < -90) overdue90.push(e);
