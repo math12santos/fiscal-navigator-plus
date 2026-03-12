@@ -1,8 +1,17 @@
 import { useMemo } from "react";
-import { format, addMonths, startOfMonth, isAfter, isBefore } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, isAfter, isBefore, eachDayOfInterval, getDay } from "date-fns";
 import { useEmployees, useDPConfig, calcINSSEmpregado, calcIRRF } from "@/hooks/useDP";
 import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
+
+/** Count Mon–Fri business days in a given month */
+export function getBusinessDays(monthStart: Date): number {
+  const interval = { start: startOfMonth(monthStart), end: endOfMonth(monthStart) };
+  return eachDayOfInterval(interval).filter((d) => {
+    const day = getDay(d);
+    return day >= 1 && day <= 5;
+  }).length;
+}
 
 interface EmployeeRow {
   id: string;
