@@ -285,30 +285,30 @@ export function AgingListTab() {
         <Card className={arBuckets.ar7.entries.length > 0 ? "" : "opacity-50"}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-green-600"><TrendingUp className="h-4 w-4" /></span>
+              <span className="text-success"><TrendingUp className="h-4 w-4" /></span>
               <span className="text-xs font-medium text-muted-foreground">Receber em 7d</span>
             </div>
-            <p className="text-lg font-bold text-green-600">{fmt(arBuckets.ar7.total)}</p>
+            <p className="text-lg font-bold text-success">{fmt(arBuckets.ar7.total)}</p>
             <p className="text-xs text-muted-foreground">{arBuckets.ar7.entries.length} título(s)</p>
           </CardContent>
         </Card>
         <Card className={arBuckets.ar15.entries.length > 0 ? "" : "opacity-50"}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-green-500"><TrendingUp className="h-4 w-4" /></span>
+              <span className="text-success"><TrendingUp className="h-4 w-4" /></span>
               <span className="text-xs font-medium text-muted-foreground">Receber em 15d</span>
             </div>
-            <p className="text-lg font-bold text-green-500">{fmt(arBuckets.ar15.total)}</p>
+            <p className="text-lg font-bold text-success">{fmt(arBuckets.ar15.total)}</p>
             <p className="text-xs text-muted-foreground">{arBuckets.ar15.entries.length} título(s)</p>
           </CardContent>
         </Card>
         <Card className={arBuckets.ar30.entries.length > 0 ? "" : "opacity-50"}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-emerald-500"><TrendingUp className="h-4 w-4" /></span>
+              <span className="text-success/70"><TrendingUp className="h-4 w-4" /></span>
               <span className="text-xs font-medium text-muted-foreground">Receber em 30d</span>
             </div>
-            <p className="text-lg font-bold text-emerald-500">{fmt(arBuckets.ar30.total)}</p>
+            <p className="text-lg font-bold text-success/70">{fmt(arBuckets.ar30.total)}</p>
             <p className="text-xs text-muted-foreground">{arBuckets.ar30.entries.length} título(s)</p>
           </CardContent>
         </Card>
