@@ -89,9 +89,9 @@ export function ClassificacaoDialog({
       setForm({
         account_id: first.account_id || "",
         cost_center_id: first.cost_center_id || "",
-        natureza_contabil: first.natureza_contabil || "despesa",
-        competencia: first.competencia || "",
-        data_vencimento: first.data_vencimento || first.data_prevista || "",
+        natureza_contabil: (first as any).natureza_contabil || "despesa",
+        competencia: (first as any).competencia || "",
+        data_vencimento: (first as any).data_vencimento || first.data_prevista || "",
         valor_previsto: projections.reduce((s, p) => s + p.valor_previsto, 0),
         notes: "",
       });
