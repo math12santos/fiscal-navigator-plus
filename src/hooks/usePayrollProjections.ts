@@ -99,7 +99,16 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         const inssEmp = calcINSSEmpregado(salary);
         const baseIRRF = salary - inssEmp;
         const irrf = calcIRRF(baseIRRF);
-        const netSalary = salary - inssEmp - irrf;
+
+        // VT discount (6% of salary, capped at VT gross cost)
+        const businessDays = getBusinessDays(cursor);
+        let vtDesconto = 0;
+        if (emp.vt_ativo && emp.vt_diario > 0) {
+          const vtBrutoCalc = Number(emp.vt_diario) * businessDays;
+          vtDesconto = Math.min(salary * vtDescontoPct, vtBrutoCalc);
+        }
+
+        const netSalary = salary - inssEmp - irrf - vtDesconto;
         const fgtsVal = salary * fgtsPct;
         const inssPatronalVal = salary * inssPatronalPct;
         const ratVal = salary * ratPct;
@@ -108,8 +117,9 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
 
         const base = { contract_id: null, contract_installment_id: null, tipo: "saida" as const, categoria: "Pessoal", valor_realizado: null, data_prevista: monthDate, data_realizada: null, status: "previsto", account_id: null, cost_center_id: emp.cost_center_id ?? null, entity_id: null, source: "dp", created_at: now, updated_at: now };
 
-        // 1. Salário Líquido
-        entries.push({ ...base, id: `proj-dp-sal-${emp.id}-${monthKey}`, descricao: `Salário Líquido — ${emp.name}`, valor_previsto: Math.round(netSalary * 100) / 100, notes: `Base: ${salary.toFixed(0)} | INSS Emp: ${inssEmp.toFixed(0)} | IRRF: ${irrf.toFixed(0)} | Líquido: ${netSalary.toFixed(0)}`, dp_sub_category: "salario_liquido" });
+        // 1. Salário Líquido (includes VT discount deduction)
+        const salNotes = `Base: ${salary.toFixed(0)} | INSS Emp: ${inssEmp.toFixed(0)} | IRRF: ${irrf.toFixed(0)}${vtDesconto > 0 ? ` | VT Desc: ${vtDesconto.toFixed(0)}` : ""} | Líquido: ${netSalary.toFixed(0)}`;
+        entries.push({ ...base, id: `proj-dp-sal-${emp.id}-${monthKey}`, descricao: `Salário Líquido — ${emp.name}`, valor_previsto: Math.round(netSalary * 100) / 100, notes: salNotes, dp_sub_category: "salario_liquido" });
 
         // 2. FGTS
         if (fgtsVal > 0) {
