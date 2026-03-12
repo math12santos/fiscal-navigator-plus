@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Plus, Edit2, Trash2, Wand2, Layers } from "lucide-react";
-import { useGroupingMacrogroups, type GroupingMacrogroup, type GroupingGroup } from "@/hooks/useGroupingMacrogroups";
+import { ChevronDown, ChevronRight, Plus, Edit2, Trash2, Layers, Check, X, Sparkles } from "lucide-react";
+import { useGroupingMacrogroups, DEFAULT_SEED, type GroupingMacrogroup, type GroupingGroup } from "@/hooks/useGroupingMacrogroups";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -15,20 +16,25 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
     getGroupsForMacrogroup,
     createMacrogroup, updateMacrogroup, deleteMacrogroup, toggleMacrogroup,
     createGroup, updateGroup, deleteGroup, toggleGroup,
-    seedDefaults,
+    seedDefaults, seedSingleMacrogroup,
   } = useGroupingMacrogroups();
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [ignoredSeeds, setIgnoredSeeds] = useState<Set<number>>(new Set());
   const [mgDialog, setMgDialog] = useState<{ open: boolean; editing: GroupingMacrogroup | null }>({ open: false, editing: null });
   const [gDialog, setGDialog] = useState<{ open: boolean; macrogroupId: string; editing: GroupingGroup | null }>({ open: false, macrogroupId: "", editing: null });
 
-  // MG form state
   const [mgName, setMgName] = useState("");
   const [mgIcon, setMgIcon] = useState("Layers");
   const [mgColor, setMgColor] = useState("#6366f1");
-
-  // G form state
   const [gName, setGName] = useState("");
+
+  // Seeds not yet activated or ignored
+  const pendingSeeds = useMemo(() => {
+    const existingNames = new Set(macrogroups.map((m) => m.name));
+    return DEFAULT_SEED.map((s, i) => ({ ...s, index: i }))
+      .filter((s) => !existingNames.has(s.name) && !ignoredSeeds.has(s.index));
+  }, [macrogroups, ignoredSeeds]);
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => {
@@ -68,6 +74,15 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
     }
   };
 
+  const handleActivateAll = () => {
+    const existingNames = new Set(macrogroups.map((m) => m.name));
+    const toActivate = DEFAULT_SEED.map((s, i) => ({ ...s, index: i }))
+      .filter((s) => !existingNames.has(s.name) && !ignoredSeeds.has(s.index));
+    if (toActivate.length > 0) {
+      seedDefaults.mutate();
+    }
+  };
+
   if (isLoading) {
     return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
   }
@@ -76,25 +91,13 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Macrogrupos e Grupos</h3>
-        <div className="flex items-center gap-2">
-          {macrogroups.length === 0 && (
-            <Button variant="outline" size="sm" onClick={() => seedDefaults.mutate()} disabled={seedDefaults.isPending}>
-              <Wand2 size={14} /> Gerar Padrão
-            </Button>
-          )}
-          <Button size="sm" onClick={() => openMgDialog(null)}>
-            <Plus size={14} /> Macrogrupo
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => openMgDialog(null)}>
+          <Plus size={14} /> Macrogrupo
+        </Button>
       </div>
 
-      {macrogroups.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground space-y-2">
-          <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" />
-          <p>Nenhum macrogrupo configurado.</p>
-          <p className="text-xs">Clique em "Gerar Padrão" para criar a estrutura inicial.</p>
-        </div>
-      ) : (
+      {/* ── Active macrogroups tree ── */}
+      {macrogroups.length > 0 && (
         <div className="space-y-1">
           {macrogroups.map((mg) => {
             const mgGroups = getGroupsForMacrogroup(mg.id);
@@ -157,6 +160,78 @@ export default function GroupingMacrogroupManager({ ruleCountByGroup }: { ruleCo
               </Collapsible>
             );
           })}
+        </div>
+      )}
+
+      {/* ── Seed suggestions (selective activation) ── */}
+      {pendingSeeds.length > 0 && (
+        <div className="space-y-3 mt-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-xs font-medium text-muted-foreground">
+                {macrogroups.length === 0 ? "Sugestões de macrogrupos para começar" : "Macrogrupos sugeridos disponíveis"}
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={handleActivateAll}
+              disabled={seedDefaults.isPending}
+            >
+              <Check size={12} /> Ativar Todos ({pendingSeeds.length})
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            {pendingSeeds.map((seed) => (
+              <Card key={seed.index} className="border-dashed">
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="h-8 w-8 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: seed.color + "18" }}>
+                      <div className="h-3 w-3 rounded-full" style={{ backgroundColor: seed.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{seed.name}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {seed.groups.map((g) => (
+                          <Badge key={g} variant="secondary" className="text-[10px] font-normal">{g}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs"
+                        onClick={() => seedSingleMacrogroup.mutate(seed.index)}
+                        disabled={seedSingleMacrogroup.isPending}
+                      >
+                        <Check size={12} /> Ativar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-muted-foreground"
+                        onClick={() => setIgnoredSeeds((prev) => new Set(prev).add(seed.index))}
+                      >
+                        <X size={12} /> Ignorar
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {macrogroups.length === 0 && pendingSeeds.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground space-y-2">
+          <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" />
+          <p>Nenhum macrogrupo configurado.</p>
+          <p className="text-xs">Clique em "+ Macrogrupo" para criar manualmente.</p>
         </div>
       )}
 
