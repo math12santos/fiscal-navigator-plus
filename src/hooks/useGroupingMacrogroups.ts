@@ -191,7 +191,47 @@ export function useGroupingMacrogroups() {
     onSuccess: () => invalidateAll(),
   });
 
-  // ── Seed defaults ──
+  // ── Seed single macrogroup ──
+  const seedSingleMacrogroup = useMutation({
+    mutationFn: async (seedIndex: number) => {
+      const s = DEFAULT_SEED[seedIndex];
+      if (!s) throw new Error("Invalid seed index");
+      const { data: mg, error: mgErr } = await supabase
+        .from("grouping_macrogroups" as any)
+        .insert({
+          organization_id: orgId!,
+          user_id: user!.id,
+          name: s.name,
+          icon: s.icon,
+          color: s.color,
+          order_index: macrogroups.length + seedIndex,
+          enabled: true,
+        })
+        .select()
+        .single();
+      if (mgErr) throw mgErr;
+
+      const groupInserts = s.groups.map((g, j) => ({
+        macrogroup_id: (mg as any).id,
+        organization_id: orgId!,
+        user_id: user!.id,
+        name: g,
+        order_index: j,
+        enabled: true,
+      }));
+      const { error: gErr } = await supabase
+        .from("grouping_groups" as any)
+        .insert(groupInserts);
+      if (gErr) throw gErr;
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Macrogrupo ativado com sucesso" });
+    },
+    onError: () => toast({ title: "Erro ao ativar macrogrupo", variant: "destructive" }),
+  });
+
+  // ── Seed all defaults ──
   const seedDefaults = useMutation({
     mutationFn: async () => {
       for (let i = 0; i < DEFAULT_SEED.length; i++) {
