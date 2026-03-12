@@ -68,7 +68,7 @@ interface Props {
 }
 
 export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDeleting }: Props) {
-  const { isGroupable, getGroupLabel, getSubGroupKey, getSubGroupLabel, getMinItems } = useGroupingRules();
+  const { isGroupable, getGroupLabel, getSubGroupKey, getSubGroupLabel, getMinItems, getGroupId } = useGroupingRules();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [payEntry, setPayEntry] = useState<FinanceiroEntry | null>(null);
   const [payDate, setPayDate] = useState(format(new Date(), "yyyy-MM-dd"));
