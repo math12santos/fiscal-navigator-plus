@@ -28,8 +28,6 @@ const statusConfig: Record<string, { icon: typeof Circle; class: string; label: 
   cancelado: { icon: Circle, class: "text-destructive", label: "Cancelado" },
 };
 
-const GROUPABLE_CATEGORIES = ["Pessoal"];
-const GROUPABLE_SOURCES = ["dp"];
 
 /* ── Types ── */
 
