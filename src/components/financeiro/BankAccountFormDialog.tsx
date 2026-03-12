@@ -46,6 +46,8 @@ export function BankAccountFormDialog({ open, onOpenChange, onSave, isPending }:
       conta: form.conta || null,
       tipo_conta: form.tipo_conta,
       pix_key: form.pix_key || null,
+      saldo_atual: form.saldo_atual ? Number(form.saldo_atual) : 0,
+      limite_credito: form.limite_credito ? Number(form.limite_credito) : 0,
     });
   };
 
