@@ -100,12 +100,15 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
               return (
                 <TableRow key={e.id} className={cn(isProjected && "opacity-80")}>
                   <TableCell className="whitespace-nowrap text-sm">
-                    {format(new Date(e.data_prevista), "dd/MM/yyyy")}
+                    {format(new Date((e as any).data_vencimento || e.data_prevista), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell className="text-sm">{e.descricao}</TableCell>
+                  <TableCell className="text-sm max-w-[200px] truncate">{e.descricao}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {(e as any).documento ?? "—"}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs capitalize">
-                      {e.categoria ?? "—"}
+                      {(e as any).tipo_despesa ?? e.categoria ?? "—"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">{fmt(Number(e.valor_previsto))}</TableCell>
