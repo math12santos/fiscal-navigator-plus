@@ -20,6 +20,8 @@ import { useCostCenters } from "@/hooks/useCostCenters";
 import GroupingRuleDialog from "@/components/financeiro/GroupingRuleDialog";
 import GroupingMacrogroupManager from "@/components/financeiro/GroupingMacrogroupManager";
 import GroupingPropagation from "@/components/financeiro/GroupingPropagation";
+import SuggestedRuleTemplates from "@/components/financeiro/SuggestedRuleTemplates";
+import AIRuleSuggestions from "@/components/financeiro/AIRuleSuggestions";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 
 const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
