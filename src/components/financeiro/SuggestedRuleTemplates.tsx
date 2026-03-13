@@ -151,30 +151,28 @@ export default function SuggestedRuleTemplates() {
                       return (
                         <div
                           key={item.key}
-                          className="flex items-center gap-2 px-2.5 py-1.5 rounded border border-dashed bg-muted/30"
+                          className="flex flex-col gap-1.5 px-2.5 py-2 rounded border border-dashed bg-muted/30"
                         >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-xs font-medium">{item.template.ruleName}</span>
-                              <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                              <Badge variant="secondary" className="text-[10px] font-normal">{item.group.name}</Badge>
-                            </div>
-                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                              <Badge variant="outline" className="text-[10px]">{field}</Badge>
-                              <Badge variant="outline" className="text-[10px]">{op}</Badge>
-                              {keywords.slice(0, 3).map((k) => (
-                                <span key={k} className="text-[10px] font-mono text-muted-foreground">"{k}"</span>
-                              ))}
-                              {keywords.length > 3 && (
-                                <span className="text-[10px] text-muted-foreground">+{keywords.length - 3}</span>
-                              )}
-                            </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-medium">{item.template.ruleName}</span>
+                            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <Badge variant="secondary" className="text-[10px] font-normal">{item.group.name}</Badge>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Badge variant="outline" className="text-[10px]">{field}</Badge>
+                            <Badge variant="outline" className="text-[10px]">{op}</Badge>
+                            {keywords.slice(0, 3).map((k) => (
+                              <span key={k} className="text-[10px] font-mono text-muted-foreground">"{k}"</span>
+                            ))}
+                            {keywords.length > 3 && (
+                              <span className="text-[10px] text-muted-foreground">+{keywords.length - 3}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 justify-end pt-1">
                             <Button
                               size="sm"
                               variant="default"
-                              className="h-7 text-xs"
+                              className="h-8 text-xs min-w-fit"
                               onClick={() => handleActivate(item)}
                               disabled={isActivating || activatingAll}
                             >
@@ -184,7 +182,7 @@ export default function SuggestedRuleTemplates() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 text-xs text-muted-foreground"
+                              className="h-8 text-xs text-muted-foreground min-w-fit"
                               onClick={() => setIgnoredKeys((prev) => new Set(prev).add(item.key))}
                             >
                               <X size={12} />
