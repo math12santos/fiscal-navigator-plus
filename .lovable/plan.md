@@ -1,77 +1,214 @@
+# Plano: Módulo de Gestão de Tarefas por Solicitações
+
+## Visão Geral
+
+Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
+
+---
+
+## 1. Estrutura de Dados (Migrações)
+
+### Tabela `requests` (Solicitações)
+
+```text
+id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
+area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
+due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
+created_at, updated_at
+```
+
+### Tabela `request_tasks` (Tarefas geradas)
+
+```text
+id, request_id (FK), organization_id, assigned_to, status, due_date,
+created_by, executed_by, approved_by, created_at, updated_at
+```
+
+### Tabela `request_comments` (Comentarios/Historico)
+
+```text
+id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
+old_value, new_value, created_at
+```
+
+### Tabela `request_attachments`
+
+```text
+id, request_id (FK), user_id, file_name, file_path, created_at
+```
+
+### Tabela `notifications`
+
+```text
+id, organization_id, user_id (destinatario), title, body, type, priority,
+reference_type (request/task), reference_id, read, read_at, created_at
+```
+
+RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
+
+Habilitar realtime em `notifications` para push instantâneo.
+
+---
+
+## 2. Componentes e Páginas
+
+### Página `Tarefas.tsx` (reescrita completa)
+
+Três abas controladas por permissões (`getAllowedTabs`):
 
 
-# Templates de Regras Sugeridas + IA para Aglutinação Inteligente
+| Aba            | Key              | Conteúdo                                                                                  |
+| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
+| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
+| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
 
-## Contexto
 
-Atualmente, criar regras de classificação é um processo manual — o usuário precisa definir campo, operador, valor e grupo destino para cada regra. Faltam:
-1. **Templates pré-definidos** que derivem automaticamente dos macrogrupos/grupos já ativados
-2. **IA** que analise o histórico de lançamentos da empresa e sugira regras otimizadas
+### Dialog `RequestFormDialog.tsx`
 
-## Mudanças
+Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
 
-### 1. Templates de Regras Sugeridas (baseados em macrogrupos/grupos)
+### Componente `RequestDetail.tsx`
 
-**Novo componente**: `SuggestedRuleTemplates` dentro de `GroupingConfigTab`
+Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
 
-- Para cada grupo ativado (ex: "Energia" dentro de "Infraestrutura"), gerar templates de regras pré-definidas com mapeamento estático:
-  - Grupo "Folha" → regra `source equals dp`
-  - Grupo "Contratos Recorrentes" → regra `source equals contrato`
-  - Grupo "Energia" → regra `descricao contains energia, cpfl, cemig, enel`
-  - Grupo "Aluguel" → regra `descricao contains aluguel, locação`
-  - Grupo "Internet" → regra `descricao contains internet, banda larga`
-  - etc. (~30 templates mapeados dos `DEFAULT_SEED` groups)
+### Central de Notificações `NotificationCenter.tsx`
 
-- Exibir como cards com badge "Sugerido", mostrando a condição da regra e o grupo destino
-- Botão "Ativar" por template (cria a regra no banco vinculada ao group_id correto)
-- Botão "Ativar Todos" para criar todas as regras sugeridas de uma vez
-- Ocultar templates cujas regras já existem (match por group_id + match_field + match_value)
-- Posicionar entre a seção de Macrogrupos/Regras e a Simulação
+Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
 
-**Arquivo**: `src/components/financeiro/SuggestedRuleTemplates.tsx` (novo)
-**Arquivo**: `src/components/financeiro/GroupingConfigTab.tsx` (integrar)
-**Arquivo**: `src/data/ruleTemplates.ts` (novo — mapeamento grupo→templates)
+---
 
-### 2. IA para Sugestão de Regras baseada no Histórico
+## 3. Hooks
 
-**Edge Function**: `supabase/functions/suggest-grouping-rules/index.ts`
+- `useRequests.ts` — CRUD de solicitações com filtros
+- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
+- `useRequestComments.ts` — Comentários e histórico
+- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
 
-- Recebe `organization_id` e consulta os últimos 500 `cashflow_entries` da org
-- Agrupa por padrões de descrição, categoria, fornecedor e fonte
-- Envia ao Lovable AI (gemini-3-flash-preview) com prompt para:
-  - Identificar clusters de lançamentos semelhantes
-  - Sugerir regras (campo, operador, valor, nome do grupo sugerido)
-  - Priorizar regras que cubram maior volume de lançamentos
-- Retorna array de sugestões estruturadas via tool calling
+---
 
-**Hook**: `src/hooks/useAISuggestedRules.ts` (novo)
-- Chama a edge function e retorna sugestões com estado de loading
-- Cache no react-query para evitar chamadas repetidas
+## 4. Integração com Outros Módulos
 
-**UI no GroupingConfigTab**: Botão "Sugerir com IA" na seção de regras
-- Abre um painel/dialog com sugestões da IA
-- Cada sugestão mostra: nome, condição, grupo destino sugerido, cobertura estimada (quantos lançamentos)
-- Botão "Aplicar" por sugestão (cria a regra) ou "Aplicar Todas"
-- Badge "IA" diferenciando de templates estáticos
+Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
 
-**Arquivo**: `supabase/functions/suggest-grouping-rules/index.ts` (novo)
-**Arquivo**: `src/hooks/useAISuggestedRules.ts` (novo)
-**Arquivo**: `src/components/financeiro/AIRuleSuggestions.tsx` (novo)
-**Arquivo**: `src/components/financeiro/GroupingConfigTab.tsx` (integrar botão + dialog)
+- Financeiro → "Aprovação de pagamento"
+- Contratos → "Revisão jurídica"
+- DP → "Solicitação de contratação"
 
-### 3. Atualizar config.toml
+Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
 
-Adicionar a nova edge function com `verify_jwt = false`.
+---
 
-## Arquivos afetados
+## 5. Atualização de Definições
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/data/ruleTemplates.ts` | **Novo** — mapeamento grupo→templates de regras |
-| `src/components/financeiro/SuggestedRuleTemplates.tsx` | **Novo** — cards de templates ativáveis |
-| `supabase/functions/suggest-grouping-rules/index.ts` | **Novo** — edge function com Lovable AI |
-| `src/hooks/useAISuggestedRules.ts` | **Novo** — hook para chamar a edge function |
-| `src/components/financeiro/AIRuleSuggestions.tsx` | **Novo** — UI de sugestões da IA |
-| `src/components/financeiro/GroupingConfigTab.tsx` | Integrar templates + botão IA |
-| `supabase/config.toml` | Adicionar function suggest-grouping-rules |
+- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
+- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
+- `AppLayout.tsx`: Adicionar ícone de notificações no header
 
+---
+
+## 6. Fluxo Operacional
+
+```text
+Usuário cria solicitação
+  → Sistema gera task vinculada
+  → Responsável recebe notificação (realtime)
+  → Responsável executa (muda status)
+  → Sistema registra histórico
+  → Se necessário → status "Aguardando Aprovação"
+  → Aprovador recebe notificação
+  → Solicitação concluída/rejeitada
+```
+
+---
+
+## Ordem de Implementação
+
+1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
+2. Habilitar realtime em `notifications`
+3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
+4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
+5. Criar `RequestFormDialog` e `RequestDetail`
+6. Criar `NotificationCenter` e integrar no `AppLayout`
+7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
+
+---
+
+# Onboarding Guiado — Implementação (Fase 1 ✅)
+
+## Status: Implementado
+
+### Tabelas criadas
+- `onboarding_progress` — progresso por organização com JSONB por etapa
+- `onboarding_recommendations` — recomendações automáticas
+
+### RLS
+- Org members: SELECT, INSERT (com user_id check), UPDATE
+- Masters: ALL
+
+### Componentes implementados
+- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
+- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
+- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
+- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
+- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
+- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
+- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
+
+### Rotas
+- `/onboarding-guiado` — Wizard no app
+- `/backoffice/onboarding` — Gestão no backoffice
+
+### Fase 2 (pendente)
+- Integração profunda das etapas 2-8 com módulos existentes
+- Sistema de recomendações automáticas (Etapa 9)
+- Score no dashboard principal
+
+---
+
+# Configurador de Regras de Aglutinação — Fase 1 (MVP) ✅
+
+## Status: Implementado
+
+### Tabelas criadas
+- `grouping_macrogroups` — Macrogrupos hierárquicos com nome, ícone, cor, ordem, enabled
+- `grouping_groups` — Grupos dentro de macrogrupos com FK para macrogroup_id
+- `grouping_rules` alterada — Adicionadas colunas `group_id`, `operator`, `match_keyword`
+
+### RLS
+- Org members: SELECT, INSERT, UPDATE, DELETE em ambas tabelas
+
+### Hooks implementados
+- `src/hooks/useGroupingMacrogroups.ts` — CRUD macrogrupos + grupos + seed de 10 macrogrupos padrão
+- `src/hooks/useGroupingRules.ts` — Refatorado com operadores (equals, contains, starts_with, in_list), match por keyword/descrição, group_id targeting, fallback "Não Classificado"
+
+### Componentes implementados
+- `src/components/financeiro/GroupingMacrogroupManager.tsx` — UI colapsável de macrogrupos/grupos com CRUD inline, toggle ativo/inativo, botão "Gerar Padrão"
+- `src/components/financeiro/GroupingRuleDialog.tsx` — Refatorado com operador, campo dinâmico (select por tipo), grupo destino, keyword input para descrição
+- `src/pages/Configuracoes.tsx` — Aba Aglutinação com 3 blocos: Macrogrupos, Regras de Classificação, Fallback
+
+### Seed padrão (10 macrogrupos)
+- Pessoal e RH, Infraestrutura, Tecnologia e Sistemas, Fornecedores Operacionais, Serviços Profissionais, Tributário, Financeiro, Contratos, Patrimonial/Investimentos, Despesas Eventuais
+
+### Integração
+- AgingListTab e FinanceiroTable integrados com o novo sistema de regras (operadores avançados, group_id)
+- Fallback automático para "Não Classificado" em entradas sem match
+
+---
+
+# Templates de Regras Sugeridas + IA para Aglutinação ✅
+
+## Status: Implementado
+
+### Templates Estáticos
+- `src/data/ruleTemplates.ts` — ~30 templates mapeados dos grupos padrão (Folha, Energia, Aluguel, Impostos, etc.)
+- `src/components/financeiro/SuggestedRuleTemplates.tsx` — Cards ativáveis com badge "Sugerido", botão "Ativar Todas"
+- Templates ocultados automaticamente quando regra já existe no banco
+
+### IA para Sugestão de Regras
+- `supabase/functions/suggest-grouping-rules/index.ts` — Edge function que analisa últimos 500 lançamentos via Lovable AI (gemini-3-flash-preview) com tool calling para output estruturado
+- `src/hooks/useAISuggestedRules.ts` — Hook para invocar a edge function
+- `src/components/financeiro/AIRuleSuggestions.tsx` — Dialog com sugestões da IA, cobertura estimada, botão "Aplicar" individual ou "Aplicar Todas"
+
+### Integração
+- `GroupingConfigTab.tsx` — Templates sugeridos entre macrogrupos/regras e simulação; botão "Sugerir com IA" abre dialog

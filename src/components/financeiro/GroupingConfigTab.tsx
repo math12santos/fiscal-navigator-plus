@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Plus, Edit2, Trash2, Layers, Wand2, ChevronDown, ChevronRight,
-  Search, FlaskConical, AlertCircle, Clock, FileText, ArrowRight,
+  Search, FlaskConical, AlertCircle, Clock, FileText, ArrowRight, Sparkles,
 } from "lucide-react";
 import { useGroupingRules, type GroupingRule, MATCH_FIELD_OPTIONS, OPERATOR_OPTIONS } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
@@ -20,6 +20,8 @@ import { useCostCenters } from "@/hooks/useCostCenters";
 import GroupingRuleDialog from "@/components/financeiro/GroupingRuleDialog";
 import GroupingMacrogroupManager from "@/components/financeiro/GroupingMacrogroupManager";
 import GroupingPropagation from "@/components/financeiro/GroupingPropagation";
+import SuggestedRuleTemplates from "@/components/financeiro/SuggestedRuleTemplates";
+import AIRuleSuggestions from "@/components/financeiro/AIRuleSuggestions";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 
 const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
@@ -153,6 +155,7 @@ export default function GroupingConfigTab() {
 
   // ── Unclassified panel state ──
   const [showUnclassified, setShowUnclassified] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -335,6 +338,15 @@ export default function GroupingConfigTab() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* ════════ Templates Sugeridos + IA ════════ */}
+      <SuggestedRuleTemplates />
+
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setAiDialogOpen(true)}>
+          <Sparkles size={14} /> Sugerir com IA
+        </Button>
       </div>
 
       {/* ════════ ZONA 3 — Simulação ════════ */}
@@ -538,6 +550,9 @@ export default function GroupingConfigTab() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── AI Suggestions Dialog ── */}
+      <AIRuleSuggestions open={aiDialogOpen} onOpenChange={setAiDialogOpen} />
 
       {/* ── Rule Dialog ── */}
       <GroupingRuleDialog
