@@ -215,10 +215,11 @@ export default function GroupingConfigTab() {
 
       {/* ════════ ZONA 2 — 2 Colunas ════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Coluna Esquerda — Macrogrupos & Grupos */}
+        {/* Coluna Esquerda — Macrogrupos & Grupos + Templates */}
         <Card className="h-fit">
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 space-y-6">
             <GroupingMacrogroupManager ruleCountByGroup={ruleCountByGroup} />
+            <SuggestedRuleTemplates />
           </CardContent>
         </Card>
 
@@ -227,9 +228,14 @@ export default function GroupingConfigTab() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-semibold">Regras de Classificação</CardTitle>
-              <Button size="sm" onClick={() => { setEditingRule(null); setDialogOpen(true); }}>
-                <Plus size={14} /> Nova Regra
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setAiDialogOpen(true)}>
+                  <Sparkles size={14} /> Sugerir com IA
+                </Button>
+                <Button size="sm" onClick={() => { setEditingRule(null); setDialogOpen(true); }}>
+                  <Plus size={14} /> Nova Regra
+                </Button>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2 mt-3">
               <Select value={ruleFilterMacrogroup} onValueChange={setRuleFilterMacrogroup}>
@@ -338,15 +344,6 @@ export default function GroupingConfigTab() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {/* ════════ Templates Sugeridos + IA ════════ */}
-      <SuggestedRuleTemplates />
-
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={() => setAiDialogOpen(true)}>
-          <Sparkles size={14} /> Sugerir com IA
-        </Button>
       </div>
 
       {/* ════════ ZONA 3 — Simulação ════════ */}
