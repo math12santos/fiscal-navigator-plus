@@ -340,6 +340,15 @@ export default function GroupingConfigTab() {
         </Card>
       </div>
 
+      {/* ════════ Templates Sugeridos + IA ════════ */}
+      <SuggestedRuleTemplates />
+
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setAiDialogOpen(true)}>
+          <Sparkles size={14} /> Sugerir com IA
+        </Button>
+      </div>
+
       {/* ════════ ZONA 3 — Simulação ════════ */}
       <Card>
         <CardHeader className="pb-3">
