@@ -261,7 +261,10 @@ export default function GroupingConfigTab() {
               </Select>
             </div>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 space-y-0">
+            <div className="p-4 pb-0">
+              <SuggestedRuleTemplates />
+            </div>
             {loadingRules ? (
               <div className="text-center py-8 text-muted-foreground">Carregando...</div>
             ) : filteredRules.length === 0 ? (
