@@ -155,6 +155,7 @@ export default function GroupingConfigTab() {
 
   // ── Unclassified panel state ──
   const [showUnclassified, setShowUnclassified] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
 
   return (
     <div className="space-y-6">
