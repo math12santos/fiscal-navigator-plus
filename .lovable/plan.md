@@ -193,3 +193,22 @@ Usuário cria solicitação
 ### Integração
 - AgingListTab e FinanceiroTable integrados com o novo sistema de regras (operadores avançados, group_id)
 - Fallback automático para "Não Classificado" em entradas sem match
+
+---
+
+# Templates de Regras Sugeridas + IA para Aglutinação ✅
+
+## Status: Implementado
+
+### Templates Estáticos
+- `src/data/ruleTemplates.ts` — ~30 templates mapeados dos grupos padrão (Folha, Energia, Aluguel, Impostos, etc.)
+- `src/components/financeiro/SuggestedRuleTemplates.tsx` — Cards ativáveis com badge "Sugerido", botão "Ativar Todas"
+- Templates ocultados automaticamente quando regra já existe no banco
+
+### IA para Sugestão de Regras
+- `supabase/functions/suggest-grouping-rules/index.ts` — Edge function que analisa últimos 500 lançamentos via Lovable AI (gemini-3-flash-preview) com tool calling para output estruturado
+- `src/hooks/useAISuggestedRules.ts` — Hook para invocar a edge function
+- `src/components/financeiro/AIRuleSuggestions.tsx` — Dialog com sugestões da IA, cobertura estimada, botão "Aplicar" individual ou "Aplicar Todas"
+
+### Integração
+- `GroupingConfigTab.tsx` — Templates sugeridos entre macrogrupos/regras e simulação; botão "Sugerir com IA" abre dialog
