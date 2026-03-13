@@ -210,14 +210,6 @@ export function AgingListTab() {
 
       if (!isMgExpanded) continue;
 
-      // If only one group, skip group level and show entries directly
-      if (hasSingleGroup) {
-        for (const entry of mgGroups[0].entries) {
-          rows.push(renderEntry(entry, b, 1));
-        }
-        continue;
-      }
-
       // Level 1 — Group headers
       for (const grpBucket of mgGroups) {
         const grpKey = `${mgKey}__${grpBucket.info.groupId}`;
