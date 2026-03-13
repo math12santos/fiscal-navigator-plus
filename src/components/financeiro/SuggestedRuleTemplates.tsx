@@ -42,8 +42,6 @@ export default function SuggestedRuleTemplates() {
     return results;
   }, [groups, macrogroups, rules, ignoredKeys]);
 
-  if (availableTemplates.length === 0) return null;
-
   const handleActivate = async (item: typeof availableTemplates[0]) => {
     setActivating(item.key);
     try {
@@ -107,6 +105,8 @@ export default function SuggestedRuleTemplates() {
     }
     return Array.from(map.entries());
   }, [availableTemplates]);
+
+  if (availableTemplates.length === 0) return null;
 
   return (
     <div className="space-y-3">
