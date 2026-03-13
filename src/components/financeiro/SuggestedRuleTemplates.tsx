@@ -106,6 +106,8 @@ export default function SuggestedRuleTemplates() {
     return Array.from(map.entries());
   }, [availableTemplates]);
 
+  if (availableTemplates.length === 0) return null;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
