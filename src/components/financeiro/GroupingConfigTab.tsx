@@ -551,6 +551,9 @@ export default function GroupingConfigTab() {
         </DialogContent>
       </Dialog>
 
+      {/* ── AI Suggestions Dialog ── */}
+      <AIRuleSuggestions open={aiDialogOpen} onOpenChange={setAiDialogOpen} />
+
       {/* ── Rule Dialog ── */}
       <GroupingRuleDialog
         open={dialogOpen}
