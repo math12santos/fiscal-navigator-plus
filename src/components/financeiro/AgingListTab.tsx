@@ -176,7 +176,6 @@ export function AgingListTab() {
       const mgKey = `aging-${b.label}-mg-${mgBucket.info.macrogroupId}`;
       const isMgExpanded = expandedMacrogroups.has(mgKey);
       const mgGroups = Array.from(mgBucket.groups.values());
-      const hasSingleGroup = mgGroups.length === 1;
 
       // Level 0 — Macrogroup header
       rows.push(
@@ -209,14 +208,6 @@ export function AgingListTab() {
       );
 
       if (!isMgExpanded) continue;
-
-      // If only one group, skip group level and show entries directly
-      if (hasSingleGroup) {
-        for (const entry of mgGroups[0].entries) {
-          rows.push(renderEntry(entry, b, 1));
-        }
-        continue;
-      }
 
       // Level 1 — Group headers
       for (const grpBucket of mgGroups) {
