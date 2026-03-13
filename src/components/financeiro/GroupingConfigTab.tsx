@@ -215,11 +215,10 @@ export default function GroupingConfigTab() {
 
       {/* ════════ ZONA 2 — 2 Colunas ════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Coluna Esquerda — Macrogrupos & Grupos + Templates */}
+        {/* Coluna Esquerda — Macrogrupos & Grupos */}
         <Card className="h-fit">
           <CardContent className="pt-6 space-y-6">
             <GroupingMacrogroupManager ruleCountByGroup={ruleCountByGroup} />
-            <SuggestedRuleTemplates />
           </CardContent>
         </Card>
 
