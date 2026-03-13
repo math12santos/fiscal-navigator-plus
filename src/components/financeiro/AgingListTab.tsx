@@ -176,7 +176,6 @@ export function AgingListTab() {
       const mgKey = `aging-${b.label}-mg-${mgBucket.info.macrogroupId}`;
       const isMgExpanded = expandedMacrogroups.has(mgKey);
       const mgGroups = Array.from(mgBucket.groups.values());
-      const hasSingleGroup = mgGroups.length === 1;
 
       // Level 0 — Macrogroup header
       rows.push(
