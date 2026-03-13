@@ -1,1 +1,4 @@
 project_id = "pkvsqkilfodfduohwtpy"
+
+[functions.suggest-grouping-rules]
+verify_jwt = false

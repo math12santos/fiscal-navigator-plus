@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Plus, Edit2, Trash2, Layers, Wand2, ChevronDown, ChevronRight,
-  Search, FlaskConical, AlertCircle, Clock, FileText, ArrowRight,
+  Search, FlaskConical, AlertCircle, Clock, FileText, ArrowRight, Sparkles,
 } from "lucide-react";
 import { useGroupingRules, type GroupingRule, MATCH_FIELD_OPTIONS, OPERATOR_OPTIONS } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
