@@ -31,6 +31,7 @@ export const MATCH_FIELD_OPTIONS = [
   { value: "entity_id", label: "Fornecedor" },
   { value: "descricao", label: "Descrição" },
   { value: "cost_center_id", label: "Centro de Custo" },
+  { value: "dp_sub_category", label: "Subcategoria DP" },
 ];
 
 export const OPERATOR_OPTIONS = [
