@@ -1,95 +1,214 @@
+# Plano: Módulo de Gestão de Tarefas por Solicitações
+
+## Visão Geral
+
+Substituir o módulo atual de tarefas (mock data estático) por um sistema completo de **solicitações → tarefas → notificações**, funcionando como motor de workflow interno conectado a todos os módulos.
+
+---
+
+## 1. Estrutura de Dados (Migrações)
+
+### Tabela `requests` (Solicitações)
+
+```text
+id, organization_id, user_id (criador), title, type (financeiro/compras/contratos/juridico/rh/ti/operacional),
+area_responsavel, assigned_to (uuid), description, priority (alta/media/baixa/urgente),
+due_date, cost_center_id, reference_module, reference_id, status (aberta/em_analise/em_execucao/aguardando_aprovacao/concluida/rejeitada),
+created_at, updated_at
+```
+
+### Tabela `request_tasks` (Tarefas geradas)
+
+```text
+id, request_id (FK), organization_id, assigned_to, status, due_date,
+created_by, executed_by, approved_by, created_at, updated_at
+```
+
+### Tabela `request_comments` (Comentarios/Historico)
+
+```text
+id, request_id (FK), user_id, content, type (comment/status_change/assignment/approval),
+old_value, new_value, created_at
+```
+
+### Tabela `request_attachments`
+
+```text
+id, request_id (FK), user_id, file_name, file_path, created_at
+```
+
+### Tabela `notifications`
+
+```text
+id, organization_id, user_id (destinatario), title, body, type, priority,
+reference_type (request/task), reference_id, read, read_at, created_at
+```
+
+RLS: Todas com `is_org_member` para SELECT, INSERT com `auth.uid() = user_id`. Notifications visíveis apenas pelo destinatário.
+
+Habilitar realtime em `notifications` para push instantâneo.
+
+---
+
+## 2. Componentes e Páginas
+
+### Página `Tarefas.tsx` (reescrita completa)
+
+Três abas controladas por permissões (`getAllowedTabs`):
 
 
-# Reestruturar Regras de Aglutinação — Cobertura Completa
+| Aba            | Key              | Conteúdo                                                                                  |
+| -------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| Dashboard      | `dashboard`      | KPIs (abertas, atrasadas, por área, por responsável, produtividade), gráficos recharts    |
+| Solicitações   | `solicitacoes`   | Tabela de requests com filtros (tipo, prioridade, status, área), botão "Nova Solicitação" |
+| Minhas Tarefas | `minhas-tarefas` | Tasks atribuídas ao usuário logado, com ações rápidas de status                           |
 
-## Problema
 
-As regras template atuais (`ruleTemplates.ts`) são genéricas demais. Exemplo: a regra "Folha de Pagamento" captura tudo com `source=dp` num único grupo, misturando salários, encargos (FGTS, INSS, IRRF), benefícios e provisões. Os demais macrogrupos também têm regras vagas baseadas apenas em keywords de descrição, sem aproveitar campos estruturados como `dp_sub_category`, `source`, `categoria`, ou `natureza_financeira` dos contratos.
+### Dialog `RequestFormDialog.tsx`
 
-## Escopo
+Formulário de criação/edição de solicitação com campos: título, tipo, área, responsável, descrição, prioridade, data limite, centro de custo, referência a módulo.
 
-1. **Reescrever `src/data/ruleTemplates.ts`** — regras precisas para todos os 10 macrogrupos e seus grupos
-2. **Adicionar "Provisões" ao seed** em `src/hooks/useGroupingMacrogroups.ts`
-3. **Adicionar `dp_sub_category`** como match field disponível em `src/hooks/useGroupingRules.ts`
-4. **Atualizar DEFAULT_RULES** fallback — substituir a regra genérica `source=dp`
-5. **Aging List** — filtrar para exibir apenas vencidos + a vencer até 30 dias (remover bucket "Futuro > 30d" da tabela de detalhes)
+### Componente `RequestDetail.tsx`
 
-## Design das Regras por Macrogrupo
+Painel lateral (Sheet) com detalhes da solicitação, timeline de histórico, comentários, anexos, e ações (mudar status, reatribuir, aprovar/rejeitar).
 
-### 1. Pessoal e RH (+ novo grupo "Provisões")
-| Grupo | match_field | operator | match_value | Prio |
-|---|---|---|---|---|
-| Folha | dp_sub_category | equals | salario_liquido | 25 |
-| Encargos | dp_sub_category | in_list | encargos_fgts,encargos_inss,encargos_irrf | 24 |
-| VT | dp_sub_category | equals | vt | 23 |
-| Benefícios | dp_sub_category | equals | beneficios | 22 |
-| Provisões | dp_sub_category | equals | provisoes | 21 |
-| Pró-labore | descricao | contains | (keyword) pro-labore,pró-labore,prolabore | 18 |
-| Férias | descricao | contains | (keyword) férias,ferias | 13 |
-| 13º Salário | descricao | contains | (keyword) 13o,13º,décimo terceiro | 13 |
-| Rescisões | descricao | contains | (keyword) rescisão,rescisao,multa rescisória | 12 |
-| RPA | descricao | contains | (keyword) rpa,autônomo,recibo pagamento | 11 |
+### Central de Notificações `NotificationCenter.tsx`
 
-### 2. Infraestrutura
-Mantém regras por keyword na descrição (aluguel, condomínio, água, energia, etc.) — sem alterações significativas, apenas revisão de prioridades para evitar conflitos.
+Ícone de sino no `AppLayout` (header ou sidebar) com badge de contagem. Dropdown/popover com lista de notificações agrupadas por prioridade/prazo, com link direto para a tarefa. Realtime via canal Supabase.
 
-### 3. Tecnologia e Sistemas
-Mantém regras por keyword (saas, software, aws, azure, etc.) — sem alterações.
+---
 
-### 4. Fornecedores Operacionais
-| Grupo | match_field | operator | match_value/keyword | Prio |
-|---|---|---|---|---|
-| Materiais | descricao | contains | material,insumo,matéria-prima | 12 |
-| Logística | descricao | contains | frete,transporte,correios,logística,sedex | 12 |
-| Suprimentos | descricao | contains | suprimento,estoque,reposição | 11 |
+## 3. Hooks
 
-### 5. Serviços Profissionais
-Mantém regras por keyword — adicionar "Auditoria":
-| Grupo | match_field | operator | match_value/keyword | Prio |
-|---|---|---|---|---|
-| Auditoria | descricao | contains | auditoria,audit | 13 |
+- `useRequests.ts` — CRUD de solicitações com filtros
+- `useRequestTasks.ts` — Tarefas vinculadas a uma solicitação
+- `useRequestComments.ts` — Comentários e histórico
+- `useNotifications.ts` — Fetch, mark as read, realtime subscription, contagem de não-lidas
 
-### 6. Contratos
-| Grupo | match_field | operator | match_value | Prio |
-|---|---|---|---|---|
-| Contratos Recorrentes | source | equals | contrato | 10 |
-| Contratos Pontuais | (sem regra automática — requer classificação manual) | — | — | — |
+---
 
-### 7. Tributário
-Mantém regras por keyword (irpj, csll, icms, iss, etc.) — adicionar "Parcelamentos":
-| Grupo | match_field | operator | match_value/keyword | Prio |
-|---|---|---|---|---|
-| Parcelamentos | descricao | contains | parcelamento,refis,pert,programa especial | 10 |
+## 4. Integração com Outros Módulos
 
-### 8. Financeiro
-Mantém regras existentes + adicionar "IOF":
-| Grupo | match_field | operator | match_value/keyword | Prio |
-|---|---|---|---|---|
-| IOF | descricao | contains | iof,imposto operações financeiras | 10 |
+Função utilitária `createRequest()` que pode ser chamada de qualquer módulo para disparar solicitações automaticamente. Exemplos de uso futuro:
 
-### 9. Patrimonial / Investimentos
-| Grupo | match_field | operator | match_value/keyword | Prio |
-|---|---|---|---|---|
-| Investimentos | descricao | contains | investimento,aplicação,cdb,lci,lca,fundo | 10 |
-| Amortização | descricao | contains | amortização,amortizacao,parcela empréstimo | 10 |
-| Depreciação | descricao | contains | depreciação,depreciacao | 8 |
+- Financeiro → "Aprovação de pagamento"
+- Contratos → "Revisão jurídica"
+- DP → "Solicitação de contratação"
 
-### 10. Despesas Eventuais
-Mantém regras existentes + adicionar "Eventos":
-| Grupo | match_field | operator | match_value/keyword | Prio |
-|---|---|---|---|---|
-| Eventos | descricao | contains | evento,confraternização,workshop,treinamento | 8 |
+Implementação inicial apenas no módulo de Tarefas (manual). Os disparos automáticos de outros módulos ficam preparados mas serão ativados incrementalmente a partir de uma integração com fluxo de trabalho e rotinas por cargo que será implementado futuramente.
 
-## Alterações no Aging List
+---
 
-No `AgingListTab.tsx`, remover o bucket "Futuro > 30d" da tabela de detalhes (index 7). Os cards de resumo podem continuar mostrando o total futuro, mas a tabela detalhada fica limitada a vencidos + a vencer em até 30 dias.
+## 5. Atualização de Definições
 
-## Arquivos alterados
+- `moduleDefinitions.ts`: Adicionar tabs `dashboard`, `solicitacoes`, `minhas-tarefas` ao módulo `tarefas`
+- `BackofficeCompany.tsx`: Sincronizar tabs do módulo tarefas
+- `AppLayout.tsx`: Adicionar ícone de notificações no header
 
-| Arquivo | Mudança |
-|---|---|
-| `src/data/ruleTemplates.ts` | Reescrever todas as regras com lógica granular |
-| `src/hooks/useGroupingMacrogroups.ts` | Adicionar "Provisões" ao seed de Pessoal e RH |
-| `src/hooks/useGroupingRules.ts` | Adicionar `dp_sub_category` aos match fields + atualizar DEFAULT_RULES |
-| `src/components/financeiro/AgingListTab.tsx` | Filtrar tabela de detalhes para vencidos + a vencer ≤30d |
+---
 
+## 6. Fluxo Operacional
+
+```text
+Usuário cria solicitação
+  → Sistema gera task vinculada
+  → Responsável recebe notificação (realtime)
+  → Responsável executa (muda status)
+  → Sistema registra histórico
+  → Se necessário → status "Aguardando Aprovação"
+  → Aprovador recebe notificação
+  → Solicitação concluída/rejeitada
+```
+
+---
+
+## Ordem de Implementação
+
+1. Criar tabelas via migração (requests, request_comments, request_attachments, notifications) com RLS
+2. Habilitar realtime em `notifications`
+3. Criar hooks (`useRequests`, `useRequestComments`, `useNotifications`)
+4. Reescrever `Tarefas.tsx` com abas Dashboard, Solicitações, Minhas Tarefas
+5. Criar `RequestFormDialog` e `RequestDetail`
+6. Criar `NotificationCenter` e integrar no `AppLayout`
+7. Atualizar `moduleDefinitions.ts` e `BackofficeCompany.tsx`
+
+---
+
+# Onboarding Guiado — Implementação (Fase 1 ✅)
+
+## Status: Implementado
+
+### Tabelas criadas
+- `onboarding_progress` — progresso por organização com JSONB por etapa
+- `onboarding_recommendations` — recomendações automáticas
+
+### RLS
+- Org members: SELECT, INSERT (com user_id check), UPDATE
+- Masters: ALL
+
+### Componentes implementados
+- `src/pages/OnboardingGuiado.tsx` — Wizard com 10 etapas, barra de progresso, navegação livre
+- `src/components/onboarding-guiado/OnboardingProgressBar.tsx` — Barra de progresso clicável
+- `src/components/onboarding-guiado/Step1Diagnostico.tsx` — Questionário com cálculo automático de maturidade (1-5)
+- `src/components/onboarding-guiado/Step10Score.tsx` — Score de maturidade com 5 dimensões (Bronze/Prata/Ouro/Board Ready)
+- `src/components/onboarding-guiado/StepShell.tsx` — Shell reutilizável para etapas 2-9 (Fase 2)
+- `src/pages/BackofficeOnboarding.tsx` — Gestão de onboarding no backoffice
+- `src/hooks/useOnboardingProgress.ts` — Hook com auto-save debounced
+
+### Rotas
+- `/onboarding-guiado` — Wizard no app
+- `/backoffice/onboarding` — Gestão no backoffice
+
+### Fase 2 (pendente)
+- Integração profunda das etapas 2-8 com módulos existentes
+- Sistema de recomendações automáticas (Etapa 9)
+- Score no dashboard principal
+
+---
+
+# Configurador de Regras de Aglutinação — Fase 1 (MVP) ✅
+
+## Status: Implementado
+
+### Tabelas criadas
+- `grouping_macrogroups` — Macrogrupos hierárquicos com nome, ícone, cor, ordem, enabled
+- `grouping_groups` — Grupos dentro de macrogrupos com FK para macrogroup_id
+- `grouping_rules` alterada — Adicionadas colunas `group_id`, `operator`, `match_keyword`
+
+### RLS
+- Org members: SELECT, INSERT, UPDATE, DELETE em ambas tabelas
+
+### Hooks implementados
+- `src/hooks/useGroupingMacrogroups.ts` — CRUD macrogrupos + grupos + seed de 10 macrogrupos padrão
+- `src/hooks/useGroupingRules.ts` — Refatorado com operadores (equals, contains, starts_with, in_list), match por keyword/descrição, group_id targeting, fallback "Não Classificado"
+
+### Componentes implementados
+- `src/components/financeiro/GroupingMacrogroupManager.tsx` — UI colapsável de macrogrupos/grupos com CRUD inline, toggle ativo/inativo, botão "Gerar Padrão"
+- `src/components/financeiro/GroupingRuleDialog.tsx` — Refatorado com operador, campo dinâmico (select por tipo), grupo destino, keyword input para descrição
+- `src/pages/Configuracoes.tsx` — Aba Aglutinação com 3 blocos: Macrogrupos, Regras de Classificação, Fallback
+
+### Seed padrão (10 macrogrupos)
+- Pessoal e RH, Infraestrutura, Tecnologia e Sistemas, Fornecedores Operacionais, Serviços Profissionais, Tributário, Financeiro, Contratos, Patrimonial/Investimentos, Despesas Eventuais
+
+### Integração
+- AgingListTab e FinanceiroTable integrados com o novo sistema de regras (operadores avançados, group_id)
+- Fallback automático para "Não Classificado" em entradas sem match
+
+---
+
+# Templates de Regras Sugeridas + IA para Aglutinação ✅
+
+## Status: Implementado
+
+### Templates Estáticos
+- `src/data/ruleTemplates.ts` — ~30 templates mapeados dos grupos padrão (Folha, Energia, Aluguel, Impostos, etc.)
+- `src/components/financeiro/SuggestedRuleTemplates.tsx` — Cards ativáveis com badge "Sugerido", botão "Ativar Todas"
+- Templates ocultados automaticamente quando regra já existe no banco
+
+### IA para Sugestão de Regras
+- `supabase/functions/suggest-grouping-rules/index.ts` — Edge function que analisa últimos 500 lançamentos via Lovable AI (gemini-3-flash-preview) com tool calling para output estruturado
+- `src/hooks/useAISuggestedRules.ts` — Hook para invocar a edge function
+- `src/components/financeiro/AIRuleSuggestions.tsx` — Dialog com sugestões da IA, cobertura estimada, botão "Aplicar" individual ou "Aplicar Todas"
+
+### Integração
+- `GroupingConfigTab.tsx` — Templates sugeridos entre macrogrupos/regras e simulação; botão "Sugerir com IA" abre dialog

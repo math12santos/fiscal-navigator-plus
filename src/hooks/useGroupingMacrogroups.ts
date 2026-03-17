@@ -34,7 +34,7 @@ export type MacrogroupInput = Pick<GroupingMacrogroup, "name" | "icon" | "color"
 export type GroupInput = Pick<GroupingGroup, "macrogroup_id" | "name" | "order_index" | "enabled">;
 
 export const DEFAULT_SEED: { name: string; icon: string; color: string; groups: string[] }[] = [
-  { name: "Pessoal e RH", icon: "Users", color: "#6366f1", groups: ["Folha", "Pró-labore", "Encargos", "Benefícios", "VT", "Férias", "13º Salário", "Rescisões", "RPA"] },
+  { name: "Pessoal e RH", icon: "Users", color: "#6366f1", groups: ["Folha", "Pró-labore", "Encargos", "Benefícios", "VT", "Férias", "13º Salário", "Rescisões", "RPA", "Provisões"] },
   { name: "Infraestrutura", icon: "Building2", color: "#8b5cf6", groups: ["Aluguel", "Condomínio", "Água", "Energia", "Internet", "Telefonia", "Limpeza", "Produtos de Limpeza"] },
   { name: "Tecnologia e Sistemas", icon: "Monitor", color: "#06b6d4", groups: ["Software/SaaS", "Hospedagem/Cloud", "Suporte TI", "Equipamentos"] },
   { name: "Fornecedores Operacionais", icon: "Truck", color: "#f59e0b", groups: ["Materiais", "Logística", "Suprimentos"] },

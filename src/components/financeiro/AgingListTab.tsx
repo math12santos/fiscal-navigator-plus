@@ -132,6 +132,7 @@ export function AgingListTab() {
   const totalOverdue = buckets.slice(0, 4).reduce((s, b) => s + b.total, 0);
   const totalDue = buckets.slice(4).reduce((s, b) => s + b.total, 0);
   const countOverdue = buckets.slice(0, 4).reduce((s, b) => s + b.entries.length, 0);
+  const countDue30 = buckets.slice(4, 7).reduce((s, b) => s + b.entries.length, 0);
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="animate-spin" /></div>;
@@ -373,7 +374,7 @@ export function AgingListTab() {
         ))}
       </div>
 
-      {/* ── Detail table ── */}
+      {/* ── Detail table: Overdue ── */}
       {countOverdue > 0 && (
         <Card>
           <CardHeader className="py-3">
@@ -396,6 +397,35 @@ export function AgingListTab() {
               </TableHeader>
               <TableBody>
                 {buckets.slice(0, 4).flatMap((b) => renderBucketRows(b))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Detail table: Due within 30 days ── */}
+      {countDue30 > 0 && (
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm font-medium text-warning flex items-center gap-2">
+              <CalendarClock className="h-4 w-4" />
+              A Vencer em até 30 dias ({countDue30})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Dias</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  {holdingMode && <TableHead>Empresa</TableHead>}
+                  <TableHead>Faixa</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {buckets.slice(4, 7).flatMap((b) => renderBucketRows(b))}
               </TableBody>
             </Table>
           </CardContent>

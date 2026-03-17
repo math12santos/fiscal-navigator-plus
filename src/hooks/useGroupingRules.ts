@@ -31,6 +31,7 @@ export const MATCH_FIELD_OPTIONS = [
   { value: "entity_id", label: "Fornecedor" },
   { value: "descricao", label: "Descrição" },
   { value: "cost_center_id", label: "Centro de Custo" },
+  { value: "dp_sub_category", label: "Subcategoria DP" },
 ];
 
 export const OPERATOR_OPTIONS = [
@@ -53,7 +54,11 @@ export const SUB_GROUP_FIELD_OPTIONS = [
 
 /** Default rules used as fallback when no DB rules exist */
 const DEFAULT_RULES: Omit<GroupingRule, "id" | "created_at" | "updated_at" | "organization_id" | "user_id">[] = [
-  { name: "Pessoal", match_field: "source", match_value: "dp", sub_group_field: "dp_sub_category", min_items: 2, enabled: true, priority: 10, group_id: null, operator: "equals", match_keyword: null },
+  { name: "Folha", match_field: "dp_sub_category", match_value: "salario_liquido", sub_group_field: null, min_items: 1, enabled: true, priority: 25, group_id: null, operator: "equals", match_keyword: null },
+  { name: "Encargos", match_field: "dp_sub_category", match_value: "encargos_fgts,encargos_inss,encargos_irrf", sub_group_field: null, min_items: 1, enabled: true, priority: 24, group_id: null, operator: "in_list", match_keyword: null },
+  { name: "VT", match_field: "dp_sub_category", match_value: "vt", sub_group_field: null, min_items: 1, enabled: true, priority: 23, group_id: null, operator: "equals", match_keyword: null },
+  { name: "Benefícios", match_field: "dp_sub_category", match_value: "beneficios", sub_group_field: null, min_items: 1, enabled: true, priority: 22, group_id: null, operator: "equals", match_keyword: null },
+  { name: "Provisões", match_field: "dp_sub_category", match_value: "provisoes", sub_group_field: null, min_items: 1, enabled: true, priority: 21, group_id: null, operator: "equals", match_keyword: null },
   { name: "Contratos", match_field: "source", match_value: "contrato", sub_group_field: "entity_id", min_items: 2, enabled: true, priority: 5, group_id: null, operator: "equals", match_keyword: null },
 ];
 
@@ -63,15 +68,15 @@ function evaluateRule(rule: GroupingRule | typeof DEFAULT_RULES[0], entry: any):
   const fieldValue = String(entry[rule.match_field] ?? "");
   const matchVal = rule.match_value ?? "";
 
-  // Keyword match for descricao field
-  if (rule.match_field === "descricao" && rule.match_keyword) {
-    const desc = fieldValue.toLowerCase();
-    const keyword = rule.match_keyword.toLowerCase();
+  // Keyword match — comma-separated list means "any keyword matches"
+  if (rule.match_keyword) {
+    const fieldVal = fieldValue.toLowerCase();
+    const keywords = rule.match_keyword.split(",").map(s => s.trim().toLowerCase());
     switch (op) {
-      case "contains": return desc.includes(keyword);
-      case "starts_with": return desc.startsWith(keyword);
-      case "equals": return desc === keyword;
-      case "in_list": return keyword.split(",").map(s => s.trim().toLowerCase()).includes(desc);
+      case "contains": return keywords.some(kw => fieldVal.includes(kw));
+      case "starts_with": return keywords.some(kw => fieldVal.startsWith(kw));
+      case "equals": return keywords.some(kw => fieldVal === kw);
+      case "in_list": return keywords.includes(fieldVal);
       default: return false;
     }
   }
