@@ -132,6 +132,7 @@ export function AgingListTab() {
   const totalOverdue = buckets.slice(0, 4).reduce((s, b) => s + b.total, 0);
   const totalDue = buckets.slice(4).reduce((s, b) => s + b.total, 0);
   const countOverdue = buckets.slice(0, 4).reduce((s, b) => s + b.entries.length, 0);
+  const countDue30 = buckets.slice(4, 7).reduce((s, b) => s + b.entries.length, 0);
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="animate-spin" /></div>;
