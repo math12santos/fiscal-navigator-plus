@@ -68,15 +68,15 @@ function evaluateRule(rule: GroupingRule | typeof DEFAULT_RULES[0], entry: any):
   const fieldValue = String(entry[rule.match_field] ?? "");
   const matchVal = rule.match_value ?? "";
 
-  // Keyword match for descricao field
-  if (rule.match_field === "descricao" && rule.match_keyword) {
-    const desc = fieldValue.toLowerCase();
-    const keyword = rule.match_keyword.toLowerCase();
+  // Keyword match — comma-separated list means "any keyword matches"
+  if (rule.match_keyword) {
+    const fieldVal = fieldValue.toLowerCase();
+    const keywords = rule.match_keyword.split(",").map(s => s.trim().toLowerCase());
     switch (op) {
-      case "contains": return desc.includes(keyword);
-      case "starts_with": return desc.startsWith(keyword);
-      case "equals": return desc === keyword;
-      case "in_list": return keyword.split(",").map(s => s.trim().toLowerCase()).includes(desc);
+      case "contains": return keywords.some(kw => fieldVal.includes(kw));
+      case "starts_with": return keywords.some(kw => fieldVal.startsWith(kw));
+      case "equals": return keywords.some(kw => fieldVal === kw);
+      case "in_list": return keywords.includes(fieldVal);
       default: return false;
     }
   }
