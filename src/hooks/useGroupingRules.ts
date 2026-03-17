@@ -54,7 +54,11 @@ export const SUB_GROUP_FIELD_OPTIONS = [
 
 /** Default rules used as fallback when no DB rules exist */
 const DEFAULT_RULES: Omit<GroupingRule, "id" | "created_at" | "updated_at" | "organization_id" | "user_id">[] = [
-  { name: "Pessoal", match_field: "source", match_value: "dp", sub_group_field: "dp_sub_category", min_items: 2, enabled: true, priority: 10, group_id: null, operator: "equals", match_keyword: null },
+  { name: "Folha", match_field: "dp_sub_category", match_value: "salario_liquido", sub_group_field: null, min_items: 1, enabled: true, priority: 25, group_id: null, operator: "equals", match_keyword: null },
+  { name: "Encargos", match_field: "dp_sub_category", match_value: "encargos_fgts,encargos_inss,encargos_irrf", sub_group_field: null, min_items: 1, enabled: true, priority: 24, group_id: null, operator: "in_list", match_keyword: null },
+  { name: "VT", match_field: "dp_sub_category", match_value: "vt", sub_group_field: null, min_items: 1, enabled: true, priority: 23, group_id: null, operator: "equals", match_keyword: null },
+  { name: "Benefícios", match_field: "dp_sub_category", match_value: "beneficios", sub_group_field: null, min_items: 1, enabled: true, priority: 22, group_id: null, operator: "equals", match_keyword: null },
+  { name: "Provisões", match_field: "dp_sub_category", match_value: "provisoes", sub_group_field: null, min_items: 1, enabled: true, priority: 21, group_id: null, operator: "equals", match_keyword: null },
   { name: "Contratos", match_field: "source", match_value: "contrato", sub_group_field: "entity_id", min_items: 2, enabled: true, priority: 5, group_id: null, operator: "equals", match_keyword: null },
 ];
 
