@@ -38,7 +38,6 @@ export function resolveHierarchy(
   const rule = getMatchingRule(entry);
 
   if (!rule) {
-    // No rule match — use entry's own label as group name
     const label = entry.categoria || entry.source || "Outros";
     return {
       ...UNCLASSIFIED_MACROGROUP,
@@ -47,7 +46,6 @@ export function resolveHierarchy(
     };
   }
 
-  // Rule matched — resolve group and macrogroup
   if (rule.group_id) {
     const group = groups.find((g) => g.id === rule.group_id);
     if (group) {
@@ -66,7 +64,6 @@ export function resolveHierarchy(
     }
   }
 
-  // Rule exists but no group_id linked — put under "Não Classificado" macrogroup
   return {
     ...UNCLASSIFIED_MACROGROUP,
     groupId: `rule__${rule.name}`,
@@ -75,15 +72,28 @@ export function resolveHierarchy(
   };
 }
 
+export interface SubgroupBucket {
+  label: string;
+  entries: any[];
+  total: number;
+}
+
+export interface GroupBucket {
+  info: HierarchyInfo;
+  entries: any[];
+  total: number;
+  subgroups: Map<string, SubgroupBucket>;
+}
+
 export interface MacrogroupBucket {
   info: HierarchyInfo;
-  groups: Map<string, { info: HierarchyInfo; entries: any[]; total: number }>;
+  groups: Map<string, GroupBucket>;
   entries: any[];
   total: number;
 }
 
 /**
- * Groups entries into a 3-level hierarchy: Macrogroup → Group → Entries
+ * Groups entries into a 4-level hierarchy: Macrogroup → Group → Subgroup → Entries
  */
 export function buildHierarchy(
   entries: any[],
@@ -91,12 +101,14 @@ export function buildHierarchy(
   getGroupLabel: (entry: any) => string,
   groups: GroupingGroup[],
   macrogroups: GroupingMacrogroup[],
-  valueKey = "valor_previsto"
+  valueKey = "valor_previsto",
+  getSubGroupLabel?: (key: string, source: string, entries: any[]) => string
 ): MacrogroupBucket[] {
   const mgMap = new Map<string, MacrogroupBucket>();
 
   for (const entry of entries) {
     const hi = resolveHierarchy(entry, getMatchingRule, getGroupLabel, groups, macrogroups);
+    const rule = getMatchingRule(entry);
     const val = Number(entry[valueKey] ?? 0);
 
     if (!mgMap.has(hi.macrogroupId)) {
@@ -112,14 +124,32 @@ export function buildHierarchy(
     mgBucket.entries.push(entry);
 
     if (!mgBucket.groups.has(hi.groupId)) {
-      mgBucket.groups.set(hi.groupId, { info: hi, entries: [], total: 0 });
+      mgBucket.groups.set(hi.groupId, { info: hi, entries: [], total: 0, subgroups: new Map() });
     }
     const grpBucket = mgBucket.groups.get(hi.groupId)!;
     grpBucket.total += val;
     grpBucket.entries.push(entry);
+
+    // Subgroup level: if the rule has sub_group_field, nest under subgroups
+    if (rule?.sub_group_field) {
+      const subKey = String(entry[rule.sub_group_field] ?? "other");
+      if (!grpBucket.subgroups.has(subKey)) {
+        const label = getSubGroupLabel
+          ? getSubGroupLabel(subKey, entry.source, [entry])
+          : subKey;
+        grpBucket.subgroups.set(subKey, { label, entries: [], total: 0 });
+      }
+      const sgBucket = grpBucket.subgroups.get(subKey)!;
+      sgBucket.total += val;
+      sgBucket.entries.push(entry);
+      // Update label with better data if available
+      if (getSubGroupLabel && sgBucket.entries.length === 1) {
+        sgBucket.label = getSubGroupLabel(subKey, entry.source, sgBucket.entries);
+      }
+    }
   }
 
-  // Sort macrogroups: classified first (by macrogroup order), unclassified last
+  // Sort macrogroups: classified first, unclassified last
   const sorted = Array.from(mgMap.values()).sort((a, b) => {
     if (a.info.macrogroupId === UNCLASSIFIED_ID) return 1;
     if (b.info.macrogroupId === UNCLASSIFIED_ID) return -1;

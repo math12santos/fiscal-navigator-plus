@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, Layers, FolderOpen } from "lucide-react";
+import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, FolderOpen, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGroupingRules } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
@@ -39,7 +39,7 @@ interface Props {
 }
 
 export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDeleting }: Props) {
-  const { getMatchingRule, getGroupLabel, getMinItems } = useGroupingRules();
+  const { getMatchingRule, getGroupLabel, getMinItems, getSubGroupLabel } = useGroupingRules();
   const { macrogroups, groups } = useGroupingMacrogroups();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [payEntry, setPayEntry] = useState<FinanceiroEntry | null>(null);
@@ -47,6 +47,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
   const [payValue, setPayValue] = useState(0);
   const [expandedMacrogroups, setExpandedMacrogroups] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedSubgroups, setExpandedSubgroups] = useState<Set<string>>(new Set());
 
   const toggle = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, key: string) => {
     setter((prev) => {
@@ -57,9 +58,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     });
   };
 
-  // Group entries by month first, then build hierarchy within each month
   const monthlyHierarchy = useMemo(() => {
-    // Group by month
     const byMonth = new Map<string, FinanceiroEntry[]>();
     for (const e of entries) {
       const month = format(new Date(e.data_prevista), "yyyy-MM");
@@ -72,12 +71,11 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
     for (const [month, monthEntries] of byMonth) {
       const monthLabel = format(new Date(month + "-01"), "MM/yyyy");
 
-      // Build hierarchy for groupable entries within this month
       const hierarchy = buildHierarchy(
-        monthEntries, getMatchingRule, getGroupLabel, groups, macrogroups
+        monthEntries, getMatchingRule, getGroupLabel, groups, macrogroups,
+        "valor_previsto", getSubGroupLabel
       );
 
-      // Filter: macrogroups with too few items become singles
       const singles: FinanceiroEntry[] = [];
       const filteredHierarchy = hierarchy.filter((mgBucket) => {
         const minItems = mgBucket.entries.length > 0 ? getMinItems(mgBucket.entries[0]) : 2;
@@ -93,7 +91,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
 
     result.sort((a, b) => a.month.localeCompare(b.month));
     return result;
-  }, [entries, macrogroups, groups, getMatchingRule, getGroupLabel, getMinItems]);
+  }, [entries, macrogroups, groups, getMatchingRule, getGroupLabel, getMinItems, getSubGroupLabel]);
 
   const openPay = (e: FinanceiroEntry) => {
     setPayEntry(e);
@@ -134,7 +132,12 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
 
     return (
       <TableRow key={e.id} className={cn(isProjected && "opacity-80", indent > 0 && "bg-muted/30", indent > 1 && "bg-muted/15")}>
-        <TableCell className={cn("whitespace-nowrap text-sm", indent === 1 && "pl-10", indent === 2 && "pl-16")}>
+        <TableCell className={cn(
+          "whitespace-nowrap text-sm",
+          indent === 1 && "pl-10",
+          indent === 2 && "pl-16",
+          indent === 3 && "pl-20"
+        )}>
           {format(new Date((e as any).data_vencimento || e.data_prevista), "dd/MM/yyyy")}
         </TableCell>
         <TableCell className="text-sm max-w-[200px] truncate">{e.descricao}</TableCell>
@@ -257,8 +260,8 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
 
                 if (!isMgExpanded) continue;
 
-                // If single group, skip group level
-                if (hasSingleGroup) {
+                // If single group with no subgroups, skip group level
+                if (hasSingleGroup && mgGroups[0].subgroups.size === 0) {
                   for (const entry of mgGroups[0].entries) {
                     rows.push(renderEntryRow(entry, 1));
                   }
@@ -271,6 +274,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
                   const isGrpExpanded = expandedGroups.has(grpKey);
                   const grpTotalPrevisto = grpBucket.entries.reduce((s: number, e: any) => s + Number(e.valor_previsto), 0);
                   const grpTotalRealizado = grpBucket.entries.reduce((s: number, e: any) => s + (e.valor_realizado != null ? Number(e.valor_realizado) : 0), 0);
+                  const hasSubgroups = grpBucket.subgroups.size > 0;
 
                   rows.push(
                     <TableRow
@@ -304,8 +308,55 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
                     </TableRow>
                   );
 
-                  // Level 2 — Individual entries
-                  if (isGrpExpanded) {
+                  if (!isGrpExpanded) continue;
+
+                  if (hasSubgroups) {
+                    // Level 2 — Subgroup headers
+                    const subgroups = Array.from(grpBucket.subgroups.entries());
+                    for (const [sgKey, sgBucket] of subgroups) {
+                      const sgExpandKey = `${grpKey}__sg__${sgKey}`;
+                      const isSgExpanded = expandedSubgroups.has(sgExpandKey);
+                      const sgTotalPrevisto = sgBucket.entries.reduce((s: number, e: any) => s + Number(e.valor_previsto), 0);
+
+                      rows.push(
+                        <TableRow
+                          key={sgExpandKey}
+                          className="cursor-pointer hover:bg-muted/30 bg-muted/20"
+                          onClick={(ev) => { ev.stopPropagation(); toggle(setExpandedSubgroups, sgExpandKey); }}
+                        >
+                          <TableCell className="pl-14 whitespace-nowrap text-sm">
+                            <div className="flex items-center gap-1.5">
+                              {isSgExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <div className="flex items-center gap-2">
+                              <Layers className="h-3 w-3 text-muted-foreground" />
+                              {sgBucket.label}
+                              <Badge variant="secondary" className="text-xs font-normal">
+                                {sgBucket.entries.length}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">—</TableCell>
+                          <TableCell />
+                          <TableCell className="text-right font-mono text-sm">{fmt(sgTotalPrevisto)}</TableCell>
+                          <TableCell />
+                          <TableCell />
+                          <TableCell />
+                          <TableCell />
+                        </TableRow>
+                      );
+
+                      // Level 3 — Individual entries under subgroup
+                      if (isSgExpanded) {
+                        for (const entry of sgBucket.entries) {
+                          rows.push(renderEntryRow(entry, 3));
+                        }
+                      }
+                    }
+                  } else {
+                    // No subgroups — entries directly under group
                     for (const entry of grpBucket.entries) {
                       rows.push(renderEntryRow(entry, 2));
                     }
