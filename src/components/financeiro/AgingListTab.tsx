@@ -30,11 +30,12 @@ export function AgingListTab() {
   const { entries: saidaEntries, isLoading: saidaLoading } = useFinanceiro("saida");
   const { entries: entradaEntries, isLoading: entradaLoading } = useFinanceiro("entrada");
   const { bankAccounts, isLoading: bankLoading } = useBankAccounts();
-  const { getMatchingRule, getGroupLabel } = useGroupingRules();
+  const { getMatchingRule, getGroupLabel, getSubGroupLabel } = useGroupingRules();
   const { macrogroups, groups } = useGroupingMacrogroups();
   const { holdingMode } = useHolding();
   const [expandedMacrogroups, setExpandedMacrogroups] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedSubgroups, setExpandedSubgroups] = useState<Set<string>>(new Set());
   const today = new Date();
 
   const isLoading = saidaLoading || entradaLoading || bankLoading;
@@ -144,7 +145,12 @@ export function AgingListTab() {
     const days = Math.abs(differenceInDays(dueDate, today));
     return (
       <TableRow key={e.id} className={cn(indent > 0 && "bg-muted/30", indent > 1 && "bg-muted/15")}>
-        <TableCell className={cn("font-medium max-w-[200px] truncate", indent === 1 && "pl-10", indent === 2 && "pl-16")}>
+        <TableCell className={cn(
+          "font-medium max-w-[200px] truncate",
+          indent === 1 && "pl-10",
+          indent === 2 && "pl-16",
+          indent === 3 && "pl-20"
+        )}>
           {e.descricao}
         </TableCell>
         <TableCell>{format(dueDate, "dd/MM/yyyy")}</TableCell>
@@ -163,12 +169,13 @@ export function AgingListTab() {
     );
   };
 
-  /** Build 3-level grouped rows for a bucket */
+  /** Build 4-level grouped rows for a bucket */
   const renderBucketRows = (b: AgingBucket) => {
     if (b.entries.length === 0) return [];
 
     const hierarchy = buildHierarchy(
-      b.entries, getMatchingRule, getGroupLabel, groups, macrogroups
+      b.entries, getMatchingRule, getGroupLabel, groups, macrogroups,
+      "valor_previsto", getSubGroupLabel
     );
 
     const rows: React.ReactNode[] = [];
@@ -214,6 +221,7 @@ export function AgingListTab() {
       for (const grpBucket of mgGroups) {
         const grpKey = `${mgKey}__${grpBucket.info.groupId}`;
         const isGrpExpanded = expandedGroups.has(grpKey);
+        const hasSubgroups = grpBucket.subgroups.size > 0;
 
         rows.push(
           <TableRow
@@ -241,8 +249,50 @@ export function AgingListTab() {
           </TableRow>
         );
 
-        // Level 2 — Individual entries
-        if (isGrpExpanded) {
+        if (!isGrpExpanded) continue;
+
+        if (hasSubgroups) {
+          // Level 2 — Subgroup headers
+          const subgroups = Array.from(grpBucket.subgroups.entries());
+          for (const [sgKey, sgBucket] of subgroups) {
+            const sgExpandKey = `${grpKey}__sg__${sgKey}`;
+            const isSgExpanded = expandedSubgroups.has(sgExpandKey);
+
+            rows.push(
+              <TableRow
+                key={sgExpandKey}
+                className="cursor-pointer hover:bg-muted/30 bg-muted/20"
+                onClick={(ev) => { ev.stopPropagation(); toggle(setExpandedSubgroups, sgExpandKey); }}
+              >
+                <TableCell className="pl-14">
+                  <div className="flex items-center gap-2">
+                    {isSgExpanded
+                      ? <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                      : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                    <Layers className="h-3 w-3 text-muted-foreground" />
+                    {sgBucket.label}
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {sgBucket.entries.length}
+                    </Badge>
+                  </div>
+                </TableCell>
+                <TableCell>—</TableCell>
+                <TableCell />
+                <TableCell className="text-right font-medium">{fmt(sgBucket.total)}</TableCell>
+                {holdingMode && <TableCell />}
+                <TableCell />
+              </TableRow>
+            );
+
+            // Level 3 — Individual entries under subgroup
+            if (isSgExpanded) {
+              for (const entry of sgBucket.entries) {
+                rows.push(renderEntry(entry, b, 3));
+              }
+            }
+          }
+        } else {
+          // No subgroups — entries directly under group
           for (const entry of grpBucket.entries) {
             rows.push(renderEntry(entry, b, 2));
           }
