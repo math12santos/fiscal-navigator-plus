@@ -256,9 +256,8 @@ export function ClassificacaoDialog({
       await onConfirmRequest(request.id, form);
       onOpenChange(false);
     } else if (isProjectionMode && onConfirmProjections) {
-      // Classify only the selected entries
       const items = selectedEntries.map((entry) => ({ entry, classification: form }));
-      await onConfirmProjections(items);
+      await onConfirmProjections(items, saveRule);
 
       // Mark selected as classified
       const newClassified = new Set(classifiedIds);

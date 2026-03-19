@@ -124,7 +124,8 @@ export function ContasAPagar() {
 
   // Classify projections and materialize
   const handleClassifyProjectionsConfirm = async (
-    items: { entry: FinanceiroEntry; classification: any }[]
+    items: { entry: FinanceiroEntry; classification: any }[],
+    saveRule?: boolean
   ) => {
     for (const { entry, classification } of items) {
       await markAsPaid.mutateAsync({
@@ -134,6 +135,7 @@ export function ContasAPagar() {
         isProjected: true,
       });
     }
+    // TODO: If saveRule is true, persist a classification_mapping for future auto-classification
   };
 
   // Legacy approve handler for PendingExpenseRequests
