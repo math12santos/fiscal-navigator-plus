@@ -48,7 +48,7 @@ interface Props {
   request?: Request | null;
   projections?: FinanceiroEntry[];
   onConfirmRequest?: (requestId: string, data: ClassificationData) => Promise<void>;
-  onConfirmProjections?: (items: { entry: FinanceiroEntry; classification: ClassificationData }[]) => Promise<void>;
+  onConfirmProjections?: (items: { entry: FinanceiroEntry; classification: ClassificationData }[], saveRule: boolean) => Promise<void>;
   isPending: boolean;
 }
 
