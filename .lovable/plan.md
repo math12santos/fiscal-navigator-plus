@@ -1,78 +1,50 @@
 
 
-# Importador CSV/XLSX com IA + Mapeamento Manual para o Financeiro
+# Aprimorar Detecção de Duplicidades com Metodologia MECE
 
-## Visão geral
+## Situação atual
 
-Ferramenta de importação no módulo Financeiro com fluxo em 4 etapas: **Upload → IA sugere mapeamento → Usuário revisa/ajusta → Preview e confirma**. Reutiliza as tabelas `data_imports` e `data_import_rows` já existentes e uma edge function para detecção automática via IA.
+Já existe um mecanismo básico em `useDuplicateDetection.ts` que detecta duplicatas com 3 critérios simultâneos: mesmo fornecedor + valor similar (±5%) + datas próximas (±7 dias). Porém ele é limitado:
 
-## Fluxo do usuário
+- Só analisa entries com `entity_id` preenchido (ignora lançamentos sem fornecedor)
+- Não detecta duplicatas entre importações e lançamentos existentes
+- Não categoriza o tipo/gravidade da duplicidade
+- Não oferece ações ao usuário (apenas lista)
+- Não cobre Contas a Receber
+- Não verifica duplicatas entre projeções e lançamentos manuais (violação MECE)
 
-```text
-┌─────────────┐    ┌──────────────────┐    ┌─────────────────┐    ┌──────────────┐
-│  1. Upload  │───▶│ 2. IA detecta    │───▶│ 3. Revisar      │───▶│ 4. Preview   │
-│  CSV / XLSX │    │    colunas e      │    │    mapeamento   │    │    + Importar│
-│  drag&drop  │    │    sugere mapping │    │    DE/PARA      │    │              │
-└─────────────┘    └──────────────────┘    └─────────────────┘    └──────────────┘
-```
+## Plano — Cobertura MECE completa
 
-## Detecção por IA
+### Categorias de duplicidade (mutuamente exclusivas, coletivamente exaustivas)
 
-Uma edge function `detect-import-mapping` recebe os headers + 5 primeiras linhas do arquivo e retorna:
-- Separador detectado (`;`, `,`, `\t`)
-- Formato de data (`dd/MM/yyyy`, `yyyy-MM-dd`, etc.)
-- Formato numérico (vírgula decimal BR vs ponto decimal US)
-- Mapeamento sugerido: `{ "Data pagamento": "data_realizada", "Fornecedor": "entity_name", "Categoria": "categoria", "Valor": "valor_previsto", ... }`
-- Confiança por campo (alta/média/baixa)
-
-Usa Lovable AI (Gemini Flash) com tool calling para structured output.
-
-## Campos-alvo do mapeamento
-
-| Campo sistema | Descrição | Obrigatório |
+| Categoria | Critérios | Severidade |
 |---|---|---|
-| `descricao` | Descrição do lançamento | Sim |
-| `valor_previsto` | Valor | Sim |
-| `data_prevista` | Data de vencimento ou pagamento | Sim |
-| `data_realizada` | Data do pagamento efetivo | Não |
-| `entity_name` | Nome do fornecedor/cliente | Não |
-| `categoria` | Categoria da despesa | Não |
-| `documento` | Nº documento | Não |
-| `conta_bancaria_nome` | Conta financeira | Não |
-| `notes` | Observações | Não |
-| `ignorar` | Não importar | — |
+| **Exata** | Mesmo fornecedor + valor idêntico + mesma data | Alta (vermelha) |
+| **Valor similar** | Mesmo fornecedor + valor ±5% + data ±7d | Média (âmbar) |
+| **Sem fornecedor** | Sem entity_id, mas descrição similar (Levenshtein ≥80%) + valor ±5% + data ±7d | Média (âmbar) |
+| **Projeção vs Manual** | Entry manual duplica projeção de contrato/DP no mesmo mês | Alta (vermelha) |
+| **Importação vs Existente** | Entry com `source=importacao` duplica entry existente (valor ±2% + data ±3d + descrição similar) | Alta (vermelha) |
 
-## Arquivos a criar/alterar
+### Arquivos alterados
 
-### Novos
-1. **`supabase/functions/detect-import-mapping/index.ts`** — Edge function que usa Lovable AI para analisar headers + sample rows e retornar mapeamento estruturado via tool calling
-2. **`src/components/financeiro/ImportDialog.tsx`** — Dialog com as 4 etapas (upload, IA, revisão, preview/importação)
-3. **`src/hooks/useFinanceiroImport.ts`** — Hook para gerenciar o fluxo de importação (upload, chamar IA, staging, persistência em `cashflow_entries`)
+| Arquivo | Mudança |
+|---|---|
+| `src/hooks/useDuplicateDetection.ts` | Expandir para 5 categorias MECE, adicionar severidade, incluir entries sem entity_id via similaridade de descrição, cruzar projeções vs manuais |
+| `src/components/financeiro/DuplicateAlerts.tsx` | UI com severidade (cores), agrupamento por categoria, botões de ação (ignorar, excluir, ver detalhes) |
+| `src/components/financeiro/ContasAReceber.tsx` | Adicionar `useDuplicateDetection` + `DuplicateAlerts` (atualmente ausente) |
+| `src/hooks/useFinanceiroImport.ts` | Na etapa de preview, cruzar rows importadas com entries existentes e sinalizar possíveis duplicatas antes de confirmar |
 
-### Alterados
-4. **`src/components/financeiro/ContasAPagar.tsx`** — Adicionar botão "Importar CSV/XLSX" ao lado do "Nova Despesa"
-5. **`src/components/financeiro/ContasAReceber.tsx`** — Mesmo botão para importação de receitas
+### Lógica de similaridade de descrição
 
-## Lógica de importação
+Implementar função simples de similaridade (normalizar texto + comparar tokens) sem dependência externa — suficiente para detectar "Aluguel Sala 01" vs "Aluguel - Sala 01".
 
-1. **Parse local** — CSV (detectando separador) ou XLSX via `SheetJS` (já disponível como `xlsx` no npm)
-2. **IA detecta** — Envia headers + 5 rows para edge function, recebe mapping sugerido
-3. **Usuário revisa** — Interface DE/PARA com dropdowns para cada coluna, campos com confiança baixa destacados em amarelo
-4. **Preview** — Tabela com as primeiras 10 linhas convertidas, alertas de validação (datas inválidas, valores zerados)
-5. **Persistência** — Salva no staging (`data_imports` + `data_import_rows`), depois materializa em `cashflow_entries` com `source: "importacao"`
+### Ações do usuário nos alertas
 
-## Tratamento de formatos brasileiros
+- **Ignorar** — marca o par como revisado (estado local, não persiste)
+- **Excluir duplicata** — botão para remover a entry duplicada diretamente
+- **Ver detalhes** — expande mostrando os dois lançamentos lado a lado
 
-O parse deve tratar:
-- Valores: `1.354,47` → `1354.47` (remove pontos de milhar, troca vírgula por ponto)
-- Datas: `01/01/2026` → `2026-01-01`
-- Campos vazios entre separadores (`;;`) como null
+### Proteção na importação
 
-## Migração de banco
-
-Nenhuma nova tabela necessária — reutiliza `data_imports` e `data_import_rows`. Os lançamentos finais vão para `cashflow_entries` já existente.
-
-## Dependência npm
-
-Adicionar `xlsx` (SheetJS) para parsing de arquivos XLSX no client-side.
+Na etapa de preview do `ImportDialog`, adicionar coluna "Status" que mostra badge "Possível duplicata" quando a row cruza com entry existente, permitindo ao usuário desmarcar antes de importar.
 
