@@ -165,7 +165,7 @@ export function ContasAPagar() {
         onValorExecutado={handleValorExecutado}
         onClassifyRequest={handleClassifyRequest}
       />
-      <DuplicateAlerts duplicates={duplicates} />
+      <DuplicateAlerts duplicates={duplicates} onDelete={(id) => remove.mutate(id)} />
 
       {/* Actions */}
       <div className="flex justify-end gap-2">

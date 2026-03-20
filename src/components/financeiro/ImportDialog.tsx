@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Upload,
   Loader2,
   FileSpreadsheet,
@@ -32,12 +37,15 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  Copy,
 } from "lucide-react";
 import {
   useFinanceiroImport,
   TARGET_FIELDS,
   type ImportStep,
 } from "@/hooks/useFinanceiroImport";
+import { useFinanceiro } from "@/hooks/useFinanceiro";
+import { detectImportDuplicates } from "@/hooks/useDuplicateDetection";
 import { cn } from "@/lib/utils";
 
 interface ImportDialogProps {
@@ -57,9 +65,16 @@ const STEP_LABELS: Record<ImportStep, string> = {
 
 export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   const imp = useFinanceiroImport(tipo);
+  const { entries: existingEntries } = useFinanceiro(tipo);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
+  // Detect duplicates between imported rows and existing entries
+  const duplicateIndices = useMemo(() => {
+    if (imp.step !== "preview" || imp.parsedRows.length === 0) return new Set<number>();
+    const rows = imp.parsedRows.map((r) => r.mapped);
+    return detectImportDuplicates(rows, existingEntries);
+  }, [imp.step, imp.parsedRows, existingEntries]);
   const handleClose = (o: boolean) => {
     if (!o) imp.reset();
     onOpenChange(o);
@@ -231,6 +246,12 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                 {imp.parsedRows.some((r) => r.errors.length > 0) && (
                   <Badge variant="destructive">{imp.parsedRows.filter((r) => r.errors.length > 0).length} com erros</Badge>
                 )}
+                {duplicateIndices.size > 0 && (
+                  <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30">
+                    <Copy className="h-3 w-3 mr-1" />
+                    {duplicateIndices.size} possíveis duplicatas
+                  </Badge>
+                )}
               </div>
 
               <div className="border rounded-md overflow-hidden">
@@ -243,33 +264,48 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                       <TableHead>Data Venc.</TableHead>
                       <TableHead>Data Pgto.</TableHead>
                       <TableHead>Fornecedor</TableHead>
-                      <TableHead className="w-8">OK</TableHead>
+                      <TableHead className="w-20">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {imp.parsedRows.slice(0, 20).map((r, i) => (
-                      <TableRow key={i} className={cn(r.errors.length > 0 && "bg-destructive/5")}>
-                        <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="text-xs max-w-[200px] truncate">{r.mapped.descricao || "—"}</TableCell>
-                        <TableCell className="text-xs tabular-nums">
-                          {r.mapped.valor_previsto != null
-                            ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(r.mapped.valor_previsto)
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-xs">{r.mapped.data_prevista || "—"}</TableCell>
-                        <TableCell className="text-xs">{r.mapped.data_realizada || "—"}</TableCell>
-                        <TableCell className="text-xs max-w-[150px] truncate">{r.mapped.entity_name || "—"}</TableCell>
-                        <TableCell>
-                          {r.errors.length === 0 ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                          ) : (
-                            <span title={r.errors.join("; ")}>
-                              <X className="h-3.5 w-3.5 text-destructive" />
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {imp.parsedRows.slice(0, 20).map((r, i) => {
+                      const isDup = duplicateIndices.has(i);
+                      return (
+                        <TableRow key={i} className={cn(r.errors.length > 0 && "bg-destructive/5", isDup && r.errors.length === 0 && "bg-amber-50/50 dark:bg-amber-950/10")}>
+                          <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+                          <TableCell className="text-xs max-w-[200px] truncate">{r.mapped.descricao || "—"}</TableCell>
+                          <TableCell className="text-xs tabular-nums">
+                            {r.mapped.valor_previsto != null
+                              ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(r.mapped.valor_previsto)
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs">{r.mapped.data_prevista || "—"}</TableCell>
+                          <TableCell className="text-xs">{r.mapped.data_realizada || "—"}</TableCell>
+                          <TableCell className="text-xs max-w-[150px] truncate">{r.mapped.entity_name || "—"}</TableCell>
+                          <TableCell>
+                            {r.errors.length > 0 ? (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Badge variant="destructive" className="text-[10px]">Erro</Badge>
+                                </TooltipTrigger>
+                                <TooltipContent><p className="text-xs">{r.errors.join("; ")}</p></TooltipContent>
+                              </Tooltip>
+                            ) : isDup ? (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Badge className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30">
+                                    <Copy className="h-2.5 w-2.5 mr-0.5" /> Duplicata?
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent><p className="text-xs">Lançamento similar já existe no sistema</p></TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
