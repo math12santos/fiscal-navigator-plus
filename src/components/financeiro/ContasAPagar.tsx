@@ -26,6 +26,7 @@ export function ContasAPagar() {
   const { user } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
   const [prefill, setPrefill] = useState<Partial<FinanceiroInput> | undefined>();
+  const [showImport, setShowImport] = useState(false);
 
   // Valor Executado dialog
   const [executadoEntries, setExecutadoEntries] = useState<FinanceiroEntry[]>([]);
