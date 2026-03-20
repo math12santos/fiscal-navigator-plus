@@ -23,7 +23,15 @@
     <script>
       (function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}})();
     </script>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static skeleton to reduce LCP element render delay -->
+      <main class="min-h-screen flex items-center justify-center bg-background p-4" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem">
+        <div style="width:100%;max-width:28rem;text-align:center">
+          <h1 style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;color:inherit">FinCore</h1>
+          <div style="height:20rem;border-radius:0.75rem;background:rgba(128,128,128,0.06)"></div>
+        </div>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
