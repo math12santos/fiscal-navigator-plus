@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Upload,
   Loader2,
   FileSpreadsheet,
@@ -32,12 +37,15 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  Copy,
 } from "lucide-react";
 import {
   useFinanceiroImport,
   TARGET_FIELDS,
   type ImportStep,
 } from "@/hooks/useFinanceiroImport";
+import { useFinanceiro } from "@/hooks/useFinanceiro";
+import { detectImportDuplicates } from "@/hooks/useDuplicateDetection";
 import { cn } from "@/lib/utils";
 
 interface ImportDialogProps {
