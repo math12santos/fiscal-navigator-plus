@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
+import { useDuplicateDetection } from "@/hooks/useDuplicateDetection";
 import { KPICard } from "@/components/KPICard";
 import { Button } from "@/components/ui/button";
 import { FinanceiroEntryDialog } from "./FinanceiroEntryDialog";
 import { FinanceiroTable } from "./FinanceiroTable";
 import { ImportDialog } from "./ImportDialog";
+import { DuplicateAlerts } from "./DuplicateAlerts";
 import { Plus, Loader2, TrendingUp, Wallet, Clock, FileUp } from "lucide-react";
 
 const fmt = (v: number) =>
@@ -12,6 +14,7 @@ const fmt = (v: number) =>
 
 export function ContasAReceber() {
   const { entries, totals, isLoading, create, markAsPaid, remove } = useFinanceiro("entrada");
+  const duplicates = useDuplicateDetection(entries);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
@@ -26,6 +29,8 @@ export function ContasAReceber() {
         <KPICard title="Total Recebido" value={fmt(totals.total_realizado)} icon={<Wallet size={20} />} />
         <KPICard title="Pendente" value={`${fmt(totals.pendente)} (${totals.count_pendente})`} icon={<Clock size={20} />} />
       </div>
+
+      <DuplicateAlerts duplicates={duplicates} onDelete={(id) => remove.mutate(id)} />
 
       <div className="flex justify-end gap-2">
         <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
