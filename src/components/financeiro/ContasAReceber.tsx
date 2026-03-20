@@ -4,7 +4,8 @@ import { KPICard } from "@/components/KPICard";
 import { Button } from "@/components/ui/button";
 import { FinanceiroEntryDialog } from "./FinanceiroEntryDialog";
 import { FinanceiroTable } from "./FinanceiroTable";
-import { Plus, Loader2, TrendingUp, Wallet, Clock } from "lucide-react";
+import { ImportDialog } from "./ImportDialog";
+import { Plus, Loader2, TrendingUp, Wallet, Clock, FileUp } from "lucide-react";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -12,6 +13,7 @@ const fmt = (v: number) =>
 export function ContasAReceber() {
   const { entries, totals, isLoading, create, markAsPaid, remove } = useFinanceiro("entrada");
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="animate-spin" /></div>;
@@ -25,7 +27,10 @@ export function ContasAReceber() {
         <KPICard title="Pendente" value={`${fmt(totals.pendente)} (${totals.count_pendente})`} icon={<Clock size={20} />} />
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
+          <FileUp className="h-4 w-4 mr-1" /> Importar CSV/XLSX
+        </Button>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="h-4 w-4 mr-1" /> Nova Receita
         </Button>
@@ -45,6 +50,12 @@ export function ContasAReceber() {
         tipo="entrada"
         onSave={async (input) => { await create.mutateAsync(input); }}
         isPending={create.isPending}
+      />
+
+      <ImportDialog
+        open={showImport}
+        onOpenChange={setShowImport}
+        tipo="entrada"
       />
     </div>
   );

@@ -2,3 +2,6 @@ project_id = "pkvsqkilfodfduohwtpy"
 
 [functions.suggest-grouping-rules]
 verify_jwt = false
+
+[functions.detect-import-mapping]
+verify_jwt = false

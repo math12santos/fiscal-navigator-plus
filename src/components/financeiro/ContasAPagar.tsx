@@ -11,7 +11,8 @@ import { ClassificacaoDialog } from "./ClassificacaoDialog";
 import { DuplicateAlerts } from "./DuplicateAlerts";
 import { ExpenseRequestButton } from "./ExpenseRequestButton";
 import { PendingExpenseRequests } from "./PendingExpenseRequests";
-import { Plus, Loader2, TrendingDown, Wallet, Clock } from "lucide-react";
+import { ImportDialog } from "./ImportDialog";
+import { Plus, Loader2, TrendingDown, Wallet, Clock, FileUp } from "lucide-react";
 import { useUpdateRequest, type Request } from "@/hooks/useRequests";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -25,6 +26,7 @@ export function ContasAPagar() {
   const { user } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
   const [prefill, setPrefill] = useState<Partial<FinanceiroInput> | undefined>();
+  const [showImport, setShowImport] = useState(false);
 
   // Valor Executado dialog
   const [executadoEntries, setExecutadoEntries] = useState<FinanceiroEntry[]>([]);
@@ -168,6 +170,9 @@ export function ContasAPagar() {
       {/* Actions */}
       <div className="flex justify-end gap-2">
         <ExpenseRequestButton />
+        <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
+          <FileUp className="h-4 w-4 mr-1" /> Importar CSV/XLSX
+        </Button>
         <Button size="sm" onClick={() => { setPrefill(undefined); setShowCreate(true); }}>
           <Plus className="h-4 w-4 mr-1" /> Nova Despesa
         </Button>
@@ -213,6 +218,13 @@ export function ContasAPagar() {
         entries={executadoEntries}
         onConfirm={handleExecutadoConfirm}
         isPending={markAsPaid.isPending}
+      />
+
+      {/* Import dialog */}
+      <ImportDialog
+        open={showImport}
+        onOpenChange={setShowImport}
+        tipo="saida"
       />
     </div>
   );
