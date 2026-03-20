@@ -65,9 +65,16 @@ const STEP_LABELS: Record<ImportStep, string> = {
 
 export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   const imp = useFinanceiroImport(tipo);
+  const { entries: existingEntries } = useFinanceiro(tipo);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
+  // Detect duplicates between imported rows and existing entries
+  const duplicateIndices = useMemo(() => {
+    if (imp.step !== "preview" || imp.parsedRows.length === 0) return new Set<number>();
+    const rows = imp.parsedRows.map((r) => r.mapped);
+    return detectImportDuplicates(rows, existingEntries);
+  }, [imp.step, imp.parsedRows, existingEntries]);
   const handleClose = (o: boolean) => {
     if (!o) imp.reset();
     onOpenChange(o);
