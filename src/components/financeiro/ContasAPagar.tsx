@@ -219,6 +219,13 @@ export function ContasAPagar() {
         onConfirm={handleExecutadoConfirm}
         isPending={markAsPaid.isPending}
       />
+
+      {/* Import dialog */}
+      <ImportDialog
+        open={showImport}
+        onOpenChange={setShowImport}
+        tipo="saida"
+      />
     </div>
   );
 }
