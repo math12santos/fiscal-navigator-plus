@@ -273,7 +273,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       // Create staging record
       const fieldByHeader: Record<string, string> = {};
       mappings.forEach((m) => {
-        if (m.target_field !== "ignorar") fieldByHeader[m.source_column] = m.target_field;
+        if (m.source_column && m.target_field !== "ignorar") fieldByHeader[m.source_column] = m.target_field;
       });
 
       const { data: importRecord, error: importErr } = await supabase
