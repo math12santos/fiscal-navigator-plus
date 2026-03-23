@@ -317,7 +317,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
               )}
 
               <div className="flex justify-between items-center">
-                <Button variant="outline" size="sm" onClick={() => { imp.buildPreview(); /* go back to mapping by re-triggering */ }}>
+                <Button variant="outline" size="sm" onClick={() => imp.goToMapping()}>
                   Voltar
                 </Button>
                 <Button
