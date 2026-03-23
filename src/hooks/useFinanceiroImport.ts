@@ -220,7 +220,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
 
     const fieldByHeader: Record<string, string> = {};
     mappings.forEach((m) => {
-      if (m.target_field !== "ignorar") fieldByHeader[m.source_column] = m.target_field;
+      if (m.source_column && m.target_field !== "ignorar") fieldByHeader[m.source_column] = m.target_field;
     });
 
     const parsed: ParsedRow[] = rawRows.map((row) => {
