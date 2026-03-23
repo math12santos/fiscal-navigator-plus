@@ -359,6 +359,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     reset,
     parseFile,
     updateMapping,
+    updateMappingByTarget,
     buildPreview,
     goToMapping,
     executeImport,
