@@ -154,29 +154,38 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
         body: { headers, sampleRows },
       });
 
+      // Build full mappings array keyed by TARGET_FIELDS
+      const buildFullMappings = (aiMappings: { source_column: string; target_field: string; confidence: string }[]): MappingItem[] => {
+        return TARGET_FIELDS
+          .filter((f) => f.value !== "ignorar")
+          .map((f) => {
+            const aiMatch = aiMappings.find((m) => m.target_field === f.value);
+            return {
+              target_field: f.value,
+              source_column: aiMatch?.source_column ?? null,
+              confidence: aiMatch ? (aiMatch.confidence as "high" | "medium" | "low") : null,
+            };
+          });
+      };
+
       if (fnError || data?.error) {
         console.error("AI mapping error:", fnError || data?.error);
-        // Fallback: create basic mappings
-        const fallbackMappings: MappingItem[] = headers.map((h) => ({
-          source_column: h,
-          target_field: "ignorar",
-          confidence: "low" as const,
-        }));
         setDetectedFormat({
           separator: ";",
           date_format: "dd/MM/yyyy",
           number_format: "br",
-          mappings: fallbackMappings,
+          mappings: [],
         });
-        setMappings(fallbackMappings);
+        setMappings(buildFullMappings([]));
         toast({
           title: "IA indisponível",
           description: "Mapeamento automático falhou. Configure manualmente.",
           variant: "destructive",
         });
       } else {
-        setDetectedFormat(data as DetectedFormat);
-        setMappings((data as DetectedFormat).mappings);
+        const detected = data as DetectedFormat;
+        setDetectedFormat(detected);
+        setMappings(buildFullMappings(detected.mappings));
       }
       setStep("mapping");
     } catch (e) {
