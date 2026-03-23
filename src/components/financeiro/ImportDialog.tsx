@@ -90,7 +90,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   };
 
   const requiredMapped = TARGET_FIELDS.filter((f) => f.required).every((f) =>
-    imp.mappings.some((m) => m.target_field === f.value)
+    imp.mappings.some((m) => m.target_field === f.value && m.source_column)
   );
 
   return (
