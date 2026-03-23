@@ -9,9 +9,9 @@ import * as XLSX from "xlsx";
 export type ImportStep = "upload" | "detecting" | "mapping" | "preview" | "importing" | "done";
 
 export interface MappingItem {
-  source_column: string;
   target_field: string;
-  confidence: "high" | "medium" | "low";
+  source_column: string | null;
+  confidence: "high" | "medium" | "low" | null;
 }
 
 export interface DetectedFormat {
