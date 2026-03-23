@@ -319,6 +319,10 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     }
   }, [parsedRows, mappings, tipo, user, currentOrg, fileName, queryClient, toast]);
 
+  const goToMapping = useCallback(() => {
+    setStep("mapping");
+  }, []);
+
   return {
     step,
     fileName,
