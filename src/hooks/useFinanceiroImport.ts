@@ -9,9 +9,9 @@ import * as XLSX from "xlsx";
 export type ImportStep = "upload" | "detecting" | "mapping" | "preview" | "importing" | "done";
 
 export interface MappingItem {
-  source_column: string;
   target_field: string;
-  confidence: "high" | "medium" | "low";
+  source_column: string | null;
+  confidence: "high" | "medium" | "low" | null;
 }
 
 export interface DetectedFormat {
@@ -154,29 +154,38 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
         body: { headers, sampleRows },
       });
 
+      // Build full mappings array keyed by TARGET_FIELDS
+      const buildFullMappings = (aiMappings: { source_column: string; target_field: string; confidence: string }[]): MappingItem[] => {
+        return TARGET_FIELDS
+          .filter((f) => f.value !== "ignorar")
+          .map((f) => {
+            const aiMatch = aiMappings.find((m) => m.target_field === f.value);
+            return {
+              target_field: f.value,
+              source_column: aiMatch?.source_column ?? null,
+              confidence: aiMatch ? (aiMatch.confidence as "high" | "medium" | "low") : null,
+            };
+          });
+      };
+
       if (fnError || data?.error) {
         console.error("AI mapping error:", fnError || data?.error);
-        // Fallback: create basic mappings
-        const fallbackMappings: MappingItem[] = headers.map((h) => ({
-          source_column: h,
-          target_field: "ignorar",
-          confidence: "low" as const,
-        }));
         setDetectedFormat({
           separator: ";",
           date_format: "dd/MM/yyyy",
           number_format: "br",
-          mappings: fallbackMappings,
+          mappings: [],
         });
-        setMappings(fallbackMappings);
+        setMappings(buildFullMappings([]));
         toast({
           title: "IA indisponível",
           description: "Mapeamento automático falhou. Configure manualmente.",
           variant: "destructive",
         });
       } else {
-        setDetectedFormat(data as DetectedFormat);
-        setMappings((data as DetectedFormat).mappings);
+        const detected = data as DetectedFormat;
+        setDetectedFormat(detected);
+        setMappings(buildFullMappings(detected.mappings));
       }
       setStep("mapping");
     } catch (e) {
@@ -191,13 +200,27 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     );
   }, []);
 
+  const updateMappingByTarget = useCallback((targetField: string, sourceColumn: string) => {
+    setMappings((prev) => {
+      // Clear any other target that had this source (avoid duplicates)
+      let updated = sourceColumn
+        ? prev.map((m) => (m.source_column === sourceColumn && m.target_field !== targetField ? { ...m, source_column: null, confidence: null } : m))
+        : prev;
+      return updated.map((m) =>
+        m.target_field === targetField
+          ? { ...m, source_column: sourceColumn || null, confidence: sourceColumn ? "high" as const : null }
+          : m
+      );
+    });
+  }, []);
+
   const buildPreview = useCallback(() => {
     const parseNum = detectedFormat?.number_format === "us" ? parseUSNumber : parseBRNumber;
     const parseDate = detectedFormat?.date_format?.startsWith("MM") ? parseUSDate : parseBRDate;
 
     const fieldByHeader: Record<string, string> = {};
     mappings.forEach((m) => {
-      if (m.target_field !== "ignorar") fieldByHeader[m.source_column] = m.target_field;
+      if (m.source_column && m.target_field !== "ignorar") fieldByHeader[m.source_column] = m.target_field;
     });
 
     const parsed: ParsedRow[] = rawRows.map((row) => {
@@ -250,7 +273,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       // Create staging record
       const fieldByHeader: Record<string, string> = {};
       mappings.forEach((m) => {
-        if (m.target_field !== "ignorar") fieldByHeader[m.source_column] = m.target_field;
+        if (m.source_column && m.target_field !== "ignorar") fieldByHeader[m.source_column] = m.target_field;
       });
 
       const { data: importRecord, error: importErr } = await supabase
@@ -336,6 +359,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     reset,
     parseFile,
     updateMapping,
+    updateMappingByTarget,
     buildPreview,
     goToMapping,
     executeImport,

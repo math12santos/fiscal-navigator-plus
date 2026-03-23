@@ -90,7 +90,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   };
 
   const requiredMapped = TARGET_FIELDS.filter((f) => f.required).every((f) =>
-    imp.mappings.some((m) => m.target_field === f.value)
+    imp.mappings.some((m) => m.target_field === f.value && m.source_column)
   );
 
   return (
@@ -171,61 +171,70 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
               )}
 
               <p className="text-sm text-muted-foreground">
-                Revise o mapeamento sugerido. Campos com confiança baixa estão destacados.
+                Revise o mapeamento sugerido. Selecione a coluna do arquivo correspondente a cada campo.
               </p>
 
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[40%]">Coluna do arquivo (DE)</TableHead>
-                    <TableHead className="w-[15%]">Confiança</TableHead>
-                    <TableHead className="w-[45%]">Campo do sistema (PARA)</TableHead>
+                    <TableHead className="w-[40%]">Campo do sistema</TableHead>
+                    <TableHead className="w-[15%]">Status</TableHead>
+                    <TableHead className="w-[45%]">Coluna do arquivo (DE)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {imp.mappings.map((m) => (
-                    <TableRow
-                      key={m.source_column}
-                      className={cn(m.confidence === "low" && "bg-yellow-50 dark:bg-yellow-950/20")}
-                    >
-                      <TableCell className="font-mono text-xs">{m.source_column}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={m.confidence === "high" ? "default" : m.confidence === "medium" ? "secondary" : "destructive"}
-                          className="text-[10px]"
-                        >
-                          {m.confidence === "high" ? "Alta" : m.confidence === "medium" ? "Média" : "Baixa"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={m.target_field}
-                          onValueChange={(v) => imp.updateMapping(m.source_column, v)}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TARGET_FIELDS.map((f) => (
-                              <SelectItem key={f.value} value={f.value}>
-                                {f.label} {f.required && "*"}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {TARGET_FIELDS.filter((f) => f.value !== "ignorar").map((field) => {
+                    const mapping = imp.mappings.find((m) => m.target_field === field.value);
+                    const hasSource = !!mapping?.source_column;
+                    const isMissing = field.required && !hasSource;
+                    return (
+                      <TableRow
+                        key={field.value}
+                        className={cn(isMissing && "bg-amber-50/60 dark:bg-amber-950/20")}
+                      >
+                        <TableCell className="text-xs font-medium">
+                          {field.label}
+                          {field.required && (
+                            <Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0">Obrigatório</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {hasSource && mapping?.confidence ? (
+                            <Badge
+                              variant={mapping.confidence === "high" ? "default" : mapping.confidence === "medium" ? "secondary" : "destructive"}
+                              className="text-[10px]"
+                            >
+                              {mapping.confidence === "high" ? "✓ Alta" : mapping.confidence === "medium" ? "~ Média" : "⚠ Baixa"}
+                            </Badge>
+                          ) : isMissing ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={mapping?.source_column ?? "__none__"}
+                            onValueChange={(v) => imp.updateMappingByTarget(field.value, v === "__none__" ? "" : v)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">— Não importar —</SelectItem>
+                              {imp.rawHeaders.map((h) => (
+                                <SelectItem key={h} value={h}>
+                                  {h}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
-
-              {!requiredMapped && (
-                <p className="text-sm text-amber-600 dark:text-amber-400">
-                  <AlertTriangle className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
-                  Campos obrigatórios não mapeados:{" "}
-                  {TARGET_FIELDS.filter(f => f.required && !imp.mappings.some(m => m.target_field === f.value)).map(f => f.label).join(", ")}
-                </p>
-              )}
 
               <div className="flex justify-between items-center">
                 <Button variant="outline" size="sm" onClick={imp.reset}>
