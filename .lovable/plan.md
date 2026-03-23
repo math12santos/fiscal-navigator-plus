@@ -1,21 +1,24 @@
 
 
-# Corrigir navegação na etapa Preview do ImportDialog
+# Mostrar campos obrigatórios faltantes na etapa de Mapeamento
 
 ## Problema
 
-Na etapa "Preview" do fluxo de importação, o botão "Voltar" chama `imp.buildPreview()`, que apenas reconstrói o preview em vez de retornar à etapa de mapeamento. O hook `useFinanceiroImport` não expõe uma função para navegar entre etapas.
-
-O mesmo componente `ImportDialog` é usado tanto em Contas a Pagar quanto em Contas a Receber, então a correção resolve ambos.
+O botão "Próximo: Preview" desabilita corretamente quando campos obrigatórios (Descrição, Valor, Data Vencimento) não estão mapeados. Porém **não há feedback visual** explicando por que está desabilitado, o que confunde o usuário ao editar mapeamentos.
 
 ## Correção
 
-### 1. `src/hooks/useFinanceiroImport.ts`
-- Expor uma função `goToMapping` que seta o step para `"mapping"` (mantendo headers, rows e mappings intactos para o usuário poder ajustar e voltar ao preview).
-- Adicionar ao return do hook.
+### `src/components/financeiro/ImportDialog.tsx`
 
-### 2. `src/components/financeiro/ImportDialog.tsx`
-- No botão "Voltar" da etapa Preview (linha 320), trocar `imp.buildPreview()` por `imp.goToMapping()`.
+Adicionar uma mensagem de alerta abaixo da tabela de mapeamento, visível apenas quando `!requiredMapped`, listando os campos obrigatórios que ainda não foram atribuídos a nenhuma coluna.
 
-Ambas são mudanças de 1-2 linhas. Os botões "Importar N lançamentos" e "Voltar" já existem visualmente — o problema é apenas funcional no "Voltar".
+```text
+⚠ Campos obrigatórios não mapeados: Descrição, Valor
+```
+
+- Calcular `missingFields` filtrando `TARGET_FIELDS` obrigatórios cujo `value` não aparece em nenhum mapping
+- Exibir como texto de alerta âmbar entre a tabela e os botões
+- Nenhuma mudança de lógica — apenas feedback visual
+
+Mudança de ~5 linhas em um único arquivo.
 
