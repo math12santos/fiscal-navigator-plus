@@ -200,6 +200,20 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     );
   }, []);
 
+  const updateMappingByTarget = useCallback((targetField: string, sourceColumn: string) => {
+    setMappings((prev) => {
+      // Clear any other target that had this source (avoid duplicates)
+      let updated = sourceColumn
+        ? prev.map((m) => (m.source_column === sourceColumn && m.target_field !== targetField ? { ...m, source_column: null, confidence: null } : m))
+        : prev;
+      return updated.map((m) =>
+        m.target_field === targetField
+          ? { ...m, source_column: sourceColumn || null, confidence: sourceColumn ? "high" as const : null }
+          : m
+      );
+    });
+  }, []);
+
   const buildPreview = useCallback(() => {
     const parseNum = detectedFormat?.number_format === "us" ? parseUSNumber : parseBRNumber;
     const parseDate = detectedFormat?.date_format?.startsWith("MM") ? parseUSDate : parseBRDate;
