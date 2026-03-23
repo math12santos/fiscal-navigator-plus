@@ -219,6 +219,14 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                 </TableBody>
               </Table>
 
+              {!requiredMapped && (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                  Campos obrigatórios não mapeados:{" "}
+                  {TARGET_FIELDS.filter(f => f.required && !imp.mappings.some(m => m.target_field === f.value)).map(f => f.label).join(", ")}
+                </p>
+              )}
+
               <div className="flex justify-between items-center">
                 <Button variant="outline" size="sm" onClick={imp.reset}>
                   Voltar
