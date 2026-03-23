@@ -337,6 +337,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     parseFile,
     updateMapping,
     buildPreview,
+    goToMapping,
     executeImport,
   };
 }
