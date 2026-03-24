@@ -348,6 +348,14 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     setStep("mapping");
   }, []);
 
+  const toggleDeferred = useCallback((targetField: string) => {
+    setDeferredFields((prev) =>
+      prev.includes(targetField)
+        ? prev.filter((f) => f !== targetField)
+        : [...prev, targetField]
+    );
+  }, []);
+
   return {
     step,
     fileName,
