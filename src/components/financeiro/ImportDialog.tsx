@@ -29,6 +29,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Upload,
   Loader2,
@@ -38,6 +39,9 @@ import {
   AlertTriangle,
   X,
   Copy,
+  Filter,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   useFinanceiroImport,
