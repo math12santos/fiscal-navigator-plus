@@ -72,6 +72,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   const { entries: existingEntries } = useFinanceiro(tipo);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [previewFilter, setPreviewFilter] = useState<"all" | "errors" | "valid">("all");
 
   // Detect duplicates between imported rows and existing entries
   const duplicateIndices = useMemo(() => {
