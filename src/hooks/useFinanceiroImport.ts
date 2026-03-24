@@ -366,6 +366,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     parsedRows,
     importCount,
     error,
+    deferredFields,
     reset,
     parseFile,
     updateMapping,
@@ -373,5 +374,6 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     buildPreview,
     goToMapping,
     executeImport,
+    toggleDeferred,
   };
 }
