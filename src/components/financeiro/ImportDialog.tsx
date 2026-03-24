@@ -38,8 +38,6 @@ import {
   AlertTriangle,
   X,
   Copy,
-  Clock,
-  Info,
 } from "lucide-react";
 import {
   useFinanceiroImport,
@@ -93,17 +91,6 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
 
   const requiredMapped = TARGET_FIELDS.filter((f) => f.required).every((f) =>
     imp.mappings.some((m) => m.target_field === f.value && m.source_column)
-  );
-
-  // Build lookup: for each rawHeader, what target is it mapped to?
-  const headerToTarget: Record<string, string> = {};
-  imp.mappings.forEach((m) => {
-    if (m.source_column) headerToTarget[m.source_column] = m.target_field;
-  });
-
-  // Unmapped target fields (not assigned to any source column)
-  const unmappedFields = TARGET_FIELDS.filter(
-    (f) => f.value !== "ignorar" && !imp.mappings.some((m) => m.target_field === f.value && m.source_column)
   );
 
   return (
@@ -183,156 +170,71 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                 </div>
               )}
 
-              {/* SECTION 1 — File columns (DE → PARA) */}
-              <div>
-                <p className="text-sm font-medium mb-2">Colunas detectadas no arquivo</p>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[45%]">Coluna do arquivo (DE)</TableHead>
-                      <TableHead className="w-[15%]">Confiança</TableHead>
-                      <TableHead className="w-[40%]">Campo do sistema (PARA)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {imp.rawHeaders.map((header) => {
-                      const mapping = imp.mappings.find((m) => m.source_column === header);
-                      const currentTarget = mapping?.target_field || "ignorar";
-                      const confidence = mapping?.confidence;
-                      return (
-                        <TableRow key={header}>
-                          <TableCell className="text-xs font-medium font-mono">{header}</TableCell>
-                          <TableCell>
-                            {confidence ? (
-                              <Badge
-                                variant={confidence === "high" ? "default" : confidence === "medium" ? "secondary" : "destructive"}
-                                className="text-[10px]"
-                              >
-                                {confidence === "high" ? "✓ Alta" : confidence === "medium" ? "~ Média" : "⚠ Baixa"}
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={currentTarget}
-                              onValueChange={(v) => {
-                                // If previously mapped, clear old target
-                                if (mapping?.target_field && mapping.target_field !== "ignorar") {
-                                  imp.updateMappingByTarget(mapping.target_field, "");
-                                }
-                                // Set new target
-                                if (v !== "ignorar") {
-                                  imp.updateMappingByTarget(v, header);
-                                }
-                              }}
+              <p className="text-sm text-muted-foreground">
+                Revise o mapeamento sugerido. Selecione a coluna do arquivo correspondente a cada campo.
+              </p>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40%]">Campo do sistema</TableHead>
+                    <TableHead className="w-[15%]">Status</TableHead>
+                    <TableHead className="w-[45%]">Coluna do arquivo (DE)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {TARGET_FIELDS.filter((f) => f.value !== "ignorar").map((field) => {
+                    const mapping = imp.mappings.find((m) => m.target_field === field.value);
+                    const hasSource = !!mapping?.source_column;
+                    const isMissing = field.required && !hasSource;
+                    return (
+                      <TableRow
+                        key={field.value}
+                        className={cn(isMissing && "bg-amber-50/60 dark:bg-amber-950/20")}
+                      >
+                        <TableCell className="text-xs font-medium">
+                          {field.label}
+                          {field.required && (
+                            <Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0">Obrigatório</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {hasSource && mapping?.confidence ? (
+                            <Badge
+                              variant={mapping.confidence === "high" ? "default" : mapping.confidence === "medium" ? "secondary" : "destructive"}
+                              className="text-[10px]"
                             >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="ignorar">— Ignorar —</SelectItem>
-                                {TARGET_FIELDS.filter((f) => f.value !== "ignorar").map((f) => (
-                                  <SelectItem key={f.value} value={f.value}>
-                                    {f.label}{f.required ? " *" : ""}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* SECTION 2 — Unmapped fields */}
-              {unmappedFields.length > 0 && (
-                <div className="border border-amber-300/50 dark:border-amber-700/50 rounded-lg p-4 space-y-3 bg-amber-50/30 dark:bg-amber-950/10">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                      Campos ainda não mapeados
-                    </p>
-                  </div>
-
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[40%]">Campo</TableHead>
-                        <TableHead className="w-[40%]">Atribuir coluna</TableHead>
-                        <TableHead className="w-[20%]">Ação</TableHead>
+                              {mapping.confidence === "high" ? "✓ Alta" : mapping.confidence === "medium" ? "~ Média" : "⚠ Baixa"}
+                            </Badge>
+                          ) : isMissing ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={mapping?.source_column ?? "__none__"}
+                            onValueChange={(v) => imp.updateMappingByTarget(field.value, v === "__none__" ? "" : v)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">— Não importar —</SelectItem>
+                              {imp.rawHeaders.map((h) => (
+                                <SelectItem key={h} value={h}>
+                                  {h}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {unmappedFields.map((field) => {
-                        const isDeferred = imp.deferredFields.includes(field.value);
-                        const canDefer = !field.required;
-                        return (
-                          <TableRow key={field.value} className={cn(field.required && "bg-amber-100/40 dark:bg-amber-950/20")}>
-                            <TableCell className="text-xs font-medium">
-                              {field.label}
-                              {field.required && (
-                                <Badge variant="destructive" className="ml-2 text-[10px] px-1.5 py-0">Obrigatório</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {!isDeferred ? (
-                                <Select
-                                  value="__none__"
-                                  onValueChange={(v) => {
-                                    if (v !== "__none__") imp.updateMappingByTarget(field.value, v);
-                                  }}
-                                >
-                                  <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue placeholder="Selecione..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__none__">— Selecione —</SelectItem>
-                                    {imp.rawHeaders
-                                      .filter((h) => !headerToTarget[h] || headerToTarget[h] === "ignorar")
-                                      .map((h) => (
-                                        <SelectItem key={h} value={h}>{h}</SelectItem>
-                                      ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <span className="text-xs text-muted-foreground italic flex items-center gap-1">
-                                  <Clock className="h-3 w-3" /> Será ajustado depois
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {canDefer && (
-                                <Button
-                                  variant={isDeferred ? "secondary" : "ghost"}
-                                  size="sm"
-                                  className="h-7 text-xs"
-                                  onClick={() => imp.toggleDeferred(field.value)}
-                                >
-                                  {isDeferred ? "Desfazer" : "Ajustar depois"}
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-
-                  {imp.deferredFields.length > 0 && (
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground bg-background/60 rounded-md p-3">
-                      <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
-                      <span>
-                        Os campos marcados como "Ajustar depois" poderão ser completados diretamente nos lançamentos importados via{" "}
-                        <strong>Contas a Pagar</strong>, <strong>Aging List</strong>, <strong>Fluxo de Caixa</strong> ou <strong>Conciliação</strong>.
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
+                    );
+                  })}
+                </TableBody>
+              </Table>
 
               <div className="flex justify-between items-center">
                 <Button variant="outline" size="sm" onClick={imp.reset}>
@@ -456,32 +358,10 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
 
           {/* STEP: Done */}
           {imp.step === "done" && (
-            <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
               <CheckCircle2 className="h-12 w-12 text-emerald-500" />
               <p className="text-lg font-medium">{imp.importCount} lançamentos importados</p>
               <p className="text-sm text-muted-foreground">Os dados foram adicionados à lista de {tipo === "saida" ? "contas a pagar" : "contas a receber"}.</p>
-
-              {imp.deferredFields.length > 0 && (
-                <div className="mt-3 w-full max-w-md border border-amber-300/50 dark:border-amber-700/50 rounded-lg p-4 bg-amber-50/30 dark:bg-amber-950/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Campos para ajustar</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Os seguintes campos não foram mapeados e precisam ser completados diretamente nos lançamentos:
-                  </p>
-                  <ul className="text-xs space-y-1">
-                    {imp.deferredFields.map((df) => {
-                      const label = TARGET_FIELDS.find((f) => f.value === df)?.label || df;
-                      return <li key={df} className="flex items-center gap-1.5">• {label}</li>;
-                    })}
-                  </ul>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Ajuste via <strong>Contas a Pagar</strong>, <strong>Aging List</strong>, <strong>Fluxo de Caixa</strong> ou <strong>Conciliação</strong>.
-                  </p>
-                </div>
-              )}
-
               <Button size="sm" onClick={() => handleClose(false)} className="mt-4">
                 Fechar
               </Button>

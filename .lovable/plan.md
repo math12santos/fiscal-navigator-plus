@@ -1,69 +1,58 @@
 
 
-# Reformular tabela de mapeamento: DE → PARA com seção "Ajustar depois"
+# Inverter tabela de mapeamento: mostrar campos do sistema (PARA) como linhas
 
-## Problema
+## Problema atual
 
-A tabela atual mostra "Campo do sistema" na esquerda e "Coluna do arquivo" na direita — o fluxo natural de leitura é o inverso: o usuário pensa "esta coluna do arquivo (DE) vai para qual campo (PARA)". Além disso, campos obrigatórios sem coluna correspondente ficam perdidos no meio da lista.
+A tabela de mapeamento mostra uma linha por **coluna do arquivo** (DE), com um dropdown para selecionar o campo do sistema (PARA). Se o arquivo não tem uma coluna que a IA mapeie para "Descrição", esse campo obrigatório fica invisível — o usuário não sabe que precisa atribuí-lo.
 
 ## Solução
 
-Dividir a etapa de mapeamento em duas seções:
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│  SEÇÃO 1 — Colunas do arquivo detectadas                │
-│                                                         │
-│  Coluna do arquivo (DE)  │  Campo do sistema (PARA)     │
-│  ────────────────────────┼──────────────────────────     │
-│  Valor_Total             │  [dropdown: Valor *]          │
-│  Dt_Venc                 │  [dropdown: Data Vencimento*] │
-│  Razao_Social            │  [dropdown: Fornecedor]       │
-│  Obs                     │  [dropdown: Ignorar]          │
-│                                                         │
-├─────────────────────────────────────────────────────────┤
-│  SEÇÃO 2 — Campos não mapeados (se houver)              │
-│  ⚠ Os seguintes campos ainda precisam ser atribuídos:   │
-│                                                         │
-│  Campo            │  Ação                               │
-│  ─────────────────┼──────────────────────                │
-│  Descrição *      │  [dropdown: headers] | Ajustar depois│
-│  Data Pagamento   │  [dropdown: headers] | Ajustar depois│
-│                                                         │
-│  ℹ Campos marcados como "Ajustar depois" poderão ser    │
-│  corrigidos em Contas a Pagar, Aging List, Fluxo de     │
-│  Caixa e Conciliação após a importação.                 │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Regra de negócio "Ajustar depois"
-- Campos **opcionais** podem ser marcados como "Ajustar depois" livremente.
-- Campos **obrigatórios** (Descrição, Valor, Data Vencimento) **não** podem ser "Ajustar depois" — continuam bloqueando o botão Próximo.
-- Ao marcar "Ajustar depois", um alerta âmbar informa que esses dados precisarão ser completados nos módulos financeiros integrados (AP/AR, Aging List, Fluxo de Caixa, Conciliação).
-
-## Mudanças
+Inverter a perspectiva da tabela: cada linha será um **campo do sistema** (PARA), e o dropdown permitirá escolher qual **coluna do arquivo** (DE) o alimenta. Campos não mapeados mostrarão "Ignorar / Não importar" por padrão.
 
 ### 1. `src/hooks/useFinanceiroImport.ts`
-- Adicionar estado `deferredFields: string[]` — campos marcados como "Ajustar depois".
-- Expor `toggleDeferred(targetField)` e `deferredFields` no retorno.
-- Incluir `deferredFields` no reset.
+
+- Mudar a estrutura de `mappings` e `updateMapping` para trabalhar com chave = target_field em vez de source_column.
+- Novo `updateMappingByTarget(targetField, sourceColumn)`: atualiza qual coluna do arquivo está atribuída a cada campo do sistema.
+- Construir o mapeamento inicial a partir da resposta da IA, preenchendo todos os TARGET_FIELDS (não apenas os que a IA encontrou) — os não detectados começam com source `""` (ignorar).
 
 ### 2. `src/components/financeiro/ImportDialog.tsx`
 
-**Seção 1 — Colunas do arquivo (DE → PARA)**:
-- Iterar sobre `rawHeaders` (colunas do arquivo) na esquerda.
-- Dropdown na direita com todos os `TARGET_FIELDS` + "Ignorar".
-- Preencher com o mapeamento da IA quando disponível.
+- Na etapa "mapping", iterar sobre `TARGET_FIELDS` (não mais sobre `imp.mappings`).
+- Cada linha mostra:
+  - **Campo do sistema (PARA)**: nome do campo + badge "Obrigatório" se aplicável
+  - **Coluna do arquivo (DE)**: dropdown com todas as `rawHeaders` + opção "— Não importar —"
+  - **Confiança**: badge da confiança da IA (se mapeado)
+- O dropdown exibirá as colunas do arquivo disponíveis.
+- Campos obrigatórios sem coluna atribuída ficam destacados em amarelo.
+- Remover o aviso separado de "campos obrigatórios faltantes" pois agora está visível na própria tabela.
 
-**Seção 2 — Campos não mapeados**:
-- Listar `TARGET_FIELDS` que não foram atribuídos a nenhuma coluna.
-- Cada campo terá: dropdown com `rawHeaders` disponíveis OU botão "Ajustar depois".
-- Campos obrigatórios não podem ser deferidos.
-- Mensagem informativa sobre integração com os módulos AP, Aging, Fluxo de Caixa e Conciliação.
+### Layout da tabela (invertido)
 
-**Botão Próximo**: habilitado quando todos os campos obrigatórios estão mapeados (mesma regra atual).
+```text
+┌──────────────────────┬──────────┬──────────────────────────┐
+│ Campo do sistema     │ Status   │ Coluna do arquivo (DE)   │
+├──────────────────────┼──────────┼──────────────────────────┤
+│ Descrição *          │ ⚠ —      │ [dropdown: headers]      │
+│ Valor *              │ ✓ Alta   │ [dropdown: Valor_Total]  │
+│ Data Vencimento *    │ ✓ Alta   │ [dropdown: Dt_Venc]      │
+│ Data Pagamento       │ — —      │ [dropdown: —]            │
+│ Fornecedor / Cliente │ ✓ Média  │ [dropdown: Razao_Social] │
+│ ...                  │          │                          │
+└──────────────────────┴──────────┴──────────────────────────┘
+```
 
-### 3. Etapa Done — informar campos diferidos
-- Se `deferredFields.length > 0`, mostrar na tela de conclusão:
-  > "Atenção: os campos X, Y não foram mapeados. Ajuste-os diretamente nos lançamentos importados via Contas a Pagar, Aging List, Fluxo de Caixa ou Conciliação."
+### Mudanças detalhadas
+
+**`useFinanceiroImport.ts`**:
+- Adicionar tipo `TargetMappingItem = { target_field: string; source_column: string | null; confidence: ... }`
+- Após receber mapeamentos da IA, construir array com todos os TARGET_FIELDS, preenchendo source_column dos que foram mapeados e `null` para os demais
+- Nova função `updateMappingByTarget(target, source)` que atualiza a source_column do target indicado
+- Manter `buildPreview` funcionando com a nova estrutura (já usa `mappings.forEach` que continua compatível)
+
+**`ImportDialog.tsx`**:
+- Trocar iteração de `imp.mappings` para `TARGET_FIELDS`, buscando o mapeamento correspondente
+- Dropdown agora lista `rawHeaders` + opção vazia "— Não importar —"
+- Campos obrigatórios sem source ficam destacados
+- Remover campo "Ignorar" do dropdown de targets (não faz mais sentido nesta direção)
 
