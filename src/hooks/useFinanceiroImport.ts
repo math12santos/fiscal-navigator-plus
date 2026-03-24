@@ -375,5 +375,6 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     buildPreview,
     goToMapping,
     executeImport,
+    toggleRowExclusion,
   };
 }
