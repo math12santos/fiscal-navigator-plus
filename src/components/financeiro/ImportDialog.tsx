@@ -456,10 +456,32 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
 
           {/* STEP: Done */}
           {imp.step === "done" && (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
               <CheckCircle2 className="h-12 w-12 text-emerald-500" />
               <p className="text-lg font-medium">{imp.importCount} lançamentos importados</p>
               <p className="text-sm text-muted-foreground">Os dados foram adicionados à lista de {tipo === "saida" ? "contas a pagar" : "contas a receber"}.</p>
+
+              {imp.deferredFields.length > 0 && (
+                <div className="mt-3 w-full max-w-md border border-amber-300/50 dark:border-amber-700/50 rounded-lg p-4 bg-amber-50/30 dark:bg-amber-950/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Campos para ajustar</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Os seguintes campos não foram mapeados e precisam ser completados diretamente nos lançamentos:
+                  </p>
+                  <ul className="text-xs space-y-1">
+                    {imp.deferredFields.map((df) => {
+                      const label = TARGET_FIELDS.find((f) => f.value === df)?.label || df;
+                      return <li key={df} className="flex items-center gap-1.5">• {label}</li>;
+                    })}
+                  </ul>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Ajuste via <strong>Contas a Pagar</strong>, <strong>Aging List</strong>, <strong>Fluxo de Caixa</strong> ou <strong>Conciliação</strong>.
+                  </p>
+                </div>
+              )}
+
               <Button size="sm" onClick={() => handleClose(false)} className="mt-4">
                 Fechar
               </Button>
