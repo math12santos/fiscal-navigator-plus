@@ -109,6 +109,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     setParsedRows([]);
     setImportCount(0);
     setError(null);
+    setDeferredFields([]);
   }, []);
 
   const parseFile = useCallback(async (file: File) => {
