@@ -95,6 +95,17 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
     imp.mappings.some((m) => m.target_field === f.value && m.source_column)
   );
 
+  // Build lookup: for each rawHeader, what target is it mapped to?
+  const headerToTarget: Record<string, string> = {};
+  imp.mappings.forEach((m) => {
+    if (m.source_column) headerToTarget[m.source_column] = m.target_field;
+  });
+
+  // Unmapped target fields (not assigned to any source column)
+  const unmappedFields = TARGET_FIELDS.filter(
+    (f) => f.value !== "ignorar" && !imp.mappings.some((m) => m.target_field === f.value && m.source_column)
+  );
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
