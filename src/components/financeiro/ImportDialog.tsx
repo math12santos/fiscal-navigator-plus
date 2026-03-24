@@ -38,6 +38,8 @@ import {
   AlertTriangle,
   X,
   Copy,
+  Clock,
+  Info,
 } from "lucide-react";
 import {
   useFinanceiroImport,
