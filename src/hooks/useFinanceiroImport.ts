@@ -367,6 +367,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     parsedRows,
     importCount,
     error,
+    excludedRows,
     reset,
     parseFile,
     updateMapping,
