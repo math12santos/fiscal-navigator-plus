@@ -265,7 +265,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     setError(null);
 
     try {
-      const validRows = parsedRows.filter((r) => r.errors.length === 0);
+      const validRows = parsedRows.filter((r, i) => r.errors.length === 0 && !excludedRows.has(i));
       if (validRows.length === 0) {
         setError("Nenhuma linha válida para importar.");
         setStep("preview");
