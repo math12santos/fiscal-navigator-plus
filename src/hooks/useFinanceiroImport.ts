@@ -97,6 +97,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [importCount, setImportCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [excludedRows, setExcludedRows] = useState<Set<number>>(new Set());
 
   const reset = useCallback(() => {
     setStep("upload");
@@ -108,6 +109,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     setParsedRows([]);
     setImportCount(0);
     setError(null);
+    setExcludedRows(new Set());
   }, []);
 
   const parseFile = useCallback(async (file: File) => {
@@ -263,7 +265,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     setError(null);
 
     try {
-      const validRows = parsedRows.filter((r) => r.errors.length === 0);
+      const validRows = parsedRows.filter((r, i) => r.errors.length === 0 && !excludedRows.has(i));
       if (validRows.length === 0) {
         setError("Nenhuma linha válida para importar.");
         setStep("preview");
@@ -340,7 +342,16 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       setError("Erro na importação: " + (e instanceof Error ? e.message : "erro desconhecido"));
       setStep("preview");
     }
-  }, [parsedRows, mappings, tipo, user, currentOrg, fileName, queryClient, toast]);
+  }, [parsedRows, mappings, tipo, user, currentOrg, fileName, queryClient, toast, excludedRows]);
+
+  const toggleRowExclusion = useCallback((index: number) => {
+    setExcludedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
 
   const goToMapping = useCallback(() => {
     setStep("mapping");
@@ -356,6 +367,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     parsedRows,
     importCount,
     error,
+    excludedRows,
     reset,
     parseFile,
     updateMapping,
@@ -363,5 +375,6 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     buildPreview,
     goToMapping,
     executeImport,
+    toggleRowExclusion,
   };
 }
