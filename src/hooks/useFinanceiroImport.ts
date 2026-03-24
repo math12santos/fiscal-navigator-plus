@@ -97,6 +97,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [importCount, setImportCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [deferredFields, setDeferredFields] = useState<string[]>([]);
 
   const reset = useCallback(() => {
     setStep("upload");
@@ -108,6 +109,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     setParsedRows([]);
     setImportCount(0);
     setError(null);
+    setDeferredFields([]);
   }, []);
 
   const parseFile = useCallback(async (file: File) => {
@@ -346,6 +348,14 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     setStep("mapping");
   }, []);
 
+  const toggleDeferred = useCallback((targetField: string) => {
+    setDeferredFields((prev) =>
+      prev.includes(targetField)
+        ? prev.filter((f) => f !== targetField)
+        : [...prev, targetField]
+    );
+  }, []);
+
   return {
     step,
     fileName,
@@ -356,6 +366,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     parsedRows,
     importCount,
     error,
+    deferredFields,
     reset,
     parseFile,
     updateMapping,
@@ -363,5 +374,6 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     buildPreview,
     goToMapping,
     executeImport,
+    toggleDeferred,
   };
 }
