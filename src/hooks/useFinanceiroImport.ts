@@ -342,7 +342,16 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       setError("Erro na importação: " + (e instanceof Error ? e.message : "erro desconhecido"));
       setStep("preview");
     }
-  }, [parsedRows, mappings, tipo, user, currentOrg, fileName, queryClient, toast]);
+  }, [parsedRows, mappings, tipo, user, currentOrg, fileName, queryClient, toast, excludedRows]);
+
+  const toggleRowExclusion = useCallback((index: number) => {
+    setExcludedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
 
   const goToMapping = useCallback(() => {
     setStep("mapping");
