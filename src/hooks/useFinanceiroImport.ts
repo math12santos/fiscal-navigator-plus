@@ -97,6 +97,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [importCount, setImportCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [deferredFields, setDeferredFields] = useState<string[]>([]);
 
   const reset = useCallback(() => {
     setStep("upload");
