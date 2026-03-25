@@ -1,58 +1,88 @@
+# Aba "Importações" no Financeiro + Controle de Períodos Fiscais
 
+## Resumo
 
-# Inverter tabela de mapeamento: mostrar campos do sistema (PARA) como linhas
+Criar uma nova aba "Importações" no módulo Financeiro que lista todos os registros de `data_imports`, permite desfazer importações em lote (excluir todos os lançamentos vinculados), e implementa controle de períodos fiscais (mês aberto/fechado) que governa permissões de exclusão e edição. Os períodos serão por competência contábil e por fluxo de caixa vinculado à competência.
 
-## Problema atual
+## Mudanças no Banco de Dados
 
-A tabela de mapeamento mostra uma linha por **coluna do arquivo** (DE), com um dropdown para selecionar o campo do sistema (PARA). Se o arquivo não tem uma coluna que a IA mapeie para "Descrição", esse campo obrigatório fica invisível — o usuário não sabe que precisa atribuí-lo.
+### 1. Adicionar `import_id` em `cashflow_entries`
 
-## Solução
+- Nova coluna `import_id UUID REFERENCES data_imports(id) ON DELETE SET NULL`
+- Permitirá vincular lançamentos importados ao registro de importação para exclusão em lote
 
-Inverter a perspectiva da tabela: cada linha será um **campo do sistema** (PARA), e o dropdown permitirá escolher qual **coluna do arquivo** (DE) o alimenta. Campos não mapeados mostrarão "Ignorar / Não importar" por padrão.
+### 2. Criar tabela `fiscal_periods`
 
-### 1. `src/hooks/useFinanceiroImport.ts`
-
-- Mudar a estrutura de `mappings` e `updateMapping` para trabalhar com chave = target_field em vez de source_column.
-- Novo `updateMappingByTarget(targetField, sourceColumn)`: atualiza qual coluna do arquivo está atribuída a cada campo do sistema.
-- Construir o mapeamento inicial a partir da resposta da IA, preenchendo todos os TARGET_FIELDS (não apenas os que a IA encontrou) — os não detectados começam com source `""` (ignorar).
-
-### 2. `src/components/financeiro/ImportDialog.tsx`
-
-- Na etapa "mapping", iterar sobre `TARGET_FIELDS` (não mais sobre `imp.mappings`).
-- Cada linha mostra:
-  - **Campo do sistema (PARA)**: nome do campo + badge "Obrigatório" se aplicável
-  - **Coluna do arquivo (DE)**: dropdown com todas as `rawHeaders` + opção "— Não importar —"
-  - **Confiança**: badge da confiança da IA (se mapeado)
-- O dropdown exibirá as colunas do arquivo disponíveis.
-- Campos obrigatórios sem coluna atribuída ficam destacados em amarelo.
-- Remover o aviso separado de "campos obrigatórios faltantes" pois agora está visível na própria tabela.
-
-### Layout da tabela (invertido)
-
-```text
-┌──────────────────────┬──────────┬──────────────────────────┐
-│ Campo do sistema     │ Status   │ Coluna do arquivo (DE)   │
-├──────────────────────┼──────────┼──────────────────────────┤
-│ Descrição *          │ ⚠ —      │ [dropdown: headers]      │
-│ Valor *              │ ✓ Alta   │ [dropdown: Valor_Total]  │
-│ Data Vencimento *    │ ✓ Alta   │ [dropdown: Dt_Venc]      │
-│ Data Pagamento       │ — —      │ [dropdown: —]            │
-│ Fornecedor / Cliente │ ✓ Média  │ [dropdown: Razao_Social] │
-│ ...                  │          │                          │
-└──────────────────────┴──────────┴──────────────────────────┘
+```sql
+CREATE TABLE fiscal_periods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  year_month TEXT NOT NULL,          -- "2025-03"
+  status TEXT NOT NULL DEFAULT 'open', -- 'open' | 'closed'
+  closed_at TIMESTAMPTZ,
+  closed_by UUID REFERENCES auth.users(id),
+  reopened_at TIMESTAMPTZ,
+  reopened_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(organization_id, year_month)
+);
 ```
 
-### Mudanças detalhadas
+- RLS: membros da org podem ler; apenas owner/admin podem fechar/reabrir
 
-**`useFinanceiroImport.ts`**:
-- Adicionar tipo `TargetMappingItem = { target_field: string; source_column: string | null; confidence: ... }`
-- Após receber mapeamentos da IA, construir array com todos os TARGET_FIELDS, preenchendo source_column dos que foram mapeados e `null` para os demais
-- Nova função `updateMappingByTarget(target, source)` que atualiza a source_column do target indicado
-- Manter `buildPreview` funcionando com a nova estrutura (já usa `mappings.forEach` que continua compatível)
+### 3. Atualizar `useFinanceiroImport` para gravar `import_id`
 
-**`ImportDialog.tsx`**:
-- Trocar iteração de `imp.mappings` para `TARGET_FIELDS`, buscando o mapeamento correspondente
-- Dropdown agora lista `rawHeaders` + opção vazia "— Não importar —"
-- Campos obrigatórios sem source ficam destacados
-- Remover campo "Ignorar" do dropdown de targets (não faz mais sentido nesta direção)
+- Na inserção dos `cashflow_entries`, incluir o `import_id` do registro `data_imports` criado
 
+## Mudanças no Frontend
+
+### 4. Nova aba "Importações" em `Financeiro.tsx`
+
+- Adicionar `{ key: "importacoes", label: "Importações" }` ao `ALL_TABS`
+
+### 5. Componente `ImportacoesTab.tsx`
+
+Duas seções:
+
+**Seção A — Histórico de Importações**
+
+- Tabela listando `data_imports` da org: arquivo, data, qtd linhas, status, usuário
+- Botão "Desfazer importação" (apenas para admins/owners):
+  - Verifica se o período fiscal está aberto
+  - Se fechado: mostra alerta "Período fechado — solicite reabertura"
+  - Se aberto: confirma via AlertDialog e deleta todos `cashflow_entries` com `import_id` correspondente, depois marca `data_imports.status = 'reverted'`
+
+**Seção B — Períodos Fiscais**
+
+- Grid de meses (últimos 12-24 meses) com status aberto/fechado
+- Badge colorido: verde = aberto, vermelho = fechado
+- Botões "Fechar período" / "Reabrir período" (apenas owner/admin)
+- Meses sem importação mostram indicador visual para guiar o usuário sobre lacunas
+
+### 6. Hook `useImportHistory.ts`
+
+- Query `data_imports` filtrado por org
+- Mutation `revertImport(importId)`: deleta entries + atualiza status
+- Verifica período fiscal antes de permitir exclusão
+
+### 7. Hook `useFiscalPeriods.ts`
+
+- CRUD de `fiscal_periods` por org
+- `isMonthClosed(yearMonth)` helper
+- Mutations para fechar/reabrir períodos
+
+## Regras de Negócio
+
+- Somente owner/admin podem excluir importações ou gerenciar períodos
+- Exclusão bloqueada se o mês da importação está fechado
+- Reabertura de período requer role owner/admin
+- O status do período é consultado pelos outros módulos (AP, Aging, Fluxo de Caixa, Conciliação) para bloquear edições em meses fechados
+
+## Arquivos Envolvidos
+
+- **Migração SQL**: `import_id` em cashflow_entries + tabela `fiscal_periods` + RLS
+- `src/hooks/useFinanceiroImport.ts` — gravar `import_id` nos entries
+- `src/hooks/useImportHistory.ts` — novo hook
+- `src/hooks/useFiscalPeriods.ts` — novo hook
+- `src/components/financeiro/ImportacoesTab.tsx` — novo componente
+- `src/pages/Financeiro.tsx` — adicionar aba
