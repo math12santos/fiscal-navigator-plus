@@ -6,12 +6,14 @@ import { ContasAPagar } from "@/components/financeiro/ContasAPagar";
 import { ContasAReceber } from "@/components/financeiro/ContasAReceber";
 import { ContasBancariasTab } from "@/components/financeiro/ContasBancariasTab";
 import { AgingListTab } from "@/components/financeiro/AgingListTab";
+import { ImportacoesTab } from "@/components/financeiro/ImportacoesTab";
 
 const ALL_TABS = [
   { key: "pagar", label: "Contas a Pagar" },
   { key: "receber", label: "Contas a Receber" },
   { key: "aging", label: "Aging List" },
   { key: "contas-bancarias", label: "Contas Bancárias" },
+  { key: "importacoes", label: "Importações" },
 ];
 
 export default function Financeiro() {
@@ -51,6 +53,9 @@ export default function Financeiro() {
         )}
         {allowedTabs.some((t) => t.key === "contas-bancarias") && (
           <TabsContent value="contas-bancarias"><ContasBancariasTab /></TabsContent>
+        )}
+        {allowedTabs.some((t) => t.key === "importacoes") && (
+          <TabsContent value="importacoes"><ImportacoesTab /></TabsContent>
         )}
       </Tabs>
     </div>

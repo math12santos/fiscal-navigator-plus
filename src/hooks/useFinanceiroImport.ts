@@ -300,9 +300,10 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
 
       for (let i = 0; i < validRows.length; i += batchSize) {
         const batch = validRows.slice(i, i + batchSize);
-        const entries = batch.map((r) => ({
+      const entries = batch.map((r) => ({
           user_id: user.id,
           organization_id: currentOrg.id,
+          import_id: importRecord.id,
           tipo,
           source: "importacao",
           descricao: r.mapped.descricao || "Sem descrição",
