@@ -324,6 +324,7 @@ export type Database = {
           id: string
           impacto_fluxo_caixa: boolean | null
           impacto_orcamento: boolean | null
+          import_id: string | null
           natureza_contabil: string | null
           notes: string | null
           num_parcelas: number | null
@@ -368,6 +369,7 @@ export type Database = {
           id?: string
           impacto_fluxo_caixa?: boolean | null
           impacto_orcamento?: boolean | null
+          import_id?: string | null
           natureza_contabil?: string | null
           notes?: string | null
           num_parcelas?: number | null
@@ -412,6 +414,7 @@ export type Database = {
           id?: string
           impacto_fluxo_caixa?: boolean | null
           impacto_orcamento?: boolean | null
+          import_id?: string | null
           natureza_contabil?: string | null
           notes?: string | null
           num_parcelas?: number | null
@@ -486,6 +489,13 @@ export type Database = {
             columns: ["expense_request_id"]
             isOneToOne: false
             referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
             referencedColumns: ["id"]
           },
           {
@@ -2317,6 +2327,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fiscal_groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiscal_periods: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string | null
+          id: string
+          organization_id: string
+          reopened_at: string | null
+          reopened_by: string | null
+          status: string
+          year_month: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          reopened_at?: string | null
+          reopened_by?: string | null
+          status?: string
+          year_month: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          reopened_at?: string | null
+          reopened_by?: string | null
+          status?: string
+          year_month?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_periods_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
