@@ -4,9 +4,11 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { TarefasDashboard } from "@/components/tarefas/TarefasDashboard";
 import { SolicitacoesTab } from "@/components/tarefas/SolicitacoesTab";
 import { MinhasTarefasTab } from "@/components/tarefas/MinhasTarefasTab";
+import { TarefasCalendario } from "@/components/tarefas/TarefasCalendario";
 
 const ALL_TABS = [
   { key: "dashboard", label: "Dashboard" },
+  { key: "calendario", label: "Calendário" },
   { key: "solicitacoes", label: "Solicitações" },
   { key: "minhas-tarefas", label: "Minhas Tarefas" },
 ];
@@ -18,7 +20,7 @@ export default function Tarefas() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Gestão de Solicitações" description="Solicitações, tarefas e workflow interno" />
+      <PageHeader title="Gestão de Solicitações" description="Solicitações, tarefas, rotinas e workflow interno" />
 
       <Tabs defaultValue={defaultTab}>
         <TabsList>
@@ -29,6 +31,10 @@ export default function Tarefas() {
 
         <TabsContent value="dashboard">
           <TarefasDashboard />
+        </TabsContent>
+
+        <TabsContent value="calendario">
+          <TarefasCalendario />
         </TabsContent>
 
         <TabsContent value="solicitacoes">
