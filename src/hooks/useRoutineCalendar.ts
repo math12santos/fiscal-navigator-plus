@@ -21,7 +21,7 @@ interface EmployeeWithPosition {
   name: string;
   position_id: string | null;
   status: string;
-  user_auth_id?: string | null;
+  user_id: string;
 }
 
 /**
