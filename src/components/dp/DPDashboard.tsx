@@ -21,7 +21,7 @@ export default function DPDashboard() {
   const totalFolhaBruta = activeEmployees.reduce((sum: number, e: any) => sum + Number(e.salary_base || 0), 0);
 
   const encargosTotal = activeEmployees.reduce((sum: number, e: any) => {
-    const enc = calcEncargosPatronais(Number(e.salary_base || 0), dpConfig);
+    const enc = calcEncargosPatronais(Number(e.salary_base || 0), dpConfig, e.contract_type);
     return sum + enc.total;
   }, 0);
 
