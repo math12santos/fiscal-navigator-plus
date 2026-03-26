@@ -179,7 +179,7 @@ export default function DPColaboradores() {
               {filtered.map((e: any) => {
                 const st = STATUS_MAP[e.status] || STATUS_MAP.ativo;
                 const salario = Number(e.salary_base || 0);
-                const encargos = calcEncargosPatronais(salario, dpConfig);
+                const encargos = calcEncargosPatronais(salario, dpConfig, e.contract_type);
                 const vtDiario = Number(e.vt_diario || 0);
                 const DIAS_UTEIS_MES = 22;
                 const vtMensal = e.vt_ativo ? vtDiario * DIAS_UTEIS_MES : 0;

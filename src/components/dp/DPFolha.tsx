@@ -47,7 +47,7 @@ export default function DPFolha() {
       const businessDays = getBusinessDays(new Date());
       const vtBruto = Number(emp.vt_diario || 0) * businessDays;
       const vtDesconto = emp.vt_ativo ? Math.min(salario * ((dpConfig?.vt_desconto_pct ?? 6) / 100), vtBruto) : 0;
-      const enc = calcEncargosPatronais(salario, dpConfig);
+      const enc = calcEncargosPatronais(salario, dpConfig, emp.contract_type);
 
       const bruto = salario;
       const descontos = inssEmp + irrf + vtDesconto;
