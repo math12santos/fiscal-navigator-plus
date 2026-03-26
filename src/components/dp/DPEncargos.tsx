@@ -12,7 +12,7 @@ export default function DPEncargos() {
   const encargosData = useMemo(() => {
     return activeEmps.map((emp: any) => {
       const salario = Number(emp.salary_base || 0);
-      const enc = calcEncargosPatronais(salario, dpConfig);
+      const enc = calcEncargosPatronais(salario, dpConfig, emp.contract_type);
       return { ...emp, salario, ...enc };
     });
   }, [activeEmps, dpConfig]);

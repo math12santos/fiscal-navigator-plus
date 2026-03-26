@@ -41,7 +41,9 @@ export function useImportHistory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["data-imports"] });
+      queryClient.invalidateQueries({ queryKey: ["cashflow_entries"] });
       queryClient.invalidateQueries({ queryKey: ["cashflow-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["financeiro_entries"] });
       toast({ title: "Importação revertida", description: "Todos os lançamentos vinculados foram removidos." });
     },
     onError: (err: Error) => {

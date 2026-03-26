@@ -497,7 +497,11 @@ export function calcIRRF(baseCalculo: number): number {
   return base * 0.275 - 896.00;
 }
 
-export function calcEncargosPatronais(salario: number, config: any) {
+export function calcEncargosPatronais(salario: number, config: any, contractType?: string) {
+  // PJ contractors have no social charges (INSS, RAT, FGTS, Terceiros)
+  if (contractType === "PJ") {
+    return { inssPatronal: 0, rat: 0, fgts: 0, terceiros: 0, total: 0 };
+  }
   const inssPatronal = salario * ((config?.inss_patronal_pct ?? 20) / 100);
   const rat = salario * ((config?.rat_pct ?? 2) / 100);
   const fgts = salario * ((config?.fgts_pct ?? 8) / 100);

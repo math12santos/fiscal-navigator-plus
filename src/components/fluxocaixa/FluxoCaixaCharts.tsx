@@ -47,6 +47,8 @@ export function FluxoCaixaCharts({ entries }: Props) {
 
   if (chartData.length === 0) return null;
 
+  const hasNegative = chartData.some((d) => d.saldo < 0);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="glass-card p-5">
@@ -68,16 +70,29 @@ export function FluxoCaixaCharts({ entries }: Props) {
         <ResponsiveContainer width="100%" height={250}>
           <AreaChart data={chartData}>
             <defs>
-              <linearGradient id="saldoGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+              <linearGradient id="saldoGradPositive" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="saldoGradNegative" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
             <XAxis dataKey="dia" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
             <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
             <Tooltip content={<CustomTooltip />} />
-            <Area type="monotone" dataKey="saldo" name="Saldo" stroke="hsl(var(--primary))" fill="url(#saldoGrad)" strokeWidth={2} />
+            {/* Zero reference line */}
+            <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" strokeWidth={1.5} />
+            <Area
+              type="monotone"
+              dataKey="saldo"
+              name="Saldo"
+              stroke={hasNegative ? "hsl(var(--destructive))" : "hsl(var(--success))"}
+              fill={hasNegative ? "url(#saldoGradNegative)" : "url(#saldoGradPositive)"}
+              strokeWidth={2}
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>
