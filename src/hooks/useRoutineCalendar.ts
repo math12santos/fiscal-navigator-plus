@@ -94,7 +94,7 @@ export function useRoutineCalendar(refMonth: Date) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employees")
-        .select("id, name, position_id, status, user_auth_id")
+        .select("id, name, position_id, status, user_id")
         .eq("organization_id", orgId!)
         .eq("status", "ativo");
       if (error) throw error;
@@ -202,7 +202,7 @@ export function useRoutineCalendar(refMonth: Date) {
                 competencia,
                 reference_module: "dp",
                 reference_id: routine.id,
-                assigned_to: emp.user_auth_id || null,
+                assigned_to: emp.user_id || null,
                 status: "aberta",
                 area_responsavel: "dp",
               })
@@ -217,16 +217,16 @@ export function useRoutineCalendar(refMonth: Date) {
               request_id: request.id,
               organization_id: orgId,
               title: routine.name,
-              assigned_to: emp.user_auth_id || null,
+              assigned_to: emp.user_id || null,
               due_date: dueDateStr,
               created_by: user!.id,
             });
 
             // Notify if has auth user
-            if (emp.user_auth_id) {
+            if (emp.user_id) {
               await supabase.from("notifications" as any).insert({
                 organization_id: orgId,
-                user_id: emp.user_auth_id,
+                user_id: emp.user_id,
                 title: "Nova rotina atribuída",
                 body: `${routine.name} — Vencimento: ${format(dueDate, "dd/MM/yyyy")}`,
                 type: "assignment",
