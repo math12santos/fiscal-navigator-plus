@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { format } from "date-fns";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, AreaChart, Area, Legend,
+  ResponsiveContainer, AreaChart, Area, Legend, ReferenceLine,
 } from "recharts";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
 
