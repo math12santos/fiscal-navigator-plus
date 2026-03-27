@@ -317,7 +317,9 @@ export default function BackofficeCompany() {
     return members.filter((m: any) => {
       const profile = profileMap[m.user_id];
       const name = profile?.full_name || "";
-      return !userSearch || name.toLowerCase().includes(userSearch.toLowerCase()) || m.user_id.includes(userSearch);
+      const email = profile?.email || "";
+      const search = userSearch.toLowerCase();
+      return !userSearch || name.toLowerCase().includes(search) || email.toLowerCase().includes(search) || m.user_id.includes(userSearch);
     });
   }, [members, userSearch, profileMap]);
 
@@ -606,6 +608,7 @@ export default function BackofficeCompany() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome</TableHead>
+                    <TableHead>E-mail de Acesso</TableHead>
                     <TableHead>Cargo</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
@@ -619,6 +622,9 @@ export default function BackofficeCompany() {
                       <TableRow key={m.id}>
                         <TableCell>
                           <span className="font-medium text-foreground">{profile?.full_name || "Sem nome"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{profile?.email || "—"}</span>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{profile?.cargo || "—"}</TableCell>
                         <TableCell>
