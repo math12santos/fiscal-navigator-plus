@@ -2,9 +2,6 @@ import { useRef, useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -35,12 +31,10 @@ import {
   Loader2,
   FileSpreadsheet,
   ArrowRight,
+  ArrowLeft,
   CheckCircle2,
   AlertTriangle,
-  X,
   Copy,
-  Filter,
-  Eye,
   EyeOff,
 } from "lucide-react";
 import {
@@ -74,12 +68,12 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   const [dragOver, setDragOver] = useState(false);
   const [previewFilter, setPreviewFilter] = useState<"all" | "errors" | "valid">("all");
 
-  // Detect duplicates between imported rows and existing entries
   const duplicateIndices = useMemo(() => {
     if (imp.step !== "preview" || imp.parsedRows.length === 0) return new Set<number>();
     const rows = imp.parsedRows.map((r) => r.mapped);
     return detectImportDuplicates(rows, existingEntries);
   }, [imp.step, imp.parsedRows, existingEntries]);
+
   const handleClose = (o: boolean) => {
     if (!o) imp.reset();
     onOpenChange(o);
@@ -88,9 +82,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   const handleFile = (file: File | undefined) => {
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!["csv", "xlsx", "xls"].includes(ext || "")) {
-      return;
-    }
+    if (!["csv", "xlsx", "xls"].includes(ext || "")) return;
     imp.parseFile(file);
   };
 
@@ -98,38 +90,48 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
     imp.mappings.some((m) => m.target_field === f.value && m.source_column)
   );
 
+  const validCount = imp.parsedRows.filter((r, i) => r.errors.length === 0 && !imp.excludedRows.has(i)).length;
+  const errorCount = imp.parsedRows.filter((r) => r.errors.length > 0).length;
+  const excludedCount = imp.excludedRows.size;
+
+  const showFooter = ["mapping", "preview"].includes(imp.step);
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5" />
-            Importar {tipo === "saida" ? "Despesas" : "Receitas"}
-          </DialogTitle>
-          <DialogDescription>
+      <DialogContent className="w-[96vw] max-w-7xl h-[92vh] p-0 overflow-hidden flex flex-col">
+        {/* ── FIXED HEADER ── */}
+        <div className="shrink-0 border-b px-6 py-4">
+          <div className="flex items-center gap-2 mb-1">
+            <FileSpreadsheet className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold leading-none tracking-tight">
+              Importar {tipo === "saida" ? "Despesas" : "Receitas"}
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
             Importe lançamentos a partir de arquivo CSV ou XLSX
-          </DialogDescription>
-        </DialogHeader>
+          </p>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
-          {(["upload", "mapping", "preview", "done"] as ImportStep[]).map((s, i) => (
-            <span key={s} className="flex items-center gap-1">
-              {i > 0 && <ArrowRight className="h-3 w-3" />}
-              <span
-                className={cn(
-                  "px-2 py-0.5 rounded-full",
-                  imp.step === s && "bg-primary text-primary-foreground font-medium",
-                  imp.step !== s && "text-muted-foreground"
-                )}
-              >
-                {STEP_LABELS[s]}
+          {/* Step indicator */}
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-3">
+            {(["upload", "mapping", "preview", "done"] as ImportStep[]).map((s, i) => (
+              <span key={s} className="flex items-center gap-1">
+                {i > 0 && <ArrowRight className="h-3 w-3" />}
+                <span
+                  className={cn(
+                    "px-2 py-0.5 rounded-full",
+                    imp.step === s && "bg-primary text-primary-foreground font-medium",
+                    imp.step !== s && "text-muted-foreground"
+                  )}
+                >
+                  {STEP_LABELS[s]}
+                </span>
               </span>
-            </span>
-          ))}
+            ))}
+          </div>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0">
+        {/* ── SCROLLABLE BODY ── */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
           {/* STEP: Upload */}
           {imp.step === "upload" && (
             <div
@@ -228,9 +230,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                             <SelectContent>
                               <SelectItem value="__none__">— Não importar —</SelectItem>
                               {imp.rawHeaders.map((h) => (
-                                <SelectItem key={h} value={h}>
-                                  {h}
-                                </SelectItem>
+                                <SelectItem key={h} value={h}>{h}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -240,24 +240,11 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                   })}
                 </TableBody>
               </Table>
-
-              <div className="flex justify-between items-center">
-                <Button variant="outline" size="sm" onClick={imp.reset}>
-                  Voltar
-                </Button>
-                <Button size="sm" onClick={imp.buildPreview} disabled={!requiredMapped}>
-                  Próximo: Preview <ArrowRight className="h-3 w-3 ml-1" />
-                </Button>
-              </div>
             </div>
           )}
 
           {/* STEP: Preview */}
           {imp.step === "preview" && (() => {
-            const errorCount = imp.parsedRows.filter((r) => r.errors.length > 0).length;
-            const validCount = imp.parsedRows.filter((r, i) => r.errors.length === 0 && !imp.excludedRows.has(i)).length;
-            const excludedCount = imp.excludedRows.size;
-
             const filteredRows = imp.parsedRows
               .map((r, i) => ({ ...r, originalIndex: i }))
               .filter((r) => {
@@ -322,9 +309,9 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                   )}
                 </div>
 
-                <div className="border rounded-md overflow-hidden">
+                <div className="border rounded-md overflow-auto max-h-[calc(92vh-280px)]">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
                         <TableHead className="w-10">
                           <Tooltip>
@@ -344,7 +331,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredRows.slice(0, 50).map((r) => {
+                      {filteredRows.map((r) => {
                         const i = r.originalIndex;
                         const isDup = duplicateIndices.has(i);
                         const isExcluded = imp.excludedRows.has(i);
@@ -412,25 +399,11 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                   </Table>
                 </div>
 
-                {filteredRows.length > 50 && (
+                {filteredRows.length > 200 && (
                   <p className="text-xs text-muted-foreground text-center">
-                    Mostrando 50 de {filteredRows.length} linhas {previewFilter !== "all" ? "(filtradas)" : ""}
+                    {filteredRows.length} linhas {previewFilter !== "all" ? "(filtradas)" : ""}
                   </p>
                 )}
-
-                <div className="flex justify-between items-center">
-                  <Button variant="outline" size="sm" onClick={() => { setPreviewFilter("all"); imp.goToMapping(); }}>
-                    Voltar
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={imp.executeImport}
-                    disabled={validCount === 0}
-                  >
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Importar {validCount} lançamentos
-                  </Button>
-                </div>
               </div>
             );
           })()}
@@ -454,7 +427,42 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
               </Button>
             </div>
           )}
-        </ScrollArea>
+        </div>
+
+        {/* ── FIXED FOOTER ── */}
+        {showFooter && (
+          <div className="shrink-0 border-t bg-background px-6 py-4">
+            <div className="flex justify-between items-center">
+              {imp.step === "mapping" && (
+                <>
+                  <Button variant="outline" size="sm" onClick={imp.reset}>
+                    <ArrowLeft className="h-3 w-3 mr-1" />
+                    Voltar
+                  </Button>
+                  <Button size="sm" onClick={imp.buildPreview} disabled={!requiredMapped}>
+                    Próximo: Preview <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </>
+              )}
+              {imp.step === "preview" && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => { setPreviewFilter("all"); imp.goToMapping(); }}>
+                    <ArrowLeft className="h-3 w-3 mr-1" />
+                    Voltar ao Mapeamento
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={imp.executeImport}
+                    disabled={validCount === 0}
+                  >
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Importar {validCount} lançamentos
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
