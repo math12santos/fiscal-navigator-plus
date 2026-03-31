@@ -18,9 +18,10 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
       { key: "receber", label: "Contas a Receber" },
       { key: "aging", label: "Aging List" },
       { key: "contas-bancarias", label: "Contas Bancárias" },
+      { key: "fluxo-caixa", label: "Fluxo de Caixa" },
+      { key: "conciliacao", label: "Conciliação" },
     ],
   },
-  { key: "fluxo-caixa", label: "Fluxo de Caixa" },
   { key: "contratos", label: "Contratos" },
   {
     key: "planejamento",
