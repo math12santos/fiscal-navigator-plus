@@ -5,7 +5,7 @@ import {
   FileText,
   DollarSign,
   Target,
-  Building2,
+  
   CheckSquare,
   Plug,
   Brain,
