@@ -32,7 +32,7 @@ const BackofficeLayout = lazyRetry(() => import("@/components/BackofficeLayout")
 const Dashboard = lazyRetry(() => import("@/pages/Dashboard"));
 const Contratos = lazyRetry(() => import("@/pages/Contratos"));
 const Planejamento = lazyRetry(() => import("@/pages/Planejamento"));
-const Conciliacao = lazyRetry(() => import("@/pages/Conciliacao"));
+
 const Tarefas = lazyRetry(() => import("@/pages/Tarefas"));
 const Integracoes = lazyRetry(() => import("@/pages/Integracoes"));
 const IAFinanceira = lazyRetry(() => import("@/pages/IAFinanceira"));
