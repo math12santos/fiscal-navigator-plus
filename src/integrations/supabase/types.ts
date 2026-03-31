@@ -131,6 +131,8 @@ export type Database = {
           organization_id: string | null
           pix_key: string | null
           saldo_atual: number | null
+          saldo_atualizado_em: string | null
+          saldo_atualizado_por: string | null
           tipo_conta: string | null
           user_id: string
         }
@@ -146,6 +148,8 @@ export type Database = {
           organization_id?: string | null
           pix_key?: string | null
           saldo_atual?: number | null
+          saldo_atualizado_em?: string | null
+          saldo_atualizado_por?: string | null
           tipo_conta?: string | null
           user_id: string
         }
@@ -161,6 +165,8 @@ export type Database = {
           organization_id?: string | null
           pix_key?: string | null
           saldo_atual?: number | null
+          saldo_atualizado_em?: string | null
+          saldo_atualizado_por?: string | null
           tipo_conta?: string | null
           user_id?: string
         }

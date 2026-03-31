@@ -30,10 +30,9 @@ const BackofficeLayout = lazyRetry(() => import("@/components/BackofficeLayout")
 
 // Lazy-loaded pages
 const Dashboard = lazyRetry(() => import("@/pages/Dashboard"));
-const FluxoCaixa = lazyRetry(() => import("@/pages/FluxoCaixa"));
 const Contratos = lazyRetry(() => import("@/pages/Contratos"));
 const Planejamento = lazyRetry(() => import("@/pages/Planejamento"));
-const Conciliacao = lazyRetry(() => import("@/pages/Conciliacao"));
+
 const Tarefas = lazyRetry(() => import("@/pages/Tarefas"));
 const Integracoes = lazyRetry(() => import("@/pages/Integracoes"));
 const IAFinanceira = lazyRetry(() => import("@/pages/IAFinanceira"));
@@ -108,10 +107,10 @@ function ProtectedRoutes() {
         <Routes>
           <Route path="/" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard></Suspense>} />
           <Route path="/financeiro" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/fluxo-caixa" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="fluxo-caixa"><FluxoCaixa /></ModuleMaintenanceGuard></Suspense>} />
+          <Route path="/fluxo-caixa" element={<Navigate to="/financeiro" replace />} />
+          <Route path="/conciliacao" element={<Navigate to="/financeiro" replace />} />
           <Route path="/contratos" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard></Suspense>} />
           <Route path="/planejamento" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/conciliacao" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="conciliacao"><Conciliacao /></ModuleMaintenanceGuard></Suspense>} />
           <Route path="/tarefas" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard></Suspense>} />
           <Route path="/integracoes" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard></Suspense>} />
           <Route path="/ia" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard></Suspense>} />

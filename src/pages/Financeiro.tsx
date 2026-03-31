@@ -7,12 +7,16 @@ import { ContasAReceber } from "@/components/financeiro/ContasAReceber";
 import { ContasBancariasTab } from "@/components/financeiro/ContasBancariasTab";
 import { AgingListTab } from "@/components/financeiro/AgingListTab";
 import { ImportacoesTab } from "@/components/financeiro/ImportacoesTab";
+import { FluxoCaixaTab } from "@/components/financeiro/FluxoCaixaTab";
+import { ConciliacaoTab } from "@/components/financeiro/ConciliacaoTab";
 
 const ALL_TABS = [
   { key: "pagar", label: "Contas a Pagar" },
   { key: "receber", label: "Contas a Receber" },
   { key: "aging", label: "Aging List" },
   { key: "contas-bancarias", label: "Contas Bancárias" },
+  { key: "fluxo-caixa", label: "Fluxo de Caixa" },
+  { key: "conciliacao", label: "Conciliação" },
   { key: "importacoes", label: "Importações" },
 ];
 
@@ -33,11 +37,11 @@ export default function Financeiro() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Financeiro"
-        description="Gestão de contas a pagar, receber, aging list e contas bancárias"
+        description="Gestão financeira completa: contas, fluxo de caixa, conciliação e importações"
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList className="flex-wrap">
           {allowedTabs.map((t) => (
             <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
           ))}
@@ -53,6 +57,12 @@ export default function Financeiro() {
         )}
         {allowedTabs.some((t) => t.key === "contas-bancarias") && (
           <TabsContent value="contas-bancarias"><ContasBancariasTab /></TabsContent>
+        )}
+        {allowedTabs.some((t) => t.key === "fluxo-caixa") && (
+          <TabsContent value="fluxo-caixa"><FluxoCaixaTab /></TabsContent>
+        )}
+        {allowedTabs.some((t) => t.key === "conciliacao") && (
+          <TabsContent value="conciliacao"><ConciliacaoTab /></TabsContent>
         )}
         {allowedTabs.some((t) => t.key === "importacoes") && (
           <TabsContent value="importacoes"><ImportacoesTab /></TabsContent>

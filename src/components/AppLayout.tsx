@@ -2,11 +2,10 @@ import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  ArrowLeftRight,
   FileText,
   DollarSign,
   Target,
-  Building2,
+  
   CheckSquare,
   Plug,
   Brain,
@@ -33,12 +32,10 @@ import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
   { path: "/financeiro", label: "Financeiro", icon: DollarSign, module: "financeiro" },
-  { path: "/fluxo-caixa", label: "Fluxo de Caixa", icon: ArrowLeftRight, module: "fluxo-caixa" },
   { path: "/contratos", label: "Contratos", icon: FileText, module: "contratos" },
   { path: "/planejamento", label: "Planejamento", icon: Target, module: "planejamento" },
   { path: "/dp", label: "Depto. Pessoal", icon: Users, module: "dp" },
   { path: "/crm", label: "CRM", icon: Handshake, module: "crm" },
-  { path: "/conciliacao", label: "Conciliação", icon: Building2, module: "conciliacao" },
   { path: "/tarefas", label: "Tarefas", icon: CheckSquare, module: "tarefas" },
   { path: "/integracoes", label: "Integrações", icon: Plug, module: "integracoes" },
   { path: "/ia", label: "IA Financeira", icon: Brain, module: "ia" },
