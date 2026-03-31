@@ -1,88 +1,70 @@
-# Aba "Importações" no Financeiro + Controle de Períodos Fiscais
+# Consolidar Fluxo de Caixa e Conciliação como abas do Financeiro + Saldo Manual + Nome da empresa em Holding
 
 ## Resumo
 
-Criar uma nova aba "Importações" no módulo Financeiro que lista todos os registros de `data_imports`, permite desfazer importações em lote (excluir todos os lançamentos vinculados), e implementa controle de períodos fiscais (mês aberto/fechado) que governa permissões de exclusão e edição. Os períodos serão por competência contábil e por fluxo de caixa vinculado à competência.
+Três mudanças:
 
-## Mudanças no Banco de Dados
+1. Mover Fluxo de Caixa e Conciliação para dentro do módulo Financeiro como abas
+2. Adicionar botão de "Inserir Saldo" na aba Contas Bancárias (saldo manual = verdade absoluta para Aging List e comparar saldo manual com saldo de conciliação para indicar correções necessárias)
+3. Mostrar nome da empresa (não UUID) na coluna "Empresa" do modo holding consolidado
 
-### 1. Adicionar `import_id` em `cashflow_entries`
+## Mudanças
 
-- Nova coluna `import_id UUID REFERENCES data_imports(id) ON DELETE SET NULL`
-- Permitirá vincular lançamentos importados ao registro de importação para exclusão em lote
+### 1. Financeiro.tsx — Adicionar abas Fluxo de Caixa e Conciliação
 
-### 2. Criar tabela `fiscal_periods`
+- Adicionar `{ key: "fluxo-caixa", label: "Fluxo de Caixa" }` e `{ key: "conciliacao", label: "Conciliação" }` ao `ALL_TABS`
+- Importar e renderizar os conteúdos existentes de `FluxoCaixa` (inline, sem PageHeader) e `Conciliacao` (inline, sem PageHeader)
+- Criar componentes wrapper (`FluxoCaixaTab` e `ConciliacaoTab`) que reutilizam toda a lógica dos pages atuais mas sem o PageHeader redundante
+
+### 2. App.tsx — Remover rotas standalone
+
+- Remover as rotas `/fluxo-caixa` e `/conciliacao`
+- Remover os lazy imports de `FluxoCaixa` e `Conciliacao`
+- Adicionar redirects de `/fluxo-caixa` → `/financeiro` e `/conciliacao` → `/financeiro` para links antigos
+
+### 3. AppLayout.tsx — Remover itens de navegação
+
+- Remover `{ path: "/fluxo-caixa", ... }` e `{ path: "/conciliacao", ... }` do array `navItems`
+
+### 4. moduleDefinitions.ts — Consolidar módulos
+
+- Remover entries standalone de `fluxo-caixa` e `conciliacao`
+- Adicionar `"fluxo-caixa"` e `"conciliacao"` como tabs dentro do módulo `financeiro`
+
+### 5. ContasBancariasTab.tsx — Botão "Inserir Saldo" + Nome da empresa
+
+**Saldo manual:**
+
+- Adicionar coluna "Saldo" na tabela com o valor de `saldo_atual` formatado
+- Adicionar botão/ícone em cada linha para abrir um dialog simples de inserção de saldo
+- O dialog atualiza `saldo_atual` via `update.mutate({ id, saldo_atual: valor })`
+- Registrar `data_atualizacao_saldo` para auditoria (campo timestamp já existe ou será adicionado)
+
+**Nome da empresa em holding:**
+
+- Usar `subsidiaryOrgs` + `currentOrg` do `useHolding()` e `useOrganization()` para montar um mapa `orgId → orgName`
+- Substituir `acc.organization_id?.slice(0, 8)` pelo nome real da organização
+
+### 6. Migração SQL — Coluna de auditoria de saldo
 
 ```sql
-CREATE TABLE fiscal_periods (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  year_month TEXT NOT NULL,          -- "2025-03"
-  status TEXT NOT NULL DEFAULT 'open', -- 'open' | 'closed'
-  closed_at TIMESTAMPTZ,
-  closed_by UUID REFERENCES auth.users(id),
-  reopened_at TIMESTAMPTZ,
-  reopened_by UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(organization_id, year_month)
-);
+ALTER TABLE bank_accounts 
+  ADD COLUMN IF NOT EXISTS saldo_atualizado_em TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS saldo_atualizado_por UUID REFERENCES auth.users(id);
 ```
 
-- RLS: membros da org podem ler; apenas owner/admin podem fechar/reabrir
+### 7. useBankAccounts.ts — Mutation de saldo
 
-### 3. Atualizar `useFinanceiroImport` para gravar `import_id`
+- Adicionar mutation `updateBalance(id, saldo_atual)` que também grava `saldo_atualizado_em = now()` e `saldo_atualizado_por = user.id`
 
-- Na inserção dos `cashflow_entries`, incluir o `import_id` do registro `data_imports` criado
+## Arquivos envolvidos
 
-## Mudanças no Frontend
-
-### 4. Nova aba "Importações" em `Financeiro.tsx`
-
-- Adicionar `{ key: "importacoes", label: "Importações" }` ao `ALL_TABS`
-
-### 5. Componente `ImportacoesTab.tsx`
-
-Duas seções:
-
-**Seção A — Histórico de Importações**
-
-- Tabela listando `data_imports` da org: arquivo, data, qtd linhas, status, usuário
-- Botão "Desfazer importação" (apenas para admins/owners):
-  - Verifica se o período fiscal está aberto
-  - Se fechado: mostra alerta "Período fechado — solicite reabertura"
-  - Se aberto: confirma via AlertDialog e deleta todos `cashflow_entries` com `import_id` correspondente, depois marca `data_imports.status = 'reverted'`
-
-**Seção B — Períodos Fiscais**
-
-- Grid de meses (últimos 12-24 meses) com status aberto/fechado
-- Badge colorido: verde = aberto, vermelho = fechado
-- Botões "Fechar período" / "Reabrir período" (apenas owner/admin)
-- Meses sem importação mostram indicador visual para guiar o usuário sobre lacunas
-
-### 6. Hook `useImportHistory.ts`
-
-- Query `data_imports` filtrado por org
-- Mutation `revertImport(importId)`: deleta entries + atualiza status
-- Verifica período fiscal antes de permitir exclusão
-
-### 7. Hook `useFiscalPeriods.ts`
-
-- CRUD de `fiscal_periods` por org
-- `isMonthClosed(yearMonth)` helper
-- Mutations para fechar/reabrir períodos
-
-## Regras de Negócio
-
-- Somente owner/admin podem excluir importações ou gerenciar períodos
-- Exclusão bloqueada se o mês da importação está fechado
-- Reabertura de período requer role owner/admin
-- O status do período é consultado pelos outros módulos (AP, Aging, Fluxo de Caixa, Conciliação) para bloquear edições em meses fechados
-
-## Arquivos Envolvidos
-
-- **Migração SQL**: `import_id` em cashflow_entries + tabela `fiscal_periods` + RLS
-- `src/hooks/useFinanceiroImport.ts` — gravar `import_id` nos entries
-- `src/hooks/useImportHistory.ts` — novo hook
-- `src/hooks/useFiscalPeriods.ts` — novo hook
-- `src/components/financeiro/ImportacoesTab.tsx` — novo componente
-- `src/pages/Financeiro.tsx` — adicionar aba
+- `src/pages/Financeiro.tsx` — adicionar 2 abas
+- `src/components/financeiro/FluxoCaixaTab.tsx` — novo wrapper (conteúdo do FluxoCaixa sem PageHeader)
+- `src/components/financeiro/ConciliacaoTab.tsx` — novo wrapper (conteúdo do Conciliacao sem PageHeader)
+- `src/components/financeiro/ContasBancariasTab.tsx` — saldo manual + nome empresa
+- `src/App.tsx` — remover rotas, adicionar redirects
+- `src/components/AppLayout.tsx` — remover nav items
+- `src/data/moduleDefinitions.ts` — consolidar definições
+- `src/hooks/useBankAccounts.ts` — mutation de saldo com auditoria
+- Migração SQL — colunas de auditoria de saldo
