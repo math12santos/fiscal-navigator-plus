@@ -30,7 +30,6 @@ const BackofficeLayout = lazyRetry(() => import("@/components/BackofficeLayout")
 
 // Lazy-loaded pages
 const Dashboard = lazyRetry(() => import("@/pages/Dashboard"));
-const FluxoCaixa = lazyRetry(() => import("@/pages/FluxoCaixa"));
 const Contratos = lazyRetry(() => import("@/pages/Contratos"));
 const Planejamento = lazyRetry(() => import("@/pages/Planejamento"));
 const Conciliacao = lazyRetry(() => import("@/pages/Conciliacao"));
