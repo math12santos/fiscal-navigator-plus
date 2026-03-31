@@ -61,7 +61,6 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
       { key: "indicadores", label: "Indicadores" },
     ],
   },
-  { key: "conciliacao", label: "Conciliação" },
   {
     key: "tarefas",
     label: "Tarefas",
