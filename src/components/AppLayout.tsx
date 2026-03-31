@@ -2,7 +2,6 @@ import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  ArrowLeftRight,
   FileText,
   DollarSign,
   Target,
