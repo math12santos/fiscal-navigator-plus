@@ -207,18 +207,23 @@ export function useManagePermissions() {
         .eq("user_id", targetUserId)
         .eq("organization_id", orgId);
 
-      // Insert cloned
+      // Insert cloned (filter out ghost meta-modules)
+      const GHOST_MODULES = ["scope", "action", "documentos", "conciliacao", "fluxo-caixa"];
       if (sourcePerms && sourcePerms.length > 0) {
-        const newPerms = sourcePerms.map((p) => ({
-          user_id: targetUserId,
-          organization_id: orgId,
-          module: p.module,
-          tab: p.tab,
-          allowed: p.allowed,
-          granted_by: user!.id,
-        }));
-        const { error } = await supabase.from("user_permissions").insert(newPerms);
-        if (error) throw error;
+        const newPerms = sourcePerms
+          .filter((p) => !GHOST_MODULES.includes(p.module))
+          .map((p) => ({
+            user_id: targetUserId,
+            organization_id: orgId,
+            module: p.module,
+            tab: p.tab,
+            allowed: p.allowed,
+            granted_by: user!.id,
+          }));
+        if (newPerms.length > 0) {
+          const { error } = await supabase.from("user_permissions").insert(newPerms);
+          if (error) throw error;
+        }
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["backoffice_permissions"] }),
@@ -267,18 +272,23 @@ export function useManagePermissions() {
           .eq("user_id", userId)
           .eq("organization_id", targetOrgId);
 
-        // Insert cloned permissions
+        // Insert cloned permissions (filter out ghost meta-modules)
+        const GHOST_MODULES = ["scope", "action", "documentos", "conciliacao", "fluxo-caixa"];
         if (sourcePerms && sourcePerms.length > 0) {
-          const newPerms = sourcePerms.map((p) => ({
-            user_id: userId,
-            organization_id: targetOrgId,
-            module: p.module,
-            tab: p.tab,
-            allowed: p.allowed,
-            granted_by: user!.id,
-          }));
-          const { error } = await supabase.from("user_permissions").insert(newPerms);
-          if (error) throw error;
+          const newPerms = sourcePerms
+            .filter((p) => !GHOST_MODULES.includes(p.module))
+            .map((p) => ({
+              user_id: userId,
+              organization_id: targetOrgId,
+              module: p.module,
+              tab: p.tab,
+              allowed: p.allowed,
+              granted_by: user!.id,
+            }));
+          if (newPerms.length > 0) {
+            const { error } = await supabase.from("user_permissions").insert(newPerms);
+            if (error) throw error;
+          }
         }
         updated++;
       }
