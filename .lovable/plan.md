@@ -1,70 +1,58 @@
-# Consolidar Fluxo de Caixa e Conciliação como abas do Financeiro + Saldo Manual + Nome da empresa em Holding
+# Descoberta Automática de Estrutura: Categorias, Centros de Custo e Regras a partir de Dados Importados
 
-## Resumo
+## Problema
 
-Três mudanças:
+Quando o usuário importa lançamentos com categorias e centros de custo preenchidos, esses valores aparecem nos módulos financeiros (Dashboard, Fluxo de Caixa) como agrupamentos visuais — mas não existem como registros na estrutura configurada do sistema (tabelas `cost_centers`, `chart_of_accounts`, `grouping_rules`). Isso cria uma **desconexão entre dados operacionais e estrutura de governança**: o sistema exibe informação que não pode ser gerenciada, auditada ou reutilizada.
 
-1. Mover Fluxo de Caixa e Conciliação para dentro do módulo Financeiro como abas
-2. Adicionar botão de "Inserir Saldo" na aba Contas Bancárias (saldo manual = verdade absoluta para Aging List e comparar saldo manual com saldo de conciliação para indicar correções necessárias)
-3. Mostrar nome da empresa (não UUID) na coluna "Empresa" do modo holding consolidado
+## Solução: "Descoberta de Estrutura"
+
+Criar uma funcionalidade que **detecta padrões órfãos** nos dados importados e oferece ao usuário a opção de **promovê-los** a registros reais do sistema ou ajuste automático de categoria quando muito repetido o mesmo padrão — categorias no plano de contas, centros de custo, e regras de aglutinação.
 
 ## Mudanças
 
-### 1. Financeiro.tsx — Adicionar abas Fluxo de Caixa e Conciliação
+### 1. Novo hook `useStructureDiscovery.ts`
 
-- Adicionar `{ key: "fluxo-caixa", label: "Fluxo de Caixa" }` e `{ key: "conciliacao", label: "Conciliação" }` ao `ALL_TABS`
-- Importar e renderizar os conteúdos existentes de `FluxoCaixa` (inline, sem PageHeader) e `Conciliacao` (inline, sem PageHeader)
-- Criar componentes wrapper (`FluxoCaixaTab` e `ConciliacaoTab`) que reutilizam toda a lógica dos pages atuais mas sem o PageHeader redundante
+Analisa `cashflow_entries` da organização e cruza com a estrutura existente para identificar:
 
-### 2. App.tsx — Remover rotas standalone
+- **Categorias órfãs**: valores únicos em `categoria` que não correspondem a nenhuma conta no plano de contas nem a nenhuma regra de aglutinação
+- **Centros de custo órfãos**: valores em `cost_center_id` que não existem na tabela `cost_centers` (texto livre importado vs UUID real) — ou textos em campos como `categoria` que parecem centros de custo
+- **Padrões recorrentes sem regra**: descrições/categorias que aparecem N+ vezes mas não têm regra de aglutinação associada
 
-- Remover as rotas `/fluxo-caixa` e `/conciliacao`
-- Remover os lazy imports de `FluxoCaixa` e `Conciliacao`
-- Adicionar redirects de `/fluxo-caixa` → `/financeiro` e `/conciliacao` → `/financeiro` para links antigos
+Retorna arrays tipados com: `valor`, `frequência`, `valor_total`, `sugestão_de_ação` (criar conta, criar CC, criar regra).
 
-### 3. AppLayout.tsx — Remover itens de navegação
+### 2. Novo componente `StructureDiscoveryPanel.tsx`
 
-- Remover `{ path: "/fluxo-caixa", ... }` e `{ path: "/conciliacao", ... }` do array `navItems`
+Painel exibido na aba **Aglutinação** (GroupingConfigTab) como seção superior, visível quando há itens descobertos. Mostra:
 
-### 4. moduleDefinitions.ts — Consolidar módulos
+- Card resumo: "X categorias sem registro · Y padrões sem regra"
+- Tabela com cada item órfão: nome, frequência, valor acumulado, e botões de ação:
+  - **"Criar Categoria"** → abre dialog para criar conta analítica no plano de contas com o nome pré-preenchido
+  - **"Criar Centro de Custo"** → abre dialog para criar CC com nome pré-preenchido
+  - **"Criar Regra"** → abre GroupingRuleDialog com `match_field=categoria`, `operator=equals`, `match_value` pré-preenchido
+  - **"Ignorar"** → adiciona a uma lista de ignorados (localStorage por org)
+- Botão **"Promover Todos"** → cria em lote todas as sugestões aceitas
 
-- Remover entries standalone de `fluxo-caixa` e `conciliacao`
-- Adicionar `"fluxo-caixa"` e `"conciliacao"` como tabs dentro do módulo `financeiro`
+### 3. Integração com o fluxo de importação (pós-importação)
 
-### 5. ContasBancariasTab.tsx — Botão "Inserir Saldo" + Nome da empresa
+Após uma importação bem-sucedida no `ImportDialog`, exibir um toast/banner:
 
-**Saldo manual:**
+> "Detectamos 5 categorias e 2 centros de custo que não existem na estrutura. [Revisar →]"
 
-- Adicionar coluna "Saldo" na tabela com o valor de `saldo_atual` formatado
-- Adicionar botão/ícone em cada linha para abrir um dialog simples de inserção de saldo
-- O dialog atualiza `saldo_atual` via `update.mutate({ id, saldo_atual: valor })`
-- Registrar `data_atualizacao_saldo` para auditoria (campo timestamp já existe ou será adicionado)
+O link direciona para a aba Aglutinação com o painel de descoberta em destaque.
 
-**Nome da empresa em holding:**
+### 4. Atualização em `GroupingConfigTab.tsx`
 
-- Usar `subsidiaryOrgs` + `currentOrg` do `useHolding()` e `useOrganization()` para montar um mapa `orgId → orgName`
-- Substituir `acc.organization_id?.slice(0, 8)` pelo nome real da organização
+- Importar e renderizar `StructureDiscoveryPanel` no topo da aba, antes dos KPIs existentes
+- Passar callbacks de criação (`createRule`, `createGroup`) para que as ações do painel usem as mutations existentes
 
-### 6. Migração SQL — Coluna de auditoria de saldo
+### 5. Vinculação retroativa dos entries
 
-```sql
-ALTER TABLE bank_accounts 
-  ADD COLUMN IF NOT EXISTS saldo_atualizado_em TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS saldo_atualizado_por UUID REFERENCES auth.users(id);
-```
-
-### 7. useBankAccounts.ts — Mutation de saldo
-
-- Adicionar mutation `updateBalance(id, saldo_atual)` que também grava `saldo_atualizado_em = now()` e `saldo_atualizado_por = user.id`
+Quando o usuário cria uma categoria/CC a partir da descoberta, oferecer opção de **atualizar os lançamentos existentes** que usam aquele texto para apontar para o novo registro criado (via batch update nos `cashflow_entries`).
 
 ## Arquivos envolvidos
 
-- `src/pages/Financeiro.tsx` — adicionar 2 abas
-- `src/components/financeiro/FluxoCaixaTab.tsx` — novo wrapper (conteúdo do FluxoCaixa sem PageHeader)
-- `src/components/financeiro/ConciliacaoTab.tsx` — novo wrapper (conteúdo do Conciliacao sem PageHeader)
-- `src/components/financeiro/ContasBancariasTab.tsx` — saldo manual + nome empresa
-- `src/App.tsx` — remover rotas, adicionar redirects
-- `src/components/AppLayout.tsx` — remover nav items
-- `src/data/moduleDefinitions.ts` — consolidar definições
-- `src/hooks/useBankAccounts.ts` — mutation de saldo com auditoria
-- Migração SQL — colunas de auditoria de saldo
+- `src/hooks/useStructureDiscovery.ts` — novo hook de análise
+- `src/components/financeiro/StructureDiscoveryPanel.tsx` — novo componente visual
+- `src/components/financeiro/GroupingConfigTab.tsx` — integrar painel
+- `src/components/financeiro/ImportDialog.tsx` — toast pós-importação com link
+- Nenhuma migração SQL necessária — usa dados existentes em `cashflow_entries` cruzados com `cost_centers`, `chart_of_accounts` e `grouping_rules`
