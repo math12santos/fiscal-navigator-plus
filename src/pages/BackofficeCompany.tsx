@@ -66,87 +66,9 @@ import { useSystemModules } from "@/hooks/useSystemModules";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { Checkbox } from "@/components/ui/checkbox";
 
-const MODULES: { key: string; label: string; tabs?: { key: string; label: string }[] }[] = [
-  { key: "dashboard", label: "Dashboard" },
-  {
-    key: "financeiro",
-    label: "Financeiro",
-    tabs: [
-      { key: "pagar", label: "Contas a Pagar" },
-      { key: "receber", label: "Contas a Receber" },
-    ],
-  },
-  {
-    key: "fluxo-caixa",
-    label: "Fluxo de Caixa",
-    tabs: [
-      { key: "visao-geral", label: "Visão Geral" },
-      { key: "projetado", label: "Projetado" },
-      { key: "realizado", label: "Realizado" },
-    ],
-  },
-  { key: "contratos", label: "Contratos" },
-  {
-    key: "planejamento",
-    label: "Planejamento",
-    tabs: [
-      { key: "visao-geral", label: "Visão Geral" },
-      { key: "orcamento", label: "Orçamento" },
-      { key: "cenarios", label: "Cenários" },
-      { key: "planejado-realizado", label: "Planejado × Realizado" },
-      { key: "liquidez", label: "Liquidez" },
-      { key: "passivos", label: "Passivos" },
-      { key: "rh", label: "RH" },
-      { key: "comercial", label: "Comercial" },
-    ],
-  },
-  {
-    key: "dp",
-    label: "Departamento Pessoal",
-    tabs: [
-      { key: "dashboard", label: "Dashboard" },
-      { key: "colaboradores", label: "Colaboradores" },
-      { key: "folha", label: "Folha" },
-      { key: "ferias", label: "Férias / 13º" },
-      { key: "rescisoes", label: "Rescisões" },
-      { key: "encargos", label: "Encargos" },
-      { key: "cargos", label: "Cargos & Rotinas" },
-      { key: "beneficios", label: "Benefícios" },
-      { key: "config", label: "Configurações" },
-    ],
-  },
-  {
-    key: "crm",
-    label: "CRM",
-    tabs: [
-      { key: "carteira", label: "Carteira" },
-      { key: "pipeline", label: "Pipeline" },
-      { key: "indicadores", label: "Indicadores" },
-    ],
-  },
-  { key: "conciliacao", label: "Conciliação" },
-  {
-    key: "configuracoes",
-    label: "Configurações",
-    tabs: [
-      { key: "plano-contas", label: "Plano de Contas" },
-      { key: "centros-custo", label: "Centros de Custo" },
-      { key: "fornecedores", label: "Fornecedores / Clientes" },
-      { key: "produtos", label: "Produtos / Serviços" },
-    ],
-  },
-  {
-    key: "tarefas",
-    label: "Tarefas",
-    tabs: [
-      { key: "dashboard", label: "Dashboard" },
-      { key: "solicitacoes", label: "Solicitações" },
-      { key: "minhas-tarefas", label: "Minhas Tarefas" },
-    ],
-  },
-  { key: "integracoes", label: "Integrações" },
-  { key: "ia", label: "IA Financeira" },
-];
+import { MODULE_DEFINITIONS } from "@/data/moduleDefinitions";
+
+const MODULES = MODULE_DEFINITIONS;
 
 // SCOPES removed — replaced by cost center access selector
 
