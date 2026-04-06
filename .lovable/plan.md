@@ -1,58 +1,69 @@
-# Descoberta Automática de Estrutura: Categorias, Centros de Custo e Regras a partir de Dados Importados
 
-## Problema
 
-Quando o usuário importa lançamentos com categorias e centros de custo preenchidos, esses valores aparecem nos módulos financeiros (Dashboard, Fluxo de Caixa) como agrupamentos visuais — mas não existem como registros na estrutura configurada do sistema (tabelas `cost_centers`, `chart_of_accounts`, `grouping_rules`). Isso cria uma **desconexão entre dados operacionais e estrutura de governança**: o sistema exibe informação que não pode ser gerenciada, auditada ou reutilizada.
+# Análise e Limpeza da tabela `user_permissions` (362 → ~180 registros)
 
-## Solução: "Descoberta de Estrutura"
+## Diagnóstico
 
-Criar uma funcionalidade que **detecta padrões órfãos** nos dados importados e oferece ao usuário a opção de **promovê-los** a registros reais do sistema ou ajuste automático de categoria quando muito repetido o mesmo padrão — categorias no plano de contas, centros de custo, e regras de aglutinação.
+362 permissões distribuídas entre 8 usuários × 8 organizações. Três problemas identificados:
 
-## Mudanças
+### 1. Módulos obsoletos/fantasma (estimativa: ~85 registros removíveis)
 
-### 1. Novo hook `useStructureDiscovery.ts`
+| Módulo | Registros | Problema |
+|--------|-----------|----------|
+| `scope` | 8 | Meta-dado, não é módulo real — controlado por `user_cost_center_access` |
+| `action` | 19 | Meta-dado genérico, não utilizado na lógica de `canAccessModule` |
+| `conciliacao` | 16 | Módulo foi integrado como aba do Financeiro — agora é `financeiro` tab `conciliacao` |
+| `fluxo-caixa` | 28 | Idem — agora é `financeiro` tab `fluxo-caixa` |
+| `documentos` | 2 | Módulo não existe no sistema |
 
-Analisa `cashflow_entries` da organização e cruza com a estrutura existente para identificar:
+Esses 73+ registros podem ser removidos ou migrados.
 
-- **Categorias órfãs**: valores únicos em `categoria` que não correspondem a nenhuma conta no plano de contas nem a nenhuma regra de aglutinação
-- **Centros de custo órfãos**: valores em `cost_center_id` que não existem na tabela `cost_centers` (texto livre importado vs UUID real) — ou textos em campos como `categoria` que parecem centros de custo
-- **Padrões recorrentes sem regra**: descrições/categorias que aparecem N+ vezes mas não têm regra de aglutinação associada
+### 2. Propagação multiplica linhas desnecessariamente
 
-Retorna arrays tipados com: `valor`, `frequência`, `valor_total`, `sugestão_de_ação` (criar conta, criar CC, criar regra).
+Ao propagar permissões para 6 subsidiárias, cada usuário gera ~21 linhas × 6 orgs = 126 linhas. O modelo "1 linha por módulo/tab" é correto, mas o problema é que **cada módulo grava uma linha mesmo quando `allowed=true` e o comportamento padrão já seria permitir** (para owners/admins).
 
-### 2. Novo componente `StructureDiscoveryPanel.tsx`
+### 3. Granularidade de tabs sem necessidade
 
-Painel exibido na aba **Aglutinação** (GroupingConfigTab) como seção superior, visível quando há itens descobertos. Mostra:
+Várias permissões de tabs (ex: `planejamento` × `cenarios`, `planejamento` × `comercial`, etc.) estão gravadas como `allowed=false` para todos os usuários — seriam melhor representadas por uma única regra no módulo pai.
 
-- Card resumo: "X categorias sem registro · Y padrões sem regra"
-- Tabela com cada item órfão: nome, frequência, valor acumulado, e botões de ação:
-  - **"Criar Categoria"** → abre dialog para criar conta analítica no plano de contas com o nome pré-preenchido
-  - **"Criar Centro de Custo"** → abre dialog para criar CC com nome pré-preenchido
-  - **"Criar Regra"** → abre GroupingRuleDialog com `match_field=categoria`, `operator=equals`, `match_value` pré-preenchido
-  - **"Ignorar"** → adiciona a uma lista de ignorados (localStorage por org)
-- Botão **"Promover Todos"** → cria em lote todas as sugestões aceitas
+---
 
-### 3. Integração com o fluxo de importação (pós-importação)
+## Plano de Correção
 
-Após uma importação bem-sucedida no `ImportDialog`, exibir um toast/banner:
+### Etapa 1 — Migrar permissões de módulos obsoletos (SQL data update)
 
-> "Detectamos 5 categorias e 2 centros de custo que não existem na estrutura. [Revisar →]"
+- Converter `conciliacao` → `financeiro` tab `conciliacao` (onde não existir duplicata)
+- Converter `fluxo-caixa` → `financeiro` tab `fluxo-caixa` (onde não existir duplicata)  
+- Deletar registros de `scope`, `action`, `documentos`
 
-O link direciona para a aba Aglutinação com o painel de descoberta em destaque.
+### Etapa 2 — Atualizar código para não gerar registros fantasma
 
-### 4. Atualização em `GroupingConfigTab.tsx`
+**`src/hooks/useBackoffice.ts`**: No `upsertPermission` e `propagateToGroup`, filtrar módulos `scope` e `action` para não serem copiados/propagados.
 
-- Importar e renderizar `StructureDiscoveryPanel` no topo da aba, antes dos KPIs existentes
-- Passar callbacks de criação (`createRule`, `createGroup`) para que as ações do painel usem as mutations existentes
+**`src/hooks/useUserPermissions.ts`**: Já filtra `scope`/`action` na verificação `hasConfiguredPermissions` — manter.
 
-### 5. Vinculação retroativa dos entries
+### Etapa 3 — Atualizar `moduleDefinitions.ts`
 
-Quando o usuário cria uma categoria/CC a partir da descoberta, oferecer opção de **atualizar os lançamentos existentes** que usam aquele texto para apontar para o novo registro criado (via batch update nos `cashflow_entries`).
+Garantir que `conciliacao` e `fluxo-caixa` como módulos standalone não existam (já feito na consolidação anterior), e que a tela de configuração de permissões do backoffice use `MODULE_DEFINITIONS` como fonte canônica — evitando gravar permissões para módulos inexistentes.
+
+### Etapa 4 — Limpeza na tela de permissões do Backoffice
+
+Verificar o componente que renderiza checkboxes de permissões e garantir que ele use `MODULE_DEFINITIONS` como lista de módulos, não uma lista hardcoded que ainda inclua módulos extintos.
+
+---
+
+## Resultado esperado
+
+| Antes | Depois |
+|-------|--------|
+| 362 registros | ~180 registros |
+| 5 módulos fantasma | 0 |
+| Propagação copia tudo | Propagação filtra meta-dados |
 
 ## Arquivos envolvidos
 
-- `src/hooks/useStructureDiscovery.ts` — novo hook de análise
-- `src/components/financeiro/StructureDiscoveryPanel.tsx` — novo componente visual
-- `src/components/financeiro/GroupingConfigTab.tsx` — integrar painel
-- `src/components/financeiro/ImportDialog.tsx` — toast pós-importação com link
-- Nenhuma migração SQL necessária — usa dados existentes em `cashflow_entries` cruzados com `cost_centers`, `chart_of_accounts` e `grouping_rules`
+- **SQL (data update)**: migrar `conciliacao`/`fluxo-caixa` → tabs do financeiro, deletar `scope`/`action`/`documentos`
+- `src/hooks/useBackoffice.ts` — filtrar meta-permissões na propagação
+- `src/data/moduleDefinitions.ts` — confirmar que é fonte única
+- Componente de configuração de permissões no Backoffice — usar `MODULE_DEFINITIONS`
+
