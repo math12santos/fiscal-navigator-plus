@@ -22,6 +22,7 @@ import GroupingMacrogroupManager from "@/components/financeiro/GroupingMacrogrou
 import GroupingPropagation from "@/components/financeiro/GroupingPropagation";
 import SuggestedRuleTemplates from "@/components/financeiro/SuggestedRuleTemplates";
 import AIRuleSuggestions from "@/components/financeiro/AIRuleSuggestions";
+import StructureDiscoveryPanel from "@/components/financeiro/StructureDiscoveryPanel";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 
 const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
@@ -157,8 +158,36 @@ export default function GroupingConfigTab() {
   const [showUnclassified, setShowUnclassified] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
 
+  const handleDiscoveryCreateCategory = (name: string) => {
+    // Pre-fill a rule creation with category match
+    setEditingRule(null);
+    setDialogOpen(true);
+    // We pass via a temporary state — the dialog will pick it up
+    setPrefilledRule({ match_field: "categoria", operator: "equals", match_value: name, name });
+  };
+
+  const handleDiscoveryCreateRule = (matchField: string, matchValue: string) => {
+    setEditingRule(null);
+    setDialogOpen(true);
+    setPrefilledRule({
+      match_field: matchField,
+      operator: matchField === "descricao" ? "contains" : "equals",
+      match_value: matchField === "descricao" ? "" : matchValue,
+      match_keyword: matchField === "descricao" ? matchValue : undefined,
+      name: matchValue.slice(0, 30),
+    });
+  };
+
+  const [prefilledRule, setPrefilledRule] = useState<any>(null);
+
   return (
     <div className="space-y-6">
+      {/* ════════ DESCOBERTA DE ESTRUTURA ════════ */}
+      <StructureDiscoveryPanel
+        onCreateCategory={handleDiscoveryCreateCategory}
+        onCreateRule={handleDiscoveryCreateRule}
+      />
+
       {/* ════════ ZONA 1 — Cabeçalho + KPIs ════════ */}
       <div>
         <h2 className="text-lg font-semibold">Motor de Aglutinação</h2>

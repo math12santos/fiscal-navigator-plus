@@ -422,6 +422,9 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
               <CheckCircle2 className="h-12 w-12 text-emerald-500" />
               <p className="text-lg font-medium">{imp.importCount} lançamentos importados</p>
               <p className="text-sm text-muted-foreground">Os dados foram adicionados à lista de {tipo === "saida" ? "contas a pagar" : "contas a receber"}.</p>
+              <p className="text-xs text-muted-foreground max-w-md text-center mt-1">
+                Verifique a aba <strong>Aglutinação</strong> para revisar categorias e padrões importados que ainda não existem na estrutura do sistema.
+              </p>
               <Button size="sm" onClick={() => handleClose(false)} className="mt-4">
                 Fechar
               </Button>
