@@ -44,6 +44,7 @@ import {
 } from "@/hooks/useFinanceiroImport";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { detectImportDuplicates } from "@/hooks/useDuplicateDetection";
+import { EntityMatchingStep } from "./EntityMatchingStep";
 import { cn } from "@/lib/utils";
 
 interface ImportDialogProps {
@@ -57,6 +58,7 @@ const STEP_LABELS: Record<ImportStep, string> = {
   detecting: "Detectando",
   mapping: "Mapeamento",
   preview: "Preview",
+  entity_matching: "Cadastros",
   importing: "Importando",
   done: "Concluído",
 };
@@ -94,7 +96,20 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   const errorCount = imp.parsedRows.filter((r) => r.errors.length > 0).length;
   const excludedCount = imp.excludedRows.size;
 
-  const showFooter = ["mapping", "preview"].includes(imp.step);
+  const showFooter = ["mapping", "preview", "entity_matching"].includes(imp.step);
+
+  const hasEntityNames = imp.parsedRows.some(
+    (r, i) => r.errors.length === 0 && !imp.excludedRows.has(i) && (r.mapped.entity_name || "").toString().trim() !== ""
+  );
+
+  const handleAdvanceFromPreview = async () => {
+    if (!hasEntityNames) {
+      imp.executeImport();
+      return;
+    }
+    const opened = await imp.prepareEntityMatching();
+    if (!opened) imp.executeImport();
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -113,7 +128,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
 
           {/* Step indicator */}
           <div className="flex items-center gap-1 text-xs text-muted-foreground mt-3">
-            {(["upload", "mapping", "preview", "done"] as ImportStep[]).map((s, i) => (
+            {(["upload", "mapping", "preview", "entity_matching", "done"] as ImportStep[]).map((s, i) => (
               <span key={s} className="flex items-center gap-1">
                 {i > 0 && <ArrowRight className="h-3 w-3" />}
                 <span
