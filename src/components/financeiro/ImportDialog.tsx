@@ -423,6 +423,18 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
             );
           })()}
 
+          {/* STEP: Entity Matching */}
+          {imp.step === "entity_matching" && (
+            <EntityMatchingStep
+              matches={imp.entityMatches}
+              tipo={tipo}
+              onConfirmPossible={imp.confirmPossibleMatch}
+              onSelectEntity={imp.selectEntityForMatch}
+              onIgnore={imp.ignoreEntityMatch}
+              onCreateAllNew={imp.createMissingEntities}
+            />
+          )}
+
           {/* STEP: Importing */}
           {imp.step === "importing" && (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
@@ -470,9 +482,24 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                   </Button>
                   <Button
                     size="sm"
-                    onClick={imp.executeImport}
+                    onClick={handleAdvanceFromPreview}
                     disabled={validCount === 0}
                   >
+                    {hasEntityNames ? (
+                      <>Próximo: Cadastros <ArrowRight className="h-3 w-3 ml-1" /></>
+                    ) : (
+                      <><CheckCircle2 className="h-3 w-3 mr-1" /> Importar {validCount} lançamentos</>
+                    )}
+                  </Button>
+                </>
+              )}
+              {imp.step === "entity_matching" && (
+                <>
+                  <Button variant="outline" size="sm" onClick={imp.goToPreview}>
+                    <ArrowLeft className="h-3 w-3 mr-1" />
+                    Voltar ao Preview
+                  </Button>
+                  <Button size="sm" onClick={imp.executeImport} disabled={validCount === 0}>
                     <CheckCircle2 className="h-3 w-3 mr-1" />
                     Importar {validCount} lançamentos
                   </Button>
