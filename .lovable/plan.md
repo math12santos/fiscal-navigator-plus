@@ -1,69 +1,88 @@
 
+# Reconciliação de Fornecedores/Clientes na Importação
 
-# Análise e Limpeza da tabela `user_permissions` (362 → ~180 registros)
+## Problema
 
-## Diagnóstico
+A importação captura o campo `entity_name` (Fornecedor/Cliente) como texto livre, mas não vincula ao cadastro de entidades (`entities`). Isso gera registros órfãos — o sistema exibe nomes de fornecedores que não existem formalmente, impedindo rastreabilidade e governança.
 
-362 permissões distribuídas entre 8 usuários × 8 organizações. Três problemas identificados:
+## Solução
 
-### 1. Módulos obsoletos/fantasma (estimativa: ~85 registros removíveis)
+Adicionar uma etapa de **reconciliação de entidades** entre o Preview e a Importação. Nessa etapa o sistema cruza os nomes importados com o cadastro existente e apresenta o resultado ao usuário.
 
-| Módulo | Registros | Problema |
-|--------|-----------|----------|
-| `scope` | 8 | Meta-dado, não é módulo real — controlado por `user_cost_center_access` |
-| `action` | 19 | Meta-dado genérico, não utilizado na lógica de `canAccessModule` |
-| `conciliacao` | 16 | Módulo foi integrado como aba do Financeiro — agora é `financeiro` tab `conciliacao` |
-| `fluxo-caixa` | 28 | Idem — agora é `financeiro` tab `fluxo-caixa` |
-| `documentos` | 2 | Módulo não existe no sistema |
+## Fluxo atualizado
 
-Esses 73+ registros podem ser removidos ou migrados.
+```text
+Upload → Mapeamento → Preview → RECONCILIAÇÃO DE ENTIDADES → Importação
+```
 
-### 2. Propagação multiplica linhas desnecessariamente
+## Mudanças
 
-Ao propagar permissões para 6 subsidiárias, cada usuário gera ~21 linhas × 6 orgs = 126 linhas. O modelo "1 linha por módulo/tab" é correto, mas o problema é que **cada módulo grava uma linha mesmo quando `allowed=true` e o comportamento padrão já seria permitir** (para owners/admins).
+### 1. Nova etapa `entity_matching` no hook `useFinanceiroImport.ts`
 
-### 3. Granularidade de tabs sem necessidade
+- Adicionar step `"entity_matching"` ao tipo `ImportStep`
+- Após o Preview, ao clicar "Próximo", extrair todos os valores únicos de `entity_name` dos `parsedRows` válidos
+- Buscar entidades existentes da org via `supabase.from("entities").select("id, name, document_number, type")`
+- Fazer matching por similaridade (normalização: lowercase, trim, remoção de acentos e pontuação)
+- Classificar cada nome importado como:
+  - **Encontrado** (match exato ou muito próximo) — vincula automaticamente ao `entity_id`
+  - **Possível match** (similaridade parcial) — sugere candidato para confirmação
+  - **Não encontrado** — oferece cadastro rápido ou ignorar
+- Armazenar um mapa `entityNameToId: Record<string, string | null>` no state
 
-Várias permissões de tabs (ex: `planejamento` × `cenarios`, `planejamento` × `comercial`, etc.) estão gravadas como `allowed=false` para todos os usuários — seriam melhor representadas por uma única regra no módulo pai.
+### 2. Novo componente `EntityMatchingStep.tsx`
 
----
+Tabela com colunas:
+- Nome importado
+- Status (Encontrado / Possível / Novo)
+- Entidade sugerida (dropdown com busca para trocar)
+- Ação: "Criar cadastro" (abre EntityFormDialog com nome pré-preenchido) ou "Ignorar"
 
-## Plano de Correção
+Indicadores no topo:
+- X encontrados automaticamente
+- Y para revisar
+- Z não encontrados
 
-### Etapa 1 — Migrar permissões de módulos obsoletos (SQL data update)
+Botão "Cadastrar todos não encontrados" para criação em lote (tipo baseado no `tipo` da importação: saida→fornecedor, entrada→cliente).
 
-- Converter `conciliacao` → `financeiro` tab `conciliacao` (onde não existir duplicata)
-- Converter `fluxo-caixa` → `financeiro` tab `fluxo-caixa` (onde não existir duplicata)  
-- Deletar registros de `scope`, `action`, `documentos`
+### 3. Atualizar `executeImport` no hook
 
-### Etapa 2 — Atualizar código para não gerar registros fantasma
+- Ao montar cada `cashflow_entry`, incluir `entity_id` do mapa de reconciliação quando disponível
+- Manter `entity_name` como campo de texto para referência (campo já existe na importação)
 
-**`src/hooks/useBackoffice.ts`**: No `upsertPermission` e `propagateToGroup`, filtrar módulos `scope` e `action` para não serem copiados/propagados.
+### 4. Atualizar `ImportDialog.tsx`
 
-**`src/hooks/useUserPermissions.ts`**: Já filtra `scope`/`action` na verificação `hasConfiguredPermissions` — manter.
+- Renderizar a nova etapa entre Preview e Importing
+- Footer com botões "Voltar ao Preview" e "Importar N lançamentos"
+- A etapa só aparece se houver pelo menos um `entity_name` nos dados importados; caso contrário, pula direto para importação
 
-### Etapa 3 — Atualizar `moduleDefinitions.ts`
+### 5. Lógica de matching (normalização)
 
-Garantir que `conciliacao` e `fluxo-caixa` como módulos standalone não existam (já feito na consolidação anterior), e que a tela de configuração de permissões do backoffice use `MODULE_DEFINITIONS` como fonte canônica — evitando gravar permissões para módulos inexistentes.
+```typescript
+function normalize(s: string): string {
+  return s.toLowerCase().trim()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
+}
 
-### Etapa 4 — Limpeza na tela de permissões do Backoffice
-
-Verificar o componente que renderiza checkboxes de permissões e garantir que ele use `MODULE_DEFINITIONS` como lista de módulos, não uma lista hardcoded que ainda inclua módulos extintos.
-
----
-
-## Resultado esperado
-
-| Antes | Depois |
-|-------|--------|
-| 362 registros | ~180 registros |
-| 5 módulos fantasma | 0 |
-| Propagação copia tudo | Propagação filtra meta-dados |
+function similarity(a: string, b: string): number {
+  // Token-based: % de tokens em comum
+  const ta = new Set(normalize(a).split(" "));
+  const tb = new Set(normalize(b).split(" "));
+  const inter = [...ta].filter(t => tb.has(t)).length;
+  return inter / Math.max(ta.size, tb.size);
+}
+// >= 0.9 → match automático, >= 0.6 → possível, < 0.6 → não encontrado
+```
 
 ## Arquivos envolvidos
 
-- **SQL (data update)**: migrar `conciliacao`/`fluxo-caixa` → tabs do financeiro, deletar `scope`/`action`/`documentos`
-- `src/hooks/useBackoffice.ts` — filtrar meta-permissões na propagação
-- `src/data/moduleDefinitions.ts` — confirmar que é fonte única
-- Componente de configuração de permissões no Backoffice — usar `MODULE_DEFINITIONS`
+- `src/hooks/useFinanceiroImport.ts` — novo step, estado de matching, lógica de normalização
+- `src/components/financeiro/EntityMatchingStep.tsx` — novo componente visual
+- `src/components/financeiro/ImportDialog.tsx` — integrar nova etapa no fluxo
+- Nenhuma migração SQL — `cashflow_entries` já possui coluna `entity_id`
 
+## Detalhes técnicos
+
+- O matching usa normalização de texto client-side (sem IA) para ser instantâneo
+- A criação de entidades usa a mutation `create` do `useEntities` existente
+- O campo `entity_id` em `cashflow_entries` já existe e aceita UUID nullable — basta populá-lo na importação
