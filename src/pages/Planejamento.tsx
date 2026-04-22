@@ -160,10 +160,11 @@ function MultiSelectList({
  * (não itens), pra manter o sinal visual estável.
  */
 function FilterPopover({
-  filters, setFilters,
+  filters, setFilters, hasActiveFiltersWithoutData,
 }: {
   filters: PlanningFilters;
   setFilters: (f: PlanningFilters) => void;
+  hasActiveFiltersWithoutData: boolean;
 }) {
   const { costCenters } = useCostCenters();
   const { allBankAccounts } = useBankAccounts();
