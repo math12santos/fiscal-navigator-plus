@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useBankAccounts, BankAccount } from "@/hooks/useBankAccounts";
 import { BankAccountFormDialog } from "./BankAccountFormDialog";
+import { OverdraftValidationDialog } from "./OverdraftValidationDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,13 +10,20 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp } from "lucide-react";
+import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp, Info } from "lucide-react";
 import { useHolding } from "@/contexts/HoldingContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  calculateAvailability,
+  estimateMonthlyClosingCharge,
+  getNextClosingDate,
+} from "@/lib/overdraftCalculations";
 
 const tipoContaLabels: Record<string, string> = {
   corrente: "Corrente",
@@ -45,6 +53,12 @@ export function ContasBancariasTab() {
   const [balanceAccount, setBalanceAccount] = useState<BankAccount | null>(null);
   const [balanceValue, setBalanceValue] = useState("");
 
+  // Overdraft validation dialog state (for cheque especial with negative balance)
+  const [overdraftValidation, setOverdraftValidation] = useState<{
+    account: BankAccount;
+    saldoNegativo: number;
+  } | null>(null);
+
   // Limite dialog state
   const [limitAccount, setLimitAccount] = useState<BankAccount | null>(null);
   const [limitForm, setLimitForm] = useState({
@@ -64,7 +78,30 @@ export function ContasBancariasTab() {
     if (!balanceAccount) return;
     const val = parseFloat(balanceValue.replace(/[^\d.,-]/g, "").replace(",", "."));
     if (isNaN(val)) return;
+
+    // Se conta de cheque especial e saldo negativo: abrir validação de uso de limite
+    const isOverdraft = (balanceAccount.limite_tipo || "cheque_especial") === "cheque_especial";
+    if (isOverdraft && val < 0 && (balanceAccount.limite_credito || 0) > 0) {
+      setOverdraftValidation({ account: balanceAccount, saldoNegativo: val });
+      return;
+    }
+
     update.mutate({ id: balanceAccount.id, saldo_atual: val } as any);
+    setBalanceAccount(null);
+    setBalanceValue("");
+  };
+
+  const handleConfirmOverdraft = ({ usoLimite }: { usoLimite: number; provisao: number }) => {
+    if (!overdraftValidation) return;
+    const { account, saldoNegativo } = overdraftValidation;
+    update.mutate({
+      id: account.id,
+      saldo_atual: saldoNegativo,
+      limite_utilizado: usoLimite,
+      saldo_atualizado_em: new Date().toISOString(),
+      limite_atualizado_em: new Date().toISOString(),
+    } as any);
+    setOverdraftValidation(null);
     setBalanceAccount(null);
     setBalanceValue("");
   };
@@ -94,22 +131,36 @@ export function ContasBancariasTab() {
     setLimitAccount(null);
   };
 
-  // Totais consolidados
+  // Totais consolidados — usa lógica diferenciada para cheque especial
   const totals = allBankAccounts.reduce(
     (acc, b) => {
       const saldo = b.saldo_atual || 0;
-      const limTotal = b.limite_credito || 0;
-      const limUsado = b.limite_utilizado || 0;
-      const limDisp = Math.max(0, limTotal - limUsado);
+      const tipo = (b.limite_tipo || "cheque_especial") as any;
+      const av = calculateAvailability({
+        saldoAtual: saldo,
+        limiteTotal: b.limite_credito || 0,
+        limiteUtilizado: b.limite_utilizado || 0,
+        limiteTipo: tipo,
+      });
       acc.saldo += saldo;
-      acc.limiteTotal += limTotal;
-      acc.limiteUsado += limUsado;
-      acc.limiteDisp += limDisp;
-      acc.disponivel += saldo + limDisp;
+      acc.limiteTotal += b.limite_credito || 0;
+      acc.limiteUsado += av.usoLimiteAtual;
+      acc.limiteDisp += av.limiteDisponivel;
+      acc.disponivel += av.capitalGiroDisponivel;
+      // Estimativa de juros do mês (cheque especial)
+      if (tipo === "cheque_especial" && av.usoLimiteAtual > 0) {
+        acc.jurosEstimado += estimateMonthlyClosingCharge(
+          av.usoLimiteAtual,
+          b.limite_taxa_juros_mensal || 0,
+          30
+        );
+      }
       return acc;
     },
-    { saldo: 0, limiteTotal: 0, limiteUsado: 0, limiteDisp: 0, disponivel: 0 }
+    { saldo: 0, limiteTotal: 0, limiteUsado: 0, limiteDisp: 0, disponivel: 0, jurosEstimado: 0 }
   );
+
+  const proximoFechamento = getNextClosingDate();
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="animate-spin" /></div>;
@@ -144,6 +195,23 @@ export function ContasBancariasTab() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
               <CreditCard className="h-3.5 w-3.5" /> Limite Utilizado
+              {totals.jurosEstimado > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3 w-3 text-warning cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs">
+                        Juros estimados do mês corrente:{" "}
+                        <strong className="text-warning">{fmt(totals.jurosEstimado)}</strong>
+                        <br />
+                        Fechamento em {format(proximoFechamento, "dd/MM/yyyy", { locale: ptBR })}.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
             <p className={`text-lg font-semibold mt-1 ${totals.limiteUsado > 0 ? "text-warning" : ""}`}>
               {fmt(totals.limiteUsado)}
@@ -151,6 +219,9 @@ export function ContasBancariasTab() {
             {totals.limiteTotal > 0 && (
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 {((totals.limiteUsado / totals.limiteTotal) * 100).toFixed(1)}% do limite
+                {totals.jurosEstimado > 0 && (
+                  <span className="text-warning"> · ~{fmt(totals.jurosEstimado)} juros/mês</span>
+                )}
               </p>
             )}
           </CardContent>
@@ -206,10 +277,21 @@ export function ContasBancariasTab() {
               )}
               {allBankAccounts.map((acc) => {
                 const limTotal = acc.limite_credito || 0;
-                const limUsado = acc.limite_utilizado || 0;
-                const limDisp = Math.max(0, limTotal - limUsado);
-                const disponivel = (acc.saldo_atual || 0) + limDisp;
+                const tipoLim = (acc.limite_tipo || "cheque_especial") as any;
+                const av = calculateAvailability({
+                  saldoAtual: acc.saldo_atual || 0,
+                  limiteTotal: limTotal,
+                  limiteUtilizado: acc.limite_utilizado || 0,
+                  limiteTipo: tipoLim,
+                });
+                const limUsado = av.usoLimiteAtual;
+                const limDisp = av.limiteDisponivel;
+                const disponivel = av.capitalGiroDisponivel;
                 const usoPct = limTotal > 0 ? (limUsado / limTotal) * 100 : 0;
+                const isOverdraft = tipoLim === "cheque_especial";
+                const jurosMes = isOverdraft && limUsado > 0
+                  ? estimateMonthlyClosingCharge(limUsado, acc.limite_taxa_juros_mensal || 0, 30)
+                  : 0;
 
                 return (
                   <TableRow key={acc.id}>
@@ -258,6 +340,11 @@ export function ContasBancariasTab() {
                           {limTotal > 0 && (
                             <div className="text-[10px] text-muted-foreground">
                               {tipoLimiteLabels[acc.limite_tipo || "cheque_especial"]} • {usoPct.toFixed(0)}% usado
+                            </div>
+                          )}
+                          {jurosMes > 0 && (
+                            <div className="text-[10px] text-warning">
+                              ~{fmt(jurosMes)}/mês juros
                             </div>
                           )}
                           {limTotal === 0 && (
@@ -341,6 +428,19 @@ export function ContasBancariasTab() {
             <p className="text-xs text-muted-foreground">
               Este saldo será a verdade absoluta para disponibilidade de caixa no Aging List e referência para conciliações futuras.
             </p>
+            {balanceAccount &&
+              (balanceAccount.limite_tipo || "cheque_especial") === "cheque_especial" &&
+              (balanceAccount.limite_credito || 0) > 0 &&
+              parseFloat(balanceValue.replace(",", ".") || "0") < 0 && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Saldo negativo + cheque especial: ao salvar, você poderá separar
+                    o valor entre <strong>uso de limite</strong> (gera juros) e
+                    <strong> provisão de pagamentos</strong> (não gera juros).
+                  </AlertDescription>
+                </Alert>
+              )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBalanceAccount(null)}>Cancelar</Button>
@@ -407,14 +507,27 @@ export function ContasBancariasTab() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Vencimento / Renovação do Contrato</Label>
-              <Input
-                type="date"
-                value={limitForm.limite_vencimento}
-                onChange={(e) => setLimitForm((p) => ({ ...p, limite_vencimento: e.target.value }))}
-              />
-            </div>
+            {limitForm.limite_tipo !== "cheque_especial" && (
+              <div className="space-y-2">
+                <Label>Vencimento / Renovação do Contrato</Label>
+                <Input
+                  type="date"
+                  value={limitForm.limite_vencimento}
+                  onChange={(e) => setLimitForm((p) => ({ ...p, limite_vencimento: e.target.value }))}
+                />
+              </div>
+            )}
+            {limitForm.limite_tipo === "cheque_especial" && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Cheque especial não possui vencimento. Os juros são calculados
+                  diariamente sobre o saldo devedor e debitados no <strong>1º dia
+                  do mês subsequente</strong>. O uso do limite é detectado
+                  automaticamente pelo saldo negativo da conta.
+                </AlertDescription>
+              </Alert>
+            )}
             {Number(limitForm.limite_credito) > 0 && (
               <div className="bg-muted/50 rounded-md p-3 text-xs space-y-1">
                 <div className="flex justify-between">
@@ -425,9 +538,29 @@ export function ContasBancariasTab() {
                 </div>
                 {Number(limitForm.limite_taxa_juros_mensal) > 0 && Number(limitForm.limite_utilizado) > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Custo mensal estimado:</span>
+                    <span className="text-muted-foreground">
+                      {limitForm.limite_tipo === "cheque_especial"
+                        ? "Juros estimados (mês cheio):"
+                        : "Custo mensal estimado:"}
+                    </span>
                     <span className="font-mono text-warning">
-                      {fmt(Number(limitForm.limite_utilizado) * (Number(limitForm.limite_taxa_juros_mensal) / 100))}
+                      {fmt(
+                        limitForm.limite_tipo === "cheque_especial"
+                          ? estimateMonthlyClosingCharge(
+                              Number(limitForm.limite_utilizado),
+                              Number(limitForm.limite_taxa_juros_mensal),
+                              30
+                            )
+                          : Number(limitForm.limite_utilizado) * (Number(limitForm.limite_taxa_juros_mensal) / 100)
+                      )}
+                    </span>
+                  </div>
+                )}
+                {limitForm.limite_tipo === "cheque_especial" && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Próximo fechamento:</span>
+                    <span className="font-mono">
+                      {format(getNextClosingDate(), "dd/MM/yyyy", { locale: ptBR })}
                     </span>
                   </div>
                 )}
@@ -440,6 +573,19 @@ export function ContasBancariasTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Overdraft validation dialog (cheque especial) */}
+      {overdraftValidation && (
+        <OverdraftValidationDialog
+          open={!!overdraftValidation}
+          onOpenChange={(open) => { if (!open) setOverdraftValidation(null); }}
+          accountName={overdraftValidation.account.nome}
+          saldoNegativo={overdraftValidation.saldoNegativo}
+          limiteTotal={overdraftValidation.account.limite_credito || 0}
+          taxaJurosMensalPct={overdraftValidation.account.limite_taxa_juros_mensal || 0}
+          onConfirm={handleConfirmOverdraft}
+        />
+      )}
 
       <BankAccountFormDialog
         open={showCreate}
