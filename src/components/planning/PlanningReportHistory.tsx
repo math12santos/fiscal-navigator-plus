@@ -74,6 +74,67 @@ function RedownloadRow({
   );
 }
 
+/**
+ * Renderiza o snapshot de filtros nomeados salvo na exportação. Cai
+ * para o resumo textual antigo (`filters_summary`) quando o registro
+ * é anterior à coluna `filter_labels` (compatibilidade com histórico
+ * existente).
+ */
+function FilterLabelsBlock({
+  labels,
+  fallbackSummary,
+}: {
+  labels: PlanningExportFilterLabels | null | undefined;
+  fallbackSummary: string | null;
+}) {
+  const subsidiary = labels?.subsidiary ?? null;
+  const banks = labels?.bankAccounts ?? [];
+  const ccs = labels?.costCenters ?? [];
+  const hasNamed = !!subsidiary || banks.length > 0 || ccs.length > 0;
+
+  if (!hasNamed) {
+    if (fallbackSummary && fallbackSummary !== "Nenhum") {
+      return (
+        <p className="text-[11px] text-muted-foreground">
+          Filtros: {fallbackSummary}
+        </p>
+      );
+    }
+    return (
+      <p className="text-[11px] text-muted-foreground italic">
+        Sem filtros aplicados
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+        Filtros aplicados
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {subsidiary && (
+          <Badge variant="secondary" className="font-normal gap-1 text-[11px]">
+            <Building2 className="h-3 w-3" />
+            {subsidiary}
+          </Badge>
+        )}
+        {banks.map((b) => (
+          <Badge key={`b-${b}`} variant="secondary" className="font-normal gap-1 text-[11px]">
+            <Wallet className="h-3 w-3" />
+            {b}
+          </Badge>
+        ))}
+        {ccs.map((c) => (
+          <Badge key={`c-${c}`} variant="secondary" className="font-normal gap-1 text-[11px]">
+            <Layers className="h-3 w-3" />
+            {c}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
 export default function PlanningReportHistory() {
   const { list, remove } = usePlanningReportExports();
   const [open, setOpen] = useState(false);
