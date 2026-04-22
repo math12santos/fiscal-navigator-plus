@@ -7,6 +7,9 @@ import { Calculator } from "lucide-react";
 import { useEmployees, useTerminations } from "@/hooks/useDP";
 import { format } from "date-fns";
 import TerminationSimulatorDialog, { TERM_TYPES, PJ_TERM_TYPES } from "./TerminationSimulatorDialog";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { DPExportButton } from "./DPExportButton";
+import { generateDPExcelReport, generateDPPdfReport } from "@/lib/dpExports";
 
 const ALL_TYPE_LABELS: Record<string, string> = Object.fromEntries(
   [...TERM_TYPES, ...PJ_TERM_TYPES].map((t) => [t.value, t.label]),

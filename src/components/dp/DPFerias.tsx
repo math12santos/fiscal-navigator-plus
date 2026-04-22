@@ -4,7 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEmployees, useVacations, useDPConfig } from "@/hooks/useDP";
 import { differenceInMonths, addYears, format, isBefore, addMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { AlertTriangle } from "lucide-react";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { DPExportButton } from "./DPExportButton";
+import { generateDPExcelReport, generateDPPdfReport } from "@/lib/dpExports";
 
 export default function DPFerias() {
   const { data: employees = [] } = useEmployees();
