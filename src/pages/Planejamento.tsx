@@ -847,6 +847,17 @@ export default function Planejamento() {
           refsLoading={refsLoadingForExport}
           invalidFilters={exportInvalidFilters}
           filtersDescription={exportFiltersDescription}
+          onClearInvalidFilters={() => {
+            // Re-aplica sanitizeFilters com as referências atuais — remove
+            // somente os IDs que não existem mais, preservando o restante.
+            const valid = {
+              orgIds: new Set(refSubsidiaries.map((o) => o.id)),
+              bankIds: new Set(refBankAccounts.map((b) => b.id)),
+              ccIds: new Set(refCostCenters.map((c) => c.id)),
+            };
+            setFilters(sanitizeFilters(filters, valid).sanitized);
+          }}
+          onClearAllFilters={() => setFilters(EMPTY_PLANNING_FILTERS)}
         />
 
         <PlanningReportHistory />
