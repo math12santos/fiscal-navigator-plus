@@ -202,6 +202,21 @@ export default function DPConfig() {
       .reduce((acc: number, e: any) => acc + Number(e.salary_base || 0), 0);
   }, [employees]);
 
+  const addCustom = (category: Category) => {
+    setCustoms((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), category, label: "", pct: 0 },
+    ]);
+  };
+
+  const updateCustom = (id: string, patch: Partial<CustomItem>) => {
+    setCustoms((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  };
+
+  const removeCustom = (id: string) => {
+    setCustoms((prev) => prev.filter((c) => c.id !== id));
+  };
+
   const sumByCategory = (
     src: Record<string, number>,
     customList: CustomItem[],
