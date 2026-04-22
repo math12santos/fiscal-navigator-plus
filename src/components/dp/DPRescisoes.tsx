@@ -6,7 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Calculator } from "lucide-react";
 import { useEmployees, useTerminations } from "@/hooks/useDP";
 import { format } from "date-fns";
-import TerminationSimulatorDialog, { TERM_TYPES } from "./TerminationSimulatorDialog";
+import TerminationSimulatorDialog, { TERM_TYPES, PJ_TERM_TYPES } from "./TerminationSimulatorDialog";
+
+const ALL_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  [...TERM_TYPES, ...PJ_TERM_TYPES].map((t) => [t.value, t.label]),
+);
 
 export default function DPRescisoes() {
   const { data: employees = [] } = useEmployees();
