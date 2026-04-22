@@ -153,18 +153,61 @@ export default function RelatorioKpi() {
     [searchParams, setSearchParams],
   );
 
+  /** Granularidade da exibição: "mensal" (padrão) ou "trimestral". */
+  const granularity = useMemo<"mensal" | "trimestral">(() => {
+    const g = searchParams.get("gran");
+    return g === "trimestral" ? "trimestral" : "mensal";
+  }, [searchParams]);
+
+  const applyGranularity = useCallback(
+    (g: "mensal" | "trimestral") => {
+      const next = new URLSearchParams(searchParams);
+      if (g === "mensal") next.delete("gran");
+      else next.set("gran", g);
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
   const meta = METRIC_META[metric as KpiMetric];
 
   // Período: usa query string ou default = últimos 6 meses (mesmo do Dashboard).
+  // Se a URL trouxer um range inválido, cai no default e avisa o usuário via toast
+  // — princípio "nada acontece silenciosamente".
   const now = useMemo(() => new Date(), []);
+  const defaultFrom = useMemo(() => startOfMonth(subMonths(now, 5)), [now]);
+  const defaultTo = useMemo(() => endOfMonth(now), [now]);
+
+  const urlFrom = searchParams.get("from");
+  const urlTo = searchParams.get("to");
+  const urlRangeValidation = useMemo(() => {
+    if (!urlFrom && !urlTo) return { ok: true as const };
+    const f = urlFrom ?? format(defaultFrom, "yyyy-MM-dd");
+    const t = urlTo ?? format(defaultTo, "yyyy-MM-dd");
+    return validateRange(f, t);
+  }, [urlFrom, urlTo, defaultFrom, defaultTo]);
+
+  const warnedRef = useRef(false);
+  useEffect(() => {
+    if (!urlRangeValidation.ok && !warnedRef.current) {
+      warnedRef.current = true;
+      toast.warning("Período da URL inválido — usando últimos 6 meses", {
+        description: urlRangeValidation.message,
+      });
+    }
+    if (urlRangeValidation.ok) {
+      warnedRef.current = false;
+    }
+  }, [urlRangeValidation]);
+
   const rangeFrom = useMemo(() => {
-    const q = searchParams.get("from");
-    return q ? parseISO(q) : startOfMonth(subMonths(now, 5));
-  }, [searchParams, now]);
+    if (!urlRangeValidation.ok || !urlFrom) return defaultFrom;
+    return parseISO(urlFrom);
+  }, [urlFrom, urlRangeValidation, defaultFrom]);
   const rangeTo = useMemo(() => {
-    const q = searchParams.get("to");
-    return q ? parseISO(q) : endOfMonth(now);
-  }, [searchParams, now]);
+    if (!urlRangeValidation.ok || !urlTo) return defaultTo;
+    return parseISO(urlTo);
+  }, [urlTo, urlRangeValidation, defaultTo]);
 
   const summary = useFinancialSummary(rangeFrom, rangeTo);
   const { contracts } = useContracts();
