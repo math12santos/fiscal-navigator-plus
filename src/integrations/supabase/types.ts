@@ -3347,6 +3347,76 @@ export type Database = {
           },
         ]
       }
+      planning_report_exports: {
+        Row: {
+          budget_version_id: string | null
+          budget_version_name: string | null
+          created_at: string
+          end_date: string
+          filters: Json
+          filters_summary: string | null
+          id: string
+          organization_id: string
+          report_type: string
+          scenario_id: string | null
+          scenario_name: string | null
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          budget_version_id?: string | null
+          budget_version_name?: string | null
+          created_at?: string
+          end_date: string
+          filters?: Json
+          filters_summary?: string | null
+          id?: string
+          organization_id: string
+          report_type?: string
+          scenario_id?: string | null
+          scenario_name?: string | null
+          start_date: string
+          user_id: string
+        }
+        Update: {
+          budget_version_id?: string | null
+          budget_version_name?: string | null
+          created_at?: string
+          end_date?: string
+          filters?: Json
+          filters_summary?: string | null
+          id?: string
+          organization_id?: string
+          report_type?: string
+          scenario_id?: string | null
+          scenario_name?: string | null
+          start_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planning_report_exports_budget_version_id_fkey"
+            columns: ["budget_version_id"]
+            isOneToOne: false
+            referencedRelation: "budget_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planning_report_exports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planning_report_exports_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planning_scenarios: {
         Row: {
           atraso_recebimento_dias: number | null
