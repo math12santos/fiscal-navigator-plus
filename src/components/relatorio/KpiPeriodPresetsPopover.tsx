@@ -134,29 +134,68 @@ export function KpiPeriodPresetsPopover({ currentFrom, currentTo, onApply, disab
               {presets.map((p) => {
                 const isActive = p.id === activePresetId;
                 const isConfirming = confirmDelete === p.id;
+                // Valida o range do próprio preset. Presets criados antes de
+                // regras mais estritas (ex.: limite de 5 anos) podem ficar
+                // inválidos — bloqueamos a aplicação e sinalizamos inline.
+                const presetValidation = validateRange(p.range_from, p.range_to);
+                const isInvalid = !presetValidation.ok;
                 return (
                   <li
                     key={p.id}
                     className={cn(
                       "flex items-center gap-2 px-3 py-2 hover:bg-muted/60 transition-colors",
                       isActive && "bg-primary/5",
+                      isInvalid && "opacity-70",
                     )}
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleApply(p)}
-                      className="flex-1 min-w-0 text-left"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        {isActive && <Check size={12} className="text-primary shrink-0" />}
-                        <span className="text-sm font-medium text-foreground truncate">
-                          {p.name}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {fmtRange(p.range_from, p.range_to)}
-                      </p>
-                    </button>
+                    {isInvalid ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              disabled
+                              aria-disabled="true"
+                              className="flex-1 min-w-0 text-left cursor-not-allowed"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-medium text-muted-foreground line-through truncate">
+                                  {p.name}
+                                </span>
+                              </div>
+                              <p className="text-xs text-destructive capitalize">
+                                {fmtRange(p.range_from, p.range_to)}
+                              </p>
+                              <p className="text-[11px] text-destructive mt-0.5" role="alert">
+                                {presetValidation.message}
+                              </p>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            <p className="text-xs max-w-[220px]">
+                              Não é possível aplicar este preset — o intervalo viola as regras atuais.
+                              Exclua e crie um novo dentro dos limites permitidos.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleApply(p)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {isActive && <Check size={12} className="text-primary shrink-0" />}
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {p.name}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {fmtRange(p.range_from, p.range_to)}
+                        </p>
+                      </button>
+                    )}
                     {isConfirming ? (
                       <div className="flex items-center gap-1">
                         <Button
