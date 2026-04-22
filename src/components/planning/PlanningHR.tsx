@@ -23,7 +23,8 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, Plus, Trash2, UserPlus, UserMinus, TrendingUp, Users, DollarSign } from "lucide-react";
+import { Loader2, Plus, Trash2, UserPlus, UserMinus, TrendingUp, Users, DollarSign, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { KPICard } from "@/components/KPICard";
 
 const fmt = (v: number) =>
@@ -36,7 +37,8 @@ interface Props {
 
 export default function PlanningHR({ startDate, endDate }: Props) {
   const { data: hrItems = [], isLoading } = useHRPlanning();
-  const { create, remove } = useMutateHRPlanning();
+  const { create, remove, execute } = useMutateHRPlanning();
+  const { toast } = useToast();
   const { data: employees = [] } = useEmployees();
   const { data: positions = [] } = usePositions();
   const { data: dpConfig } = useDPConfig();
@@ -199,9 +201,36 @@ export default function PlanningHR({ startDate, endDate }: Props) {
                   <TableCell><Badge variant="outline" className="text-xs">{item.scenario_name}</Badge></TableCell>
                   <TableCell><Badge variant="secondary" className="text-xs capitalize">{item.status}</Badge></TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove.mutate(item.id)}>
-                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {item.status !== "executado" && item.type !== "desligamento" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="Executar e gerar lançamento previsto"
+                          onClick={() =>
+                            execute.mutate(item, {
+                              onSuccess: () =>
+                                toast({
+                                  title: "Item executado",
+                                  description: "Lançamento previsto criado no Financeiro.",
+                                }),
+                              onError: (e: any) =>
+                                toast({
+                                  title: "Erro",
+                                  description: e.message,
+                                  variant: "destructive",
+                                }),
+                            })
+                          }
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5 text-success hover:text-success/80" />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove.mutate(item.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

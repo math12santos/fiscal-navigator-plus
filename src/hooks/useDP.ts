@@ -447,14 +447,69 @@ export function useMutateHRPlanning() {
 
   const create = useMutation({
     mutationFn: async (item: any) => {
-      const { error } = await supabase.from("hr_planning_items").insert({
-        ...item,
-        user_id: user!.id,
-        organization_id: currentOrg!.id,
-      });
+      const { data: created, error } = await supabase
+        .from("hr_planning_items")
+        .insert({
+          ...item,
+          user_id: user!.id,
+          organization_id: currentOrg!.id,
+        })
+        .select()
+        .single();
       if (error) throw error;
+
+      // Auto-create governance request (task) for HR
+      const isHire = item.type === "contratacao";
+      const isFire = item.type === "desligamento";
+      const titlePrefix = isHire
+        ? "Contratação planejada"
+        : isFire
+          ? "Desligamento planejado"
+          : "Reajuste planejado";
+
+      // Due date 7 days before planned_date for advance preparation
+      const planned = new Date(item.planned_date);
+      const due = new Date(planned);
+      due.setDate(due.getDate() - 7);
+      const dueStr = due.toISOString().slice(0, 10);
+
+      const { data: req, error: reqErr } = await supabase
+        .from("requests" as any)
+        .insert({
+          organization_id: currentOrg!.id,
+          user_id: user!.id,
+          title: `${titlePrefix} (${item.quantity || 1}x)`,
+          description: item.notes || `Item de planejamento RH — preparar processos para ${item.planned_date}`,
+          type: "rh_planning",
+          area_responsavel: "dp",
+          priority: "media",
+          due_date: dueStr,
+          cost_center_id: item.cost_center_id || null,
+          reference_module: "hr_planning",
+          reference_id: (created as any).id,
+          status: "aberta",
+          competencia: item.planned_date.slice(0, 7),
+        })
+        .select()
+        .single();
+
+      if (!reqErr && req) {
+        await supabase.from("request_tasks" as any).insert({
+          request_id: (req as any).id,
+          organization_id: currentOrg!.id,
+          title: titlePrefix,
+          due_date: dueStr,
+          created_by: user!.id,
+        });
+      }
+
+      return created;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["hr_planning"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["hr_planning"] });
+      qc.invalidateQueries({ queryKey: ["requests"] });
+      qc.invalidateQueries({ queryKey: ["my_request_tasks"] });
+    },
   });
 
   const update = useMutation({
@@ -473,7 +528,64 @@ export function useMutateHRPlanning() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["hr_planning"] }),
   });
 
-  return { create, update, remove };
+  /**
+   * Marks an HR planning item as executed and creates a forecasted cashflow entry
+   * representing the financial impact (salary + employer charges for hires/raises,
+   * termination cost for firings handled separately via DPRescisoes).
+   */
+  const execute = useMutation({
+    mutationFn: async (item: any) => {
+      const isHire = item.type === "contratacao";
+      const isRaise = item.type === "reajuste";
+      // Only hires and raises create recurring forecasted expense here.
+      // Terminations have their own dedicated workflow in DPRescisoes.
+      if (!isHire && !isRaise) {
+        const { error } = await supabase
+          .from("hr_planning_items")
+          .update({ status: "executado" })
+          .eq("id", item.id);
+        if (error) throw error;
+        return;
+      }
+
+      const totalCost = Number(item.total_cost_estimated || 0);
+      const descricao = isHire
+        ? `Folha — Contratação planejada (${item.quantity || 1}x)`
+        : `Folha — Reajuste planejado`;
+
+      const { error: cfErr } = await supabase.from("cashflow_entries").insert({
+        organization_id: currentOrg!.id,
+        user_id: user!.id,
+        descricao,
+        tipo: "saida",
+        valor_previsto: totalCost,
+        data_prevista: item.planned_date,
+        data_vencimento: item.planned_date,
+        competencia: item.planned_date.slice(0, 7),
+        cost_center_id: item.cost_center_id || null,
+        status: "previsto",
+        source: "hr_planning",
+        categoria: "Folha de Pagamento",
+        impacto_fluxo_caixa: true,
+        impacto_orcamento: true,
+        notes: `Gerado a partir de Planejamento RH (${item.type}). Item: ${item.id}`,
+      });
+      if (cfErr) throw cfErr;
+
+      const { error } = await supabase
+        .from("hr_planning_items")
+        .update({ status: "executado" })
+        .eq("id", item.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["hr_planning"] });
+      qc.invalidateQueries({ queryKey: ["financeiro"] });
+      qc.invalidateQueries({ queryKey: ["cashflow"] });
+    },
+  });
+
+  return { create, update, remove, execute };
 }
 
 // ========== PAYROLL CALCULATION HELPERS ==========
