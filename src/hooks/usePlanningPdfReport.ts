@@ -189,7 +189,6 @@ export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: Pd
       ],
       margin: { left: margin, right: margin },
     });
-    // @ts-expect-error autotable adds lastAutoTable
     y = (doc as any).lastAutoTable.finalY + 18;
 
     // ----- Strategic Alerts -----
@@ -218,7 +217,6 @@ export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: Pd
         },
         margin: { left: margin, right: margin },
       });
-      // @ts-expect-error autotable adds lastAutoTable
       y = (doc as any).lastAutoTable.finalY + 18;
     }
 
@@ -294,7 +292,7 @@ export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: Pd
     const fileName = `planejamento_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
     doc.save(fileName);
   }, [
-    versionsQuery.data,
+    versions,
     budgetVersionId,
     budgetLinesQuery.data,
     entries,
@@ -317,8 +315,7 @@ export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: Pd
     currentOrg?.name,
   ]);
 
-  const isReady =
-    !versionsQuery.isLoading && !budgetLinesQuery.isLoading;
+  const isReady = !isLoadingVersions && !budgetLinesQuery.isLoading;
 
   return { generatePdf, isReady };
 }
