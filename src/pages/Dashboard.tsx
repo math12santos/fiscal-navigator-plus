@@ -236,6 +236,7 @@ export default function Dashboard() {
             subtitle="vs mês anterior"
             icon={<TrendingUp size={20} />}
             groupShare={share(currentMonth.entradas, groupTotals?.entradas ?? 0)}
+            onClick={() => navigate("/relatorios/kpi/receita-mensal")}
           />
           <KPICard
             title="Despesas Mensais"
@@ -244,6 +245,7 @@ export default function Dashboard() {
             subtitle="vs mês anterior"
             icon={<TrendingDown size={20} />}
             groupShare={share(currentMonth.saidas, groupTotals?.saidas ?? 0)}
+            onClick={() => navigate("/relatorios/kpi/despesas-mensais")}
           />
           <KPICard
             title="Resultado Mensal"
@@ -252,6 +254,7 @@ export default function Dashboard() {
             subtitle="vs mês anterior"
             icon={<PiggyBank size={20} />}
             groupShare={share(Math.abs(currentMonth.lucro), Math.abs(groupTotals?.saldo ?? 0))}
+            onClick={() => navigate("/relatorios/kpi/resultado-mensal")}
           />
           <KPICard
             title="Saldo do Período"
@@ -260,6 +263,7 @@ export default function Dashboard() {
             subtitle="últimos 6 meses"
             icon={<Wallet size={20} />}
             groupShare={share(cashflowTotals.saldo, groupTotals?.saldo ?? 0)}
+            onClick={() => navigate("/relatorios/kpi/saldo-periodo")}
           />
         </div>
 
@@ -271,6 +275,7 @@ export default function Dashboard() {
             subtitle={`${formatCurrency(monthlyContractValue)}/mês`}
             icon={<FileText size={20} />}
             groupShare={isPerCompany && groupTotals ? (activeContractsCount / groupTotals.contractsCount) * 100 : undefined}
+            onClick={() => navigate("/relatorios/kpi/contratos-ativos")}
           />
           <KPICard
             title="Custo de Folha"
@@ -278,6 +283,7 @@ export default function Dashboard() {
             subtitle="mensal estimado"
             icon={<Users size={20} />}
             groupShare={isPerCompany && groupTotals && groupTotals.payrollTotal > 0 ? (avgMonthlyPayroll / groupTotals.payrollTotal) * 100 : undefined}
+            onClick={() => navigate("/relatorios/kpi/custo-folha")}
           />
           <KPICard
             title="Passivos"
@@ -285,12 +291,14 @@ export default function Dashboard() {
             subtitle={contingenciasProvaveis > 0 ? `${formatCurrency(contingenciasProvaveis)} prováveis` : "Sem contingências"}
             icon={<Shield size={20} />}
             groupShare={isPerCompany && groupTotals && groupTotals.liabilitiesTotal > 0 ? (liabilityTotals.total / groupTotals.liabilitiesTotal) * 100 : undefined}
+            onClick={() => navigate("/relatorios/kpi/passivos")}
           />
           <KPICard
             title="Runway"
             value={runway === Infinity ? "∞" : `${runway} meses`}
             subtitle={`burn: ${formatCurrency(monthlyBurn)}/mês`}
             icon={<AlertTriangle size={20} />}
+            onClick={() => navigate("/relatorios/kpi/runway")}
           />
         </div>
       </section>

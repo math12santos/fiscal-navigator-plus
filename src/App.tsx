@@ -40,6 +40,7 @@ const Configuracoes = lazyRetry(() => import("@/pages/Configuracoes"));
 const DepartamentoPessoal = lazyRetry(() => import("@/pages/DepartamentoPessoal"));
 const CRM = lazyRetry(() => import("@/pages/CRM"));
 const Financeiro = lazyRetry(() => import("@/pages/Financeiro"));
+const RelatorioKpi = lazyRetry(() => import("@/pages/RelatorioKpi"));
 const CreateOrganization = lazyRetry(() => import("@/pages/CreateOrganization"));
 const Onboarding = lazyRetry(() => import("@/pages/Onboarding"));
 const BackofficeDashboard = lazyRetry(() => import("@/pages/BackofficeDashboard"));
@@ -118,6 +119,7 @@ function ProtectedRoutes() {
           <Route path="/dp" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard></Suspense>} />
           <Route path="/crm" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard></Suspense>} />
           <Route path="/nova-empresa" element={<Suspense fallback={<LoadingFallback />}><CreateOrganization /></Suspense>} />
+          <Route path="/relatorios/kpi/:metric" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard></Suspense>} />
           <Route path="*" element={<Suspense fallback={<LoadingFallback />}><NotFound /></Suspense>} />
         </Routes>
       </AppLayout>
