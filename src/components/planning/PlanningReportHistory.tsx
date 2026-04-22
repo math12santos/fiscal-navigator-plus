@@ -18,7 +18,7 @@ import { History, FileDown, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePlanningReportExports } from "@/hooks/usePlanningReportExports";
 import { usePlanningPdfReport } from "@/hooks/usePlanningPdfReport";
-import type { PlanningFilters } from "@/lib/planningFilters";
+import { normalizeFilters, type PlanningFilters } from "@/lib/planningFilters";
 
 /**
  * Botão "Re-baixar" — instancia o hook de PDF com os parâmetros salvos
@@ -158,7 +158,7 @@ export default function PlanningReportHistory() {
                         startDate={start}
                         endDate={end}
                         budgetVersionId={item.budget_version_id}
-                        filters={item.filters}
+                        filters={normalizeFilters(item.filters)}
                         label={format(created, "dd/MM HH:mm", { locale: ptBR })}
                       />
                     </div>

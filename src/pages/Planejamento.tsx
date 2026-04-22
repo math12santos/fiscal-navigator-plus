@@ -10,7 +10,10 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { CalendarIcon, Settings, Sparkles, FileDown, Loader2, Filter, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { CalendarIcon, Settings, Sparkles, FileDown, Loader2, Filter, X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import PlanningCockpit, { PLANNING_NAV_EVENT } from "@/components/planning/PlanningCockpit";
@@ -62,8 +65,95 @@ function ScenarioPicker() {
 }
 
 /**
- * Pop-over com 3 selects (unidade / conta bancária / centro de custo).
- * Sentinela "__all__" representa "Todos" (Radix Select não aceita value="").
+ * Lista compacta de checkbox com campo de busca, usada para multi-seleção
+ * de Conta Bancária e Centro de Custo. Sem dependências novas.
+ */
+function MultiSelectList({
+  options,
+  selectedIds,
+  onChange,
+  placeholder,
+  emptyLabel,
+}: {
+  options: { id: string; label: string; sub?: string }[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  placeholder: string;
+  emptyLabel: string;
+}) {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.label.toLowerCase().includes(q) ||
+        (o.sub ?? "").toLowerCase().includes(q),
+    );
+  }, [options, query]);
+
+  const toggle = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter((x) => x !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-border">
+      <div className="relative border-b border-border">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={placeholder}
+          className="h-8 pl-7 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-xs"
+        />
+      </div>
+      <ScrollArea className="h-40">
+        {filtered.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground px-3 py-4 text-center">
+            {emptyLabel}
+          </p>
+        ) : (
+          <ul className="py-1">
+            {filtered.map((o) => {
+              const checked = selectedIds.includes(o.id);
+              return (
+                <li key={o.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(o.id)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-accent text-left"
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggle(o.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span className="flex-1 truncate">
+                      {o.label}
+                      {o.sub && (
+                        <span className="text-muted-foreground"> · {o.sub}</span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </ScrollArea>
+    </div>
+  );
+}
+
+/**
+ * Pop-over com filtros: unidade (single), conta bancária (multi) e centro
+ * de custo (multi). O contador no botão soma dimensões com filtro ativo
+ * (não itens), pra manter o sinal visual estável.
  */
 function FilterPopover({
   filters, setFilters,
@@ -77,8 +167,31 @@ function FilterPopover({
   const ALL = "__all__";
   const activeCount =
     (filters.subsidiaryOrgId ? 1 : 0) +
-    (filters.bankAccountId ? 1 : 0) +
-    (filters.costCenterId ? 1 : 0);
+    (filters.bankAccountIds.length > 0 ? 1 : 0) +
+    (filters.costCenterIds.length > 0 ? 1 : 0);
+
+  const bankOptions = useMemo(
+    () => allBankAccounts.map((b) => ({
+      id: b.id,
+      label: b.nome,
+      sub: b.banco ?? undefined,
+    })),
+    [allBankAccounts],
+  );
+
+  const ccOptions = useMemo(
+    () => costCenters
+      .filter((c) => c.active)
+      .map((c) => ({ id: c.id, label: `${c.code} · ${c.name}` })),
+    [costCenters],
+  );
+
+  const bankSummary = filters.bankAccountIds.length === 0
+    ? "Todas"
+    : `${filters.bankAccountIds.length} selecionada${filters.bankAccountIds.length > 1 ? "s" : ""}`;
+  const ccSummary = filters.costCenterIds.length === 0
+    ? "Todos"
+    : `${filters.costCenterIds.length} selecionado${filters.costCenterIds.length > 1 ? "s" : ""}`;
 
   return (
     <Popover>
@@ -93,7 +206,7 @@ function FilterPopover({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 space-y-3" align="end">
+      <PopoverContent className="w-80 space-y-3" align="end">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">Filtrar visões</p>
           {hasAnyFilter(filters) && (
@@ -132,47 +245,53 @@ function FilterPopover({
         )}
 
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Conta bancária</label>
-          <Select
-            value={filters.bankAccountId ?? ALL}
-            onValueChange={(v) =>
-              setFilters({ ...filters, bankAccountId: v === ALL ? null : v })
-            }
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Todas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Todas as contas</SelectItem>
-              {allBankAccounts.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  {b.nome}{b.banco ? ` · ${b.banco}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-muted-foreground">Contas bancárias</label>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">{bankSummary}</span>
+              {filters.bankAccountIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilters({ ...filters, bankAccountIds: [] })}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  limpar
+                </button>
+              )}
+            </div>
+          </div>
+          <MultiSelectList
+            options={bankOptions}
+            selectedIds={filters.bankAccountIds}
+            onChange={(ids) => setFilters({ ...filters, bankAccountIds: ids })}
+            placeholder="Buscar conta…"
+            emptyLabel="Nenhuma conta encontrada"
+          />
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Centro de custo</label>
-          <Select
-            value={filters.costCenterId ?? ALL}
-            onValueChange={(v) =>
-              setFilters({ ...filters, costCenterId: v === ALL ? null : v })
-            }
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Todos os centros</SelectItem>
-              {costCenters.filter((c) => c.active).map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.code} · {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-muted-foreground">Centros de custo</label>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">{ccSummary}</span>
+              {filters.costCenterIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilters({ ...filters, costCenterIds: [] })}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  limpar
+                </button>
+              )}
+            </div>
+          </div>
+          <MultiSelectList
+            options={ccOptions}
+            selectedIds={filters.costCenterIds}
+            onChange={(ids) => setFilters({ ...filters, costCenterIds: ids })}
+            placeholder="Buscar centro de custo…"
+            emptyLabel="Nenhum centro de custo encontrado"
+          />
         </div>
 
         <p className="text-[10px] text-muted-foreground pt-1 border-t border-border">
@@ -269,22 +388,30 @@ export default function Planejamento() {
   // permitir refresh, back/forward e compartilhamento de links com a mesma visão.
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const filters = useMemo<PlanningFilters>(() => ({
-    subsidiaryOrgId: searchParams.get("org"),
-    bankAccountId: searchParams.get("conta"),
-    costCenterId: searchParams.get("cc"),
-  }), [searchParams]);
+  const filters = useMemo<PlanningFilters>(() => {
+    const parseList = (key: string): string[] =>
+      searchParams.get(key)?.split(",").filter(Boolean) ?? [];
+    return {
+      subsidiaryOrgId: searchParams.get("org"),
+      bankAccountIds: parseList("conta"),
+      costCenterIds: parseList("cc"),
+    };
+  }, [searchParams]);
 
   const setFilters = useCallback((next: PlanningFilters) => {
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
-      const apply = (key: string, value: string | null) => {
+      const applyOne = (key: string, value: string | null) => {
         if (value) params.set(key, value);
         else params.delete(key);
       };
-      apply("org", next.subsidiaryOrgId);
-      apply("conta", next.bankAccountId);
-      apply("cc", next.costCenterId);
+      const applyList = (key: string, values: string[]) => {
+        if (values.length > 0) params.set(key, values.join(","));
+        else params.delete(key);
+      };
+      applyOne("org", next.subsidiaryOrgId);
+      applyList("conta", next.bankAccountIds);
+      applyList("cc", next.costCenterIds);
       return params;
     }, { replace: true });
   }, [setSearchParams]);

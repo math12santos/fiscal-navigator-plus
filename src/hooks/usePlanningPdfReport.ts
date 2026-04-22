@@ -89,7 +89,10 @@ export function usePlanningPdfReport({
     }
     const payrollProjections = (rawPayroll as any[])
       .filter((p) => !p.source_ref || !materializedRefs.has(p.source_ref))
-      .filter((p) => !filters.costCenterId || p.cost_center_id === filters.costCenterId);
+      .filter((p) =>
+        filters.costCenterIds.length === 0 ||
+        (p.cost_center_id && filters.costCenterIds.includes(p.cost_center_id))
+      );
 
     // Recompute totals over filtered entries
     let entradasTot = 0, saidasTot = 0;
@@ -122,7 +125,7 @@ export function usePlanningPdfReport({
     // Burn e runway vêm do useFinancialSummary — mesmos números do Cockpit.
     const avgMonthlySaida = monthlyBurn;
     const activeContracts = contracts.filter((c) => c.status === "Ativo").length;
-    const avgMonthlyPayroll = filters.costCenterId
+    const avgMonthlyPayroll = filters.costCenterIds.length > 0
       ? payrollProjections.reduce((s, p) => s + Number(p.valor_previsto), 0) / monthsCount
       : rawAvgPayroll;
 
@@ -242,20 +245,41 @@ export function usePlanningPdfReport({
       ? `${activeScenario.name} · ${activeScenario.variacao_receita > 0 ? "+" : ""}${activeScenario.variacao_receita}% rec / ${activeScenario.variacao_custos > 0 ? "+" : ""}${activeScenario.variacao_custos}% custo`
       : "Base";
 
-    // Filtros operacionais aplicados — refletem exatamente o que está em tela
+    // Filtros operacionais aplicados — refletem exatamente o que está em tela.
+    // Para multi-seleção, lista os 2 primeiros e adiciona "(+N)" para evitar
+    // estouro de linha no cabeçalho do PDF.
+    const fmtMulti = (
+      ids: string[],
+      lookup: (id: string) => string | undefined,
+      label: string,
+    ): string | null => {
+      if (ids.length === 0) return null;
+      const names = ids.map((id) => lookup(id) ?? id.slice(0, 8));
+      const head = names.slice(0, 2).join(", ");
+      const tail = names.length > 2 ? ` (+${names.length - 2})` : "";
+      return `${label}: ${head}${tail}`;
+    };
+
     const filterParts: string[] = [];
     if (filters.subsidiaryOrgId) {
       const sub = subsidiaryOrgs.find((s) => s.id === filters.subsidiaryOrgId);
       filterParts.push(`Unidade: ${sub?.name ?? filters.subsidiaryOrgId.slice(0, 8)}`);
     }
-    if (filters.bankAccountId) {
-      const ba = allBankAccounts.find((b) => b.id === filters.bankAccountId);
-      filterParts.push(`Conta: ${ba?.nome ?? filters.bankAccountId.slice(0, 8)}`);
-    }
-    if (filters.costCenterId) {
-      const cc = costCenters.find((c) => c.id === filters.costCenterId);
-      filterParts.push(`CC: ${cc ? `${cc.code} ${cc.name}` : filters.costCenterId.slice(0, 8)}`);
-    }
+    const contasPart = fmtMulti(
+      filters.bankAccountIds,
+      (id) => allBankAccounts.find((b) => b.id === id)?.nome,
+      filters.bankAccountIds.length > 1 ? "Contas" : "Conta",
+    );
+    if (contasPart) filterParts.push(contasPart);
+    const ccPart = fmtMulti(
+      filters.costCenterIds,
+      (id) => {
+        const cc = costCenters.find((c) => c.id === id);
+        return cc ? `${cc.code} ${cc.name}` : undefined;
+      },
+      filters.costCenterIds.length > 1 ? "CCs" : "CC",
+    );
+    if (ccPart) filterParts.push(ccPart);
     const filtersLine = filterParts.length > 0 ? filterParts.join(" · ") : "Nenhum";
 
     doc.text(`Organização: ${orgName}`, margin, y); y += 12;
