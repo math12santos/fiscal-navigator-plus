@@ -364,15 +364,29 @@ export function useMutateTermination() {
 
   const create = useMutation({
     mutationFn: async (t: any) => {
+      const { hr_planning_item_id, ...payload } = t;
       const { data, error } = await supabase.from("employee_terminations").insert({
-        ...t,
+        ...payload,
+        hr_planning_item_id: hr_planning_item_id || null,
         user_id: user!.id,
         organization_id: currentOrg!.id,
       }).select().single();
       if (error) throw error;
+
+      // Fecha o ciclo planejamento → execução: marca item de RH como executado
+      // quando a rescisão real foi originada de um item planejado.
+      if (hr_planning_item_id) {
+        await supabase
+          .from("hr_planning_items")
+          .update({ status: "executado" })
+          .eq("id", hr_planning_item_id);
+      }
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["terminations"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["terminations"] });
+      qc.invalidateQueries({ queryKey: ["hr_planning"] });
+    },
   });
 
   const update = useMutation({

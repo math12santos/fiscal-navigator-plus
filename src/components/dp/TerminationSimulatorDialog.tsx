@@ -27,9 +27,13 @@ interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   initialEmployeeId?: string;
+  /** ID do item de hr_planning_items que originou esta rescisão (fecha o ciclo planejamento → execução). */
+  hrPlanningItemId?: string;
+  /** Data planejada vinda do item de RH (pré-preenche a data de desligamento). */
+  initialTerminationDate?: string;
 }
 
-export default function TerminationSimulatorDialog({ open, onOpenChange, initialEmployeeId }: Props) {
+export default function TerminationSimulatorDialog({ open, onOpenChange, initialEmployeeId, hrPlanningItemId, initialTerminationDate }: Props) {
   const { data: employees = [] } = useEmployees();
   const { data: dpConfig } = useDPConfig();
   const { create } = useMutateTermination();
