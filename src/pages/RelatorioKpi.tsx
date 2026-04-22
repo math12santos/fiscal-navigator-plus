@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { KpiPeriodPresetsPopover } from "@/components/relatorio/KpiPeriodPresetsPopover";
 import { ArrowLeft, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info } from "lucide-react";
 import { startOfMonth, endOfMonth, subMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -129,9 +130,25 @@ const fmtDate = (d: string) => {
 
 export default function RelatorioKpi() {
   const { metric } = useParams<{ metric: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { currentOrg } = useOrganization();
+
+  /**
+   * Aplica um novo intervalo (from/to) à URL — fonte de verdade do período.
+   * Ao atualizar `?from=&to=`, os memos `rangeFrom`/`rangeTo` recalculam e
+   * `useFinancialSummary` recarrega os dados naturalmente. Mantém a URL
+   * compartilhável e reproduzível (princípio de auditabilidade).
+   */
+  const applyRange = useCallback(
+    (from: string, to: string) => {
+      const next = new URLSearchParams(searchParams);
+      next.set("from", from);
+      next.set("to", to);
+      setSearchParams(next, { replace: false });
+    },
+    [searchParams, setSearchParams],
+  );
 
   const meta = METRIC_META[metric as KpiMetric];
 
