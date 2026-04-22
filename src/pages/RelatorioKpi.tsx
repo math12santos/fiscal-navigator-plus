@@ -818,9 +818,9 @@ export default function RelatorioKpi() {
           <>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>{renderHeader(rows.kind)}</TableHeader>
+                <TableHeader>{renderHeader(displayKind)}</TableHeader>
                 <TableBody>
-                  {pagedItems.map((r, i) => renderRow(rows.kind, r, (page - 1) * pageSize + i))}
+                  {pagedItems.map((r, i) => renderRow(displayKind, r, (page - 1) * pageSize + i))}
                 </TableBody>
               </Table>
             </div>
@@ -829,7 +829,8 @@ export default function RelatorioKpi() {
               <p className="text-xs text-muted-foreground">
                 Mostrando <span className="font-medium text-foreground">{showingFrom}</span>–
                 <span className="font-medium text-foreground">{showingTo}</span> de{" "}
-                <span className="font-medium text-foreground">{filteredItems.length}</span>
+                <span className="font-medium text-foreground">{aggregatedRows.length}</span>
+                {isQuarterly && <span className="ml-1">trimestre(s)</span>}
               </p>
               {totalPages > 1 && (
                 <Pagination className="mx-0 w-auto justify-end">
