@@ -11,10 +11,29 @@ import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { format, addDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { calcEncargosPatronais } from "@/hooks/useDP";
 
-interface Alert {
+export type AlertCategory =
+  | "runway"
+  | "saldo_minimo"
+  | "passivo"
+  | "contrato"
+  | "crm"
+  | "divergencia";
+
+export type PlanningTab =
+  | "cockpit"
+  | "orcamento"
+  | "cenarios-risco"
+  | "operacional";
+
+export interface Alert {
   type: "warning" | "danger" | "info";
+  category: AlertCategory;
   title: string;
   description: string;
+  /** Tab dentro de /planejamento que resolve o alerta */
+  actionTab: PlanningTab;
+  /** Rótulo curto do botão de ação (ex.: "Abrir Cenários") */
+  actionLabel: string;
 }
 
 export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
