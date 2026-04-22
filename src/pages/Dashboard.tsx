@@ -169,6 +169,11 @@ export default function Dashboard() {
     );
   }
 
+  // First-load: show module-faithful skeleton instead of zeros while data fetches
+  if (isLoading && entries.length === 0) {
+    return <DashboardSkeleton />;
+  }
+
   const noData = entries.length === 0 && !isLoading;
 
   const alertIcon = (type: string) => {
