@@ -72,6 +72,50 @@ export default function DPBeneficios() {
       ? `${Number(b.default_value).toFixed(1)}%`
       : Number(b.default_value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  const handleExportMatrix = () => {
+    const activeEmps = employees.filter((e: any) => e.status === "ativo");
+    const activeBenefits = benefits.filter((b: any) => b.active);
+
+    const matrixHeader = ["Colaborador", "Salário Base", ...activeBenefits.map((b: any) => b.name), "Custo Total Mensal"];
+    const matrixRows = activeEmps.map((emp: any) => {
+      const sal = Number(emp.salary_base || 0);
+      let totalEmp = 0;
+      const cells = activeBenefits.map((b: any) => {
+        const link = empBenefits.find((eb: any) => eb.employee_id === emp.id && eb.benefit_id === b.id && eb.active);
+        if (!link) return "";
+        const valor = link.custom_value != null ? Number(link.custom_value) : Number(b.default_value);
+        const custo = b.type === "percentual" ? sal * (valor / 100) : valor;
+        totalEmp += custo;
+        return custo;
+      });
+      return [emp.name, sal, ...cells, totalEmp];
+    });
+
+    generateDPExcelReport({
+      title: `Beneficios ${currentOrg?.name || ""}`.trim(),
+      sheets: [
+        {
+          name: "Matriz Colab x Benefício",
+          rows: [matrixHeader, ...matrixRows],
+        },
+        {
+          name: "Cadastro",
+          rows: [
+            ["Nome", "Tipo", "Valor Padrão", "Ativo", "Descrição"],
+            ...benefits.map((b: any) => [
+              b.name,
+              b.type === "percentual" ? "Percentual" : "Valor Fixo",
+              Number(b.default_value),
+              b.active ? "Sim" : "Não",
+              b.description || "",
+            ]),
+          ],
+        },
+      ],
+    });
+    toast({ title: "Matriz de benefícios exportada" });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -79,6 +123,7 @@ export default function DPBeneficios() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
           <Input placeholder="Buscar benefício..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
+        <DPExportButton onExcel={handleExportMatrix} disabled={benefits.length === 0} />
         <Button onClick={openNew}><Plus size={14} className="mr-1" /> Novo Benefício</Button>
       </div>
 
