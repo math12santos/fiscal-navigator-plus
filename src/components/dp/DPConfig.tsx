@@ -66,6 +66,7 @@ const DEFAULTS: Record<string, number> = {
 
 export default function DPConfig() {
   const { data: config, isLoading } = useDPConfig();
+  const { data: employees = [] } = useEmployees();
   const mutate = useMutateDPConfig();
   const { toast } = useToast();
 
