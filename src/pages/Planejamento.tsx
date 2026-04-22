@@ -471,9 +471,9 @@ export default function Planejamento() {
         if (values.length > 0) params.set(key, values.join(","));
         else params.delete(key);
       };
-      applyOne("org", next.subsidiaryOrgId);
-      applyList("conta", next.bankAccountIds);
-      applyList("cc", next.costCenterIds);
+      applyOne("org", safe.subsidiaryOrgId);
+      applyList("conta", safe.bankAccountIds);
+      applyList("cc", safe.costCenterIds);
       return params;
     }, { replace: true });
   }, [setSearchParams]);
