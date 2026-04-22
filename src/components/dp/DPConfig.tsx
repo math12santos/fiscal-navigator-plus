@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useDPConfig, useMutateDPConfig } from "@/hooks/useDP";
+import { useDPConfig, useMutateDPConfig, useEmployees } from "@/hooks/useDP";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Plus, Trash2, TrendingUp, PiggyBank, MinusCircle } from "lucide-react";
+import { Save, Plus, Trash2, TrendingUp, PiggyBank, MinusCircle, Calculator, ArrowRight } from "lucide-react";
 
 type Category = "encargo" | "provisao" | "desconto";
 
