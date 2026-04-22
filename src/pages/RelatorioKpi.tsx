@@ -129,13 +129,15 @@ const fmtDate = (d: string) => {
 
 export default function RelatorioKpi() {
   const { metric } = useParams<{ metric: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { currentOrg } = useOrganization();
 
   const meta = METRIC_META[metric as KpiMetric];
 
   // Período: usa query string ou default = últimos 6 meses (mesmo do Dashboard).
+  // Mantemos os valores na URL para preservar deep-link e auditabilidade —
+  // qualquer recorte do drill-down pode ser reaberto/compartilhado.
   const now = useMemo(() => new Date(), []);
   const rangeFrom = useMemo(() => {
     const q = searchParams.get("from");
@@ -145,6 +147,17 @@ export default function RelatorioKpi() {
     const q = searchParams.get("to");
     return q ? parseISO(q) : endOfMonth(now);
   }, [searchParams, now]);
+
+  // Atualiza o período na URL (dispara reload de useFinancialSummary).
+  const applyRange = useCallback(
+    (from: Date, to: Date) => {
+      const next = new URLSearchParams(searchParams);
+      next.set("from", format(from, "yyyy-MM-dd"));
+      next.set("to", format(to, "yyyy-MM-dd"));
+      setSearchParams(next, { replace: false });
+    },
+    [searchParams, setSearchParams],
+  );
 
   const summary = useFinancialSummary(rangeFrom, rangeTo);
   const { contracts } = useContracts();
