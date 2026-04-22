@@ -887,7 +887,17 @@ export default function RelatorioKpi() {
               <Table>
                 <TableHeader>{renderHeader(displayKind)}</TableHeader>
                 <TableBody>
-                  {pagedItems.map((r, i) => renderRow(displayKind, r, (page - 1) * pageSize + i))}
+                  {isGranularityPending && supportsQuarterly
+                    ? Array.from({ length: Math.min(pageSize, 8) }).map((_, i) => (
+                        <TableRow key={`sk-${i}`}>
+                          {Array.from({ length: getColumnCount(displayKind) }).map((__, c) => (
+                            <TableCell key={c}>
+                              <Skeleton className="h-4 w-full" />
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    : pagedItems.map((r, i) => renderRow(displayKind, r, (page - 1) * pageSize + i))}
                 </TableBody>
               </Table>
             </div>
