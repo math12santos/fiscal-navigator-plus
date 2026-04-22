@@ -12,10 +12,18 @@ import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { KPICard } from "@/components/KPICard";
+import { Button } from "@/components/ui/button";
 import {
   AlertTriangle, TrendingUp, Wallet, Shield, Users, FileSignature,
-  TrendingDown, Target,
+  TrendingDown, Target, ArrowRight, Info,
 } from "lucide-react";
+import type { PlanningTab } from "@/hooks/useFinancialSummary";
+
+/** Custom event fired by alert action buttons to switch the active planning tab. */
+export const PLANNING_NAV_EVENT = "planning:navigate";
+export function emitPlanningNav(tab: PlanningTab) {
+  window.dispatchEvent(new CustomEvent(PLANNING_NAV_EVENT, { detail: { tab } }));
+}
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
