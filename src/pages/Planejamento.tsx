@@ -236,6 +236,7 @@ export default function Planejamento() {
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [budgetVersionId, setBudgetVersionId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [filters, setFilters] = useState<PlanningFilters>(EMPTY_PLANNING_FILTERS);
   const { getAllowedTabs } = useUserPermissions();
 
   const allowedTabs = getAllowedTabs("planejamento", ALL_TABS);
@@ -302,7 +303,7 @@ export default function Planejamento() {
   const renderTabContent = (tabKey: string) => {
     switch (tabKey) {
       case "cockpit":
-        return <PlanningCockpit startDate={startDate} endDate={endDate} />;
+        return <PlanningCockpit startDate={startDate} endDate={endDate} filters={filters} />;
       case "orcamento":
         return (
           <PlanningBudget
@@ -310,6 +311,7 @@ export default function Planejamento() {
             endDate={endDate}
             selectedVersionId={budgetVersionId}
             onSelectVersion={setBudgetVersionId}
+            filters={filters}
           />
         );
       case "cenarios-risco":
@@ -378,10 +380,13 @@ export default function Planejamento() {
 
         <ScenarioPicker />
 
+        <FilterPopover filters={filters} setFilters={setFilters} />
+
         <ExportPdfButton
           startDate={startDate}
           endDate={endDate}
           budgetVersionId={budgetVersionId}
+          filters={filters}
         />
 
         <Button
