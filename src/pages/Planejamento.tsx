@@ -322,9 +322,26 @@ interface ExportPdfButtonProps {
   budgetVersionId: string | null;
   filters: PlanningFilters;
   onHasFilteredDataChange?: (v: boolean) => void;
+  /** Quando true, ainda estamos carregando listas de referência usadas
+   *  para validar filtros (contas, CCs, subsidiárias). Bloqueia exportar
+   *  para evitar mensagens incorretas de "filtros inconsistentes". */
+  refsLoading?: boolean;
+  /** Inconsistências detectadas no momento do clique: filtros do URL que
+   *  não existem mais nas listas atuais. Permite mensagem precisa antes
+   *  de gastar tempo gerando um PDF vazio. */
+  invalidFilters?: { dimension: string; count: number }[];
+  /** Resumo legível dos filtros aplicados — usado para enriquecer o
+   *  diálogo de "sem dados" e ajudar o usuário a entender o recorte. */
+  filtersDescription?: string[];
 }
 
-function ExportPdfButton({ startDate, endDate, budgetVersionId, filters, onHasFilteredDataChange }: ExportPdfButtonProps) {
+function ExportPdfButton({
+  startDate, endDate, budgetVersionId, filters,
+  onHasFilteredDataChange,
+  refsLoading = false,
+  invalidFilters = [],
+  filtersDescription = [],
+}: ExportPdfButtonProps) {
   const { generatePdf, isReady, hasFilteredData } = usePlanningPdfReport({ startDate, endDate, budgetVersionId, filters });
   const { record } = usePlanningReportExports();
   const [busy, setBusy] = useState(false);
@@ -372,12 +389,34 @@ function ExportPdfButton({ startDate, endDate, budgetVersionId, filters, onHasFi
   };
 
   const handleClick = () => {
-    // Filtro ativo + zero dados → exige confirmação para evitar PDF "fantasma"
-    // sem o usuário perceber que o vazio foi causado pelo recorte.
+    // 1) Ainda carregando referências → não dá pra validar nem garantir
+    //    consistência. Avisa em vez de gerar PDF que pode ficar errado.
+    if (refsLoading) {
+      toast.info("Carregando dados…", {
+        description: "Aguarde a sincronização das listas de filtro antes de exportar.",
+      });
+      return;
+    }
+
+    // 2) Inconsistências detectadas: filtros referenciam itens que não
+    //    existem mais (conta excluída, CC desativado, link de outra org).
+    //    Bloqueia exportação até que a sanitização rode ou o usuário ajuste.
+    if (invalidFilters.length > 0) {
+      const total = invalidFilters.reduce((s, r) => s + r.count, 0);
+      const dims = invalidFilters.map((r) => r.dimension).join(", ");
+      toast.warning("Filtros inconsistentes", {
+        description: `${total} filtro(s) referenciam itens que não existem mais (${dims}). Ajuste o recorte e tente novamente.`,
+      });
+      return;
+    }
+
+    // 3) Filtros válidos mas zero dados no horizonte → confirma para evitar
+    //    PDF "fantasma" sem o usuário perceber que o vazio veio do recorte.
     if (hasAnyFilter(filters) && !hasFilteredData) {
       setConfirmOpen(true);
       return;
     }
+
     void runExport();
   };
 
@@ -402,10 +441,28 @@ function ExportPdfButton({ startDate, endDate, budgetVersionId, filters, onHasFi
               <AlertTriangle className="h-4 w-4 text-warning" />
               Recorte sem dados no período
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Os filtros atuais não retornam nenhum lançamento, contrato ou
-              folha no horizonte selecionado. O PDF será gerado em branco e
-              registrado no histórico assim mesmo. Deseja continuar?
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Os filtros atuais não retornam nenhum lançamento, contrato ou
+                  folha entre <strong>{format(startDate, "MMM/yyyy", { locale: ptBR })}</strong>{" "}
+                  e <strong>{format(endDate, "MMM/yyyy", { locale: ptBR })}</strong>.
+                </p>
+                {filtersDescription.length > 0 && (
+                  <div className="rounded-md bg-muted/50 p-2 text-xs">
+                    <p className="font-medium text-foreground mb-1">Recorte aplicado:</p>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {filtersDescription.map((d) => (
+                        <li key={d}>{d}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p>
+                  O PDF será gerado em branco e registrado no histórico assim
+                  mesmo. Recomendamos revisar os filtros antes de continuar.
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -567,6 +624,48 @@ export default function Planejamento() {
   const [hasFilteredData, setHasFilteredData] = useState(true);
   const hasActiveFiltersWithoutData = hasAnyFilter(filters) && !hasFilteredData;
 
+  // ===== Pré-validação para o botão de exportar =====
+  // Detecta inconsistências instantaneamente (sem esperar o effect de
+  // sanitização) para que o clique em "Exportar PDF" devolva mensagem
+  // amigável precisa, mesmo se o usuário clicar antes da limpeza automática.
+  const refsLoadingForExport = isLoadingBank || isLoadingCc || isLoadingHolding;
+  const exportInvalidFilters = useMemo(() => {
+    if (refsLoadingForExport || !hasAnyFilter(filters)) return [];
+    const valid = {
+      orgIds: new Set(refSubsidiaries.map((o) => o.id)),
+      bankIds: new Set(refBankAccounts.map((b) => b.id)),
+      ccIds: new Set(refCostCenters.map((c) => c.id)),
+    };
+    return sanitizeFilters(filters, valid).removed;
+  }, [filters, refsLoadingForExport, refSubsidiaries, refBankAccounts, refCostCenters]);
+
+  // Resumo legível do recorte aplicado — exibido no diálogo de "sem dados"
+  // para o usuário entender por que o resultado ficou vazio.
+  const exportFiltersDescription = useMemo(() => {
+    const desc: string[] = [];
+    if (filters.subsidiaryOrgId) {
+      const org = refSubsidiaries.find((o) => o.id === filters.subsidiaryOrgId);
+      desc.push(`Unidade: ${org?.name ?? filters.subsidiaryOrgId.slice(0, 8)}`);
+    }
+    if (filters.bankAccountIds.length > 0) {
+      const names = filters.bankAccountIds
+        .map((id) => refBankAccounts.find((b) => b.id === id)?.nome ?? id.slice(0, 8))
+        .slice(0, 3)
+        .join(", ");
+      const extra = filters.bankAccountIds.length > 3 ? ` (+${filters.bankAccountIds.length - 3})` : "";
+      desc.push(`Conta(s) bancária(s): ${names}${extra}`);
+    }
+    if (filters.costCenterIds.length > 0) {
+      const names = filters.costCenterIds
+        .map((id) => refCostCenters.find((c) => c.id === id)?.name ?? id.slice(0, 8))
+        .slice(0, 3)
+        .join(", ");
+      const extra = filters.costCenterIds.length > 3 ? ` (+${filters.costCenterIds.length - 3})` : "";
+      desc.push(`Centro(s) de custo: ${names}${extra}`);
+    }
+    return desc;
+  }, [filters, refSubsidiaries, refBankAccounts, refCostCenters]);
+
   const { startDate, endDate } = useMemo(() => {
     const now = startOfMonth(new Date());
     if (horizon === "custom" && customFrom && customTo) {
@@ -669,6 +768,9 @@ export default function Planejamento() {
           budgetVersionId={budgetVersionId}
           filters={filters}
           onHasFilteredDataChange={setHasFilteredData}
+          refsLoading={refsLoadingForExport}
+          invalidFilters={exportInvalidFilters}
+          filtersDescription={exportFiltersDescription}
         />
 
         <PlanningReportHistory />
