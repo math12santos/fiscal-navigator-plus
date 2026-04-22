@@ -267,6 +267,9 @@ export default function DPFolha() {
             <Button onClick={handleLock} variant="destructive"><Lock size={14} className="mr-1" /> Fechar Folha</Button>
           </>
         )}
+        {selectedRun && (
+          <DPExportButton onPdf={handleExportPdf} onExcel={handleExportExcel} />
+        )}
       </div>
 
       {selectedRun && (
