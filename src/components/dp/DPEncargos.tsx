@@ -2,6 +2,11 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEmployees, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { DPExportButton } from "./DPExportButton";
+import { generateDPExcelReport, generateDPPdfReport } from "@/lib/dpExports";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function DPEncargos() {
   const { data: employees = [] } = useEmployees();
