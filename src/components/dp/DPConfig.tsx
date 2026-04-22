@@ -4,9 +4,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useDPConfig, useMutateDPConfig, useEmployees } from "@/hooks/useDP";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  useDPConfig,
+  useMutateDPConfig,
+  useEmployees,
+  usePropagateDPConfigToSubsidiaries,
+  useApplyHoldingDPSuggestion,
+  useDismissHoldingDPSuggestion,
+} from "@/hooks/useDP";
+import { useHolding } from "@/contexts/HoldingContext";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Plus, Trash2, TrendingUp, PiggyBank, MinusCircle, Calculator, ArrowRight } from "lucide-react";
+import {
+  Save,
+  Plus,
+  Trash2,
+  TrendingUp,
+  PiggyBank,
+  MinusCircle,
+  Calculator,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  XCircle,
+  Send,
+} from "lucide-react";
 
 type Category = "encargo" | "provisao" | "desconto";
 
@@ -68,10 +98,16 @@ export default function DPConfig() {
   const { data: config, isLoading } = useDPConfig();
   const { data: employees = [] } = useEmployees();
   const mutate = useMutateDPConfig();
+  const propagate = usePropagateDPConfigToSubsidiaries();
+  const applySuggestion = useApplyHoldingDPSuggestion();
+  const dismissSuggestion = useDismissHoldingDPSuggestion();
+  const { isHolding, subsidiaryOrgs } = useHolding();
   const { toast } = useToast();
 
   const [base, setBase] = useState<Record<string, number>>(DEFAULTS);
   const [customs, setCustoms] = useState<CustomItem[]>([]);
+  const [propagateDialogOpen, setPropagateDialogOpen] = useState(false);
+  const [selectedSubsidiaries, setSelectedSubsidiaries] = useState<Set<string>>(new Set());
 
   // Sync local state when remote config loads
   useEffect(() => {
@@ -89,6 +125,9 @@ export default function DPConfig() {
     }
   }, [config]);
 
+  // Sugestão pendente vinda da holding (apenas em subsidiárias)
+  const pendingSuggestion = (config as any)?.pending_holding_suggestion ?? null;
+
   const handleSave = () => {
     // Sanitize customs: drop blank labels
     const cleanCustoms = customs
@@ -98,11 +137,70 @@ export default function DPConfig() {
     mutate.mutate(
       { ...base, custom_items: cleanCustoms } as any,
       {
-        onSuccess: () => toast({ title: "Configurações salvas" }),
+        onSuccess: () => {
+          toast({ title: "Configurações salvas" });
+          // Se é holding e tem subsidiárias, abre modal perguntando se quer propagar
+          if (isHolding && subsidiaryOrgs.length > 0) {
+            setSelectedSubsidiaries(new Set(subsidiaryOrgs.map((o) => o.id)));
+            setPropagateDialogOpen(true);
+          }
+        },
         onError: (e: any) => toast({ title: "Erro ao salvar", description: e?.message, variant: "destructive" }),
       },
     );
   };
+
+  const handlePropagate = () => {
+    const cleanCustoms = customs
+      .filter((c) => c.label.trim().length > 0)
+      .map((c) => ({ ...c, label: c.label.trim(), pct: Number(c.pct) || 0 }));
+    propagate.mutate(
+      { subsidiaryIds: Array.from(selectedSubsidiaries), base, customs: cleanCustoms },
+      {
+        onSuccess: ({ count }) => {
+          toast({
+            title: "Sugestão enviada",
+            description: `${count} ${count === 1 ? "subsidiária recebeu" : "subsidiárias receberam"} a sugestão para revisão.`,
+          });
+          setPropagateDialogOpen(false);
+        },
+        onError: (e: any) =>
+          toast({ title: "Erro ao propagar", description: e?.message, variant: "destructive" }),
+      },
+    );
+  };
+
+  const handleApplySuggestion = () => {
+    applySuggestion.mutate(undefined, {
+      onSuccess: () => toast({ title: "Sugestão aplicada", description: "Os percentuais da holding foram adotados." }),
+      onError: (e: any) =>
+        toast({ title: "Erro ao aplicar", description: e?.message, variant: "destructive" }),
+    });
+  };
+
+  const handleDismissSuggestion = () => {
+    dismissSuggestion.mutate(undefined, {
+      onSuccess: () => toast({ title: "Sugestão descartada" }),
+      onError: (e: any) =>
+        toast({ title: "Erro ao descartar", description: e?.message, variant: "destructive" }),
+    });
+  };
+
+  const toggleSubsidiary = (id: string) => {
+    setSelectedSubsidiaries((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // ===== Impacto estimado: aplica %s atuais (config) e novos (state) sobre a folha base =====
+  const folhaBase = useMemo(() => {
+    return employees
+      .filter((e: any) => e.status === "ativo" && e.contract_type !== "PJ")
+      .reduce((acc: number, e: any) => acc + Number(e.salary_base || 0), 0);
+  }, [employees]);
 
   const addCustom = (category: Category) => {
     setCustoms((prev) => [
@@ -118,13 +216,6 @@ export default function DPConfig() {
   const removeCustom = (id: string) => {
     setCustoms((prev) => prev.filter((c) => c.id !== id));
   };
-
-  // ===== Impacto estimado: aplica %s atuais (config) e novos (state) sobre a folha base =====
-  const folhaBase = useMemo(() => {
-    return employees
-      .filter((e: any) => e.status === "ativo" && e.contract_type !== "PJ")
-      .reduce((acc: number, e: any) => acc + Number(e.salary_base || 0), 0);
-  }, [employees]);
 
   const sumByCategory = (
     src: Record<string, number>,
@@ -205,6 +296,90 @@ export default function DPConfig() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Banner de sugestão pendente vinda da Holding (apenas em subsidiárias) */}
+      {pendingSuggestion && (
+        <Card className="border-warning/40 bg-warning/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-start gap-2">
+                <Building2 size={16} className="mt-0.5 text-warning" />
+                <div>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    Sugestão da Holding pendente de revisão
+                    <Badge variant="outline" className="text-[10px] border-warning/50 text-warning">
+                      Aguardando decisão
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <strong>{pendingSuggestion.suggested_by_org_name ?? "Holding"}</strong> propôs novos percentuais de encargos, provisionamentos e descontos.
+                    {pendingSuggestion.suggested_at && (
+                      <> Recebido em {new Date(pendingSuggestion.suggested_at).toLocaleDateString("pt-BR")}.</>
+                    )}
+                    {" "}Os valores atuais permanecem ativos até você decidir.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDismissSuggestion}
+                  disabled={dismissSuggestion.isPending}
+                  className="h-8 text-xs"
+                >
+                  <XCircle size={12} className="mr-1" /> Descartar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleApplySuggestion}
+                  disabled={applySuggestion.isPending}
+                  className="h-8 text-xs"
+                >
+                  <CheckCircle2 size={12} className="mr-1" />
+                  {applySuggestion.isPending ? "Aplicando..." : "Aplicar sugestão"}
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="rounded-md border border-border bg-background/60 p-2.5 space-y-1.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Comparação: atual → sugerido
+              </p>
+              <div className="grid gap-1 sm:grid-cols-2 text-[11px] font-mono">
+                {(Object.keys(SECTIONS) as Category[]).flatMap((cat) =>
+                  SECTIONS[cat].baseFields.map((f) => {
+                    const atual = base[f.key] ?? 0;
+                    const sugerido = (pendingSuggestion.base ?? {})[f.key] ?? atual;
+                    const changed = Math.abs(Number(atual) - Number(sugerido)) > 0.001;
+                    return (
+                      <div
+                        key={f.key}
+                        className={`flex items-center justify-between gap-2 py-0.5 ${changed ? "" : "opacity-50"}`}
+                      >
+                        <span className="text-muted-foreground truncate">{f.label}</span>
+                        <span className="flex items-center gap-1">
+                          <span className="text-muted-foreground">{Number(atual).toFixed(2)}%</span>
+                          <ArrowRight size={9} className="text-muted-foreground" />
+                          <span className={changed ? "text-warning font-semibold" : "text-foreground"}>
+                            {Number(sugerido).toFixed(2)}%
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  }),
+                )}
+              </div>
+              {Array.isArray(pendingSuggestion.custom_items) && pendingSuggestion.custom_items.length > 0 && (
+                <p className="text-[10px] text-muted-foreground pt-1 border-t mt-1.5">
+                  + {pendingSuggestion.custom_items.length} {pendingSuggestion.custom_items.length === 1 ? "item personalizado" : "itens personalizados"} sugeridos
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {(Object.keys(SECTIONS) as Category[]).map((cat) => {
         const section = SECTIONS[cat];
@@ -389,6 +564,63 @@ export default function DPConfig() {
           <Save size={14} className="mr-1" /> {mutate.isPending ? "Salvando..." : "Salvar Configurações"}
         </Button>
       </div>
+
+      {/* Modal: propagar percentuais para subsidiárias (apenas em holdings) */}
+      <Dialog open={propagateDialogOpen} onOpenChange={setPropagateDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send size={16} className="text-primary" />
+              Propagar para o grupo?
+            </DialogTitle>
+            <DialogDescription>
+              Os percentuais salvos serão enviados como <strong>sugestão pendente</strong> para as subsidiárias
+              selecionadas. Os valores atuais delas <em>não serão sobrescritos</em> — cada subsidiária poderá
+              revisar e aplicar a sugestão.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 max-h-64 overflow-y-auto rounded-md border border-border p-2">
+            {subsidiaryOrgs.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2 text-center">Nenhuma subsidiária encontrada.</p>
+            ) : (
+              subsidiaryOrgs.map((org) => {
+                const checked = selectedSubsidiaries.has(org.id);
+                return (
+                  <label
+                    key={org.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleSubsidiary(org.id)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <Building2 size={12} className="text-muted-foreground" />
+                    <span className="text-sm">{org.name}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setPropagateDialogOpen(false)}>
+              Agora não
+            </Button>
+            <Button
+              onClick={handlePropagate}
+              disabled={propagate.isPending || selectedSubsidiaries.size === 0}
+            >
+              <Send size={14} className="mr-1" />
+              {propagate.isPending
+                ? "Enviando..."
+                : `Enviar para ${selectedSubsidiaries.size} ${selectedSubsidiaries.size === 1 ? "empresa" : "empresas"}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

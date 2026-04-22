@@ -500,6 +500,125 @@ export function useMutateDPConfig() {
   });
 }
 
+// ========== DP CONFIG: HOLDING PROPAGATION ==========
+
+const DP_BASE_KEYS = [
+  "inss_patronal_pct",
+  "rat_pct",
+  "fgts_pct",
+  "terceiros_pct",
+  "provisao_ferias_pct",
+  "provisao_13_pct",
+  "vt_desconto_pct",
+] as const;
+
+/**
+ * Propaga os percentuais da holding para subsidiárias como SUGESTÃO PENDENTE
+ * (não sobrescreve os valores atuais — fica em `pending_holding_suggestion`).
+ */
+export function usePropagateDPConfigToSubsidiaries() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const { currentOrg } = useOrganization();
+
+  return useMutation({
+    mutationFn: async ({
+      subsidiaryIds,
+      base,
+      customs,
+    }: {
+      subsidiaryIds: string[];
+      base: Record<string, number>;
+      customs: any[];
+    }) => {
+      if (!subsidiaryIds.length) return { count: 0 };
+
+      const suggestion = {
+        base,
+        custom_items: customs,
+        suggested_at: new Date().toISOString(),
+        suggested_by_org_id: currentOrg!.id,
+        suggested_by_org_name: currentOrg!.name ?? "Holding",
+      };
+
+      // Para cada subsidiária: upsert apenas pending_holding_suggestion (sem tocar nos valores reais).
+      // Precisa garantir que existe row em dp_config (organization_id é UNIQUE).
+      const rows = subsidiaryIds.map((orgId) => ({
+        organization_id: orgId,
+        user_id: user!.id,
+        pending_holding_suggestion: suggestion as any,
+      }));
+
+      const { error } = await supabase
+        .from("dp_config")
+        .upsert(rows as any, { onConflict: "organization_id", ignoreDuplicates: false });
+
+      if (error) throw error;
+      return { count: subsidiaryIds.length };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["dp_config"] }),
+  });
+}
+
+/**
+ * Aplica a sugestão pendente da holding na subsidiária atual:
+ * copia os valores de pending_holding_suggestion para os campos reais e limpa a sugestão.
+ */
+export function useApplyHoldingDPSuggestion() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const { currentOrg } = useOrganization();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data: cfg, error: readErr } = await supabase
+        .from("dp_config")
+        .select("*")
+        .eq("organization_id", currentOrg!.id)
+        .maybeSingle();
+      if (readErr) throw readErr;
+      const suggestion = (cfg as any)?.pending_holding_suggestion;
+      if (!suggestion) throw new Error("Nenhuma sugestão pendente");
+
+      const baseFromSuggestion = (suggestion.base ?? {}) as Record<string, number>;
+      const payload: Record<string, any> = {
+        organization_id: currentOrg!.id,
+        user_id: user!.id,
+        custom_items: suggestion.custom_items ?? [],
+        pending_holding_suggestion: null,
+      };
+      for (const k of DP_BASE_KEYS) {
+        if (baseFromSuggestion[k] !== undefined) payload[k] = baseFromSuggestion[k];
+      }
+
+      const { error } = await supabase
+        .from("dp_config")
+        .upsert(payload as any, { onConflict: "organization_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["dp_config"] }),
+  });
+}
+
+/**
+ * Descarta a sugestão pendente sem aplicar.
+ */
+export function useDismissHoldingDPSuggestion() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrganization();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("dp_config")
+        .update({ pending_holding_suggestion: null } as any)
+        .eq("organization_id", currentOrg!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["dp_config"] }),
+  });
+}
+
 // ========== HR PLANNING ==========
 export function useHRPlanning() {
   const { currentOrg } = useOrganization();
