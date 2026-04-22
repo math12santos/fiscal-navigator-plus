@@ -719,12 +719,31 @@ export default function RelatorioKpi() {
             </div>
           </div>
           <div className="text-right">
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-2 flex-wrap">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
                 {isFiltering ? "Total filtrado" : "Total"}
               </p>
               {!isFiltering && reconciliationStatus && (
                 <ReconciliationBadge status={reconciliationStatus} />
+              )}
+              {supportsQuarterly && (
+                <ToggleGroup
+                  type="single"
+                  size="sm"
+                  value={granularity}
+                  onValueChange={(v) => {
+                    if (v === "mensal" || v === "trimestral") applyGranularity(v);
+                  }}
+                  aria-label="Granularidade da composição"
+                  className="ml-1"
+                >
+                  <ToggleGroupItem value="mensal" aria-label="Visão mensal" className="h-6 px-2 text-[11px]">
+                    Mensal
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="trimestral" aria-label="Visão trimestral" className="h-6 px-2 text-[11px]">
+                    Trimestral
+                  </ToggleGroupItem>
+                </ToggleGroup>
               )}
             </div>
             <p className="text-2xl font-bold text-foreground">
@@ -736,27 +755,9 @@ export default function RelatorioKpi() {
                 : `${rows.items.length} item(ns)`}
             </p>
             {supportsQuarterly && (
-              <div className="mt-3 flex flex-col items-end gap-1">
-                <ToggleGroup
-                  type="single"
-                  size="sm"
-                  value={granularity}
-                  onValueChange={(v) => {
-                    if (v === "mensal" || v === "trimestral") applyGranularity(v);
-                  }}
-                  aria-label="Granularidade da composição"
-                >
-                  <ToggleGroupItem value="mensal" aria-label="Visão mensal" className="h-7 px-3 text-xs">
-                    Mensal
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="trimestral" aria-label="Visão trimestral" className="h-7 px-3 text-xs">
-                    Trimestral
-                  </ToggleGroupItem>
-                </ToggleGroup>
-                <p className="text-[10px] text-muted-foreground max-w-[260px] text-right leading-tight">
-                  A granularidade muda apenas a forma de exibição; o total e a reconciliação não mudam.
-                </p>
-              </div>
+              <p className="text-[10px] text-muted-foreground max-w-[260px] text-right leading-tight mt-1">
+                A granularidade muda apenas a exibição da composição; o total e a reconciliação permanecem.
+              </p>
             )}
           </div>
         </div>
