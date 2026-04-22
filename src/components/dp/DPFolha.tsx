@@ -294,15 +294,16 @@ export default function DPFolha() {
                 <TableHead>Líquido</TableHead>
                 <TableHead>FGTS</TableHead>
                 <TableHead>Encargos</TableHead>
+                <TableHead className="w-12 text-center">Holerite</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Clique em "Calcular" para gerar a folha</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Clique em "Calcular" para gerar a folha</TableCell></TableRow>
               ) : (
                 items.map((item: any) => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-medium text-foreground">{empMap[item.employee_id] || "—"}</TableCell>
+                    <TableCell className="font-medium text-foreground">{empMap[item.employee_id]?.name || "—"}</TableCell>
                     <TableCell className="font-mono">{fmt(item.salario_base)}</TableCell>
                     <TableCell className="text-destructive font-mono">{fmt(item.inss_empregado)}</TableCell>
                     <TableCell className="text-destructive font-mono">{fmt(item.irrf)}</TableCell>
@@ -310,6 +311,16 @@ export default function DPFolha() {
                     <TableCell className="font-mono font-bold">{fmt(item.total_liquido)}</TableCell>
                     <TableCell className="font-mono text-muted-foreground">{fmt(item.fgts)}</TableCell>
                     <TableCell className="font-mono text-muted-foreground">{fmt(item.total_encargos)}</TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePaystub(item)}
+                        title="Baixar holerite (PDF)"
+                      >
+                        <Download size={14} />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
