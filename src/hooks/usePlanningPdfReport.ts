@@ -55,7 +55,7 @@ export function usePlanningPdfReport({
   const { config } = usePlanningConfig();
   const { avgMonthlyPayroll: rawAvgPayroll, payrollProjections: rawPayroll } = usePayrollProjections(startDate, endDate);
   const { totals: liabTotals } = useLiabilities();
-  const { crmWeightedValue, alerts } = useFinancialSummary(startDate, endDate);
+  const { crmWeightedValue, alerts } = useFinancialSummary(startDate, endDate, filters);
   const { versions, isLoadingVersions } = useBudget();
   const budgetLinesQuery = useBudgetLines(budgetVersionId);
   const { opportunities } = useCRMOpportunities();
