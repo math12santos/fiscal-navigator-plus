@@ -18,6 +18,7 @@ import {
 import { usePlanningScenarioContext } from "@/contexts/PlanningScenarioContext";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { generateProjectionsFromContract } from "@/lib/contractProjections";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
