@@ -16,6 +16,13 @@ export const TERM_TYPES = [
   { value: "acordo", label: "Acordo (reforma)" },
 ];
 
+/** Tipos PJ — distrato comercial, não rescisão trabalhista */
+export const PJ_TERM_TYPES = [
+  { value: "distrato_aviso", label: "Distrato com aviso prévio contratual" },
+  { value: "distrato_imediato", label: "Distrato imediato" },
+  { value: "fim_contrato", label: "Fim natural do contrato" },
+];
+
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -50,6 +57,21 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
     }
   }, [open, initialEmployeeId]);
 
+  const selectedEmp = empMap[selectedEmpId];
+  const isPJ = selectedEmp?.contract_type === "PJ";
+  const isEstagio = selectedEmp?.contract_type === "estagio";
+  const termTypeOptions = isPJ ? PJ_TERM_TYPES : TERM_TYPES;
+
+  // Reset termType quando trocar de colaborador entre regimes incompatíveis
+  useEffect(() => {
+    if (!selectedEmp) return;
+    const validValues = (isPJ ? PJ_TERM_TYPES : TERM_TYPES).map((t) => t.value);
+    if (!validValues.includes(termType)) {
+      setTermType(validValues[0]);
+      setSimResult(null);
+    }
+  }, [selectedEmpId, isPJ, termType, selectedEmp]);
+
   const handleSimulate = () => {
     const emp = empMap[selectedEmpId];
     if (!emp) return;
@@ -59,8 +81,46 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
     const tDate = new Date(termDate);
     const monthsWorked = differenceInMonths(tDate, admDate);
     const currentMonthDay = tDate.getDate();
-
     const saldoSalario = (salario / 30) * currentMonthDay;
+
+    // ============== PJ: distrato comercial, sem verbas trabalhistas ==============
+    if (emp.contract_type === "PJ") {
+      // Aviso prévio contratual: paga-se proporcional aos dias contratuais (default: 30 se houver aviso).
+      // Não há FGTS, multa, 13º, férias proporcionais — relação é cível, não trabalhista.
+      const avisoContratual = termType === "distrato_aviso" ? salario : 0;
+      const total = saldoSalario + avisoContratual;
+      setSimResult({
+        contract_type: "PJ",
+        saldo_salario: Math.round(saldoSalario * 100) / 100,
+        aviso_previo: Math.round(avisoContratual * 100) / 100,
+        ferias_proporcionais: 0,
+        terco_ferias: 0,
+        decimo_terceiro_proporcional: 0,
+        multa_fgts: 0,
+        total_rescisao: Math.round(total * 100) / 100,
+      });
+      return;
+    }
+
+    // ============== Estágio: bolsa proporcional + recesso (sem FGTS/13º) ==============
+    if (emp.contract_type === "estagio") {
+      // Recesso remunerado proporcional (Lei 11.788, art. 13): 30 dias após 12 meses.
+      const recessoProp = (salario / 12) * (monthsWorked % 12);
+      const total = saldoSalario + recessoProp;
+      setSimResult({
+        contract_type: "estagio",
+        saldo_salario: Math.round(saldoSalario * 100) / 100,
+        aviso_previo: 0,
+        ferias_proporcionais: Math.round(recessoProp * 100) / 100, // armazena recesso no campo férias
+        terco_ferias: 0,
+        decimo_terceiro_proporcional: 0,
+        multa_fgts: 0,
+        total_rescisao: Math.round(total * 100) / 100,
+      });
+      return;
+    }
+
+    // ============== CLT: cálculo padrão de rescisão trabalhista ==============
     const anosCompletos = Math.floor(monthsWorked / 12);
     const diasAviso = termType === "sem_justa_causa" ? 30 + (anosCompletos * 3) : 0;
     const avisoPrevio = termType === "sem_justa_causa" ? (salario / 30) * diasAviso : 0;
@@ -77,6 +137,7 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
     const total = saldoSalario + avisoPrevio + feriasProporcionais + tercoFerias + decimoTerceiro + multaFGTS;
 
     setSimResult({
+      contract_type: "CLT",
       saldo_salario: Math.round(saldoSalario * 100) / 100,
       aviso_previo: Math.round(avisoPrevio * 100) / 100,
       ferias_proporcionais: Math.round(feriasProporcionais * 100) / 100,
