@@ -6,8 +6,16 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
 import { HoldingProvider } from "@/contexts/HoldingContext";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { GenericPageSkeleton } from "@/components/skeletons/GenericPageSkeleton";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
+import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
+import { PlanejamentoSkeleton } from "@/components/skeletons/PlanejamentoSkeleton";
+import { ContratosSkeleton } from "@/components/skeletons/ContratosSkeleton";
+import { DpSkeleton } from "@/components/skeletons/DpSkeleton";
+import { CrmSkeleton } from "@/components/skeletons/CrmSkeleton";
+import { RelatorioKpiSkeleton } from "@/components/skeletons/RelatorioKpiSkeleton";
 
 /** Retry dynamic imports on failure (stale chunk after deploy) */
 function lazyRetry(factory: () => Promise<{ default: React.ComponentType<any> }>) {
@@ -89,18 +97,10 @@ const FullScreenLoader = () => (
   </div>
 );
 
-/** Lightweight content-area skeleton — preserves sidebar/header during route transitions */
-const ContentSkeleton = () => (
-  <div className="space-y-4 animate-pulse" aria-hidden="true">
-    <div className="h-8 w-64 rounded-md bg-muted/60" />
-    <div className="h-4 w-96 rounded-md bg-muted/40" />
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-      <div className="h-28 rounded-xl bg-muted/40" />
-      <div className="h-28 rounded-xl bg-muted/40" />
-      <div className="h-28 rounded-xl bg-muted/40" />
-    </div>
-    <div className="h-64 rounded-xl bg-muted/30 mt-4" />
-  </div>
+/** Wrap each route element in its own Suspense with a module-faithful skeleton.
+ *  Sidebar/header stay mounted (outer Suspense at AppLayout level). */
+const RouteShell = ({ skeleton, children }: { skeleton: ReactNode; children: ReactNode }) => (
+  <Suspense fallback={skeleton}>{children}</Suspense>
 );
 
 /** Hook to check if user needs onboarding */
@@ -147,25 +147,23 @@ function ProtectedRoutes() {
   return (
     <Suspense fallback={<FullScreenLoader />}>
       <AppLayout>
-        <Suspense fallback={<ContentSkeleton />}>
-          <Routes>
-            <Route path="/" element={<ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard>} />
-            <Route path="/financeiro" element={<ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard>} />
-            <Route path="/fluxo-caixa" element={<Navigate to="/financeiro" replace />} />
-            <Route path="/conciliacao" element={<Navigate to="/financeiro" replace />} />
-            <Route path="/contratos" element={<ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard>} />
-            <Route path="/planejamento" element={<ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard>} />
-            <Route path="/tarefas" element={<ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard>} />
-            <Route path="/integracoes" element={<ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard>} />
-            <Route path="/ia" element={<ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard>} />
-            <Route path="/configuracoes" element={<ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard>} />
-            <Route path="/dp" element={<ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard>} />
-            <Route path="/crm" element={<ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard>} />
-            <Route path="/nova-empresa" element={<CreateOrganization />} />
-            <Route path="/relatorios/kpi/:metric" element={<ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
+        <Routes>
+          <Route path="/" element={<RouteShell skeleton={<DashboardSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/financeiro" element={<RouteShell skeleton={<FinanceiroSkeleton />}><ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/fluxo-caixa" element={<Navigate to="/financeiro" replace />} />
+          <Route path="/conciliacao" element={<Navigate to="/financeiro" replace />} />
+          <Route path="/contratos" element={<RouteShell skeleton={<ContratosSkeleton />}><ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/planejamento" element={<RouteShell skeleton={<PlanejamentoSkeleton />}><ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/tarefas" element={<RouteShell skeleton={<GenericPageSkeleton title="Tarefas" />}><ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/integracoes" element={<RouteShell skeleton={<GenericPageSkeleton title="Integrações" />}><ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/ia" element={<RouteShell skeleton={<GenericPageSkeleton title="IA Financeira" />}><ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/configuracoes" element={<RouteShell skeleton={<GenericPageSkeleton title="Configurações" />}><ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/dp" element={<RouteShell skeleton={<DpSkeleton />}><ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/crm" element={<RouteShell skeleton={<CrmSkeleton />}><ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/nova-empresa" element={<RouteShell skeleton={<GenericPageSkeleton title="Nova empresa" />}><CreateOrganization /></RouteShell>} />
+          <Route path="/relatorios/kpi/:metric" element={<RouteShell skeleton={<RelatorioKpiSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="*" element={<RouteShell skeleton={<GenericPageSkeleton />}><NotFound /></RouteShell>} />
+        </Routes>
       </AppLayout>
     </Suspense>
   );
@@ -209,7 +207,7 @@ function BackofficeRoutes() {
   return (
     <Suspense fallback={<FullScreenLoader />}>
       <BackofficeLayout>
-        <Suspense fallback={<ContentSkeleton />}>
+        <Suspense fallback={<GenericPageSkeleton />}>
           <Routes>
             <Route path="/" element={<BackofficeDashboard />} />
             <Route path="/usuarios" element={<BackofficeUsers />} />

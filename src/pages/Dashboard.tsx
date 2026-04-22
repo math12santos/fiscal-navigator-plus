@@ -19,6 +19,7 @@ import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useMemo, useCallback } from "react";
 import { startOfMonth, subMonths, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -166,6 +167,11 @@ export default function Dashboard() {
         </div>
       </div>
     );
+  }
+
+  // First-load: show module-faithful skeleton instead of zeros while data fetches
+  if (isLoading && entries.length === 0) {
+    return <DashboardSkeleton />;
   }
 
   const noData = entries.length === 0 && !isLoading;

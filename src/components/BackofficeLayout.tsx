@@ -17,6 +17,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { GlobalFetchingIndicator } from "@/components/GlobalFetchingIndicator";
 
 const navItems = [
   { path: "/backoffice", label: "Empresas", icon: Building2 },
@@ -104,6 +105,7 @@ export default function BackofficeLayout({ children }: { children: ReactNode }) 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         <div className="flex items-center justify-end gap-2 px-6 pt-4 lg:px-8">
+          <GlobalFetchingIndicator />
           <ThemeToggle />
         </div>
         <div className="p-6 lg:p-8 pt-2">{children}</div>
