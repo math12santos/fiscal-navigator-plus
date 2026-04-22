@@ -192,6 +192,7 @@ interface ExportPdfButtonProps {
 
 function ExportPdfButton({ startDate, endDate, budgetVersionId, filters }: ExportPdfButtonProps) {
   const { generatePdf, isReady } = usePlanningPdfReport({ startDate, endDate, budgetVersionId, filters });
+  const { record } = usePlanningReportExports();
   const [busy, setBusy] = useState(false);
 
   const handleClick = async () => {
@@ -199,8 +200,29 @@ function ExportPdfButton({ startDate, endDate, budgetVersionId, filters }: Expor
     try {
       setBusy(true);
       await new Promise((r) => setTimeout(r, 0));
-      generatePdf();
+      const meta = generatePdf();
       toast.success("PDF gerado com sucesso");
+
+      // Registra no histórico (best-effort — uma falha aqui não anula o PDF).
+      if (meta) {
+        record.mutate(
+          {
+            startDate, endDate, filters,
+            scenarioId: meta.scenarioId,
+            scenarioName: meta.scenarioName,
+            budgetVersionId: meta.budgetVersionId,
+            budgetVersionName: meta.budgetVersionName,
+            filtersSummary: meta.filtersSummary,
+          },
+          {
+            onError: (e: any) => {
+              if (import.meta.env.DEV) {
+                console.warn("Falha ao registrar exportação no histórico:", e?.message);
+              }
+            },
+          },
+        );
+      }
     } catch (e: any) {
       toast.error("Falha ao gerar PDF", { description: e?.message });
     } finally {
