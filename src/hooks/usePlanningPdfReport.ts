@@ -87,40 +87,69 @@ export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: Pd
       }
     }
 
-    // Projected (contracts + payroll + CRM weighted)
-    const monthlyContractRevenue = contracts
-      .filter((c) => c.status === "Ativo" && (c.tipo === "Receita" || c.tipo === "receita"))
-      .reduce((sum, c) => {
-        const v = Number(c.valor);
-        if (c.tipo_recorrencia === "mensal") return sum + v;
-        if (c.tipo_recorrencia === "bimestral") return sum + v / 2;
-        if (c.tipo_recorrencia === "trimestral") return sum + v / 3;
-        if (c.tipo_recorrencia === "semestral") return sum + v / 6;
-        if (c.tipo_recorrencia === "anual") return sum + v / 12;
-        return sum;
-      }, 0);
-    const monthlyContractCost = contracts
-      .filter((c) => c.status === "Ativo" && c.tipo !== "Receita" && c.tipo !== "receita")
-      .reduce((sum, c) => {
-        const v = Number(c.valor);
-        if (c.tipo_recorrencia === "mensal") return sum + v;
-        if (c.tipo_recorrencia === "bimestral") return sum + v / 2;
-        if (c.tipo_recorrencia === "trimestral") return sum + v / 3;
-        if (c.tipo_recorrencia === "semestral") return sum + v / 6;
-        if (c.tipo_recorrencia === "anual") return sum + v / 12;
-        return sum;
-      }, 0);
+    // ===== Realizado (somente lançamentos efetivamente realizados) =====
+    // Evita dupla contagem com Projetado, que é construído a partir das mesmas fontes virtuais.
+    const realizedByMonth: Record<string, { entradas: number; saidas: number }> = {};
+    for (const key of Object.keys(monthly)) realizedByMonth[key] = { entradas: 0, saidas: 0 };
+    for (const e of materializedEntries) {
+      const isRealized =
+        e.valor_realizado != null ||
+        e.status === "pago" ||
+        e.status === "recebido" ||
+        e.status === "conciliado";
+      if (!isRealized) continue;
+      const key = e.data_prevista.slice(0, 7);
+      if (!realizedByMonth[key]) continue;
+      const val = Number(e.valor_realizado ?? e.valor_previsto);
+      if (e.tipo === "entrada") realizedByMonth[key].entradas += val;
+      else realizedByMonth[key].saidas += val;
+    }
 
+    // ===== Projetado por mês — mesma granularidade, sem dupla contagem =====
+    const projectedByMonth: Record<string, { receita: number; gasto: number }> = {};
+    for (const key of Object.keys(monthly)) projectedByMonth[key] = { receita: 0, gasto: 0 };
+
+    // 1. Contratos: usa o mesmo motor que o Fluxo de Caixa (respeita janela e intervalo)
+    for (const c of contracts) {
+      const projs = generateProjectionsFromContract(c, startDate, endDate);
+      for (const p of projs) {
+        const key = p.data_prevista.slice(0, 7);
+        if (!projectedByMonth[key]) continue;
+        const v = Number(p.valor_previsto);
+        if (p.tipo === "entrada") projectedByMonth[key].receita += v;
+        else projectedByMonth[key].gasto += v;
+      }
+    }
+
+    // 2. DP/Folha — projeções já vêm com data_prevista correta por mês
+    for (const p of payrollProjections) {
+      const key = String(p.data_prevista).slice(0, 7);
+      if (!projectedByMonth[key]) continue;
+      projectedByMonth[key].gasto += Number(p.valor_previsto);
+    }
+
+    // 3. CRM ponderado — concentra em estimated_close_date; sem data, distribui no horizonte
     const stageMap = new Map(stages.map((s) => [s.id, s]));
-    const totalPipelineWeighted = opportunities
-      .filter((o) => !o.won_at && !o.lost_at)
-      .reduce((sum, o) => {
-        const s = stageMap.get(o.stage_id);
-        const prob = s ? Number(s.probability) / 100 : 0;
-        return sum + Number(o.estimated_value) * prob;
-      }, 0);
-    const projMonthsCount = Math.max(1, payrollProjections.length || monthsCount);
-    const crmPerMonth = totalPipelineWeighted / projMonthsCount;
+    const openOpps = opportunities.filter((o) => !o.won_at && !o.lost_at);
+    let undatedWeighted = 0;
+    for (const o of openOpps) {
+      const stage = stageMap.get(o.stage_id);
+      const prob = stage ? Number(stage.probability) / 100 : 0;
+      const weighted = Number(o.estimated_value) * prob;
+      if (weighted <= 0) continue;
+      if (o.estimated_close_date) {
+        const key = String(o.estimated_close_date).slice(0, 7);
+        if (projectedByMonth[key]) projectedByMonth[key].receita += weighted;
+      } else {
+        undatedWeighted += weighted;
+      }
+    }
+    if (undatedWeighted > 0) {
+      const perMonth = undatedWeighted / monthsCount;
+      for (const key of Object.keys(projectedByMonth)) {
+        projectedByMonth[key].receita += perMonth;
+      }
+    }
 
     // ============= Build PDF =============
     const doc = new jsPDF({ unit: "pt", format: "a4" });
