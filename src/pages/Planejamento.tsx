@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { CalendarIcon, Settings, Sparkles } from "lucide-react";
+import { CalendarIcon, Settings, Sparkles, FileDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import PlanningCockpit, { PLANNING_NAV_EVENT } from "@/components/planning/PlanningCockpit";
@@ -18,6 +18,8 @@ import PlanningScenariosRisk from "@/components/planning/PlanningScenariosRisk";
 import PlanningOperational from "@/components/planning/PlanningOperational";
 import PlanningSettingsDialog from "@/components/planning/PlanningSettingsDialog";
 import { PlanningScenarioProvider, usePlanningScenarioContext } from "@/contexts/PlanningScenarioContext";
+import { usePlanningPdfReport } from "@/hooks/usePlanningPdfReport";
+import { toast } from "sonner";
 
 function ScenarioPicker() {
   const { scenarios, activeScenarioId, setActiveScenarioId, activeScenario } = usePlanningScenarioContext();
