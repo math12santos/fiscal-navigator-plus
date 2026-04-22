@@ -81,6 +81,60 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
     return map;
   }, [budgetLines]);
 
+  // Projected (contracts recurring monthly + payroll + CRM weighted)
+  const projectedByMonth = useMemo(() => {
+    const map: Record<string, { receita: number; gasto: number }> = {};
+
+    // Active recurring contracts → monthly value
+    const monthlyContractRevenue = contracts
+      .filter((c) => c.status === "Ativo" && (c.tipo === "Receita" || c.tipo === "receita"))
+      .reduce((sum, c) => {
+        const v = Number(c.valor);
+        if (c.tipo_recorrencia === "mensal") return sum + v;
+        if (c.tipo_recorrencia === "bimestral") return sum + v / 2;
+        if (c.tipo_recorrencia === "trimestral") return sum + v / 3;
+        if (c.tipo_recorrencia === "semestral") return sum + v / 6;
+        if (c.tipo_recorrencia === "anual") return sum + v / 12;
+        return sum;
+      }, 0);
+
+    const monthlyContractCost = contracts
+      .filter((c) => c.status === "Ativo" && c.tipo !== "Receita" && c.tipo !== "receita")
+      .reduce((sum, c) => {
+        const v = Number(c.valor);
+        if (c.tipo_recorrencia === "mensal") return sum + v;
+        if (c.tipo_recorrencia === "bimestral") return sum + v / 2;
+        if (c.tipo_recorrencia === "trimestral") return sum + v / 3;
+        if (c.tipo_recorrencia === "semestral") return sum + v / 6;
+        if (c.tipo_recorrencia === "anual") return sum + v / 12;
+        return sum;
+      }, 0);
+
+    // CRM weighted pipeline → monthly fraction over horizon
+    const stageMap = new Map(stages.map((s) => [s.id, s]));
+    const totalPipelineWeighted = opportunities
+      .filter((o) => !o.won_at && !o.lost_at)
+      .reduce((sum, o) => {
+        const s = stageMap.get(o.stage_id);
+        const prob = s ? Number(s.probability) / 100 : 0;
+        return sum + Number(o.estimated_value) * prob;
+      }, 0);
+
+    let cursor = startOfMonth(startDate);
+    const monthsCount = Math.max(1, payrollProjections.length || 1);
+    const crmPerMonth = totalPipelineWeighted / monthsCount;
+
+    while (!isAfter(cursor, endDate)) {
+      const key = format(cursor, "yyyy-MM");
+      map[key] = {
+        receita: monthlyContractRevenue + crmPerMonth,
+        gasto: monthlyContractCost + avgMonthlyPayroll,
+      };
+      cursor = addMonths(cursor, 1);
+    }
+    return map;
+  }, [contracts, opportunities, stages, avgMonthlyPayroll, payrollProjections.length, startDate, endDate]);
+
   // Chart data
   const chartData = useMemo(() => {
     const data: any[] = [];
@@ -89,6 +143,7 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
       const key = format(cursor, "yyyy-MM");
       const realized = realizedByMonth[key] ?? { entradas: 0, saidas: 0 };
       const budgeted = budgetedByMonth[key] ?? { receita: 0, gasto: 0 };
+      const projected = projectedByMonth[key] ?? { receita: 0, gasto: 0 };
       data.push({
         mes: format(cursor, "MMM/yy", { locale: ptBR }),
         monthKey: key,
@@ -96,23 +151,27 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
         "Realizado (Saída)": -realized.saidas,
         "Orçado (Receita)": budgeted.receita,
         "Orçado (Gasto)": -budgeted.gasto,
+        "Projetado (Receita)": projected.receita,
+        "Projetado (Gasto)": -projected.gasto,
       });
       cursor = addMonths(cursor, 1);
     }
     return data;
-  }, [realizedByMonth, budgetedByMonth, startDate, endDate]);
+  }, [realizedByMonth, budgetedByMonth, projectedByMonth, startDate, endDate]);
 
   // Variance table by month
   const varianceData = useMemo(() => {
     return chartData.map((d) => {
       const realizado = d["Realizado (Entrada)"] + d["Realizado (Saída)"];
       const orcado = d["Orçado (Receita)"] + d["Orçado (Gasto)"];
+      const projetado = d["Projetado (Receita)"] + d["Projetado (Gasto)"];
       const dp = dpByMonth[d.monthKey] ?? 0;
       const variacao = orcado !== 0 ? ((realizado - orcado) / Math.abs(orcado)) * 100 : 0;
       return {
         mes: d.mes,
         orcado,
         realizado,
+        projetado,
         dp,
         diferenca: realizado - orcado,
         variacao,
