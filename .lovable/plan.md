@@ -1,70 +1,67 @@
 
 
-# Plano: Seleção múltipla para Conta Bancária e Centro de Custo nos filtros
+# Plano: Sanitização automática de filtros inválidos + aviso ao exportar
 
-## Objetivo
-
-Permitir comparar rapidamente recortes compostos (ex.: duas filiais + três centros de custo) sem precisar exportar várias vezes. Hoje cada dimensão aceita apenas um valor; vamos transformar **Conta Bancária** e **Centro de Custo** em multi-seleção, mantendo **Unidade (subsidiária)** como single-select (faz parte do contexto de holding e não admite mistura).
+## Problema
+Hoje o URL pode carregar IDs que não existem mais (conta bancária excluída, CC desativado, subsidiária removida, link compartilhado por usuário com escopo diferente). O sistema continua aplicando esses filtros silenciosamente — nenhum dado bate com o ID, então KPIs zeram, gráficos ficam vazios e o PDF é exportado "limpo" sem avisar que a visão é vazia por filtro fantasma. Vai contra o princípio de "decisões auditáveis".
 
 ## Comportamento esperado
 
-- **Filtro de Conta Bancária**: lista de checkboxes com busca; usuário marca quantas contas quiser. Sem nada marcado = "Todas".
-- **Filtro de Centro de Custo**: idem, com busca por código/nome.
-- **Badge no botão "Filtros"** continua mostrando o total de dimensões com filtro ativo (não a soma de itens).
-- **Resumo no PDF e no histórico**: passa a listar os nomes selecionados separados por vírgula. Se houver mais de 3 itens em uma dimensão, exibe os 2 primeiros + "(+N)" para evitar estouro de linha.
-- **URL compartilhável**: `?conta=<uuid1>,<uuid2>&cc=<uuid3>,<uuid4>` — ainda permite recarregar e compartilhar a mesma visão.
-- **Sem regressão**: filtros existentes salvos como string única no histórico continuam sendo lidos corretamente (compatibilidade ascendente).
+1. **Sanitização automática (silenciosa quando trivial, com aviso quando relevante)**
+   - Ao montar a página de Planejamento, tão logo as listas de referência (`allBankAccounts`, `costCenters`, `subsidiaryOrgs`) terminem de carregar, o sistema valida cada ID presente no URL.
+   - IDs que não existem mais nas listas ativas são removidos do URL via `replace: true` (não polui histórico).
+   - Se algo foi removido, dispara um **toast informativo único** (não bloqueia): _"Removemos N filtro(s) que não existem mais nesta organização."_ — com a lista das dimensões afetadas.
+   - Aguarda explicitamente o fim do carregamento das três fontes antes de validar (não remove filtro só porque a query ainda não voltou).
+
+2. **Aviso ao exportar PDF com filtros inconsistentes**
+   - O `ExportPdfButton` ganha uma checagem pré-exportação:
+     - Se algum filtro ativo **não casa com nenhum lançamento/contrato/passivo no horizonte selecionado** (resultado vazio causado pelo filtro), abre um `AlertDialog` de confirmação: _"O recorte atual não retorna dados no período. O PDF será gerado em branco. Deseja continuar?"_ com botões **Revisar filtros** (fecha) e **Exportar mesmo assim**.
+   - O cálculo de "filtro vazio" é barato: reaproveita os arrays já filtrados que `usePlanningPdfReport` produz internamente (vamos expor um booleano `hasFilteredData` no retorno do hook).
+   - Quando não há filtro ativo OU há dados, o fluxo continua igual ao atual (sem diálogo extra).
+
+3. **Mensagem visual no FilterPopover**
+   - Pequena nota no rodapé do popover quando há filtros ativos mas zero resultado: _"Recorte atual sem dados no período."_ — ajuda o usuário a entender por que a tela está vazia antes mesmo de tentar exportar.
 
 ## Mudanças técnicas
 
-### 1. `src/lib/planningFilters.ts` — modelo
+### 1. `src/lib/planningFilters.ts`
+- Nova função utilitária:
 ```ts
-export interface PlanningFilters {
-  subsidiaryOrgId: string | null;        // segue single
-  bankAccountIds: string[];              // [] = todas
-  costCenterIds: string[];               // [] = todos
-}
+sanitizeFilters(
+  current: PlanningFilters,
+  valid: { orgIds: Set<string>; bankIds: Set<string>; ccIds: Set<string> },
+): { sanitized: PlanningFilters; removed: { dimension: string; count: number }[] }
 ```
-- `EMPTY_PLANNING_FILTERS` usa arrays vazios.
-- `hasAnyFilter`: true se qualquer dimensão tem valor.
-- `entryMatchesFilters` / `contractMatchesFilters`: trocam `===` por `array.includes()` (com early-return se array vazio = "sem filtro").
+- Retorna o objeto limpo e a lista de dimensões com itens removidos para o toast.
 
-### 2. `src/pages/Planejamento.tsx` — URL + UI
-- **Serialização URL**: `params.set("conta", ids.join(","))` quando `ids.length > 0`; `params.delete("conta")` quando vazio. Idem para `cc`. Leitura: `searchParams.get("conta")?.split(",").filter(Boolean) ?? []`.
-- **`FilterPopover`**: substituir os dois `Select` por um componente simples de **multi-select com checkbox + busca** inline (sem nova dependência — usar `Popover` interno ou lista com `Checkbox` já existentes em `@/components/ui/checkbox` + `Input` de busca). Cabeçalho de cada dimensão mostra "Todas" / "N selecionadas".
-- **Badge contador** continua somando dimensões ativas (não itens).
+### 2. `src/pages/Planejamento.tsx`
+- Novo `useEffect` que roda **apenas** quando `isLoadingBankAccounts === false && isLoadingCostCenters === false && holdingQuery loaded`. Compara `filters` atual contra os Sets válidos via `sanitizeFilters`, e:
+  - Se `removed.length > 0`, chama `setFilters(sanitized)` e dispara `toast.info(...)`.
+  - Usa um `useRef` para garantir que o toast só apareça **uma vez por sessão de sanitização** (não dispara em loop após `setFilters`).
+- Passa a propriedade `hasActiveFiltersWithoutData` (derivada abaixo) para o `FilterPopover` exibir a nota de "sem dados".
 
-### 3. `src/hooks/useFinancialSummary.ts` / `PlanningCockpit.tsx` / `PlannedVsActual.tsx`
-- Nenhuma mudança de lógica de cálculo — basta consumir os matchers atualizados (que agora aceitam arrays). Como já passam `filters` para `entryMatchesFilters`/`contractMatchesFilters`, a propagação é automática.
+### 3. `src/hooks/usePlanningPdfReport.ts`
+- Expor no retorno: `hasFilteredData: boolean` — true se a soma de `entries.length + contracts.length + payrollProjections.length > 0` após filtros, ou se não há filtro ativo.
+- Não muda a lógica de geração — apenas adiciona o sinalizador.
 
-### 4. `src/hooks/usePlanningPdfReport.ts` — resumo
-- Trocar bloco de `filterParts` para mapear arrays:
-```ts
-const fmt = (ids, lookup, label) => {
-  if (ids.length === 0) return null;
-  const names = ids.map(id => lookup(id)).filter(Boolean);
-  const head = names.slice(0, 2).join(", ");
-  const tail = names.length > 2 ? ` (+${names.length - 2})` : "";
-  return `${label}: ${head}${tail}`;
-};
-```
-- Aplica para Conta e CC; Unidade segue single.
-
-### 5. `PlanningReportHistory.tsx` / `usePlanningReportExports.ts`
-- Sem mudança de schema (`filters` é `Json`, suporta arrays). O campo `filters_summary` já é texto livre — herda o novo formato automaticamente.
-- **Compatibilidade com histórico antigo**: ao reabrir um registro salvo no formato antigo (com `bankAccountId: "uuid"`), normalizamos no momento da leitura: se for string, vira `[string]`; se ausente/null, vira `[]`. Adicionamos um pequeno helper `normalizeFilters()` em `planningFilters.ts` e usamos em `RedownloadRow`.
-
-## Arquivos afetados
-
-- **Editado:** `src/lib/planningFilters.ts` (modelo, matchers, helper `normalizeFilters`)
-- **Editado:** `src/pages/Planejamento.tsx` (URL + nova UI multi-select no `FilterPopover`)
-- **Editado:** `src/hooks/usePlanningPdfReport.ts` (resumo de filtros)
-- **Editado:** `src/components/planning/PlanningReportHistory.tsx` (normaliza filtros antigos antes de regerar)
-- **Sem mudanças funcionais (apenas tipo):** `useFinancialSummary.ts`, `PlanningCockpit.tsx`, `PlannedVsActual.tsx` — já consomem os matchers via `filters`.
+### 4. `src/pages/Planejamento.tsx` — `ExportPdfButton`
+- Importa `AlertDialog` do shadcn.
+- Antes de chamar `generatePdf()`:
+  - Se `hasAnyFilter(filters) && !hasFilteredData` → abre o dialog de confirmação.
+  - Botão **Exportar mesmo assim** chama `generatePdf()` (mesmo fluxo de toast/registro).
+  - Botão **Revisar filtros** fecha o dialog.
+- Quando não há motivo para alertar, fluxo segue idêntico ao atual.
 
 ## Garantias
 
-- **Comparação rápida**: usuário marca várias contas/CCs, vê tudo consolidado em uma só visão e exporta um único PDF representando a combinação.
-- **Coerência total**: como o filtro flui pelo mesmo `useFinancialSummary` que já alimenta Cockpit, Plan×Real×Projetado e PDF, todos os números continuam batendo (princípio reforçado nas iterações anteriores).
-- **Nenhuma quebra de histórico**: PDFs antigos continuam re-baixáveis graças ao `normalizeFilters`.
+- **Sem perda silenciosa de visão**: usuário sempre sabe quando o sistema removeu filtros obsoletos ou quando o recorte resulta em vazio.
+- **Sem loops**: a sanitização só roda após carregamento concluído e usa ref para single-fire por mudança real.
+- **Compatibilidade com links compartilhados**: link válido continua funcionando; link inválido se auto-corrige e avisa o destinatário.
+- **PDF auditável**: relatório só é gerado em branco mediante confirmação explícita, preservando o princípio "se não pode ser reproduzido, não é válido".
+- **Sem regressão**: filtros válidos seguem aplicados; nenhum cálculo (Cockpit, Plan×Real, PDF) muda.
+
+## Arquivos afetados
+- **Editado:** `src/lib/planningFilters.ts` (nova `sanitizeFilters`)
+- **Editado:** `src/hooks/usePlanningPdfReport.ts` (expõe `hasFilteredData`)
+- **Editado:** `src/pages/Planejamento.tsx` (effect de sanitização, AlertDialog no export, nota no FilterPopover)
 
