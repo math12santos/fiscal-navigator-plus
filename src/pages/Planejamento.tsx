@@ -260,15 +260,34 @@ export default function Planejamento() {
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [budgetVersionId, setBudgetVersionId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [filters, setFilters] = useState<PlanningFilters>(EMPTY_PLANNING_FILTERS);
   const { getAllowedTabs } = useUserPermissions();
 
   const allowedTabs = getAllowedTabs("planejamento", ALL_TABS);
   const fallbackTab = allowedTabs[0]?.key || "cockpit";
 
-  // Active tab is persisted in the URL (?tab=...) so refresh, back/forward
-  // and shared links preserve navigation context.
+  // Active tab + filtros operacionais (unidade/conta/cc) persistem no URL para
+  // permitir refresh, back/forward e compartilhamento de links com a mesma visão.
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const filters = useMemo<PlanningFilters>(() => ({
+    subsidiaryOrgId: searchParams.get("org"),
+    bankAccountId: searchParams.get("conta"),
+    costCenterId: searchParams.get("cc"),
+  }), [searchParams]);
+
+  const setFilters = useCallback((next: PlanningFilters) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      const apply = (key: string, value: string | null) => {
+        if (value) params.set(key, value);
+        else params.delete(key);
+      };
+      apply("org", next.subsidiaryOrgId);
+      apply("conta", next.bankAccountId);
+      apply("cc", next.costCenterId);
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
   const urlTab = searchParams.get("tab");
   const activeTab =
     urlTab && allowedTabs.some((t) => t.key === urlTab) ? urlTab : fallbackTab;
