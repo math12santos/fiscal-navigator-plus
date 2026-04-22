@@ -138,6 +138,51 @@ export default function DPColaboradores() {
     remove.mutate(id, { onSuccess: () => toast({ title: "Colaborador removido" }) });
   };
 
+  const handleExportExcel = () => {
+    const benefitsByEmp: Record<string, string[]> = {};
+    allEmployeeBenefits.forEach((eb: any) => {
+      if (!eb.active) return;
+      const benefit = allBenefits.find((b: any) => b.id === eb.benefit_id);
+      if (!benefit) return;
+      if (!benefitsByEmp[eb.employee_id]) benefitsByEmp[eb.employee_id] = [];
+      benefitsByEmp[eb.employee_id].push(benefit.name);
+    });
+
+    generateDPExcelReport({
+      title: `Colaboradores ${currentOrg?.name || ""}`.trim(),
+      sheets: [
+        {
+          name: "Colaboradores",
+          rows: [
+            [
+              "Nome", "CPF", "Email", "Telefone", "Cargo", "Tipo Contrato",
+              "Salário Base", "Jornada (h/sem)", "Centro de Custo", "Status",
+              "Admissão", "Comissão Tipo", "Comissão Valor",
+              "VT Ativo", "VT Diário", "Encargos Estimados", "Custo Total Estimado",
+              "Benefícios", "Observações",
+            ],
+            ...filtered.map((e: any) => {
+              const sal = Number(e.salary_base || 0);
+              const enc = calcEncargosPatronais(sal, dpConfig, e.contract_type);
+              return [
+                e.name, e.cpf || "", e.email || "", e.phone || "",
+                posMap[e.position_id] || "", e.contract_type,
+                sal, e.workload_hours || 44, ccMap[e.cost_center_id] || "",
+                e.status, e.admission_date,
+                e.comissao_tipo || "nenhuma", Number(e.comissao_valor || 0),
+                e.vt_ativo ? "Sim" : "Não", Number(e.vt_diario || 0),
+                enc.total, sal + enc.total,
+                (benefitsByEmp[e.id] || []).join(", "),
+                e.notes || "",
+              ];
+            }),
+          ],
+        },
+      ],
+    });
+    toast({ title: "Lista exportada" });
+  };
+
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
@@ -156,6 +201,7 @@ export default function DPColaboradores() {
             <SelectItem value="desligado">Desligados</SelectItem>
           </SelectContent>
         </Select>
+        <DPExportButton onExcel={handleExportExcel} disabled={filtered.length === 0} />
         <Button onClick={openNew}><Plus size={14} className="mr-1" /> Novo Colaborador</Button>
       </div>
 
