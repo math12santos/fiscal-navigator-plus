@@ -441,6 +441,8 @@ export function usePlanningPdfReport({
     liabTotals.total,
     crmWeightedValue,
     alerts,
+    monthlyBurn,
+    runway,
     opportunities,
     stages,
     activeScenario,
