@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { addMonths, startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -13,7 +13,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CalendarIcon, Settings, Sparkles, FileDown, Loader2, Filter, X, Search } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CalendarIcon, Settings, Sparkles, FileDown, Loader2, Filter, X, Search, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import PlanningCockpit, { PLANNING_NAV_EVENT } from "@/components/planning/PlanningCockpit";
@@ -29,7 +33,7 @@ import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { useHolding } from "@/contexts/HoldingContext";
 import { Badge } from "@/components/ui/badge";
 import {
-  PlanningFilters, EMPTY_PLANNING_FILTERS, hasAnyFilter,
+  PlanningFilters, EMPTY_PLANNING_FILTERS, hasAnyFilter, sanitizeFilters,
 } from "@/lib/planningFilters";
 import PlanningReportHistory from "@/components/planning/PlanningReportHistory";
 import { usePlanningReportExports } from "@/hooks/usePlanningReportExports";
