@@ -130,22 +130,36 @@ export function ContasBancariasTab() {
     setLimitAccount(null);
   };
 
-  // Totais consolidados
+  // Totais consolidados — usa lógica diferenciada para cheque especial
   const totals = allBankAccounts.reduce(
     (acc, b) => {
       const saldo = b.saldo_atual || 0;
-      const limTotal = b.limite_credito || 0;
-      const limUsado = b.limite_utilizado || 0;
-      const limDisp = Math.max(0, limTotal - limUsado);
+      const tipo = (b.limite_tipo || "cheque_especial") as any;
+      const av = calculateAvailability({
+        saldoAtual: saldo,
+        limiteTotal: b.limite_credito || 0,
+        limiteUtilizado: b.limite_utilizado || 0,
+        limiteTipo: tipo,
+      });
       acc.saldo += saldo;
-      acc.limiteTotal += limTotal;
-      acc.limiteUsado += limUsado;
-      acc.limiteDisp += limDisp;
-      acc.disponivel += saldo + limDisp;
+      acc.limiteTotal += b.limite_credito || 0;
+      acc.limiteUsado += av.usoLimiteAtual;
+      acc.limiteDisp += av.limiteDisponivel;
+      acc.disponivel += av.capitalGiroDisponivel;
+      // Estimativa de juros do mês (cheque especial)
+      if (tipo === "cheque_especial" && av.usoLimiteAtual > 0) {
+        acc.jurosEstimado += estimateMonthlyClosingCharge(
+          av.usoLimiteAtual,
+          b.limite_taxa_juros_mensal || 0,
+          30
+        );
+      }
       return acc;
     },
-    { saldo: 0, limiteTotal: 0, limiteUsado: 0, limiteDisp: 0, disponivel: 0 }
+    { saldo: 0, limiteTotal: 0, limiteUsado: 0, limiteDisp: 0, disponivel: 0, jurosEstimado: 0 }
   );
+
+  const proximoFechamento = getNextClosingDate();
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="animate-spin" /></div>;
