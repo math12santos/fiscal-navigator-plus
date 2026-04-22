@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { KpiPeriodPresetsPopover } from "@/components/relatorio/KpiPeriodPresetsPopover";
 import { ArrowLeft, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info } from "lucide-react";
-import { startOfMonth, endOfMonth, subMonths, format, parseISO } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, format, parseISO, getQuarter } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { useContracts } from "@/hooks/useContracts";
@@ -32,6 +34,7 @@ import { useEmployees } from "@/hooks/useDP";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { validateRange } from "@/lib/kpiRangeValidation";
 
 /**
  * Página única de "drill-down" para KPIs do Dashboard.
@@ -150,18 +153,61 @@ export default function RelatorioKpi() {
     [searchParams, setSearchParams],
   );
 
+  /** Granularidade da exibição: "mensal" (padrão) ou "trimestral". */
+  const granularity = useMemo<"mensal" | "trimestral">(() => {
+    const g = searchParams.get("gran");
+    return g === "trimestral" ? "trimestral" : "mensal";
+  }, [searchParams]);
+
+  const applyGranularity = useCallback(
+    (g: "mensal" | "trimestral") => {
+      const next = new URLSearchParams(searchParams);
+      if (g === "mensal") next.delete("gran");
+      else next.set("gran", g);
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
   const meta = METRIC_META[metric as KpiMetric];
 
   // Período: usa query string ou default = últimos 6 meses (mesmo do Dashboard).
+  // Se a URL trouxer um range inválido, cai no default e avisa o usuário via toast
+  // — princípio "nada acontece silenciosamente".
   const now = useMemo(() => new Date(), []);
+  const defaultFrom = useMemo(() => startOfMonth(subMonths(now, 5)), [now]);
+  const defaultTo = useMemo(() => endOfMonth(now), [now]);
+
+  const urlFrom = searchParams.get("from");
+  const urlTo = searchParams.get("to");
+  const urlRangeValidation = useMemo(() => {
+    if (!urlFrom && !urlTo) return { ok: true as const };
+    const f = urlFrom ?? format(defaultFrom, "yyyy-MM-dd");
+    const t = urlTo ?? format(defaultTo, "yyyy-MM-dd");
+    return validateRange(f, t);
+  }, [urlFrom, urlTo, defaultFrom, defaultTo]);
+
+  const warnedRef = useRef(false);
+  useEffect(() => {
+    if (!urlRangeValidation.ok && !warnedRef.current) {
+      warnedRef.current = true;
+      toast.warning("Período da URL inválido — usando últimos 6 meses", {
+        description: urlRangeValidation.message,
+      });
+    }
+    if (urlRangeValidation.ok) {
+      warnedRef.current = false;
+    }
+  }, [urlRangeValidation]);
+
   const rangeFrom = useMemo(() => {
-    const q = searchParams.get("from");
-    return q ? parseISO(q) : startOfMonth(subMonths(now, 5));
-  }, [searchParams, now]);
+    if (!urlRangeValidation.ok || !urlFrom) return defaultFrom;
+    return parseISO(urlFrom);
+  }, [urlFrom, urlRangeValidation, defaultFrom]);
   const rangeTo = useMemo(() => {
-    const q = searchParams.get("to");
-    return q ? parseISO(q) : endOfMonth(now);
-  }, [searchParams, now]);
+    if (!urlRangeValidation.ok || !urlTo) return defaultTo;
+    return parseISO(urlTo);
+  }, [urlTo, urlRangeValidation, defaultTo]);
 
   const summary = useFinancialSummary(rangeFrom, rangeTo);
   const { contracts } = useContracts();
@@ -489,17 +535,74 @@ export default function RelatorioKpi() {
     );
   }, [rows.items, search]);
 
+  /** Granularidade aplicável apenas a KPIs com dimensão temporal de fluxo. */
+  const supportsQuarterly = rows.kind === "cashflow" || rows.kind === "result";
+  const isQuarterly = supportsQuarterly && granularity === "trimestral";
+
+  /**
+   * Quando trimestral está ativo e o KPI é de fluxo/resultado, agregamos
+   * `filteredItems` por trimestre (`yyyy-Qn`). O valor total do horizonte
+   * (`rows.total`) e a reconciliação não mudam — granularidade é apenas
+   * apresentação.
+   */
+  const aggregatedRows = useMemo(() => {
+    if (!isQuarterly) return filteredItems;
+    const buckets = new Map<
+      string,
+      { period: string; label: string; count: number; entradas: number; saidas: number; valor: number }
+    >();
+    for (const item of filteredItems as any[]) {
+      if (!item.data) continue;
+      const d = parseISO(item.data);
+      const q = getQuarter(d);
+      const y = d.getFullYear();
+      const key = `${y}-Q${q}`;
+      const monthStart = (q - 1) * 3;
+      const months = [monthStart, monthStart + 1, monthStart + 2]
+        .map((m) => format(new Date(y, m, 1), "MMM", { locale: ptBR }))
+        .join("–");
+      const label = `${key} — ${months}/${y}`;
+      const bucket = buckets.get(key) ?? {
+        period: key,
+        label,
+        count: 0,
+        entradas: 0,
+        saidas: 0,
+        valor: 0,
+      };
+      bucket.count += 1;
+      if (rows.kind === "result") {
+        // Em "result", `valor` já vem com sinal (entrada positiva, saída negativa).
+        const v = Number(item.valor) || 0;
+        if (v >= 0) bucket.entradas += v;
+        else bucket.saidas += Math.abs(v);
+        bucket.valor += v;
+      } else {
+        const v = Number(item.valor) || 0;
+        bucket.valor += v;
+      }
+      buckets.set(key, bucket);
+    }
+    return Array.from(buckets.values()).sort((a, b) => a.period.localeCompare(b.period));
+  }, [filteredItems, isQuarterly, rows.kind]);
+
+  const displayKind = isQuarterly
+    ? rows.kind === "result"
+      ? "result-quarter"
+      : "cashflow-quarter"
+    : rows.kind;
+
   const filteredTotal = useMemo(
     () => filteredItems.reduce((s: number, i: any) => s + Number(i.valor ?? i.mensal ?? i.ponderado ?? i.salario ?? 0), 0),
     [filteredItems],
   );
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(aggregatedRows.length / pageSize));
 
-  // Reseta página ao mudar busca, métrica ou tamanho de página
+  // Reseta página ao mudar busca, métrica, tamanho de página ou granularidade
   useEffect(() => {
     setPage(1);
-  }, [search, metric, pageSize]);
+  }, [search, metric, pageSize, isQuarterly]);
 
   // Garante que a página atual existe após mudanças no dataset
   useEffect(() => {
@@ -508,19 +611,22 @@ export default function RelatorioKpi() {
 
   const pagedItems = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filteredItems.slice(start, start + pageSize);
-  }, [filteredItems, page, pageSize]);
+    return aggregatedRows.slice(start, start + pageSize);
+  }, [aggregatedRows, page, pageSize]);
 
   const isFiltering = search.trim().length > 0;
-  const showingFrom = filteredItems.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const showingTo = Math.min(page * pageSize, filteredItems.length);
+  const showingFrom = aggregatedRows.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const showingTo = Math.min(page * pageSize, aggregatedRows.length);
 
   const exportCsv = () => {
-    if (filteredItems.length === 0) return;
-    const headers = Object.keys(filteredItems[0]);
+    // Quando trimestral, exportamos as linhas agregadas (1 por trimestre);
+    // caso contrário, exportamos os itens individuais filtrados.
+    const source = isQuarterly ? aggregatedRows : filteredItems;
+    if (source.length === 0) return;
+    const headers = Object.keys(source[0] as Record<string, unknown>);
     const csvRows = [
       headers.join(";"),
-      ...filteredItems.map((r) =>
+      ...source.map((r) =>
         headers
           .map((h) => {
             const v = (r as any)[h];
@@ -534,8 +640,9 @@ export default function RelatorioKpi() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const suffix = isFiltering ? "-filtrado" : "";
-    a.download = `relatorio-${metric}${suffix}-${format(now, "yyyyMMdd")}.csv`;
+    const granSuffix = isQuarterly ? "-trimestral" : "";
+    const filterSuffix = isFiltering ? "-filtrado" : "";
+    a.download = `relatorio-${metric}${granSuffix}${filterSuffix}-${format(now, "yyyyMMdd")}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -563,9 +670,20 @@ export default function RelatorioKpi() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
           <ArrowLeft size={14} className="mr-2" /> Voltar ao Dashboard
         </Button>
-        <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredItems.length === 0}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportCsv}
+          disabled={(isQuarterly ? aggregatedRows.length : filteredItems.length) === 0}
+        >
           <Download size={14} className="mr-2" />
-          {isFiltering ? "Exportar CSV (filtrado)" : "Exportar CSV"}
+          {isQuarterly
+            ? isFiltering
+              ? "Exportar CSV (trimestral, filtrado)"
+              : "Exportar CSV (trimestral)"
+            : isFiltering
+            ? "Exportar CSV (filtrado)"
+            : "Exportar CSV"}
         </Button>
       </div>
 
@@ -608,6 +726,29 @@ export default function RelatorioKpi() {
                 ? `${filteredItems.length} de ${rows.items.length} item(ns)`
                 : `${rows.items.length} item(ns)`}
             </p>
+            {supportsQuarterly && (
+              <div className="mt-3 flex flex-col items-end gap-1">
+                <ToggleGroup
+                  type="single"
+                  size="sm"
+                  value={granularity}
+                  onValueChange={(v) => {
+                    if (v === "mensal" || v === "trimestral") applyGranularity(v);
+                  }}
+                  aria-label="Granularidade da composição"
+                >
+                  <ToggleGroupItem value="mensal" aria-label="Visão mensal" className="h-7 px-3 text-xs">
+                    Mensal
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="trimestral" aria-label="Visão trimestral" className="h-7 px-3 text-xs">
+                    Trimestral
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <p className="text-[10px] text-muted-foreground max-w-[260px] text-right leading-tight">
+                  A granularidade muda apenas a forma de exibição; o total e a reconciliação não mudam.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -688,9 +829,9 @@ export default function RelatorioKpi() {
           <>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>{renderHeader(rows.kind)}</TableHeader>
+                <TableHeader>{renderHeader(displayKind)}</TableHeader>
                 <TableBody>
-                  {pagedItems.map((r, i) => renderRow(rows.kind, r, (page - 1) * pageSize + i))}
+                  {pagedItems.map((r, i) => renderRow(displayKind, r, (page - 1) * pageSize + i))}
                 </TableBody>
               </Table>
             </div>
@@ -699,7 +840,8 @@ export default function RelatorioKpi() {
               <p className="text-xs text-muted-foreground">
                 Mostrando <span className="font-medium text-foreground">{showingFrom}</span>–
                 <span className="font-medium text-foreground">{showingTo}</span> de{" "}
-                <span className="font-medium text-foreground">{filteredItems.length}</span>
+                <span className="font-medium text-foreground">{aggregatedRows.length}</span>
+                {isQuarterly && <span className="ml-1">trimestre(s)</span>}
               </p>
               {totalPages > 1 && (
                 <Pagination className="mx-0 w-auto justify-end">
@@ -780,6 +922,14 @@ function renderHeader(kind: string) {
           <TableHead className="text-right">Valor</TableHead>
         </TableRow>
       );
+    case "cashflow-quarter":
+      return (
+        <TableRow>
+          <TableHead>Trimestre</TableHead>
+          <TableHead className="text-right">Itens</TableHead>
+          <TableHead className="text-right">Valor total</TableHead>
+        </TableRow>
+      );
     case "result":
       return (
         <TableRow>
@@ -788,6 +938,16 @@ function renderHeader(kind: string) {
           <TableHead>Tipo</TableHead>
           <TableHead>Categoria</TableHead>
           <TableHead className="text-right">Impacto</TableHead>
+        </TableRow>
+      );
+    case "result-quarter":
+      return (
+        <TableRow>
+          <TableHead>Trimestre</TableHead>
+          <TableHead className="text-right">Itens</TableHead>
+          <TableHead className="text-right">Entradas</TableHead>
+          <TableHead className="text-right">Saídas</TableHead>
+          <TableHead className="text-right">Líquido</TableHead>
         </TableRow>
       );
     case "contracts":
@@ -850,6 +1010,14 @@ function renderRow(kind: string, r: any, i: number) {
           <TableCell className="text-right font-mono">{fmt(r.valor)}</TableCell>
         </TableRow>
       );
+    case "cashflow-quarter":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium capitalize">{r.label}</TableCell>
+          <TableCell className="text-right text-muted-foreground">{r.count}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
     case "result":
       return (
         <TableRow key={i}>
@@ -862,6 +1030,18 @@ function renderRow(kind: string, r: any, i: number) {
           </TableCell>
           <TableCell className="text-muted-foreground">{r.categoria}</TableCell>
           <TableCell className={`text-right font-mono ${r.valor < 0 ? "text-destructive" : "text-success"}`}>
+            {fmt(r.valor)}
+          </TableCell>
+        </TableRow>
+      );
+    case "result-quarter":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium capitalize">{r.label}</TableCell>
+          <TableCell className="text-right text-muted-foreground">{r.count}</TableCell>
+          <TableCell className="text-right font-mono text-success">{fmt(r.entradas)}</TableCell>
+          <TableCell className="text-right font-mono text-destructive">{fmt(r.saidas)}</TableCell>
+          <TableCell className={`text-right font-mono font-semibold ${r.valor < 0 ? "text-destructive" : "text-success"}`}>
             {fmt(r.valor)}
           </TableCell>
         </TableRow>
