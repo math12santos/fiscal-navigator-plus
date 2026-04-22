@@ -52,7 +52,13 @@ export function KpiPeriodPresetsPopover({ currentFrom, currentTo, onApply, disab
     setOpen(false);
   };
 
+  const rangeValidation = useMemo(
+    () => validateRange(currentFrom, currentTo),
+    [currentFrom, currentTo],
+  );
+
   const handleSave = async () => {
+    if (!rangeValidation.ok) return;
     try {
       await savePreset(name, currentFrom, currentTo);
       setName("");
