@@ -76,8 +76,11 @@ export default function PlannedVsActual({
   const payrollProjections = useMemo(
     () => (rawPayroll as any[])
       .filter((p) => !p.source_ref || !materializedPayrollRefs.has(p.source_ref))
-      .filter((p) => !filters.costCenterId || p.cost_center_id === filters.costCenterId),
-    [rawPayroll, filters.costCenterId, materializedPayrollRefs],
+      .filter((p) =>
+        filters.costCenterIds.length === 0 ||
+        (p.cost_center_id && filters.costCenterIds.includes(p.cost_center_id))
+      ),
+    [rawPayroll, filters.costCenterIds, materializedPayrollRefs],
   );
 
   // Horizon months — single source of truth for granularity & divisors

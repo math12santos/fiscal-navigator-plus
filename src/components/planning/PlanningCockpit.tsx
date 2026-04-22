@@ -87,15 +87,18 @@ export default function PlanningCockpit({ startDate, endDate, filters = EMPTY_PL
   );
   const monthsCount = Math.max(1, horizonMonths.length);
 
-  // Custo Folha: when a cost center is selected, restrict payroll average to it
-  // using the SAME divisor as everywhere else (horizonMonths.length).
+  // Custo Folha: when one or more cost centers are selected, restrict payroll
+  // average to them using the SAME divisor as everywhere else (horizonMonths.length).
   const avgMonthlyPayroll = useMemo(() => {
-    if (!filters.costCenterId) return rawAvgPayroll;
+    if (filters.costCenterIds.length === 0) return rawAvgPayroll;
     const total = payrollProjections
-      .filter((p) => (p as any).cost_center_id === filters.costCenterId)
+      .filter((p) => {
+        const cc = (p as any).cost_center_id;
+        return cc && filters.costCenterIds.includes(cc);
+      })
       .reduce((s, p) => s + Number(p.valor_previsto), 0);
     return total / monthsCount;
-  }, [rawAvgPayroll, filters.costCenterId, payrollProjections, monthsCount]);
+  }, [rawAvgPayroll, filters.costCenterIds, payrollProjections, monthsCount]);
 
 
   // Monthly aggregation
