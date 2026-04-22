@@ -894,3 +894,136 @@ function renderRow(kind: string, r: any, i: number) {
       return null;
   }
 }
+
+// ===== Componentes de validação cruzada =====
+
+type ReconciliationStatus = "match" | "mismatch" | "info";
+
+/** Pequeno selo ao lado do "Total" — sinaliza rapidamente se a soma confere. */
+function ReconciliationBadge({ status }: { status: ReconciliationStatus }) {
+  const config = {
+    match: {
+      icon: <CheckCircle2 size={12} />,
+      label: "Confere com Dashboard",
+      className: "bg-success/15 text-success border-success/30",
+    },
+    mismatch: {
+      icon: <AlertCircle size={12} />,
+      label: "Diverge do Dashboard",
+      className: "bg-destructive/15 text-destructive border-destructive/30",
+    },
+    info: {
+      icon: <Info size={12} />,
+      label: "KPI derivado",
+      className: "bg-primary/10 text-primary border-primary/30",
+    },
+  }[status];
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${config.className}`}
+            role="status"
+            aria-label={config.label}
+          >
+            {config.icon}
+            {status === "match" ? "OK" : status === "mismatch" ? "Δ" : "i"}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="left" className="max-w-[260px] text-xs">
+          {config.label}. Veja o painel abaixo para o cruzamento detalhado.
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+/** Painel completo: mostra os dois valores lado a lado com o resultado do cruzamento. */
+function ReconciliationPanel({
+  status,
+  dashboardLabel,
+  dashboardValue,
+  drilldownValue,
+  note,
+}: {
+  status: ReconciliationStatus;
+  dashboardLabel: string;
+  dashboardValue: number;
+  drilldownValue: number;
+  note?: string;
+}) {
+  const delta = drilldownValue - dashboardValue;
+  const deltaPct = dashboardValue !== 0 ? (delta / Math.abs(dashboardValue)) * 100 : 0;
+
+  const styles = {
+    match: {
+      border: "border-success/40",
+      bg: "bg-success/5",
+      iconBg: "bg-success/15 text-success",
+      icon: <CheckCircle2 size={18} />,
+      title: "Soma dos itens confere com o KPI do Dashboard",
+      subtitle: "Os valores batem exatamente — auditoria validada para este período.",
+    },
+    mismatch: {
+      border: "border-destructive/40",
+      bg: "bg-destructive/5",
+      iconBg: "bg-destructive/15 text-destructive",
+      icon: <AlertCircle size={18} />,
+      title: "Divergência detectada entre drill-down e Dashboard",
+      subtitle: "Os totais deveriam coincidir. Verifique filtros, atualização de dados ou regras de classificação.",
+    },
+    info: {
+      border: "border-primary/30",
+      bg: "bg-primary/5",
+      iconBg: "bg-primary/15 text-primary",
+      icon: <Info size={18} />,
+      title: "Comparação informativa",
+      subtitle: "Este KPI é derivado de um cálculo agregado — exibimos a referência do Dashboard para contexto.",
+    },
+  }[status];
+
+  return (
+    <section className={`glass-card border ${styles.border} ${styles.bg} p-4`}>
+      <div className="flex items-start gap-3 flex-wrap">
+        <div className={`rounded-lg p-2 ${styles.iconBg}`}>{styles.icon}</div>
+        <div className="flex-1 min-w-[240px]">
+          <p className="text-sm font-semibold text-foreground">{styles.title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{styles.subtitle}</p>
+          {note && (
+            <p className="text-xs text-muted-foreground mt-2 italic border-l-2 border-border pl-2">
+              {note}
+            </p>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-right">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{dashboardLabel}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Soma do drill-down</p>
+          <p className="text-sm font-mono font-semibold text-foreground">{fmt(dashboardValue)}</p>
+          <p className="text-sm font-mono font-semibold text-foreground">{fmt(drilldownValue)}</p>
+          {status !== "info" && (
+            <>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground col-span-2 mt-1 border-t border-border/60 pt-1">
+                Diferença
+              </p>
+              <p
+                className={`text-sm font-mono font-semibold col-span-2 ${
+                  status === "match" ? "text-success" : "text-destructive"
+                }`}
+              >
+                {fmt(delta)}
+                {dashboardValue !== 0 && (
+                  <span className="text-xs font-normal ml-1">
+                    ({deltaPct >= 0 ? "+" : ""}
+                    {deltaPct.toFixed(2)}%)
+                  </span>
+                )}
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
