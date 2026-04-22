@@ -164,13 +164,15 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
         "Realizado (Saída)": -realized.saidas,
         "Orçado (Receita)": budgeted.receita,
         "Orçado (Gasto)": -budgeted.gasto,
+        "Cenário (Receita)": budgeted.receita * receitaFactor,
+        "Cenário (Gasto)": -(budgeted.gasto * custoFactor + stressPerMonth),
         "Projetado (Receita)": projected.receita,
         "Projetado (Gasto)": -projected.gasto,
       });
       cursor = addMonths(cursor, 1);
     }
     return data;
-  }, [realizedByMonth, budgetedByMonth, projectedByMonth, startDate, endDate]);
+  }, [realizedByMonth, budgetedByMonth, projectedByMonth, startDate, endDate, receitaFactor, custoFactor, stressPerMonth]);
 
   // Variance table by month
   const varianceData = useMemo(() => {
@@ -209,10 +211,21 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
     <div className="space-y-6">
       {/* Chart */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Orçado × Realizado × Projetado</h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          Projetado combina contratos recorrentes ativos, projeções de folha (DP) e pipeline ponderado do CRM.
-        </p>
+        <div className="flex items-start justify-between mb-3 gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Orçado × Cenário × Realizado × Projetado</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Cenário aplica variações de receita/custo e impacto de passivos sob stress.
+              Projetado combina contratos recorrentes, folha (DP) e pipeline ponderado do CRM.
+            </p>
+          </div>
+          {!isBaseScenario && activeScenario && (
+            <Badge variant="outline" className="gap-1.5 text-xs h-fit">
+              <Sparkles className="h-3 w-3 text-primary" />
+              Sob {activeScenario.name}
+            </Badge>
+          )}
+        </div>
         <ResponsiveContainer width="100%" height={340}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -230,10 +243,16 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
             <Bar dataKey="Orçado (Receita)" fill="hsl(var(--primary) / 0.4)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Projetado (Receita)" fill="hsl(var(--primary) / 0.7)" radius={[4, 4, 0, 0]} />
+            {!isBaseScenario && (
+              <Bar dataKey="Cenário (Receita)" fill="hsl(var(--primary) / 0.85)" radius={[4, 4, 0, 0]} />
+            )}
+            <Bar dataKey="Projetado (Receita)" fill="hsl(var(--success) / 0.5)" radius={[4, 4, 0, 0]} />
             <Bar dataKey="Realizado (Entrada)" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
             <Bar dataKey="Orçado (Gasto)" fill="hsl(var(--warning) / 0.4)" radius={[0, 0, 4, 4]} />
-            <Bar dataKey="Projetado (Gasto)" fill="hsl(var(--warning) / 0.7)" radius={[0, 0, 4, 4]} />
+            {!isBaseScenario && (
+              <Bar dataKey="Cenário (Gasto)" fill="hsl(var(--warning) / 0.85)" radius={[0, 0, 4, 4]} />
+            )}
+            <Bar dataKey="Projetado (Gasto)" fill="hsl(var(--destructive) / 0.5)" radius={[0, 0, 4, 4]} />
             <Bar dataKey="Realizado (Saída)" fill="hsl(var(--destructive))" radius={[0, 0, 4, 4]} />
           </BarChart>
         </ResponsiveContainer>
@@ -247,6 +266,14 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
             <TableRow>
               <TableHead>Mês</TableHead>
               <TableHead className="text-right">Orçado</TableHead>
+              {!isBaseScenario && (
+                <TableHead className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Sparkles className="h-3 w-3 text-primary" />
+                    Sob Cenário
+                  </div>
+                </TableHead>
+              )}
               <TableHead className="text-right">Projetado</TableHead>
               <TableHead className="text-right">Realizado</TableHead>
               <TableHead className="text-right">Custo DP</TableHead>
@@ -259,6 +286,17 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
               <TableRow key={row.mes}>
                 <TableCell className="font-medium">{row.mes}</TableCell>
                 <TableCell className="text-right">{fmt(row.orcado)}</TableCell>
+                {!isBaseScenario && (
+                  <TableCell className={cn(
+                    "text-right font-medium",
+                    row.cenario >= row.orcado ? "text-success" : "text-destructive"
+                  )}>
+                    {fmt(row.cenario)}
+                    <span className="ml-1 text-[10px] text-muted-foreground">
+                      ({row.variacaoCenario >= 0 ? "+" : ""}{row.variacaoCenario.toFixed(1)}%)
+                    </span>
+                  </TableCell>
+                )}
                 <TableCell className="text-right text-muted-foreground">{fmt(row.projetado)}</TableCell>
                 <TableCell className="text-right">{fmt(row.realizado)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{fmt(row.dp)}</TableCell>
