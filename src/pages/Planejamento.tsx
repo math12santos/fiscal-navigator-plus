@@ -321,14 +321,6 @@ interface ExportPdfButtonProps {
   endDate: Date;
   budgetVersionId: string | null;
   filters: PlanningFilters;
-}
-
-function ExportPdfButton({ startDate, endDate, budgetVersionId, filters }: ExportPdfButtonProps) {
-interface ExportPdfButtonProps {
-  startDate: Date;
-  endDate: Date;
-  budgetVersionId: string | null;
-  filters: PlanningFilters;
   onHasFilteredDataChange?: (v: boolean) => void;
 }
 
