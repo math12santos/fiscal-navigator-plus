@@ -1,67 +1,49 @@
 
 
-# Plano: Sanitização automática de filtros inválidos + aviso ao exportar
+# Plano: Garantir que `filters` nunca seja `undefined` (sempre `EMPTY_PLANNING_FILTERS`)
 
-## Problema
-Hoje o URL pode carregar IDs que não existem mais (conta bancária excluída, CC desativado, subsidiária removida, link compartilhado por usuário com escopo diferente). O sistema continua aplicando esses filtros silenciosamente — nenhum dado bate com o ID, então KPIs zeram, gráficos ficam vazios e o PDF é exportado "limpo" sem avisar que a visão é vazia por filtro fantasma. Vai contra o princípio de "decisões auditáveis".
+## Objetivo
+Endurecer todos os pontos onde `PlanningFilters` trafega para que, mesmo se um chamador esquecer de passar a prop ou passar `undefined`/`null`/objeto parcial, o sistema use silenciosamente `EMPTY_PLANNING_FILTERS`. Hoje a maioria dos consumidores já tem default, mas existem três pontos vulneráveis: a fonte (`Planejamento.tsx` lê do URL "na mão"), os hooks de export/histórico (sem default) e o `setFilters` (aceita qualquer coisa).
 
 ## Comportamento esperado
 
-1. **Sanitização automática (silenciosa quando trivial, com aviso quando relevante)**
-   - Ao montar a página de Planejamento, tão logo as listas de referência (`allBankAccounts`, `costCenters`, `subsidiaryOrgs`) terminem de carregar, o sistema valida cada ID presente no URL.
-   - IDs que não existem mais nas listas ativas são removidos do URL via `replace: true` (não polui histórico).
-   - Se algo foi removido, dispara um **toast informativo único** (não bloqueia): _"Removemos N filtro(s) que não existem mais nesta organização."_ — com a lista das dimensões afetadas.
-   - Aguarda explicitamente o fim do carregamento das três fontes antes de validar (não remove filtro só porque a query ainda não voltou).
-
-2. **Aviso ao exportar PDF com filtros inconsistentes**
-   - O `ExportPdfButton` ganha uma checagem pré-exportação:
-     - Se algum filtro ativo **não casa com nenhum lançamento/contrato/passivo no horizonte selecionado** (resultado vazio causado pelo filtro), abre um `AlertDialog` de confirmação: _"O recorte atual não retorna dados no período. O PDF será gerado em branco. Deseja continuar?"_ com botões **Revisar filtros** (fecha) e **Exportar mesmo assim**.
-   - O cálculo de "filtro vazio" é barato: reaproveita os arrays já filtrados que `usePlanningPdfReport` produz internamente (vamos expor um booleano `hasFilteredData` no retorno do hook).
-   - Quando não há filtro ativo OU há dados, o fluxo continua igual ao atual (sem diálogo extra).
-
-3. **Mensagem visual no FilterPopover**
-   - Pequena nota no rodapé do popover quando há filtros ativos mas zero resultado: _"Recorte atual sem dados no período."_ — ajuda o usuário a entender por que a tela está vazia antes mesmo de tentar exportar.
+- **Fonte única**: o objeto `filters` derivado do URL passa por `normalizeFilters` e nunca é `undefined`/parcial — campos faltando viram defaults de `EMPTY_PLANNING_FILTERS`.
+- **Setter defensivo**: `setFilters(undefined as any)` ou `setFilters({} as any)` resulta em `EMPTY_PLANNING_FILTERS` no URL (todos os params removidos), em vez de jogar erro ou gravar `undefined`.
+- **Default uniforme**: todo consumidor (`PlanningCockpit`, `PlannedVsActual`, `PlanningBudget`, `usePlanningPdfReport`, `useFinancialSummary`, `PlanningReportHistory`, `usePlanningReportExports`) declara `filters?: PlanningFilters` com default `EMPTY_PLANNING_FILTERS` — nada de `filters: PlanningFilters` obrigatório que estoure se chamado sem prop.
+- **Helper único**: nova função `withFilterDefaults(input?)` em `planningFilters.ts` que delega para `normalizeFilters` e devolve um novo objeto seguro. Substitui pequenas variações espalhadas.
 
 ## Mudanças técnicas
 
 ### 1. `src/lib/planningFilters.ts`
-- Nova função utilitária:
-```ts
-sanitizeFilters(
-  current: PlanningFilters,
-  valid: { orgIds: Set<string>; bankIds: Set<string>; ccIds: Set<string> },
-): { sanitized: PlanningFilters; removed: { dimension: string; count: number }[] }
-```
-- Retorna o objeto limpo e a lista de dimensões com itens removidos para o toast.
+- Renomear/expor `withFilterDefaults(input?: Partial<PlanningFilters> | null | undefined): PlanningFilters` como wrapper fino sobre `normalizeFilters` (aceita explicitamente `undefined`/`null`).
+- Ajustar `normalizeFilters` para também tolerar quando `input.bankAccountIds` vier como `null` (hoje só trata array/string).
 
 ### 2. `src/pages/Planejamento.tsx`
-- Novo `useEffect` que roda **apenas** quando `isLoadingBankAccounts === false && isLoadingCostCenters === false && holdingQuery loaded`. Compara `filters` atual contra os Sets válidos via `sanitizeFilters`, e:
-  - Se `removed.length > 0`, chama `setFilters(sanitized)` e dispara `toast.info(...)`.
-  - Usa um `useRef` para garantir que o toast só apareça **uma vez por sessão de sanitização** (não dispara em loop após `setFilters`).
-- Passa a propriedade `hasActiveFiltersWithoutData` (derivada abaixo) para o `FilterPopover` exibir a nota de "sem dados".
+- `useMemo<PlanningFilters>` que lê o URL passa o objeto bruto por `withFilterDefaults({ subsidiaryOrgId, bankAccountIds, costCenterIds })` antes de retornar — garante shape consistente mesmo se `searchParams.get("org")` vier vazio (`""`).
+- `setFilters` interno chama `withFilterDefaults(next)` antes de serializar; `next === undefined` ou objeto parcial → URL é limpo para o estado vazio.
 
-### 3. `src/hooks/usePlanningPdfReport.ts`
-- Expor no retorno: `hasFilteredData: boolean` — true se a soma de `entries.length + contracts.length + payrollProjections.length > 0` após filtros, ou se não há filtro ativo.
-- Não muda a lógica de geração — apenas adiciona o sinalizador.
+### 3. Hooks/componentes consumidores — uniformizar default
+Tornar `filters?: PlanningFilters` opcional **e** aplicar default `EMPTY_PLANNING_FILTERS` (alguns já têm, outros não):
 
-### 4. `src/pages/Planejamento.tsx` — `ExportPdfButton`
-- Importa `AlertDialog` do shadcn.
-- Antes de chamar `generatePdf()`:
-  - Se `hasAnyFilter(filters) && !hasFilteredData` → abre o dialog de confirmação.
-  - Botão **Exportar mesmo assim** chama `generatePdf()` (mesmo fluxo de toast/registro).
-  - Botão **Revisar filtros** fecha o dialog.
-- Quando não há motivo para alertar, fluxo segue idêntico ao atual.
+- `src/hooks/usePlanningReportExports.ts`: `filters?: PlanningFilters` com default no destructuring de `recordExport({ filters = EMPTY_PLANNING_FILTERS, ... })`.
+- `src/components/planning/PlanningReportHistory.tsx`: `filters?: PlanningFilters = EMPTY_PLANNING_FILTERS` no `RedownloadRow` e na prop principal.
+- `src/components/planning/PlanningBudget.tsx`: já recebe `filters?` mas repassa cru para `PlannedVsActual` — adicionar default no destructuring e repassar `filters ?? EMPTY_PLANNING_FILTERS`.
+- `PlanningCockpit.tsx`, `PlannedVsActual.tsx`, `usePlanningPdfReport.ts`, `useFinancialSummary.ts`: já têm default, sem mudança.
+
+### 4. Sanitização (`useEffect` em `Planejamento.tsx`)
+Como `filters` agora é garantido pelo `withFilterDefaults`, a guarda `if (!hasAnyFilter(filters)) return;` continua válida e o effect fica mais previsível (sem early-undefined-crash).
 
 ## Garantias
 
-- **Sem perda silenciosa de visão**: usuário sempre sabe quando o sistema removeu filtros obsoletos ou quando o recorte resulta em vazio.
-- **Sem loops**: a sanitização só roda após carregamento concluído e usa ref para single-fire por mudança real.
-- **Compatibilidade com links compartilhados**: link válido continua funcionando; link inválido se auto-corrige e avisa o destinatário.
-- **PDF auditável**: relatório só é gerado em branco mediante confirmação explícita, preservando o princípio "se não pode ser reproduzido, não é válido".
-- **Sem regressão**: filtros válidos seguem aplicados; nenhum cálculo (Cockpit, Plan×Real, PDF) muda.
+- **Zero crash por `undefined`**: nenhum chamador, novo ou antigo, consegue passar `filters` inválido — o tipo aceita `undefined` e o default cobre.
+- **Coerência visual + cálculo**: como o objeto sempre tem o mesmo shape, os matchers (`entryMatchesFilters`, `contractMatchesFilters`) nunca quebram com `Cannot read property 'includes' of undefined`.
+- **Sem regressão de URL**: filtros já compartilhados continuam sendo lidos exatamente igual; `withFilterDefaults` só preenche o que faltar.
+- **Auditável**: única fonte de defaults (`EMPTY_PLANNING_FILTERS`) reforça o princípio "uma única verdade" — qualquer alteração futura no shape do filtro propaga automaticamente.
 
 ## Arquivos afetados
-- **Editado:** `src/lib/planningFilters.ts` (nova `sanitizeFilters`)
-- **Editado:** `src/hooks/usePlanningPdfReport.ts` (expõe `hasFilteredData`)
-- **Editado:** `src/pages/Planejamento.tsx` (effect de sanitização, AlertDialog no export, nota no FilterPopover)
+- **Editado:** `src/lib/planningFilters.ts` (novo `withFilterDefaults`, robustez do `normalizeFilters`)
+- **Editado:** `src/pages/Planejamento.tsx` (aplica `withFilterDefaults` no `useMemo` do filtro e no `setFilters`)
+- **Editado:** `src/components/planning/PlanningBudget.tsx` (default + repassa garantido)
+- **Editado:** `src/components/planning/PlanningReportHistory.tsx` (default na prop)
+- **Editado:** `src/hooks/usePlanningReportExports.ts` (default no `recordExport`)
 
