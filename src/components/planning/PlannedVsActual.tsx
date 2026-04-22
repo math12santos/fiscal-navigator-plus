@@ -15,6 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { usePlanningScenarioContext } from "@/contexts/PlanningScenarioContext";
+import { Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -33,6 +36,16 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
   const { contracts } = useContracts();
   const { opportunities } = useCRMOpportunities();
   const { stages } = usePipelineStages();
+  const { activeScenario, receitaFactor, custoFactor, stressExtraOutflow } = usePlanningScenarioContext();
+  const isBaseScenario = !activeScenario || activeScenario.type === "base";
+  // Stress contribution distributed evenly across months for visualization
+  const monthsCount = useMemo(() => {
+    let n = 0;
+    let c = startOfMonth(startDate);
+    while (!isAfter(c, endDate)) { n++; c = addMonths(c, 1); }
+    return Math.max(1, n);
+  }, [startDate, endDate]);
+  const stressPerMonth = stressExtraOutflow / monthsCount;
 
   const budgetLines = (budgetLinesQuery.data ?? []) as BudgetLine[];
 
