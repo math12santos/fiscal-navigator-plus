@@ -14,6 +14,7 @@ export default function DPFerias() {
   const { data: employees = [] } = useEmployees();
   const { data: vacations = [] } = useVacations();
   const { data: dpConfig } = useDPConfig();
+  const { currentOrg } = useOrganization();
 
   // Apenas CLT tem direito a férias remuneradas e 13º com provisão patronal.
   // PJ é regido pelo contrato cível; estagiário tem recesso (Lei 11.788) sem 13º.
@@ -78,8 +79,62 @@ export default function DPFerias() {
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  const period = format(new Date(), "MMMM/yyyy", { locale: ptBR });
+
+  const exportPdf = () => {
+    generateDPPdfReport({
+      title: "Provisões de Férias e 13º Salário",
+      orgName: currentOrg?.name || "—",
+      period,
+      summary: [
+        { label: "Provisão Mensal Férias", value: fmt(totalProvisaoFerias) },
+        { label: "Provisão Mensal 13º", value: fmt(totalProvisao13) },
+        { label: "13º Acumulado", value: fmt(totalAcumulado13) },
+      ],
+      columns: ["Colaborador", "Meses", "Prazo Limite", "Status", "Provisão Mensal", "Provisão Acumulada"],
+      rows: vacationData.map((v: any) => [
+        v.name,
+        `${v.monthsWorked} m`,
+        format(v.limitDate, "dd/MM/yyyy"),
+        v.isOverdue ? "Vencida" : v.isUrgent ? "Urgente" : v.hasVacation ? "Agendada" : "Regular",
+        fmt(v.provisaoMensal),
+        fmt(v.provisaoAcumulada),
+      ]),
+    });
+  };
+
+  const exportExcel = () => {
+    generateDPExcelReport({
+      title: "Ferias e 13o",
+      sheets: [
+        {
+          name: "Férias",
+          rows: [
+            ["Colaborador", "Meses Trabalhados", "Prazo Limite", "Status", "Provisão Mensal", "Provisão Acumulada"],
+            ...vacationData.map((v: any) => [
+              v.name, v.monthsWorked, format(v.limitDate, "dd/MM/yyyy"),
+              v.isOverdue ? "Vencida" : v.isUrgent ? "Urgente" : v.hasVacation ? "Agendada" : "Regular",
+              v.provisaoMensal, v.provisaoAcumulada,
+            ]),
+          ],
+        },
+        {
+          name: "13º Salário",
+          rows: [
+            ["Colaborador", "Salário Base", "Provisão Mensal", "Acumulado no Ano"],
+            ...decimoTerceiroData.map((d: any) => [d.name, d.salario, d.provisaoMensal, d.provisaoAcumulada]),
+          ],
+        },
+      ],
+    });
+  };
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        <DPExportButton onPdf={exportPdf} onExcel={exportExcel} disabled={vacationData.length === 0} />
+      </div>
+
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Provisão Mensal Férias</p><p className="text-lg font-bold text-foreground">{fmt(totalProvisaoFerias)}</p></CardContent></Card>
