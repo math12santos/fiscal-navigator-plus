@@ -26,6 +26,7 @@ import { ScopeIndicator } from "@/components/ScopeIndicator";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { GlobalFetchingIndicator } from "@/components/GlobalFetchingIndicator";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { pageFactories } from "@/App";
 
