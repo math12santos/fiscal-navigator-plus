@@ -315,12 +315,58 @@ export default function RelatorioKpi() {
     }
   }, [metric, meta, summary.entries, contracts, employees, liabilities, opportunities, stages, curMonthStart, curMonthEnd]);
 
+  // ===== Busca + paginação =====
+  // Filtro textual sobre todos os campos string/number do item. Total e CSV
+  // são derivados do conjunto filtrado, mantendo a auditabilidade ("o que
+  // você vê é o que você exporta").
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(25);
+
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows.items;
+    return rows.items.filter((item) =>
+      Object.values(item as Record<string, unknown>).some((v) => {
+        if (v == null) return false;
+        if (typeof v === "number") return String(v).includes(q);
+        return String(v).toLowerCase().includes(q);
+      }),
+    );
+  }, [rows.items, search]);
+
+  const filteredTotal = useMemo(
+    () => filteredItems.reduce((s: number, i: any) => s + Number(i.valor ?? i.mensal ?? i.ponderado ?? i.salario ?? 0), 0),
+    [filteredItems],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+
+  // Reseta página ao mudar busca, métrica ou tamanho de página
+  useEffect(() => {
+    setPage(1);
+  }, [search, metric, pageSize]);
+
+  // Garante que a página atual existe após mudanças no dataset
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pagedItems = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, page, pageSize]);
+
+  const isFiltering = search.trim().length > 0;
+  const showingFrom = filteredItems.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const showingTo = Math.min(page * pageSize, filteredItems.length);
+
   const exportCsv = () => {
-    if (rows.items.length === 0) return;
-    const headers = Object.keys(rows.items[0]);
+    if (filteredItems.length === 0) return;
+    const headers = Object.keys(filteredItems[0]);
     const csvRows = [
       headers.join(";"),
-      ...rows.items.map((r) =>
+      ...filteredItems.map((r) =>
         headers
           .map((h) => {
             const v = (r as any)[h];
@@ -334,7 +380,8 @@ export default function RelatorioKpi() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `relatorio-${metric}-${format(now, "yyyyMMdd")}.csv`;
+    const suffix = isFiltering ? "-filtrado" : "";
+    a.download = `relatorio-${metric}${suffix}-${format(now, "yyyyMMdd")}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
