@@ -765,11 +765,29 @@ export default function RelatorioKpi() {
                   aria-label="Granularidade da composição"
                   className="ml-1"
                 >
-                  <ToggleGroupItem value="mensal" aria-label="Visão mensal" className="h-6 px-2 text-[11px]">
+                  <ToggleGroupItem
+                    value="mensal"
+                    aria-label="Visão mensal"
+                    aria-busy={isGranularityPending && granularity === "mensal"}
+                    className="h-6 px-2 text-[11px] data-[state=on]:data-[busy=true]:opacity-70"
+                    data-busy={isGranularityPending && granularity === "mensal" ? "true" : undefined}
+                  >
                     Mensal
+                    {isGranularityPending && granularity === "mensal" && (
+                      <Loader2 className="ml-1 h-3 w-3 animate-spin" aria-hidden />
+                    )}
                   </ToggleGroupItem>
-                  <ToggleGroupItem value="trimestral" aria-label="Visão trimestral" className="h-6 px-2 text-[11px]">
+                  <ToggleGroupItem
+                    value="trimestral"
+                    aria-label="Visão trimestral"
+                    aria-busy={isGranularityPending && granularity === "trimestral"}
+                    className="h-6 px-2 text-[11px] data-[state=on]:data-[busy=true]:opacity-70"
+                    data-busy={isGranularityPending && granularity === "trimestral" ? "true" : undefined}
+                  >
                     Trimestral
+                    {isGranularityPending && granularity === "trimestral" && (
+                      <Loader2 className="ml-1 h-3 w-3 animate-spin" aria-hidden />
+                    )}
                   </ToggleGroupItem>
                 </ToggleGroup>
               )}
