@@ -9,7 +9,6 @@ import { useCashFlow } from "@/hooks/useCashFlow";
 import { useContracts } from "@/hooks/useContracts";
 import { usePlanningConfig } from "@/hooks/usePlanningConfig";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
-import { useLiabilities } from "@/hooks/useLiabilities";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { KPICard } from "@/components/KPICard";
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,7 @@ import {
   EMPTY_PLANNING_FILTERS,
   entryMatchesFilters,
   contractMatchesFilters,
+  hasAnyFilter,
 } from "@/lib/planningFilters";
 
 /** Custom event fired by alert action buttons to switch the active planning tab. */
@@ -45,8 +45,11 @@ export default function PlanningCockpit({ startDate, endDate, filters = EMPTY_PL
   const { contracts: rawContracts } = useContracts();
   const { config } = usePlanningConfig();
   const { avgMonthlyPayroll: rawAvgPayroll, payrollProjections } = usePayrollProjections(startDate, endDate);
-  const { totals: liabTotals } = useLiabilities();
-  const { crmWeightedValue, alerts } = useFinancialSummary(startDate, endDate);
+  // useFinancialSummary now consumes the same filters and returns filtered
+  // CRM weighted value, liability totals and alerts — keeping every Cockpit
+  // block aligned to the user's selected scope.
+  const { crmWeightedValue, alerts, liabTotals } = useFinancialSummary(startDate, endDate, filters);
+  const filtered = hasAnyFilter(filters);
 
   // Apply operational filters consistently across every aggregation below.
   const entries = useMemo(
@@ -200,6 +203,9 @@ export default function PlanningCockpit({ startDate, endDate, filters = EMPTY_PL
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-warning" />
             Alertas Estratégicos ({alerts.length})
+            {filtered && (
+              <span className="text-xs font-normal text-muted-foreground">(filtrado)</span>
+            )}
           </h3>
           <div className="space-y-2">
             {alerts.map((alert, idx) => {
