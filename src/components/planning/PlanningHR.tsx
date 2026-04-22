@@ -386,6 +386,14 @@ export default function PlanningHR({ startDate, endDate }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Simulador de Rescisão (fechamento do ciclo planejamento → execução) */}
+      <TerminationSimulatorDialog
+        open={!!termSimItem}
+        onOpenChange={(o) => { if (!o) setTermSimItem(null); }}
+        hrPlanningItemId={termSimItem?.id}
+        initialTerminationDate={termSimItem?.planned_date}
+      />
     </div>
   );
 }
