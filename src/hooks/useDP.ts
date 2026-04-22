@@ -486,11 +486,14 @@ export function useMutateDPConfig() {
 
   return useMutation({
     mutationFn: async (config: any) => {
-      const { error } = await supabase.from("dp_config").upsert({
-        ...config,
-        organization_id: currentOrg!.id,
-        user_id: user!.id,
-      });
+      const { error } = await supabase.from("dp_config").upsert(
+        {
+          ...config,
+          organization_id: currentOrg!.id,
+          user_id: user!.id,
+        },
+        { onConflict: "organization_id" },
+      );
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dp_config"] }),
