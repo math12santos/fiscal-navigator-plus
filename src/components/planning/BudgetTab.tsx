@@ -17,7 +17,9 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, Loader2, Trash2, FileText } from "lucide-react";
+import { Plus, Loader2, Trash2, FileText, Sparkles } from "lucide-react";
+import { usePlanningScenarioContext } from "@/contexts/PlanningScenarioContext";
+import { cn } from "@/lib/utils";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -34,6 +36,8 @@ export default function BudgetTab({ startDate, endDate, selectedVersionId, onSel
   const budgetLinesQuery = useBudgetLines(selectedVersionId);
   const { accounts } = useChartOfAccounts();
   const { costCenters } = useCostCenters();
+  const { activeScenario, applyToLine } = usePlanningScenarioContext();
+  const isBaseScenario = !activeScenario || activeScenario.type === "base";
 
   const [showNewVersion, setShowNewVersion] = useState(false);
   const [showNewLine, setShowNewLine] = useState(false);
@@ -69,6 +73,13 @@ export default function BudgetTab({ startDate, endDate, selectedVersionId, onSel
   }, [startDate, endDate]);
 
   const totalOrcado = lines.reduce((s, l) => s + Number(l.valor_orcado), 0);
+  const totalSobCenario = lines.reduce(
+    (s, l) => s + applyToLine(l.tipo, Number(l.valor_orcado)),
+    0
+  );
+  const variacaoPct = totalOrcado !== 0
+    ? ((totalSobCenario - totalOrcado) / Math.abs(totalOrcado)) * 100
+    : 0;
 
   const handleCreateVersion = async () => {
     const result = await createVersion.mutateAsync({
@@ -143,10 +154,19 @@ export default function BudgetTab({ startDate, endDate, selectedVersionId, onSel
       {selectedVersionId ? (
         <>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Badge variant="outline" className="text-xs">
                 Total Orçado: {fmt(totalOrcado)}
               </Badge>
+              {!isBaseScenario && activeScenario && (
+                <Badge variant="outline" className="text-xs gap-1.5">
+                  <Sparkles className="h-3 w-3" />
+                  Sob {activeScenario.name}: <span className="font-semibold">{fmt(totalSobCenario)}</span>
+                  <span className={cn("font-medium", variacaoPct >= 0 ? "text-success" : "text-destructive")}>
+                    ({variacaoPct >= 0 ? "+" : ""}{variacaoPct.toFixed(1)}%)
+                  </span>
+                </Badge>
+              )}
               <Badge variant="outline" className="text-xs">
                 {lines.length} linhas
               </Badge>
@@ -176,11 +196,22 @@ export default function BudgetTab({ startDate, endDate, selectedVersionId, onSel
                     <TableHead>Tipo</TableHead>
                     <TableHead>Natureza</TableHead>
                     <TableHead className="text-right">Valor Orçado</TableHead>
+                    {!isBaseScenario && (
+                      <TableHead className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Sparkles className="h-3 w-3 text-primary" />
+                          Sob {activeScenario?.name}
+                        </div>
+                      </TableHead>
+                    )}
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lines.map((line) => (
+                  {lines.map((line) => {
+                    const sobCenario = applyToLine(line.tipo, Number(line.valor_orcado));
+                    const delta = sobCenario - Number(line.valor_orcado);
+                    return (
                     <TableRow key={line.id}>
                       <TableCell className="text-sm">
                         {format(new Date(line.month), "MMM/yy", { locale: ptBR })}
@@ -192,13 +223,24 @@ export default function BudgetTab({ startDate, endDate, selectedVersionId, onSel
                       </TableCell>
                       <TableCell className="text-xs capitalize text-muted-foreground">{line.natureza}</TableCell>
                       <TableCell className="text-right font-medium">{fmt(Number(line.valor_orcado))}</TableCell>
+                      {!isBaseScenario && (
+                        <TableCell className={cn(
+                          "text-right font-medium",
+                          delta === 0 ? "text-muted-foreground" :
+                          (line.tipo === "receita" ? (delta >= 0 ? "text-success" : "text-destructive")
+                                                    : (delta <= 0 ? "text-success" : "text-warning"))
+                        )}>
+                          {fmt(sobCenario)}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteLine.mutate(line.id)}>
                           <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
