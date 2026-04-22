@@ -297,6 +297,90 @@ export default function DPConfig() {
         </CardContent>
       </Card>
 
+      {/* Banner de sugestão pendente vinda da Holding (apenas em subsidiárias) */}
+      {pendingSuggestion && (
+        <Card className="border-warning/40 bg-warning/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-start gap-2">
+                <Building2 size={16} className="mt-0.5 text-warning" />
+                <div>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    Sugestão da Holding pendente de revisão
+                    <Badge variant="outline" className="text-[10px] border-warning/50 text-warning">
+                      Aguardando decisão
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <strong>{pendingSuggestion.suggested_by_org_name ?? "Holding"}</strong> propôs novos percentuais de encargos, provisionamentos e descontos.
+                    {pendingSuggestion.suggested_at && (
+                      <> Recebido em {new Date(pendingSuggestion.suggested_at).toLocaleDateString("pt-BR")}.</>
+                    )}
+                    {" "}Os valores atuais permanecem ativos até você decidir.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDismissSuggestion}
+                  disabled={dismissSuggestion.isPending}
+                  className="h-8 text-xs"
+                >
+                  <XCircle size={12} className="mr-1" /> Descartar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleApplySuggestion}
+                  disabled={applySuggestion.isPending}
+                  className="h-8 text-xs"
+                >
+                  <CheckCircle2 size={12} className="mr-1" />
+                  {applySuggestion.isPending ? "Aplicando..." : "Aplicar sugestão"}
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="rounded-md border border-border bg-background/60 p-2.5 space-y-1.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Comparação: atual → sugerido
+              </p>
+              <div className="grid gap-1 sm:grid-cols-2 text-[11px] font-mono">
+                {(Object.keys(SECTIONS) as Category[]).flatMap((cat) =>
+                  SECTIONS[cat].baseFields.map((f) => {
+                    const atual = base[f.key] ?? 0;
+                    const sugerido = (pendingSuggestion.base ?? {})[f.key] ?? atual;
+                    const changed = Math.abs(Number(atual) - Number(sugerido)) > 0.001;
+                    return (
+                      <div
+                        key={f.key}
+                        className={`flex items-center justify-between gap-2 py-0.5 ${changed ? "" : "opacity-50"}`}
+                      >
+                        <span className="text-muted-foreground truncate">{f.label}</span>
+                        <span className="flex items-center gap-1">
+                          <span className="text-muted-foreground">{Number(atual).toFixed(2)}%</span>
+                          <ArrowRight size={9} className="text-muted-foreground" />
+                          <span className={changed ? "text-warning font-semibold" : "text-foreground"}>
+                            {Number(sugerido).toFixed(2)}%
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  }),
+                )}
+              </div>
+              {Array.isArray(pendingSuggestion.custom_items) && pendingSuggestion.custom_items.length > 0 && (
+                <p className="text-[10px] text-muted-foreground pt-1 border-t mt-1.5">
+                  + {pendingSuggestion.custom_items.length} {pendingSuggestion.custom_items.length === 1 ? "item personalizado" : "itens personalizados"} sugeridos
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {(Object.keys(SECTIONS) as Category[]).map((cat) => {
         const section = SECTIONS[cat];
         const Icon = section.icon;
