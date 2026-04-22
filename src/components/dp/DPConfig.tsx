@@ -4,9 +4,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useDPConfig, useMutateDPConfig, useEmployees } from "@/hooks/useDP";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  useDPConfig,
+  useMutateDPConfig,
+  useEmployees,
+  usePropagateDPConfigToSubsidiaries,
+  useApplyHoldingDPSuggestion,
+  useDismissHoldingDPSuggestion,
+} from "@/hooks/useDP";
+import { useHolding } from "@/contexts/HoldingContext";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Plus, Trash2, TrendingUp, PiggyBank, MinusCircle, Calculator, ArrowRight } from "lucide-react";
+import {
+  Save,
+  Plus,
+  Trash2,
+  TrendingUp,
+  PiggyBank,
+  MinusCircle,
+  Calculator,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  XCircle,
+  Send,
+} from "lucide-react";
 
 type Category = "encargo" | "provisao" | "desconto";
 
