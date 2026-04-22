@@ -190,16 +190,26 @@ export default function RelatorioKpi() {
 
   const warnedRef = useRef(false);
   useEffect(() => {
-    if (!urlRangeValidation.ok && !warnedRef.current) {
-      warnedRef.current = true;
-      toast.warning("Período da URL inválido — usando últimos 6 meses", {
-        description: urlRangeValidation.message,
-      });
-    }
-    if (urlRangeValidation.ok) {
+    if (!urlRangeValidation.ok) {
+      if (!warnedRef.current) {
+        warnedRef.current = true;
+        toast.warning("Período da URL inválido — usando últimos 6 meses", {
+          description: urlRangeValidation.message,
+        });
+      }
+      // Sanitiza a URL: remove ?from/?to inválidos para que a barra de
+      // endereços reflita o período efetivamente aplicado (default).
+      // Mantemos os demais parâmetros (gran, search, etc.) intactos.
+      if (urlFrom || urlTo) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("from");
+        next.delete("to");
+        setSearchParams(next, { replace: true });
+      }
+    } else {
       warnedRef.current = false;
     }
-  }, [urlRangeValidation]);
+  }, [urlRangeValidation, urlFrom, urlTo, searchParams, setSearchParams]);
 
   const rangeFrom = useMemo(() => {
     if (!urlRangeValidation.ok || !urlFrom) return defaultFrom;
