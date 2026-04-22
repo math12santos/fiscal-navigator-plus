@@ -388,22 +388,30 @@ export default function Planejamento() {
   // permitir refresh, back/forward e compartilhamento de links com a mesma visão.
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const filters = useMemo<PlanningFilters>(() => ({
-    subsidiaryOrgId: searchParams.get("org"),
-    bankAccountId: searchParams.get("conta"),
-    costCenterId: searchParams.get("cc"),
-  }), [searchParams]);
+  const filters = useMemo<PlanningFilters>(() => {
+    const parseList = (key: string): string[] =>
+      searchParams.get(key)?.split(",").filter(Boolean) ?? [];
+    return {
+      subsidiaryOrgId: searchParams.get("org"),
+      bankAccountIds: parseList("conta"),
+      costCenterIds: parseList("cc"),
+    };
+  }, [searchParams]);
 
   const setFilters = useCallback((next: PlanningFilters) => {
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
-      const apply = (key: string, value: string | null) => {
+      const applyOne = (key: string, value: string | null) => {
         if (value) params.set(key, value);
         else params.delete(key);
       };
-      apply("org", next.subsidiaryOrgId);
-      apply("conta", next.bankAccountId);
-      apply("cc", next.costCenterId);
+      const applyList = (key: string, values: string[]) => {
+        if (values.length > 0) params.set(key, values.join(","));
+        else params.delete(key);
+      };
+      applyOne("org", next.subsidiaryOrgId);
+      applyList("conta", next.bankAccountIds);
+      applyList("cc", next.costCenterIds);
       return params;
     }, { replace: true });
   }, [setSearchParams]);
