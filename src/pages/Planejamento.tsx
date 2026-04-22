@@ -333,6 +333,11 @@ interface ExportPdfButtonProps {
   /** Resumo legível dos filtros aplicados — usado para enriquecer o
    *  diálogo de "sem dados" e ajudar o usuário a entender o recorte. */
   filtersDescription?: string[];
+  /** Sanitiza in-place removendo apenas filtros inválidos (ação sugerida
+   *  no toast de "filtros inconsistentes"). */
+  onClearInvalidFilters?: () => void;
+  /** Limpa todos os filtros (ação sugerida no diálogo "zero dados"). */
+  onClearAllFilters?: () => void;
 }
 
 function ExportPdfButton({
@@ -341,11 +346,19 @@ function ExportPdfButton({
   refsLoading = false,
   invalidFilters = [],
   filtersDescription = [],
+  onClearInvalidFilters,
+  onClearAllFilters,
 }: ExportPdfButtonProps) {
   const { generatePdf, isReady, hasFilteredData } = usePlanningPdfReport({ startDate, endDate, budgetVersionId, filters });
   const { record } = usePlanningReportExports();
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // ID do toast de "carregando referências" para podermos atualizá-lo
+  // assim que as listas terminarem de carregar (UX contínua, sem clique extra).
+  const loadingToastIdRef = useRef<string | number | null>(null);
+  // Marca quando o usuário clicou enquanto as referências ainda carregavam,
+  // para podermos disparar o export automaticamente assim que estiverem prontas.
+  const pendingExportRef = useRef(false);
 
   // Repassa o sinal "tem dados após filtro" para o pai poder mostrar a nota
   // no FilterPopover. Single source of truth para evitar divergir do PDF.
@@ -353,7 +366,7 @@ function ExportPdfButton({
     onHasFilteredDataChange?.(hasFilteredData);
   }, [hasFilteredData, onHasFilteredDataChange]);
 
-  const runExport = async () => {
+  const runExport = useCallback(async () => {
     if (!isReady || busy) return;
     try {
       setBusy(true);
@@ -382,43 +395,88 @@ function ExportPdfButton({
         );
       }
     } catch (e: any) {
-      toast.error("Falha ao gerar PDF", { description: e?.message });
+      toast.error("Falha ao gerar PDF", {
+        description: e?.message ?? "Erro inesperado ao montar o relatório.",
+        action: {
+          label: "Tentar novamente",
+          onClick: () => void runExport(),
+        },
+      });
     } finally {
       setBusy(false);
     }
-  };
+  }, [isReady, busy, generatePdf, record, startDate, endDate, filters]);
 
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     // 1) Ainda carregando referências → não dá pra validar nem garantir
-    //    consistência. Avisa em vez de gerar PDF que pode ficar errado.
+    //    consistência. Mostramos toast de progresso e marcamos
+    //    `pendingExportRef` para disparar automaticamente quando terminar.
     if (refsLoading) {
-      toast.info("Carregando dados…", {
-        description: "Aguarde a sincronização das listas de filtro antes de exportar.",
+      pendingExportRef.current = true;
+      const id = toast.loading("Sincronizando filtros…", {
+        description:
+          "Carregando contas, centros de custo e unidades para validar o recorte. O PDF será gerado automaticamente em seguida.",
+        action: {
+          label: "Cancelar",
+          onClick: () => {
+            pendingExportRef.current = false;
+            if (loadingToastIdRef.current !== null) {
+              toast.dismiss(loadingToastIdRef.current);
+              loadingToastIdRef.current = null;
+            }
+          },
+        },
       });
+      loadingToastIdRef.current = id;
       return;
     }
 
     // 2) Inconsistências detectadas: filtros referenciam itens que não
-    //    existem mais (conta excluída, CC desativado, link de outra org).
-    //    Bloqueia exportação até que a sanitização rode ou o usuário ajuste.
+    //    existem mais. Oferecemos ação direta para limpar só os inválidos.
     if (invalidFilters.length > 0) {
       const total = invalidFilters.reduce((s, r) => s + r.count, 0);
-      const dims = invalidFilters.map((r) => r.dimension).join(", ");
-      toast.warning("Filtros inconsistentes", {
-        description: `${total} filtro(s) referenciam itens que não existem mais (${dims}). Ajuste o recorte e tente novamente.`,
+      const dims = invalidFilters.map((r) => `${r.count} em ${r.dimension}`).join(", ");
+      toast.warning("Filtros inconsistentes detectados", {
+        description: `${total} filtro(s) apontam para itens que não existem mais nesta organização (${dims}). Limpe os inválidos para continuar com o recorte restante.`,
+        duration: 10000,
+        action: onClearInvalidFilters
+          ? {
+              label: "Limpar inválidos",
+              onClick: () => {
+                onClearInvalidFilters();
+                toast.success("Filtros inválidos removidos", {
+                  description: "Recorte ajustado — clique em Exportar PDF novamente para gerar o relatório.",
+                });
+              },
+            }
+          : undefined,
       });
       return;
     }
 
-    // 3) Filtros válidos mas zero dados no horizonte → confirma para evitar
-    //    PDF "fantasma" sem o usuário perceber que o vazio veio do recorte.
+    // 3) Filtros válidos mas zero dados no horizonte → diálogo com opções
+    //    claras: revisar, limpar tudo ou exportar PDF vazio.
     if (hasAnyFilter(filters) && !hasFilteredData) {
       setConfirmOpen(true);
       return;
     }
 
     void runExport();
-  };
+  }, [refsLoading, invalidFilters, filters, hasFilteredData, onClearInvalidFilters, runExport]);
+
+  // Quando o usuário clica enquanto as referências carregam, marcamos
+  // `pendingExportRef` e, assim que `refsLoading` virar false, disparamos
+  // o handler novamente — assim o caminho correto (2 ou 3) é tomado.
+  useEffect(() => {
+    if (!refsLoading && pendingExportRef.current) {
+      pendingExportRef.current = false;
+      if (loadingToastIdRef.current !== null) {
+        toast.dismiss(loadingToastIdRef.current);
+        loadingToastIdRef.current = null;
+      }
+      handleClick();
+    }
+  }, [refsLoading, handleClick]);
 
   return (
     <>
@@ -458,23 +516,41 @@ function ExportPdfButton({
                     </ul>
                   </div>
                 )}
-                <p>
-                  O PDF será gerado em branco e registrado no histórico assim
-                  mesmo. Recomendamos revisar os filtros antes de continuar.
+                <p className="text-xs text-muted-foreground">
+                  O PDF será gerado em branco e registrado no histórico.
+                  Recomendamos limpar os filtros ou ampliar o horizonte antes
+                  de continuar.
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Revisar filtros</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setConfirmOpen(false);
-                void runExport();
-              }}
-            >
-              Exportar mesmo assim
-            </AlertDialogAction>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row sm:justify-between sm:space-x-0 gap-2">
+            <AlertDialogCancel className="mt-0">Revisar filtros</AlertDialogCancel>
+            <div className="flex flex-col-reverse sm:flex-row gap-2">
+              {onClearAllFilters && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    onClearAllFilters();
+                    setConfirmOpen(false);
+                    toast.success("Filtros limpos", {
+                      description: "Clique em Exportar PDF novamente para gerar o relatório completo.",
+                    });
+                  }}
+                >
+                  Limpar todos os filtros
+                </Button>
+              )}
+              <AlertDialogAction
+                onClick={() => {
+                  setConfirmOpen(false);
+                  void runExport();
+                }}
+              >
+                Exportar mesmo assim
+              </AlertDialogAction>
+            </div>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
