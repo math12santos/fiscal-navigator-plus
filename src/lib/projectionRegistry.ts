@@ -27,6 +27,7 @@ export type ProjectionSource =
   | "contrato"
   | "contrato_parcela"
   | "dp"
+  | "dp_rescisao"
   | "crm_won"
   | "hr_planning";
 
@@ -48,6 +49,10 @@ export const projectionKey = {
   },
   hrPlanning(itemId: string): string {
     return `hr:${itemId}`;
+  },
+  /** Rescisão materializada como compromisso de caixa único (não-recorrente). */
+  termination(terminationId: string): string {
+    return `rescisao:${terminationId}`;
   },
 };
 
