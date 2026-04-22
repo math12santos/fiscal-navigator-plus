@@ -21,6 +21,7 @@ export default function DPDashboard() {
   const { costCenters = [] } = useCostCenters();
   const { data: allBenefits = [] } = useDPBenefits();
   const { data: allEmployeeBenefits = [] } = useEmployeeBenefits();
+  const { currentOrg } = useOrganization();
 
   const activeEmployees = employees.filter((e: any) => e.status === "ativo");
   const totalFolhaBruta = activeEmployees.reduce((sum: number, e: any) => sum + Number(e.salary_base || 0), 0);
