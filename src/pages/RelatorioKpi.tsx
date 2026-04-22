@@ -922,6 +922,14 @@ function renderHeader(kind: string) {
           <TableHead className="text-right">Valor</TableHead>
         </TableRow>
       );
+    case "cashflow-quarter":
+      return (
+        <TableRow>
+          <TableHead>Trimestre</TableHead>
+          <TableHead className="text-right">Itens</TableHead>
+          <TableHead className="text-right">Valor total</TableHead>
+        </TableRow>
+      );
     case "result":
       return (
         <TableRow>
@@ -930,6 +938,16 @@ function renderHeader(kind: string) {
           <TableHead>Tipo</TableHead>
           <TableHead>Categoria</TableHead>
           <TableHead className="text-right">Impacto</TableHead>
+        </TableRow>
+      );
+    case "result-quarter":
+      return (
+        <TableRow>
+          <TableHead>Trimestre</TableHead>
+          <TableHead className="text-right">Itens</TableHead>
+          <TableHead className="text-right">Entradas</TableHead>
+          <TableHead className="text-right">Saídas</TableHead>
+          <TableHead className="text-right">Líquido</TableHead>
         </TableRow>
       );
     case "contracts":
