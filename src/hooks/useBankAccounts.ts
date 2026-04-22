@@ -19,6 +19,12 @@ export interface BankAccount {
   created_at: string;
   saldo_atual: number;
   limite_credito: number;
+  limite_tipo: string | null;
+  limite_taxa_juros_mensal: number | null;
+  limite_utilizado: number | null;
+  limite_vencimento: string | null;
+  limite_atualizado_em: string | null;
+  limite_atualizado_por: string | null;
 }
 
 export function useBankAccounts() {
