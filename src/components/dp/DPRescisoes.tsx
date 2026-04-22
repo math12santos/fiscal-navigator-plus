@@ -25,7 +25,7 @@ export default function DPRescisoes() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button onClick={() => { setSimOpen(true); setSimResult(null); }}>
+        <Button onClick={() => setSimOpen(true)}>
           <Calculator size={14} className="mr-1" /> Simular Desligamento
         </Button>
       </div>
@@ -67,66 +67,7 @@ export default function DPRescisoes() {
         </CardContent>
       </Card>
 
-      {/* Simulator Dialog */}
-      <Dialog open={simOpen} onOpenChange={setSimOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>Simulador de Desligamento</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>Colaborador</Label>
-              <Select value={selectedEmpId} onValueChange={setSelectedEmpId}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {activeEmps.map((e: any) => <SelectItem key={e.id} value={e.id}>{e.name} — {fmt(Number(e.salary_base))}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Tipo</Label>
-                <Select value={termType} onValueChange={setTermType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{TERM_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Data</Label>
-                <Input type="date" value={termDate} onChange={(e) => setTermDate(e.target.value)} />
-              </div>
-            </div>
-            <Button onClick={handleSimulate} disabled={!selectedEmpId} className="w-full">
-              <Calculator size={14} className="mr-1" /> Calcular
-            </Button>
-
-            {simResult && (
-              <div className="border border-border rounded-lg p-4 space-y-2 bg-muted/30">
-                <div className="flex justify-between text-sm"><span>Saldo de Salário</span><span className="font-mono">{fmt(simResult.saldo_salario)}</span></div>
-                <div className="flex justify-between text-sm"><span>Aviso Prévio</span><span className="font-mono">{fmt(simResult.aviso_previo)}</span></div>
-                <div className="flex justify-between text-sm"><span>Férias Proporcionais</span><span className="font-mono">{fmt(simResult.ferias_proporcionais)}</span></div>
-                <div className="flex justify-between text-sm"><span>1/3 Férias</span><span className="font-mono">{fmt(simResult.terco_ferias)}</span></div>
-                <div className="flex justify-between text-sm"><span>13º Proporcional</span><span className="font-mono">{fmt(simResult.decimo_terceiro_proporcional)}</span></div>
-                <div className="flex justify-between text-sm text-destructive"><span>Multa FGTS</span><span className="font-mono">{fmt(simResult.multa_fgts)}</span></div>
-                <div className="border-t border-border pt-2 flex justify-between font-bold">
-                  <span>Total Rescisão</span>
-                  <span className="font-mono text-lg">{fmt(simResult.total_rescisao)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                  <AlertTriangle size={12} />
-                  <span>Impacto imediato no caixa: {fmt(simResult.total_rescisao)}</span>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSimOpen(false)}>Cancelar</Button>
-            {simResult && (
-              <Button onClick={handleSaveTermination} disabled={create.isPending}>
-                Registrar Rescisão
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TerminationSimulatorDialog open={simOpen} onOpenChange={setSimOpen} />
     </div>
   );
 }
