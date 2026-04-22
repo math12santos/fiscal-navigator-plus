@@ -13,6 +13,7 @@ import { useBudget, useBudgetLines, BudgetLine } from "@/hooks/useBudget";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { usePlanningScenarioContext } from "@/contexts/PlanningScenarioContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { generateProjectionsFromContract } from "@/lib/contractProjections";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", {
