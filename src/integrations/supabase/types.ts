@@ -2664,6 +2664,47 @@ export type Database = {
           },
         ]
       }
+      kpi_period_presets: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+          range_from: string
+          range_to: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+          range_from: string
+          range_to: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          range_from?: string
+          range_to?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_period_presets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       liabilities: {
         Row: {
           contract_id: string | null
