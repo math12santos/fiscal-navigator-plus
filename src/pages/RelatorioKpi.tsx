@@ -582,6 +582,23 @@ export default function RelatorioKpi() {
         </div>
       </section>
 
+      {/* Painel de validação cruzada: garante que a soma dos itens detalhados
+          confere com o KPI exibido no Dashboard para o mesmo período.
+          - "match"    → verde: somas batem exatamente (até 1 centavo)
+          - "mismatch" → vermelho: divergência detectada (mostra o delta)
+          - "info"     → azul: KPI derivado, exibimos o valor referencial
+          Quando uma busca está ativa, ocultamos o badge de validação porque
+          o "Total" no card passa a refletir apenas o subconjunto filtrado. */}
+      {reconciliation && reconciliationStatus && !isFiltering && (
+        <ReconciliationPanel
+          status={reconciliationStatus}
+          dashboardLabel={reconciliation.dashboardLabel}
+          dashboardValue={reconciliation.dashboardValue}
+          drilldownValue={reconciliation.drilldownValue}
+          note={reconciliation.note}
+        />
+      )}
+
       <section className="glass-card p-0 overflow-hidden">
         {/* Toolbar: busca + page size — sempre visível quando há dados na composição */}
         {rows.items.length > 0 && (
