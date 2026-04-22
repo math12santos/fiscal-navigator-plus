@@ -34,7 +34,7 @@ interface PdfReportOptions {
  */
 export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: PdfReportOptions) {
   const { currentOrg } = useOrganization();
-  const { entries, totals } = useCashFlow(startDate, endDate);
+  const { entries, materializedEntries, totals } = useCashFlow(startDate, endDate);
   const { contracts } = useContracts();
   const { config } = usePlanningConfig();
   const { avgMonthlyPayroll, payrollProjections } = usePayrollProjections(startDate, endDate);
