@@ -309,7 +309,7 @@ export function useCRMOpportunities() {
       if (error) throw error;
 
       // If moved to a Won stage, create a forecasted income entry in cashflow.
-      // De-dup safety: only create if no entry already references this opportunity.
+      // Idempotent: upsert by dedup_hash (UNIQUE INDEX on source_ref).
       if (won_at && oppBefore) {
         const opp: any = oppBefore;
         const valor = Number(opp.estimated_value || 0);
@@ -317,35 +317,26 @@ export function useCRMOpportunities() {
           const dataPrev = opp.estimated_close_date || new Date().toISOString().slice(0, 10);
           const competencia = dataPrev.slice(0, 7);
           const clientName = opp.crm_clients?.name || "Cliente CRM";
+          const sourceRef = `crm:${id}`;
 
-          // Check existing forecast for this opportunity to avoid duplication
-          const { data: existing } = await supabase
-            .from("cashflow_entries")
-            .select("id")
-            .eq("organization_id", orgId!)
-            .eq("source", "crm_won")
-            .ilike("notes", `%opp:${id}%`)
-            .limit(1);
-
-          if (!existing || existing.length === 0) {
-            await supabase.from("cashflow_entries").insert({
-              organization_id: orgId,
-              user_id: user!.id,
-              descricao: `${opp.title} — ${clientName}`,
-              tipo: "entrada",
-              valor_previsto: valor,
-              data_prevista: dataPrev,
-              data_vencimento: dataPrev,
-              competencia,
-              entity_id: opp.crm_clients?.entity_id || null,
-              status: "previsto",
-              source: "crm_won",
-              categoria: "Receita Comercial",
-              impacto_fluxo_caixa: true,
-              impacto_orcamento: true,
-              notes: `Gerado a partir de oportunidade CRM ganha. opp:${id}`,
-            });
-          }
+          await supabase.from("cashflow_entries" as any).upsert({
+            organization_id: orgId,
+            user_id: user!.id,
+            descricao: `${opp.title} — ${clientName}`,
+            tipo: "entrada",
+            valor_previsto: valor,
+            data_prevista: dataPrev,
+            data_vencimento: dataPrev,
+            competencia,
+            entity_id: opp.crm_clients?.entity_id || null,
+            status: "previsto",
+            source: "crm_won",
+            source_ref: sourceRef,
+            categoria: "Receita Comercial",
+            impacto_fluxo_caixa: true,
+            impacto_orcamento: true,
+            notes: `Gerado a partir de oportunidade CRM ganha. opp:${id}`,
+          } as any, { onConflict: "dedup_hash" } as any);
         }
       }
     },
