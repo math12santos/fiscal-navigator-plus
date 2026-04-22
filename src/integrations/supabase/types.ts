@@ -1929,6 +1929,7 @@ export type Database = {
       employee_terminations: {
         Row: {
           aviso_previo: number | null
+          contract_type: string | null
           created_at: string
           decimo_terceiro_proporcional: number | null
           employee_id: string
@@ -1948,6 +1949,7 @@ export type Database = {
         }
         Insert: {
           aviso_previo?: number | null
+          contract_type?: string | null
           created_at?: string
           decimo_terceiro_proporcional?: number | null
           employee_id: string
@@ -1967,6 +1969,7 @@ export type Database = {
         }
         Update: {
           aviso_previo?: number | null
+          contract_type?: string | null
           created_at?: string
           decimo_terceiro_proporcional?: number | null
           employee_id?: string

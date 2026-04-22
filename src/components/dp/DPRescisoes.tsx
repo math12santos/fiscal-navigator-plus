@@ -57,11 +57,23 @@ export default function DPRescisoes() {
                 ) : (
                   terminations.map((t: any) => {
                     const emp = empMap[t.employee_id];
-                    const regime = emp?.contract_type || "—";
+                    // Prioriza snapshot histórico (t.contract_type) sobre regime atual do colaborador.
+                    const regime = t.contract_type || emp?.contract_type || "—";
+                    const regimeMudou = t.contract_type && emp?.contract_type && t.contract_type !== emp.contract_type;
                     return (
                       <TableRow key={t.id}>
                         <TableCell className="font-medium text-foreground">{emp?.name || "—"}</TableCell>
-                        <TableCell><Badge variant="secondary" className="text-[10px]">{regime}</Badge></TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-[10px]">{regime}</Badge>
+                          {regimeMudou && (
+                            <span
+                              className="ml-1 text-[9px] text-muted-foreground"
+                              title={`Regime atual do colaborador: ${emp.contract_type}`}
+                            >
+                              (histórico)
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-xs">{format(new Date(t.termination_date), "dd/MM/yyyy")}</TableCell>
                         <TableCell><Badge variant="outline">{ALL_TYPE_LABELS[t.type] || t.type}</Badge></TableCell>
                         <TableCell className="font-mono font-bold">{fmt(t.total_rescisao)}</TableCell>
