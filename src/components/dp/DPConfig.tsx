@@ -119,9 +119,75 @@ export default function DPConfig() {
     setCustoms((prev) => prev.filter((c) => c.id !== id));
   };
 
-  if (isLoading) {
-    return <div className="text-center py-12 text-muted-foreground">Carregando...</div>;
-  }
+  // ===== Impacto estimado: aplica %s atuais (config) e novos (state) sobre a folha base =====
+  const folhaBase = useMemo(() => {
+    return employees
+      .filter((e: any) => e.status === "ativo" && e.contract_type !== "PJ")
+      .reduce((acc: number, e: any) => acc + Number(e.salary_base || 0), 0);
+  }, [employees]);
+
+  const sumByCategory = (
+    src: Record<string, number>,
+    customList: CustomItem[],
+    keys: string[],
+    cat: Category,
+  ) => {
+    const baseSum = keys.reduce((acc, k) => acc + (Number(src[k]) || 0), 0);
+    const customSum = customList
+      .filter((c) => c.category === cat && c.label.trim().length > 0)
+      .reduce((acc, c) => acc + (Number(c.pct) || 0), 0);
+    return baseSum + customSum;
+  };
+
+  const impact = useMemo(() => {
+    const encargoKeys = SECTIONS.encargo.baseFields.map((f) => f.key);
+    const provisaoKeys = SECTIONS.provisao.baseFields.map((f) => f.key);
+    const descontoKeys = SECTIONS.desconto.baseFields.map((f) => f.key);
+
+    const currentBase: Record<string, number> = {
+      inss_patronal_pct: config?.inss_patronal_pct ?? DEFAULTS.inss_patronal_pct,
+      rat_pct: config?.rat_pct ?? DEFAULTS.rat_pct,
+      fgts_pct: config?.fgts_pct ?? DEFAULTS.fgts_pct,
+      terceiros_pct: config?.terceiros_pct ?? DEFAULTS.terceiros_pct,
+      provisao_ferias_pct: config?.provisao_ferias_pct ?? DEFAULTS.provisao_ferias_pct,
+      provisao_13_pct: config?.provisao_13_pct ?? DEFAULTS.provisao_13_pct,
+      vt_desconto_pct: config?.vt_desconto_pct ?? DEFAULTS.vt_desconto_pct,
+    };
+    const currentCustoms = (Array.isArray((config as any)?.custom_items)
+      ? ((config as any).custom_items as CustomItem[])
+      : []);
+
+    const calc = (src: Record<string, number>, customList: CustomItem[]) => {
+      const encPct = sumByCategory(src, customList, encargoKeys, "encargo");
+      const provPct = sumByCategory(src, customList, provisaoKeys, "provisao");
+      const descPct = sumByCategory(src, customList, descontoKeys, "desconto");
+      const encargos = folhaBase * (encPct / 100);
+      const provisoes = folhaBase * (provPct / 100);
+      const descontos = folhaBase * (descPct / 100);
+      // Custo total mensal para o empregador = folha + encargos + provisões (descontos não somam ao custo do empregador)
+      const custoTotal = folhaBase + encargos + provisoes;
+      return { encPct, provPct, descPct, encargos, provisoes, descontos, custoTotal };
+    };
+
+    const atual = calc(currentBase, currentCustoms);
+    const novo = calc(base, customs);
+
+    return {
+      atual,
+      novo,
+      diffCusto: novo.custoTotal - atual.custoTotal,
+      diffEncargos: novo.encargos - atual.encargos,
+      diffProvisoes: novo.provisoes - atual.provisoes,
+      diffDescontos: novo.descontos - atual.descontos,
+      pctCusto: atual.custoTotal > 0 ? ((novo.custoTotal - atual.custoTotal) / atual.custoTotal) * 100 : 0,
+    };
+  }, [config, base, customs, folhaBase]);
+
+  const fmt = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
+  const fmtPct = (v: number) => `${v.toFixed(2)}%`;
+  const fmtSigned = (v: number) =>
+    `${v >= 0 ? "+" : ""}${v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-4">
