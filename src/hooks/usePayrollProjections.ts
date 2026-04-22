@@ -3,6 +3,7 @@ import { format, addMonths, startOfMonth, endOfMonth, isAfter, isBefore, eachDay
 import { useEmployees, useDPConfig, calcINSSEmpregado, calcIRRF } from "@/hooks/useDP";
 import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
+import { projectionKey } from "@/lib/projectionRegistry";
 
 /** Count Mon–Fri business days in a given month */
 export function getBusinessDays(monthStart: Date): number {
@@ -119,21 +120,21 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
 
         // 1. Salário Líquido (includes VT discount deduction)
         const salNotes = `Base: ${salary.toFixed(0)} | INSS Emp: ${inssEmp.toFixed(0)} | IRRF: ${irrf.toFixed(0)}${vtDesconto > 0 ? ` | VT Desc: ${vtDesconto.toFixed(0)}` : ""} | Líquido: ${netSalary.toFixed(0)}`;
-        entries.push({ ...base, id: `proj-dp-sal-${emp.id}-${monthKey}`, descricao: `Salário Líquido — ${emp.name}`, valor_previsto: Math.round(netSalary * 100) / 100, notes: salNotes, dp_sub_category: "salario_liquido" });
+        entries.push({ ...base, id: `proj-dp-sal-${emp.id}-${monthKey}`, descricao: `Salário Líquido — ${emp.name}`, valor_previsto: Math.round(netSalary * 100) / 100, notes: salNotes, dp_sub_category: "salario_liquido", source_ref: projectionKey.payroll(emp.id, "salario_liquido", monthKey) } as any);
 
         // 2. FGTS
         if (fgtsVal > 0) {
-          entries.push({ ...base, id: `proj-dp-fgts-${emp.id}-${monthKey}`, descricao: `FGTS — ${emp.name}`, valor_previsto: Math.round(fgtsVal * 100) / 100, notes: `${(fgtsPct * 100).toFixed(1)}% s/ ${salary.toFixed(0)}`, dp_sub_category: "encargos_fgts" });
+          entries.push({ ...base, id: `proj-dp-fgts-${emp.id}-${monthKey}`, descricao: `FGTS — ${emp.name}`, valor_previsto: Math.round(fgtsVal * 100) / 100, notes: `${(fgtsPct * 100).toFixed(1)}% s/ ${salary.toFixed(0)}`, dp_sub_category: "encargos_fgts", source_ref: projectionKey.payroll(emp.id, "encargos_fgts", monthKey) } as any);
         }
 
         // 3. GPS / INSS
         if (gpsTotal > 0) {
-          entries.push({ ...base, id: `proj-dp-inss-${emp.id}-${monthKey}`, descricao: `INSS / GPS — ${emp.name}`, valor_previsto: Math.round(gpsTotal * 100) / 100, notes: `Patronal: ${inssPatronalVal.toFixed(0)} | Emp: ${inssEmp.toFixed(0)} | RAT: ${ratVal.toFixed(0)} | 3os: ${terceirosVal.toFixed(0)}`, dp_sub_category: "encargos_inss" });
+          entries.push({ ...base, id: `proj-dp-inss-${emp.id}-${monthKey}`, descricao: `INSS / GPS — ${emp.name}`, valor_previsto: Math.round(gpsTotal * 100) / 100, notes: `Patronal: ${inssPatronalVal.toFixed(0)} | Emp: ${inssEmp.toFixed(0)} | RAT: ${ratVal.toFixed(0)} | 3os: ${terceirosVal.toFixed(0)}`, dp_sub_category: "encargos_inss", source_ref: projectionKey.payroll(emp.id, "encargos_inss", monthKey) } as any);
         }
 
         // 4. IRRF
         if (irrf > 0) {
-          entries.push({ ...base, id: `proj-dp-irrf-${emp.id}-${monthKey}`, descricao: `IRRF — ${emp.name}`, valor_previsto: Math.round(irrf * 100) / 100, notes: `Base cálculo: ${baseIRRF.toFixed(0)}`, dp_sub_category: "encargos_irrf" });
+          entries.push({ ...base, id: `proj-dp-irrf-${emp.id}-${monthKey}`, descricao: `IRRF — ${emp.name}`, valor_previsto: Math.round(irrf * 100) / 100, notes: `Base cálculo: ${baseIRRF.toFixed(0)}`, dp_sub_category: "encargos_irrf", source_ref: projectionKey.payroll(emp.id, "encargos_irrf", monthKey) } as any);
         }
 
         // VT (dynamic business days)
@@ -149,7 +150,8 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
               valor_previsto: Math.round(vtNet * 100) / 100,
               notes: `${businessDays} dias úteis × R$${Number(emp.vt_diario).toFixed(2)} = ${vtBruto.toFixed(0)} | Desc 6%: ${vtDescontoVal.toFixed(0)} | Líq: ${vtNet.toFixed(0)}`,
               dp_sub_category: "vt",
-            });
+              source_ref: projectionKey.payroll(emp.id, "vt", monthKey),
+            } as any);
           }
         }
 
@@ -173,10 +175,11 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
             entity_id: null,
             notes: null,
             source: "dp",
+            source_ref: projectionKey.payroll(emp.id, "beneficios", monthKey),
             dp_sub_category: "beneficios",
             created_at: now,
             updated_at: now,
-          });
+          } as any);
         }
 
         // Provisions (13th + vacation)
@@ -199,10 +202,11 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
             entity_id: null,
             notes: null,
             source: "dp",
+            source_ref: projectionKey.payroll(emp.id, "provisoes", monthKey),
             dp_sub_category: "provisoes",
             created_at: now,
             updated_at: now,
-          });
+          } as any);
         }
       }
 

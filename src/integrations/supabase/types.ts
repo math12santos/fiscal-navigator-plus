@@ -322,6 +322,7 @@ export type Database = {
           data_prevista_pagamento: string | null
           data_realizada: string | null
           data_vencimento: string | null
+          dedup_hash: string | null
           descricao: string
           documento: string | null
           entity_id: string | null
@@ -337,6 +338,7 @@ export type Database = {
           organization_id: string | null
           recorrencia: string | null
           source: string
+          source_ref: string | null
           status: string
           subcategoria_id: string | null
           tipo: string
@@ -367,6 +369,7 @@ export type Database = {
           data_prevista_pagamento?: string | null
           data_realizada?: string | null
           data_vencimento?: string | null
+          dedup_hash?: string | null
           descricao: string
           documento?: string | null
           entity_id?: string | null
@@ -382,6 +385,7 @@ export type Database = {
           organization_id?: string | null
           recorrencia?: string | null
           source?: string
+          source_ref?: string | null
           status?: string
           subcategoria_id?: string | null
           tipo?: string
@@ -412,6 +416,7 @@ export type Database = {
           data_prevista_pagamento?: string | null
           data_realizada?: string | null
           data_vencimento?: string | null
+          dedup_hash?: string | null
           descricao?: string
           documento?: string | null
           entity_id?: string | null
@@ -427,6 +432,7 @@ export type Database = {
           organization_id?: string | null
           recorrencia?: string | null
           source?: string
+          source_ref?: string | null
           status?: string
           subcategoria_id?: string | null
           tipo?: string

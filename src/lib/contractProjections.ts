@@ -1,6 +1,7 @@
 import { addMonths, format, isBefore, isAfter } from "date-fns";
 import type { Contract } from "@/hooks/useContracts";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
+import { projectionKey } from "@/lib/projectionRegistry";
 
 /**
  * Determine if a contract should generate recurring cashflow projections.
@@ -55,6 +56,7 @@ export function generateProjectionsFromContract(
   while (!isAfter(cursor, rangeTo)) {
     if (!isBefore(cursor, rangeFrom) && !isAfter(cursor, rangeTo)) {
       if (!contractEnd || !isAfter(cursor, contractEnd)) {
+        const dataPrevista = format(cursor, "yyyy-MM-dd");
         projections.push({
           id: `proj-${contract.id}-${format(cursor, "yyyy-MM")}`,
           contract_id: contract.id,
@@ -64,7 +66,7 @@ export function generateProjectionsFromContract(
           descricao: `${contract.nome} — ${format(cursor, "MM/yyyy")}`,
           valor_previsto: Number(contract.valor),
           valor_realizado: null,
-          data_prevista: format(cursor, "yyyy-MM-dd"),
+          data_prevista: dataPrevista,
           data_realizada: null,
           status: "previsto",
           account_id: null,
@@ -72,9 +74,10 @@ export function generateProjectionsFromContract(
           entity_id: contract.entity_id,
           notes: null,
           source: "contrato",
+          source_ref: projectionKey.contract(contract.id, dataPrevista),
           created_at: contract.created_at,
           updated_at: contract.created_at,
-        });
+        } as any);
       }
     }
     cursor = addMonths(cursor, interval);

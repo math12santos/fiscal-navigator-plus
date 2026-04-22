@@ -553,7 +553,7 @@ export function useMutateHRPlanning() {
         ? `Folha — Contratação planejada (${item.quantity || 1}x)`
         : `Folha — Reajuste planejado`;
 
-      const { error: cfErr } = await supabase.from("cashflow_entries").insert({
+      const { error: cfErr } = await supabase.from("cashflow_entries").upsert({
         organization_id: currentOrg!.id,
         user_id: user!.id,
         descricao,
@@ -565,11 +565,12 @@ export function useMutateHRPlanning() {
         cost_center_id: item.cost_center_id || null,
         status: "previsto",
         source: "hr_planning",
+        source_ref: `hr:${item.id}`,
         categoria: "Folha de Pagamento",
         impacto_fluxo_caixa: true,
         impacto_orcamento: true,
         notes: `Gerado a partir de Planejamento RH (${item.type}). Item: ${item.id}`,
-      });
+      } as any, { onConflict: "dedup_hash" } as any);
       if (cfErr) throw cfErr;
 
       const { error } = await supabase

@@ -10,6 +10,7 @@ import { useHolding } from "@/contexts/HoldingContext";
 import { useMemo } from "react";
 import { format, isBefore, isAfter } from "date-fns";
 import { isRecurringCashflow, generateProjectionsFromContract } from "@/lib/contractProjections";
+import { projectionKey, buildMaterializedRefs } from "@/lib/projectionRegistry";
 
 export interface CashFlowEntry {
   id: string;
@@ -30,6 +31,8 @@ export interface CashFlowEntry {
   entity_id: string | null;
   notes: string | null;
   source: string;
+  /** Canonical projection key — see src/lib/projectionRegistry.ts. Null for purely manual entries. */
+  source_ref?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -95,21 +98,20 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
 
   const projectedEntries = useMemo(() => {
     if (!rangeFrom || !rangeTo) return [];
-    const materializedKeys = new Set(
-      (entriesQuery.data ?? [])
-        .filter((e) => e.contract_id && e.source === "contrato")
-        .map((e) => `${e.contract_id}-${e.data_prevista}`)
-    );
 
-    // 1. Recurrent contract projections (only truly recurring services)
+    // Single source of truth: source_ref of every materialized entry.
+    const materializedRefs = buildMaterializedRefs(entriesQuery.data ?? []);
+
+    // 1. Recurrent contract projections (truly recurring services only)
     const recurrentProjections = contracts.flatMap((c) => {
       const projections = generateProjectionsFromContract(c, rangeFrom, rangeTo);
-      return projections.filter(
-        (p) => !materializedKeys.has(`${p.contract_id}-${p.data_prevista}`)
-      );
+      return projections.filter((p) => {
+        const ref = (p as any).source_ref ?? projectionKey.contract(c.id, p.data_prevista);
+        return !materializedRefs.has(ref);
+      });
     });
 
-    // 2. Installment projections (for non-recurring contracts that have manual installments)
+    // 2. Installment projections (non-recurring contracts with manual installments)
     const contractMap = new Map(contracts.map((c) => [c.id, c]));
     const installmentData = installmentsQuery.data ?? [];
     const contractsWithInstallments = new Set(installmentData.map((i) => i.contract_id));
@@ -117,8 +119,9 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     const installmentProjections = installmentData
       .filter((inst) => {
         const d = new Date(inst.data_vencimento);
-        return !isBefore(d, rangeFrom) && !isAfter(d, rangeTo) &&
-          !materializedKeys.has(`${inst.contract_id}-${inst.data_vencimento}`);
+        if (isBefore(d, rangeFrom) || isAfter(d, rangeTo)) return false;
+        const ref = projectionKey.installment(inst.id, inst.contract_id, inst.data_vencimento);
+        return !materializedRefs.has(ref);
       })
       .map((inst) => {
         const contract = contractMap.get(inst.contract_id);
@@ -140,6 +143,7 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
           entity_id: contract?.entity_id ?? null,
           notes: null,
           source: "contrato",
+          source_ref: projectionKey.installment(inst.id, inst.contract_id, inst.data_vencimento),
           created_at: inst.created_at,
           updated_at: inst.created_at,
         } as Omit<CashFlowEntry, "user_id" | "organization_id">;
@@ -152,7 +156,8 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
         const dateStr = c.data_inicio ?? format(new Date(c.created_at), "yyyy-MM-dd");
         const d = new Date(dateStr);
         if (isBefore(d, rangeFrom) || isAfter(d, rangeTo)) return [];
-        if (materializedKeys.has(`${c.id}-${dateStr}`)) return [];
+        const ref = projectionKey.contract(c.id, dateStr);
+        if (materializedRefs.has(ref)) return [];
         const tipo = c.impacto_resultado === "receita" ? "entrada" : "saida";
         return [{
           id: `proj-single-${c.id}`,
@@ -171,6 +176,7 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
           entity_id: c.entity_id,
           notes: null,
           source: "contrato",
+          source_ref: ref,
           created_at: c.created_at,
           updated_at: c.created_at,
         } as Omit<CashFlowEntry, "user_id" | "organization_id">];
@@ -193,15 +199,23 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
   // Scope filter
   const { filterByScope } = useUserDataScope();
 
-  // Merge materialized + projected + payroll
+  // Merge materialized + projected + payroll, applying registry-based dedup.
   const allEntries = useMemo(() => {
     const materialized = entriesQuery.data ?? [];
-    const merged = [...materialized, ...projectedEntries as any[], ...payrollProjections, ...crmProjections];
+    const materializedRefs = buildMaterializedRefs(materialized);
+
+    // Dedup payroll projections against materialized DP entries by source_ref.
+    const payrollDeduped = (payrollProjections as any[]).filter((p) => {
+      const ref = p.source_ref;
+      return !ref || !materializedRefs.has(ref);
+    });
+
+    const merged = [...materialized, ...projectedEntries as any[], ...payrollDeduped, ...crmProjections];
     merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
     return filterByScope(merged as CashFlowEntry[]);
   }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections, filterByScope]);
 
-  // KPIs
+  // KPIs (consolidated across realized + projected, no double counting).
   const totals = useMemo(() => {
     let entradas = 0, saidas = 0;
     for (const e of allEntries) {
@@ -241,10 +255,17 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     onError: (e: any) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
   });
 
-  // Materialize a projected entry (confirm payment)
+  // Materialize a projected entry (confirm payment) — idempotent via source_ref.
   const materialize = useMutation({
     mutationFn: async (entry: CashFlowEntry & { valor_realizado: number; data_realizada: string }) => {
-      const { error } = await supabase.from("cashflow_entries" as any).insert({
+      const sourceRef = (entry as any).source_ref
+        ?? (entry.contract_installment_id
+              ? projectionKey.installment(entry.contract_installment_id)
+              : entry.contract_id
+                ? projectionKey.contract(entry.contract_id, entry.data_prevista)
+                : null);
+
+      const payload: any = {
         contract_id: entry.contract_id,
         contract_installment_id: entry.contract_installment_id,
         tipo: entry.tipo,
@@ -260,9 +281,16 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
         entity_id: entry.entity_id,
         notes: entry.notes,
         source: "contrato",
+        source_ref: sourceRef,
         user_id: user!.id,
         organization_id: orgId,
-      } as any);
+      };
+
+      // Upsert by dedup_hash (UNIQUE INDEX). If the projection was already
+      // materialized, this updates the existing row instead of duplicating.
+      const { error } = sourceRef
+        ? await supabase.from("cashflow_entries" as any).upsert(payload, { onConflict: "dedup_hash" } as any)
+        : await supabase.from("cashflow_entries" as any).insert(payload);
       if (error) throw error;
     },
     onSuccess: () => {

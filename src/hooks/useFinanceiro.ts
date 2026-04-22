@@ -11,6 +11,7 @@ import { format, addMonths, startOfMonth } from "date-fns";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
 import { isRecurringCashflow, generateProjectionsFromContract } from "@/lib/contractProjections";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
+import { projectionKey, extractSourceRef } from "@/lib/projectionRegistry";
 
 export interface FinanceiroEntry extends CashFlowEntry {}
 
@@ -299,8 +300,10 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
         const original = allEntries.find((e) => e.id === entry.id);
         if (!original) throw new Error("Entry not found");
 
-        // Materialize: create a new cashflow_entries record
-        const { error } = await supabase.from("cashflow_entries" as any).insert({
+        // Resolve canonical source_ref so this materialization is idempotent.
+        const sourceRef = (original as any).source_ref ?? extractSourceRef(original as any);
+
+        const payload: any = {
           contract_id: original.contract_id,
           contract_installment_id: original.contract_installment_id,
           tipo: original.tipo,
@@ -316,9 +319,15 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
           entity_id: original.entity_id,
           notes: original.notes,
           source: original.source,
+          source_ref: sourceRef,
           user_id: user!.id,
           organization_id: orgId,
-        } as any);
+        };
+
+        // Upsert by dedup_hash → repeated clicks won't duplicate.
+        const { error } = sourceRef
+          ? await supabase.from("cashflow_entries" as any).upsert(payload, { onConflict: "dedup_hash" } as any)
+          : await supabase.from("cashflow_entries" as any).insert(payload);
         if (error) throw error;
 
         // Also update installment status if linked
