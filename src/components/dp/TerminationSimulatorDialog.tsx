@@ -150,13 +150,12 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
 
   const handleSaveTermination = () => {
     if (!simResult || !selectedEmpId) return;
-    // contract_type é apenas hint visual — não persiste na tabela employee_terminations.
-    const { contract_type: _ct, ...persistable } = simResult;
+    // contract_type agora é persistido como snapshot imutável do regime na data da rescisão.
     create.mutate({
       employee_id: selectedEmpId,
       termination_date: termDate,
       type: termType,
-      ...persistable,
+      ...simResult,
     }, {
       onSuccess: () => {
         toast({ title: "Rescisão registrada" });
