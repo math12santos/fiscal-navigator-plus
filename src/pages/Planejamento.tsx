@@ -51,6 +51,46 @@ function ScenarioPicker() {
   );
 }
 
+interface ExportPdfButtonProps {
+  startDate: Date;
+  endDate: Date;
+  budgetVersionId: string | null;
+}
+
+function ExportPdfButton({ startDate, endDate, budgetVersionId }: ExportPdfButtonProps) {
+  const { generatePdf, isReady } = usePlanningPdfReport({ startDate, endDate, budgetVersionId });
+  const [busy, setBusy] = useState(false);
+
+  const handleClick = async () => {
+    if (!isReady || busy) return;
+    try {
+      setBusy(true);
+      // Defer to next tick so the button can show its loading state
+      await new Promise((r) => setTimeout(r, 0));
+      generatePdf();
+      toast.success("PDF gerado com sucesso");
+    } catch (e: any) {
+      toast.error("Falha ao gerar PDF", { description: e?.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleClick}
+      disabled={!isReady || busy}
+      className="gap-1.5"
+      title="Exportar Cockpit + Plan×Real×Projetado para PDF"
+    >
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+      <span className="hidden sm:inline">Exportar PDF</span>
+    </Button>
+  );
+}
+
 type Horizon = "3m" | "6m" | "12m" | "24m" | "custom";
 
 const ALL_TABS = [
