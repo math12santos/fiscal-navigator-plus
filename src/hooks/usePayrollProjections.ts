@@ -202,8 +202,8 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           } as any);
         }
 
-        // Provisions (13th + vacation)
-        const provisoes = salary * (provisao13Pct + provisaoFeriasPct);
+        // Provisions (13th + vacation) — somente CLT (estágio não tem 13/férias remuneradas)
+        const provisoes = isEstagio ? 0 : salary * (provisao13Pct + provisaoFeriasPct);
         if (provisoes > 0) {
           entries.push({
             id: `proj-dp-provisoes-${emp.id}-${monthKey}`,
