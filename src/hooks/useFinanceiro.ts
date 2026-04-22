@@ -11,6 +11,7 @@ import { format, addMonths, startOfMonth } from "date-fns";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
 import { isRecurringCashflow, generateProjectionsFromContract } from "@/lib/contractProjections";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
+import { projectionKey, extractSourceRef } from "@/lib/projectionRegistry";
 
 export interface FinanceiroEntry extends CashFlowEntry {}
 

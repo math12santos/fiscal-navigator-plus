@@ -255,10 +255,17 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     onError: (e: any) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
   });
 
-  // Materialize a projected entry (confirm payment)
+  // Materialize a projected entry (confirm payment) — idempotent via source_ref.
   const materialize = useMutation({
     mutationFn: async (entry: CashFlowEntry & { valor_realizado: number; data_realizada: string }) => {
-      const { error } = await supabase.from("cashflow_entries" as any).insert({
+      const sourceRef = (entry as any).source_ref
+        ?? (entry.contract_installment_id
+              ? projectionKey.installment(entry.contract_installment_id)
+              : entry.contract_id
+                ? projectionKey.contract(entry.contract_id, entry.data_prevista)
+                : null);
+
+      const payload: any = {
         contract_id: entry.contract_id,
         contract_installment_id: entry.contract_installment_id,
         tipo: entry.tipo,
@@ -274,9 +281,16 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
         entity_id: entry.entity_id,
         notes: entry.notes,
         source: "contrato",
+        source_ref: sourceRef,
         user_id: user!.id,
         organization_id: orgId,
-      } as any);
+      };
+
+      // Upsert by dedup_hash (UNIQUE INDEX). If the projection was already
+      // materialized, this updates the existing row instead of duplicating.
+      const { error } = sourceRef
+        ? await supabase.from("cashflow_entries" as any).upsert(payload, { onConflict: "dedup_hash" } as any)
+        : await supabase.from("cashflow_entries" as any).insert(payload);
       if (error) throw error;
     },
     onSuccess: () => {
