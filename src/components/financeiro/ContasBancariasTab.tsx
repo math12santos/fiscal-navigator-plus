@@ -52,6 +52,12 @@ export function ContasBancariasTab() {
   const [balanceAccount, setBalanceAccount] = useState<BankAccount | null>(null);
   const [balanceValue, setBalanceValue] = useState("");
 
+  // Overdraft validation dialog state (for cheque especial with negative balance)
+  const [overdraftValidation, setOverdraftValidation] = useState<{
+    account: BankAccount;
+    saldoNegativo: number;
+  } | null>(null);
+
   // Limite dialog state
   const [limitAccount, setLimitAccount] = useState<BankAccount | null>(null);
   const [limitForm, setLimitForm] = useState({
@@ -71,7 +77,30 @@ export function ContasBancariasTab() {
     if (!balanceAccount) return;
     const val = parseFloat(balanceValue.replace(/[^\d.,-]/g, "").replace(",", "."));
     if (isNaN(val)) return;
+
+    // Se conta de cheque especial e saldo negativo: abrir validação de uso de limite
+    const isOverdraft = (balanceAccount.limite_tipo || "cheque_especial") === "cheque_especial";
+    if (isOverdraft && val < 0 && (balanceAccount.limite_credito || 0) > 0) {
+      setOverdraftValidation({ account: balanceAccount, saldoNegativo: val });
+      return;
+    }
+
     update.mutate({ id: balanceAccount.id, saldo_atual: val } as any);
+    setBalanceAccount(null);
+    setBalanceValue("");
+  };
+
+  const handleConfirmOverdraft = ({ usoLimite }: { usoLimite: number; provisao: number }) => {
+    if (!overdraftValidation) return;
+    const { account, saldoNegativo } = overdraftValidation;
+    update.mutate({
+      id: account.id,
+      saldo_atual: saldoNegativo,
+      limite_utilizado: usoLimite,
+      saldo_atualizado_em: new Date().toISOString(),
+      limite_atualizado_em: new Date().toISOString(),
+    } as any);
+    setOverdraftValidation(null);
     setBalanceAccount(null);
     setBalanceValue("");
   };
