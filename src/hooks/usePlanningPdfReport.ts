@@ -7,7 +7,6 @@ import { useCashFlow } from "@/hooks/useCashFlow";
 import { useContracts } from "@/hooks/useContracts";
 import { usePlanningConfig } from "@/hooks/usePlanningConfig";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
-import { useLiabilities } from "@/hooks/useLiabilities";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { useBudget, useBudgetLines, BudgetLine } from "@/hooks/useBudget";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
@@ -54,8 +53,14 @@ export function usePlanningPdfReport({
   const { contracts: rawContracts } = useContracts();
   const { config } = usePlanningConfig();
   const { avgMonthlyPayroll: rawAvgPayroll, payrollProjections: rawPayroll } = usePayrollProjections(startDate, endDate);
-  const { totals: liabTotals } = useLiabilities();
-  const { crmWeightedValue, alerts } = useFinancialSummary(startDate, endDate, filters);
+  // Single hook = single source of truth for filtered burn, runway, passivos and CRM.
+  const {
+    crmWeightedValue,
+    alerts,
+    liabTotals,
+    monthlyBurn,
+    runway,
+  } = useFinancialSummary(startDate, endDate, filters);
   const { versions, isLoadingVersions } = useBudget();
   const budgetLinesQuery = useBudgetLines(budgetVersionId);
   const { opportunities } = useCRMOpportunities();
@@ -73,9 +78,18 @@ export function usePlanningPdfReport({
     const entries = rawEntries.filter((e) => entryMatchesFilters(e as any, filters));
     const materializedEntries = rawMaterialized.filter((e) => entryMatchesFilters(e as any, filters));
     const contracts = rawContracts.filter((c) => contractMatchesFilters(c as any, filters));
-    const payrollProjections = filters.costCenterId
-      ? rawPayroll.filter((p) => (p as any).cost_center_id === filters.costCenterId)
-      : rawPayroll;
+
+    // Dedup folha contra DP entries já materializadas — mesma lógica usada
+    // por useCashFlow no stream consolidado. Sem isso, ao confirmar um
+    // pagamento de folha o Projetado e o Realizado contariam o mesmo valor.
+    const materializedRefs = new Set<string>();
+    for (const e of materializedEntries) {
+      const ref = (e as any).source_ref;
+      if (ref) materializedRefs.add(ref);
+    }
+    const payrollProjections = (rawPayroll as any[])
+      .filter((p) => !p.source_ref || !materializedRefs.has(p.source_ref))
+      .filter((p) => !filters.costCenterId || p.cost_center_id === filters.costCenterId);
 
     // Recompute totals over filtered entries
     let entradasTot = 0, saidasTot = 0;
@@ -102,12 +116,11 @@ export function usePlanningPdfReport({
       }
     }
 
+    // Único divisor compartilhado com Cockpit (horizonMonths.length).
     const monthsCount = Math.max(1, Object.keys(monthly).length);
     const stressPerMonth = stressExtraOutflow / monthsCount;
-    const avgMonthlySaida =
-      Object.values(monthly).reduce((s, m) => s + m.saidas, 0) / monthsCount;
-    const runway =
-      avgMonthlySaida > 0 ? Math.floor(totals.saldo / avgMonthlySaida) : Infinity;
+    // Burn e runway vêm do useFinancialSummary — mesmos números do Cockpit.
+    const avgMonthlySaida = monthlyBurn;
     const activeContracts = contracts.filter((c) => c.status === "Ativo").length;
     const avgMonthlyPayroll = filters.costCenterId
       ? payrollProjections.reduce((s, p) => s + Number(p.valor_previsto), 0) / monthsCount
@@ -428,6 +441,8 @@ export function usePlanningPdfReport({
     liabTotals.total,
     crmWeightedValue,
     alerts,
+    monthlyBurn,
+    runway,
     opportunities,
     stages,
     activeScenario,

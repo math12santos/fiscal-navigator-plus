@@ -47,3 +47,22 @@ export function contractMatchesFilters<
   if (f.costCenterId && entity.cost_center_id !== f.costCenterId) return false;
   return true;
 }
+
+/**
+ * Único divisor de meses do horizonte. Retorna chaves `yyyy-MM` cobrindo
+ * todos os meses entre `start` e `end` (inclusive). Use `.length` como
+ * divisor para médias mensais (burn, folha/mês, stress) — garante que
+ * Cockpit, Plan×Real×Projetado e PDF compartilhem a mesma contagem.
+ */
+export function getHorizonMonths(start: Date, end: Date): string[] {
+  const list: string[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+  while (cursor.getTime() <= last.getTime()) {
+    const y = cursor.getFullYear();
+    const m = String(cursor.getMonth() + 1).padStart(2, "0");
+    list.push(`${y}-${m}`);
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return list;
+}

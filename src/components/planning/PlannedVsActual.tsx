@@ -23,6 +23,7 @@ import {
   EMPTY_PLANNING_FILTERS,
   entryMatchesFilters,
   contractMatchesFilters,
+  getHorizonMonths,
 } from "@/lib/planningFilters";
 
 const fmt = (v: number) =>
@@ -59,23 +60,31 @@ export default function PlannedVsActual({
     () => rawContracts.filter((c) => contractMatchesFilters(c as any, filters)),
     [rawContracts, filters],
   );
+  // Folha: aplica filtro de CC E remove projeções já materializadas (mesma
+  // lógica do stream consolidado em useCashFlow). Sem o dedup, confirmar um
+  // pagamento de folha faria o gráfico contar o mesmo valor em Realizado e
+  // em Projetado simultaneamente.
+  const materializedPayrollRefs = useMemo(() => {
+    const refs = new Set<string>();
+    for (const e of materializedEntries) {
+      const ref = (e as any).source_ref;
+      if (ref) refs.add(ref);
+    }
+    return refs;
+  }, [materializedEntries]);
+
   const payrollProjections = useMemo(
-    () => filters.costCenterId
-      ? rawPayroll.filter((p) => (p as any).cost_center_id === filters.costCenterId)
-      : rawPayroll,
-    [rawPayroll, filters.costCenterId],
+    () => (rawPayroll as any[])
+      .filter((p) => !p.source_ref || !materializedPayrollRefs.has(p.source_ref))
+      .filter((p) => !filters.costCenterId || p.cost_center_id === filters.costCenterId),
+    [rawPayroll, filters.costCenterId, materializedPayrollRefs],
   );
 
   // Horizon months — single source of truth for granularity & divisors
-  const horizonMonths = useMemo(() => {
-    const list: string[] = [];
-    let c = startOfMonth(startDate);
-    while (!isAfter(c, endDate)) {
-      list.push(format(c, "yyyy-MM"));
-      c = addMonths(c, 1);
-    }
-    return list;
-  }, [startDate, endDate]);
+  const horizonMonths = useMemo(
+    () => getHorizonMonths(startDate, endDate),
+    [startDate, endDate],
+  );
   const monthsCount = Math.max(1, horizonMonths.length);
   const stressPerMonth = stressExtraOutflow / monthsCount;
 
