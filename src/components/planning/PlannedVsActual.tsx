@@ -23,6 +23,7 @@ import {
   EMPTY_PLANNING_FILTERS,
   entryMatchesFilters,
   contractMatchesFilters,
+  getHorizonMonths,
 } from "@/lib/planningFilters";
 
 const fmt = (v: number) =>
@@ -80,15 +81,10 @@ export default function PlannedVsActual({
   );
 
   // Horizon months — single source of truth for granularity & divisors
-  const horizonMonths = useMemo(() => {
-    const list: string[] = [];
-    let c = startOfMonth(startDate);
-    while (!isAfter(c, endDate)) {
-      list.push(format(c, "yyyy-MM"));
-      c = addMonths(c, 1);
-    }
-    return list;
-  }, [startDate, endDate]);
+  const horizonMonths = useMemo(
+    () => getHorizonMonths(startDate, endDate),
+    [startDate, endDate],
+  );
   const monthsCount = Math.max(1, horizonMonths.length);
   const stressPerMonth = stressExtraOutflow / monthsCount;
 
