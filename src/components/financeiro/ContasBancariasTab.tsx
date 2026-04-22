@@ -507,14 +507,27 @@ export function ContasBancariasTab() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Vencimento / Renovação do Contrato</Label>
-              <Input
-                type="date"
-                value={limitForm.limite_vencimento}
-                onChange={(e) => setLimitForm((p) => ({ ...p, limite_vencimento: e.target.value }))}
-              />
-            </div>
+            {limitForm.limite_tipo !== "cheque_especial" && (
+              <div className="space-y-2">
+                <Label>Vencimento / Renovação do Contrato</Label>
+                <Input
+                  type="date"
+                  value={limitForm.limite_vencimento}
+                  onChange={(e) => setLimitForm((p) => ({ ...p, limite_vencimento: e.target.value }))}
+                />
+              </div>
+            )}
+            {limitForm.limite_tipo === "cheque_especial" && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Cheque especial não possui vencimento. Os juros são calculados
+                  diariamente sobre o saldo devedor e debitados no <strong>1º dia
+                  do mês subsequente</strong>. O uso do limite é detectado
+                  automaticamente pelo saldo negativo da conta.
+                </AlertDescription>
+              </Alert>
+            )}
             {Number(limitForm.limite_credito) > 0 && (
               <div className="bg-muted/50 rounded-md p-3 text-xs space-y-1">
                 <div className="flex justify-between">
@@ -525,9 +538,29 @@ export function ContasBancariasTab() {
                 </div>
                 {Number(limitForm.limite_taxa_juros_mensal) > 0 && Number(limitForm.limite_utilizado) > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Custo mensal estimado:</span>
+                    <span className="text-muted-foreground">
+                      {limitForm.limite_tipo === "cheque_especial"
+                        ? "Juros estimados (mês cheio):"
+                        : "Custo mensal estimado:"}
+                    </span>
                     <span className="font-mono text-warning">
-                      {fmt(Number(limitForm.limite_utilizado) * (Number(limitForm.limite_taxa_juros_mensal) / 100))}
+                      {fmt(
+                        limitForm.limite_tipo === "cheque_especial"
+                          ? estimateMonthlyClosingCharge(
+                              Number(limitForm.limite_utilizado),
+                              Number(limitForm.limite_taxa_juros_mensal),
+                              30
+                            )
+                          : Number(limitForm.limite_utilizado) * (Number(limitForm.limite_taxa_juros_mensal) / 100)
+                      )}
+                    </span>
+                  </div>
+                )}
+                {limitForm.limite_tipo === "cheque_especial" && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Próximo fechamento:</span>
+                    <span className="font-mono">
+                      {format(getNextClosingDate(), "dd/MM/yyyy", { locale: ptBR })}
                     </span>
                   </div>
                 )}
@@ -540,6 +573,19 @@ export function ContasBancariasTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Overdraft validation dialog (cheque especial) */}
+      {overdraftValidation && (
+        <OverdraftValidationDialog
+          open={!!overdraftValidation}
+          onOpenChange={(open) => { if (!open) setOverdraftValidation(null); }}
+          accountName={overdraftValidation.account.nome}
+          saldoNegativo={overdraftValidation.saldoNegativo}
+          limiteTotal={overdraftValidation.account.limite_credito || 0}
+          taxaJurosMensalPct={overdraftValidation.account.limite_taxa_juros_mensal || 0}
+          onConfirm={handleConfirmOverdraft}
+        />
+      )}
 
       <BankAccountFormDialog
         open={showCreate}
