@@ -574,9 +574,29 @@ export default function RelatorioKpi() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-start gap-3">
             <div className="rounded-lg bg-primary/10 p-2.5 text-primary">{meta.icon}</div>
-            <div>
+            <div className="space-y-1.5">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">Período</p>
-              <p className="text-sm font-medium text-foreground capitalize">{periodLabel}</p>
+              {meta.scopeIsCurrentMonth ? (
+                <>
+                  <p className="text-sm font-medium text-foreground capitalize">{periodLabel}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Este KPI sempre reflete o mês corrente — período fixo.
+                  </p>
+                </>
+              ) : (
+                <RangePicker
+                  from={rangeFrom}
+                  to={rangeTo}
+                  onApply={applyRange}
+                  isCustom={Boolean(searchParams.get("from") || searchParams.get("to"))}
+                  onReset={() => {
+                    const next = new URLSearchParams(searchParams);
+                    next.delete("from");
+                    next.delete("to");
+                    setSearchParams(next, { replace: false });
+                  }}
+                />
+              )}
               {currentOrg && (
                 <p className="text-xs text-muted-foreground mt-0.5">{currentOrg.name}</p>
               )}
