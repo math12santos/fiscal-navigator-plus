@@ -341,6 +341,11 @@ export function ContasBancariasTab() {
                               {tipoLimiteLabels[acc.limite_tipo || "cheque_especial"]} • {usoPct.toFixed(0)}% usado
                             </div>
                           )}
+                          {jurosMes > 0 && (
+                            <div className="text-[10px] text-warning">
+                              ~{fmt(jurosMes)}/mês juros
+                            </div>
+                          )}
                           {limTotal === 0 && (
                             <div className="text-[10px] text-muted-foreground">sem limite</div>
                           )}
