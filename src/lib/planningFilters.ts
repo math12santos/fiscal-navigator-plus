@@ -28,6 +28,43 @@ export function hasAnyFilter(f: PlanningFilters): boolean {
 }
 
 /**
+ * Remove IDs do filtro que não existem mais nas listas de referência (conta
+ * excluída, CC desativado, subsidiária trocada por outro escopo). Devolve o
+ * objeto saneado e um descritivo do que foi removido para feedback ao usuário.
+ *
+ * IMPORTANTE: o chamador deve aguardar o término do carregamento das três
+ * fontes antes de invocar — caso contrário, filtros válidos seriam removidos
+ * apenas porque a query ainda não voltou.
+ */
+export function sanitizeFilters(
+  current: PlanningFilters,
+  valid: { orgIds: Set<string>; bankIds: Set<string>; ccIds: Set<string> },
+): { sanitized: PlanningFilters; removed: { dimension: string; count: number }[] } {
+  const removed: { dimension: string; count: number }[] = [];
+
+  const subsidiaryOrgId =
+    current.subsidiaryOrgId && valid.orgIds.has(current.subsidiaryOrgId)
+      ? current.subsidiaryOrgId
+      : null;
+  if (current.subsidiaryOrgId && subsidiaryOrgId === null) {
+    removed.push({ dimension: "Unidade", count: 1 });
+  }
+
+  const bankAccountIds = current.bankAccountIds.filter((id) => valid.bankIds.has(id));
+  const removedBank = current.bankAccountIds.length - bankAccountIds.length;
+  if (removedBank > 0) removed.push({ dimension: "Conta bancária", count: removedBank });
+
+  const costCenterIds = current.costCenterIds.filter((id) => valid.ccIds.has(id));
+  const removedCc = current.costCenterIds.length - costCenterIds.length;
+  if (removedCc > 0) removed.push({ dimension: "Centro de custo", count: removedCc });
+
+  return {
+    sanitized: { subsidiaryOrgId, bankAccountIds, costCenterIds },
+    removed,
+  };
+}
+
+/**
  * Normaliza filtros vindos de fontes externas (URL, histórico antigo salvo
  * antes da multi-seleção). Aceita campos legados `bankAccountId`/`costCenterId`
  * como string única e converte para array. Garante sempre um objeto válido.

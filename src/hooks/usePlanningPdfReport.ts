@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { format, addMonths, startOfMonth, isAfter } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import jsPDF from "jspdf";
@@ -484,5 +484,30 @@ export function usePlanningPdfReport({
 
   const isReady = !isLoadingVersions && !budgetLinesQuery.isLoading;
 
-  return { generatePdf, isReady };
+  // Sinalizador para o chamador decidir se vale a pena exportar. Considera
+  // que "tem dado" quando ao menos uma das três fontes (lançamentos do
+  // período, contratos vigentes ou folha projetada) sobrevive ao filtro.
+  // Quando NÃO há filtro ativo, retorna `true` para não bloquear exportações
+  // de organizações genuinamente vazias (caso legítimo de empresa nova).
+  const hasFilteredData = useMemo(() => {
+    if (!hasAnyFilter(filters)) return true;
+    const anyEntry = rawEntries.some((e) => entryMatchesFilters(e as any, filters));
+    if (anyEntry) return true;
+    const anyMaterialized = rawMaterialized.some((e) => entryMatchesFilters(e as any, filters));
+    if (anyMaterialized) return true;
+    const anyContract = rawContracts.some((c) => contractMatchesFilters(c as any, filters));
+    if (anyContract) return true;
+    if (filters.costCenterIds.length === 0) {
+      // sem filtro de CC, folha projetada (global) também é considerada
+      if ((rawPayroll as any[]).length > 0) return true;
+    } else {
+      const anyPayroll = (rawPayroll as any[]).some(
+        (p) => p.cost_center_id && filters.costCenterIds.includes(p.cost_center_id),
+      );
+      if (anyPayroll) return true;
+    }
+    return false;
+  }, [filters, rawEntries, rawMaterialized, rawContracts, rawPayroll]);
+
+  return { generatePdf, isReady, hasFilteredData };
 }

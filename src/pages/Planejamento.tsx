@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { addMonths, startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -13,7 +13,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CalendarIcon, Settings, Sparkles, FileDown, Loader2, Filter, X, Search } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CalendarIcon, Settings, Sparkles, FileDown, Loader2, Filter, X, Search, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import PlanningCockpit, { PLANNING_NAV_EVENT } from "@/components/planning/PlanningCockpit";
@@ -29,7 +33,7 @@ import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { useHolding } from "@/contexts/HoldingContext";
 import { Badge } from "@/components/ui/badge";
 import {
-  PlanningFilters, EMPTY_PLANNING_FILTERS, hasAnyFilter,
+  PlanningFilters, EMPTY_PLANNING_FILTERS, hasAnyFilter, sanitizeFilters,
 } from "@/lib/planningFilters";
 import PlanningReportHistory from "@/components/planning/PlanningReportHistory";
 import { usePlanningReportExports } from "@/hooks/usePlanningReportExports";
@@ -156,10 +160,11 @@ function MultiSelectList({
  * (não itens), pra manter o sinal visual estável.
  */
 function FilterPopover({
-  filters, setFilters,
+  filters, setFilters, hasActiveFiltersWithoutData,
 }: {
   filters: PlanningFilters;
   setFilters: (f: PlanningFilters) => void;
+  hasActiveFiltersWithoutData: boolean;
 }) {
   const { costCenters } = useCostCenters();
   const { allBankAccounts } = useBankAccounts();
@@ -294,6 +299,15 @@ function FilterPopover({
           />
         </div>
 
+        {hasActiveFiltersWithoutData && (
+          <div className="flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-2 py-1.5">
+            <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 flex-shrink-0" />
+            <p className="text-[10px] text-warning-foreground leading-tight">
+              Recorte atual sem dados no período. Ajuste os filtros ou o horizonte.
+            </p>
+          </div>
+        )}
+
         <p className="text-[10px] text-muted-foreground pt-1 border-t border-border">
           Filtros refletem em Cockpit, Plan×Real×Projetado e no PDF exportado.
         </p>
@@ -310,11 +324,27 @@ interface ExportPdfButtonProps {
 }
 
 function ExportPdfButton({ startDate, endDate, budgetVersionId, filters }: ExportPdfButtonProps) {
-  const { generatePdf, isReady } = usePlanningPdfReport({ startDate, endDate, budgetVersionId, filters });
+interface ExportPdfButtonProps {
+  startDate: Date;
+  endDate: Date;
+  budgetVersionId: string | null;
+  filters: PlanningFilters;
+  onHasFilteredDataChange?: (v: boolean) => void;
+}
+
+function ExportPdfButton({ startDate, endDate, budgetVersionId, filters, onHasFilteredDataChange }: ExportPdfButtonProps) {
+  const { generatePdf, isReady, hasFilteredData } = usePlanningPdfReport({ startDate, endDate, budgetVersionId, filters });
   const { record } = usePlanningReportExports();
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleClick = async () => {
+  // Repassa o sinal "tem dados após filtro" para o pai poder mostrar a nota
+  // no FilterPopover. Single source of truth para evitar divergir do PDF.
+  useEffect(() => {
+    onHasFilteredDataChange?.(hasFilteredData);
+  }, [hasFilteredData, onHasFilteredDataChange]);
+
+  const runExport = async () => {
     if (!isReady || busy) return;
     try {
       setBusy(true);
@@ -349,18 +379,57 @@ function ExportPdfButton({ startDate, endDate, budgetVersionId, filters }: Expor
     }
   };
 
+  const handleClick = () => {
+    // Filtro ativo + zero dados → exige confirmação para evitar PDF "fantasma"
+    // sem o usuário perceber que o vazio foi causado pelo recorte.
+    if (hasAnyFilter(filters) && !hasFilteredData) {
+      setConfirmOpen(true);
+      return;
+    }
+    void runExport();
+  };
+
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleClick}
-      disabled={!isReady || busy}
-      className="gap-1.5"
-      title="Exportar Cockpit + Plan×Real×Projetado para PDF"
-    >
-      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-      <span className="hidden sm:inline">Exportar PDF</span>
-    </Button>
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleClick}
+        disabled={!isReady || busy}
+        className="gap-1.5"
+        title="Exportar Cockpit + Plan×Real×Projetado para PDF"
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+        <span className="hidden sm:inline">Exportar PDF</span>
+      </Button>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              Recorte sem dados no período
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Os filtros atuais não retornam nenhum lançamento, contrato ou
+              folha no horizonte selecionado. O PDF será gerado em branco e
+              registrado no histórico assim mesmo. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Revisar filtros</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmOpen(false);
+                void runExport();
+              }}
+            >
+              Exportar mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -460,6 +529,51 @@ export default function Planejamento() {
     return () => window.removeEventListener(PLANNING_NAV_EVENT, handler);
   }, [allowedTabs, setActiveTab]);
 
+  // ===== Sanitização de filtros =====
+  // Após o carregamento das listas de referência, remove IDs órfãos do URL
+  // (ex: conta excluída, CC desativado, link compartilhado de outra org).
+  // Avisa o usuário uma vez por sanitização — sem o ref, o setFilters re-dispara
+  // o effect e o toast apareceria infinitamente.
+  const { allBankAccounts: refBankAccounts, isLoading: isLoadingBank } = useBankAccounts();
+  const { costCenters: refCostCenters, isLoading: isLoadingCc } = useCostCenters();
+  const { subsidiaryOrgs: refSubsidiaries, isLoading: isLoadingHolding } = useHolding();
+  const sanitizedSignatureRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isLoadingBank || isLoadingCc || isLoadingHolding) return;
+    if (!hasAnyFilter(filters)) return;
+
+    const valid = {
+      orgIds: new Set(refSubsidiaries.map((o) => o.id)),
+      bankIds: new Set(refBankAccounts.map((b) => b.id)),
+      ccIds: new Set(refCostCenters.map((c) => c.id)),
+    };
+    const { sanitized, removed } = sanitizeFilters(filters, valid);
+    if (removed.length === 0) return;
+
+    // Evita re-disparo ao mesmo conjunto de filtros já corrigido.
+    const signature = JSON.stringify({ ...filters, _r: removed });
+    if (sanitizedSignatureRef.current === signature) return;
+    sanitizedSignatureRef.current = signature;
+
+    setFilters(sanitized);
+    const totalRemoved = removed.reduce((s, r) => s + r.count, 0);
+    const dims = removed.map((r) => r.dimension).join(", ");
+    toast.info(
+      `Removemos ${totalRemoved} filtro(s) que não existem mais nesta organização.`,
+      { description: `Dimensão(ões) afetada(s): ${dims}.` },
+    );
+  }, [
+    filters, setFilters,
+    refBankAccounts, refCostCenters, refSubsidiaries,
+    isLoadingBank, isLoadingCc, isLoadingHolding,
+  ]);
+
+  // Sinal vindo do ExportPdfButton para o FilterPopover poder exibir nota
+  // quando filtros ativos resultam em zero dados no horizonte.
+  const [hasFilteredData, setHasFilteredData] = useState(true);
+  const hasActiveFiltersWithoutData = hasAnyFilter(filters) && !hasFilteredData;
+
   const { startDate, endDate } = useMemo(() => {
     const now = startOfMonth(new Date());
     if (horizon === "custom" && customFrom && customTo) {
@@ -550,13 +664,18 @@ export default function Planejamento() {
 
         <ScenarioPicker />
 
-        <FilterPopover filters={filters} setFilters={setFilters} />
+        <FilterPopover
+          filters={filters}
+          setFilters={setFilters}
+          hasActiveFiltersWithoutData={hasActiveFiltersWithoutData}
+        />
 
         <ExportPdfButton
           startDate={startDate}
           endDate={endDate}
           budgetVersionId={budgetVersionId}
           filters={filters}
+          onHasFilteredDataChange={setHasFilteredData}
         />
 
         <PlanningReportHistory />
