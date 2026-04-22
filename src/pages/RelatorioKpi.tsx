@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { KpiPeriodPresetsPopover } from "@/components/relatorio/KpiPeriodPresetsPopover";
+import { KpiRangePicker } from "@/components/relatorio/KpiRangePicker";
 import { ArrowLeft, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info } from "lucide-react";
 import { startOfMonth, endOfMonth, subMonths, format, parseISO, getQuarter } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -707,6 +708,14 @@ export default function RelatorioKpi() {
               {currentOrg && (
                 <p className="text-xs text-muted-foreground mt-0.5">{currentOrg.name}</p>
               )}
+              <div className="mt-3">
+                <KpiRangePicker
+                  currentFrom={format(rangeFrom, "yyyy-MM-dd")}
+                  currentTo={format(rangeTo, "yyyy-MM-dd")}
+                  onApply={applyRange}
+                  disabled={meta.scopeIsCurrentMonth}
+                />
+              </div>
             </div>
           </div>
           <div className="text-right">
