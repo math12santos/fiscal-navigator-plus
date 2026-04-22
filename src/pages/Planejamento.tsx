@@ -664,13 +664,18 @@ export default function Planejamento() {
 
         <ScenarioPicker />
 
-        <FilterPopover filters={filters} setFilters={setFilters} />
+        <FilterPopover
+          filters={filters}
+          setFilters={setFilters}
+          hasActiveFiltersWithoutData={hasActiveFiltersWithoutData}
+        />
 
         <ExportPdfButton
           startDate={startDate}
           endDate={endDate}
           budgetVersionId={budgetVersionId}
           filters={filters}
+          onHasFilteredDataChange={setHasFilteredData}
         />
 
         <PlanningReportHistory />
