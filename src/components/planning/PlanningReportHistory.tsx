@@ -18,17 +18,17 @@ import { History, FileDown, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePlanningReportExports } from "@/hooks/usePlanningReportExports";
 import { usePlanningPdfReport } from "@/hooks/usePlanningPdfReport";
-import { normalizeFilters, type PlanningFilters } from "@/lib/planningFilters";
+import { EMPTY_PLANNING_FILTERS, withFilterDefaults, type PlanningFilters } from "@/lib/planningFilters";
 
 /**
  * Botão "Re-baixar" — instancia o hook de PDF com os parâmetros salvos
  * e dispara a geração assim que ficar pronto.
  */
 function RedownloadRow({
-  startDate, endDate, budgetVersionId, filters, label,
+  startDate, endDate, budgetVersionId, filters = EMPTY_PLANNING_FILTERS, label,
 }: {
   startDate: Date; endDate: Date; budgetVersionId: string | null;
-  filters: PlanningFilters; label: string;
+  filters?: PlanningFilters; label: string;
 }) {
   const { generatePdf, isReady } = usePlanningPdfReport({
     startDate, endDate, budgetVersionId, filters,
@@ -158,7 +158,7 @@ export default function PlanningReportHistory() {
                         startDate={start}
                         endDate={end}
                         budgetVersionId={item.budget_version_id}
-                        filters={normalizeFilters(item.filters)}
+                        filters={withFilterDefaults(item.filters)}
                         label={format(created, "dd/MM HH:mm", { locale: ptBR })}
                       />
                     </div>

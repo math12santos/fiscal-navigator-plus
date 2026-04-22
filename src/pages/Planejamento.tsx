@@ -33,7 +33,7 @@ import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { useHolding } from "@/contexts/HoldingContext";
 import { Badge } from "@/components/ui/badge";
 import {
-  PlanningFilters, EMPTY_PLANNING_FILTERS, hasAnyFilter, sanitizeFilters,
+  PlanningFilters, EMPTY_PLANNING_FILTERS, hasAnyFilter, sanitizeFilters, withFilterDefaults,
 } from "@/lib/planningFilters";
 import PlanningReportHistory from "@/components/planning/PlanningReportHistory";
 import { usePlanningReportExports } from "@/hooks/usePlanningReportExports";
@@ -452,14 +452,15 @@ export default function Planejamento() {
   const filters = useMemo<PlanningFilters>(() => {
     const parseList = (key: string): string[] =>
       searchParams.get(key)?.split(",").filter(Boolean) ?? [];
-    return {
+    return withFilterDefaults({
       subsidiaryOrgId: searchParams.get("org"),
       bankAccountIds: parseList("conta"),
       costCenterIds: parseList("cc"),
-    };
+    });
   }, [searchParams]);
 
-  const setFilters = useCallback((next: PlanningFilters) => {
+  const setFilters = useCallback((next?: PlanningFilters | Partial<PlanningFilters> | null) => {
+    const safe = withFilterDefaults(next);
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
       const applyOne = (key: string, value: string | null) => {

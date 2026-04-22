@@ -67,12 +67,14 @@ export function sanitizeFilters(
 /**
  * Normaliza filtros vindos de fontes externas (URL, histórico antigo salvo
  * antes da multi-seleção). Aceita campos legados `bankAccountId`/`costCenterId`
- * como string única e converte para array. Garante sempre um objeto válido.
+ * como string única e converte para array. Tolera `null`/`undefined` em
+ * qualquer campo. Garante sempre um objeto válido com shape completo.
  */
 export function normalizeFilters(input: any): PlanningFilters {
   if (!input || typeof input !== "object") return { ...EMPTY_PLANNING_FILTERS };
 
   const toArray = (v: any): string[] => {
+    if (v == null) return [];
     if (Array.isArray(v)) return v.filter((x) => typeof x === "string" && x.length > 0);
     if (typeof v === "string" && v.length > 0) return [v];
     return [];
@@ -86,6 +88,18 @@ export function normalizeFilters(input: any): PlanningFilters {
     bankAccountIds: toArray(input.bankAccountIds ?? input.bankAccountId),
     costCenterIds: toArray(input.costCenterIds ?? input.costCenterId),
   };
+}
+
+/**
+ * Wrapper defensivo: garante que qualquer entrada (`undefined`, `null`,
+ * objeto parcial, shape legado) vire um `PlanningFilters` válido apoiado
+ * em `EMPTY_PLANNING_FILTERS`. Use em todo ponto de fronteira (URL, props
+ * opcionais, payloads externos) para nunca propagar `undefined` adiante.
+ */
+export function withFilterDefaults(
+  input?: Partial<PlanningFilters> | Record<string, any> | null,
+): PlanningFilters {
+  return normalizeFilters(input ?? EMPTY_PLANNING_FILTERS);
 }
 
 /** Filtra um lançamento (cashflow_entry) segundo as dimensões ativas. */
