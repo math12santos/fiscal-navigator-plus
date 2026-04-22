@@ -194,6 +194,23 @@ export function ContasBancariasTab() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
               <CreditCard className="h-3.5 w-3.5" /> Limite Utilizado
+              {totals.jurosEstimado > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3 w-3 text-warning cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs">
+                        Juros estimados do mês corrente:{" "}
+                        <strong className="text-warning">{fmt(totals.jurosEstimado)}</strong>
+                        <br />
+                        Fechamento em {format(proximoFechamento, "dd/MM/yyyy", { locale: ptBR })}.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
             <p className={`text-lg font-semibold mt-1 ${totals.limiteUsado > 0 ? "text-warning" : ""}`}>
               {fmt(totals.limiteUsado)}
@@ -201,6 +218,9 @@ export function ContasBancariasTab() {
             {totals.limiteTotal > 0 && (
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 {((totals.limiteUsado / totals.limiteTotal) * 100).toFixed(1)}% do limite
+                {totals.jurosEstimado > 0 && (
+                  <span className="text-warning"> · ~{fmt(totals.jurosEstimado)} juros/mês</span>
+                )}
               </p>
             )}
           </CardContent>
