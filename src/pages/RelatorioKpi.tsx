@@ -619,11 +619,14 @@ export default function RelatorioKpi() {
   const showingTo = Math.min(page * pageSize, aggregatedRows.length);
 
   const exportCsv = () => {
-    if (filteredItems.length === 0) return;
-    const headers = Object.keys(filteredItems[0]);
+    // Quando trimestral, exportamos as linhas agregadas (1 por trimestre);
+    // caso contrário, exportamos os itens individuais filtrados.
+    const source = isQuarterly ? aggregatedRows : filteredItems;
+    if (source.length === 0) return;
+    const headers = Object.keys(source[0] as Record<string, unknown>);
     const csvRows = [
       headers.join(";"),
-      ...filteredItems.map((r) =>
+      ...source.map((r) =>
         headers
           .map((h) => {
             const v = (r as any)[h];
@@ -637,8 +640,9 @@ export default function RelatorioKpi() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const suffix = isFiltering ? "-filtrado" : "";
-    a.download = `relatorio-${metric}${suffix}-${format(now, "yyyyMMdd")}.csv`;
+    const granSuffix = isQuarterly ? "-trimestral" : "";
+    const filterSuffix = isFiltering ? "-filtrado" : "";
+    a.download = `relatorio-${metric}${granSuffix}${filterSuffix}-${format(now, "yyyyMMdd")}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
