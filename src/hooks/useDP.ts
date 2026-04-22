@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useUserDataScope } from "@/hooks/useUserDataScope";
 import { useHolding } from "@/contexts/HoldingContext";
+import { projectionKey } from "@/lib/projectionRegistry";
 
 // ========== EMPLOYEES ==========
 export function useEmployees() {
@@ -381,23 +382,83 @@ export function useMutateTermination() {
           .update({ status: "executado" })
           .eq("id", hr_planning_item_id);
       }
+
+      // Materializa a rescisão como compromisso de caixa (não-recorrente).
+      // Idempotente via dedup_hash (UNIQUE INDEX em organization_id|source|source_ref).
+      await syncTerminationCashflow(data, user!.id, currentOrg!.id);
+
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["terminations"] });
       qc.invalidateQueries({ queryKey: ["hr_planning"] });
+      qc.invalidateQueries({ queryKey: ["cashflow_entries"] });
     },
   });
 
   const update = useMutation({
     mutationFn: async ({ id, ...updates }: any) => {
-      const { error } = await supabase.from("employee_terminations").update(updates).eq("id", id);
+      const { data, error } = await supabase
+        .from("employee_terminations")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
       if (error) throw error;
+      // Re-sincroniza o lançamento financeiro (valor, data ou status podem ter mudado).
+      if (data) await syncTerminationCashflow(data, user!.id, currentOrg!.id);
+      return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["terminations"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["terminations"] });
+      qc.invalidateQueries({ queryKey: ["cashflow_entries"] });
+    },
   });
 
   return { create, update };
+}
+
+/**
+ * Materializa (ou atualiza) a entrada de fluxo de caixa correspondente a uma rescisão.
+ * Usa upsert por dedup_hash para garantir idempotência: chamadas repetidas
+ * com a mesma rescisão resultam em UMA única linha em cashflow_entries.
+ *
+ * Lógica MECE: rescisão é fato firmado (não recorrente, não projetado virtualmente),
+ * portanto materializada direto — `pago` se status liquidado, senão `previsto`.
+ */
+async function syncTerminationCashflow(termination: any, userId: string, orgId: string) {
+  if (!termination?.id) return;
+  const total = Number(termination.total_rescisao ?? 0);
+  if (total <= 0) return;
+
+  const sourceRef = projectionKey.termination(termination.id);
+  const isPaid = termination.status === "pago" || termination.status === "concluido";
+
+  const payload: any = {
+    user_id: userId,
+    organization_id: orgId,
+    tipo: "saida",
+    categoria: "Pessoal",
+    descricao: `Rescisão — colaborador (${termination.type ?? "rescisao"})`,
+    valor_previsto: total,
+    valor_realizado: isPaid ? total : null,
+    data_prevista: termination.termination_date,
+    data_realizada: isPaid ? termination.termination_date : null,
+    status: isPaid ? "pago" : "previsto",
+    source: "dp",
+    source_ref: sourceRef,
+    notes: `Rescisão #${termination.id} | tipo: ${termination.type ?? "—"} | regime: ${termination.contract_type ?? "—"}`,
+  };
+
+  const { error } = await supabase
+    .from("cashflow_entries" as any)
+    .upsert(payload, { onConflict: "dedup_hash" } as any);
+
+  // Falha silenciosa: não bloqueia o registro da rescisão se a materialização
+  // falhar (ex: índice ausente). Logamos no console em DEV.
+  if (error && import.meta.env.DEV) {
+    console.error("[syncTerminationCashflow] failed:", error);
+  }
 }
 
 // ========== DP CONFIG ==========
