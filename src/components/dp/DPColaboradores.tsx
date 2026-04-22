@@ -348,6 +348,12 @@ export default function DPColaboradores() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TerminationSimulatorDialog
+        open={!!terminateEmpId}
+        onOpenChange={(o) => { if (!o) setTerminateEmpId(null); }}
+        initialEmployeeId={terminateEmpId || undefined}
+      />
     </div>
   );
 }
