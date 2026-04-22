@@ -199,15 +199,23 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
   // Scope filter
   const { filterByScope } = useUserDataScope();
 
-  // Merge materialized + projected + payroll
+  // Merge materialized + projected + payroll, applying registry-based dedup.
   const allEntries = useMemo(() => {
     const materialized = entriesQuery.data ?? [];
-    const merged = [...materialized, ...projectedEntries as any[], ...payrollProjections, ...crmProjections];
+    const materializedRefs = buildMaterializedRefs(materialized);
+
+    // Dedup payroll projections against materialized DP entries by source_ref.
+    const payrollDeduped = (payrollProjections as any[]).filter((p) => {
+      const ref = p.source_ref;
+      return !ref || !materializedRefs.has(ref);
+    });
+
+    const merged = [...materialized, ...projectedEntries as any[], ...payrollDeduped, ...crmProjections];
     merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
     return filterByScope(merged as CashFlowEntry[]);
   }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections, filterByScope]);
 
-  // KPIs
+  // KPIs (consolidated across realized + projected, no double counting).
   const totals = useMemo(() => {
     let entradas = 0, saidas = 0;
     for (const e of allEntries) {
