@@ -9,6 +9,7 @@ import { AgingListTab } from "@/components/financeiro/AgingListTab";
 import { ImportacoesTab } from "@/components/financeiro/ImportacoesTab";
 import { FluxoCaixaTab } from "@/components/financeiro/FluxoCaixaTab";
 import { ConciliacaoTab } from "@/components/financeiro/ConciliacaoTab";
+import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
 
 const ALL_TABS = [
   { key: "pagar", label: "Contas a Pagar" },
