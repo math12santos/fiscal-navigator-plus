@@ -161,12 +161,26 @@ export default function RelatorioKpi() {
     return g === "trimestral" ? "trimestral" : "mensal";
   }, [searchParams]);
 
+  /**
+   * Granularidade "diferida" para reagregação não bloqueante. O valor da URL
+   * (`granularity`) muda imediatamente — usado para refletir o toggle visual e
+   * o link compartilhável. O cálculo pesado (`aggregatedRows`) escuta o valor
+   * deferido, permitindo que o card de Total e a Reconciliação permaneçam
+   * estáveis enquanto a tabela recompõe em background.
+   */
+  const deferredGranularity = useDeferredValue(granularity);
+  const [isGranularityPending, startGranularityTransition] = useTransition();
+
   const applyGranularity = useCallback(
     (g: "mensal" | "trimestral") => {
+      // URL é síncrona — mantém link compartilhável e reflete o toggle no ato.
       const next = new URLSearchParams(searchParams);
       if (g === "mensal") next.delete("gran");
       else next.set("gran", g);
-      setSearchParams(next, { replace: true });
+      // O trabalho pesado de reagregação fica em transição (não bloqueia UI).
+      startGranularityTransition(() => {
+        setSearchParams(next, { replace: true });
+      });
     },
     [searchParams, setSearchParams],
   );
