@@ -15,6 +15,7 @@ import {
   EMPTY_PLANNING_FILTERS,
   entryMatchesFilters,
   contractMatchesFilters,
+  getHorizonMonths,
 } from "@/lib/planningFilters";
 
 export type AlertCategory =
@@ -123,17 +124,22 @@ export function useFinancialSummary(
   const now = useMemo(() => new Date(), []);
   const curMonthKey = useMemo(() => format(now, "yyyy-MM"), [now]);
 
+  // Burn mensal médio: divide por TODOS os meses do horizonte (não só os
+  // meses com saída). Mesma fonte de verdade usada por Cockpit e PDF, garante
+  // que `runway = saldo / monthlyBurn` mostre o mesmo número em qualquer tela.
+  const horizonMonthsCount = useMemo(
+    () => Math.max(1, getHorizonMonths(rangeFrom, rangeTo).length),
+    [rangeFrom, rangeTo],
+  );
+
   const monthlyBurn = useMemo(() => {
-    // Average monthly outflow from cashflow entries
-    const monthTotals: Record<string, number> = {};
+    let totalSaidas = 0;
     for (const e of entries) {
       if (e.tipo !== "saida") continue;
-      const key = e.data_prevista.slice(0, 7);
-      monthTotals[key] = (monthTotals[key] ?? 0) + Number(e.valor_realizado ?? e.valor_previsto);
+      totalSaidas += Number(e.valor_realizado ?? e.valor_previsto);
     }
-    const vals = Object.values(monthTotals);
-    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-  }, [entries]);
+    return totalSaidas / horizonMonthsCount;
+  }, [entries, horizonMonthsCount]);
 
   const runway = monthlyBurn > 0 ? Math.floor(totals.saldo / monthlyBurn) : Infinity;
 

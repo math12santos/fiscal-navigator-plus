@@ -23,6 +23,7 @@ import {
   entryMatchesFilters,
   contractMatchesFilters,
   hasAnyFilter,
+  getHorizonMonths,
 } from "@/lib/planningFilters";
 
 /** Custom event fired by alert action buttons to switch the active planning tab. */
@@ -46,9 +47,15 @@ export default function PlanningCockpit({ startDate, endDate, filters = EMPTY_PL
   const { config } = usePlanningConfig();
   const { avgMonthlyPayroll: rawAvgPayroll, payrollProjections } = usePayrollProjections(startDate, endDate);
   // useFinancialSummary now consumes the same filters and returns filtered
-  // CRM weighted value, liability totals and alerts — keeping every Cockpit
-  // block aligned to the user's selected scope.
-  const { crmWeightedValue, alerts, liabTotals } = useFinancialSummary(startDate, endDate, filters);
+  // CRM weighted value, liability totals, alerts, monthly burn and runway —
+  // keeping every Cockpit block aligned to the user's selected scope.
+  const {
+    crmWeightedValue,
+    alerts,
+    liabTotals,
+    monthlyBurn,
+    runway,
+  } = useFinancialSummary(startDate, endDate, filters);
   const filtered = hasAnyFilter(filters);
 
   // Apply operational filters consistently across every aggregation below.
@@ -73,15 +80,22 @@ export default function PlanningCockpit({ startDate, endDate, filters = EMPTY_PL
     return { entradas, saidas, saldo: entradas - saidas };
   }, [entries, rawEntries, rawTotals]);
 
-  // Custo Folha: when a cost center is selected, restrict payroll average to it.
+  // Single source of truth for monthly divisor.
+  const horizonMonths = useMemo(
+    () => getHorizonMonths(startDate, endDate),
+    [startDate, endDate],
+  );
+  const monthsCount = Math.max(1, horizonMonths.length);
+
+  // Custo Folha: when a cost center is selected, restrict payroll average to it
+  // using the SAME divisor as everywhere else (horizonMonths.length).
   const avgMonthlyPayroll = useMemo(() => {
     if (!filters.costCenterId) return rawAvgPayroll;
-    const monthsCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)));
     const total = payrollProjections
       .filter((p) => (p as any).cost_center_id === filters.costCenterId)
       .reduce((s, p) => s + Number(p.valor_previsto), 0);
     return total / monthsCount;
-  }, [rawAvgPayroll, filters.costCenterId, payrollProjections, startDate, endDate]);
+  }, [rawAvgPayroll, filters.costCenterId, payrollProjections, monthsCount]);
 
 
   // Monthly aggregation
@@ -116,14 +130,9 @@ export default function PlanningCockpit({ startDate, endDate, filters = EMPTY_PL
     });
   }, [entries, startDate, endDate]);
 
-  // Burn / Runway
-  const avgMonthlySaida = useMemo(() => {
-    const total = monthlyData.reduce((s, m) => s + m.saidas, 0);
-    return monthlyData.length > 0 ? total / monthlyData.length : 0;
-  }, [monthlyData]);
-
+  // Burn / Runway — derivados do mesmo summary que o alerta de runway,
+  // garantindo que o KPI exibido = divisor usado pelo alerta.
   const saldoAtual = totals.saldo;
-  const runway = avgMonthlySaida > 0 ? Math.floor(saldoAtual / avgMonthlySaida) : Infinity;
   const saldoMinimo = config?.saldo_minimo ?? 0;
   const alertaRunway = config?.runway_alerta_meses ?? 3;
 
@@ -159,7 +168,7 @@ export default function PlanningCockpit({ startDate, endDate, filters = EMPTY_PL
         </div>
         <KPICard
           title="Burn Mensal Médio"
-          value={fmt(avgMonthlySaida)}
+          value={fmt(monthlyBurn)}
           icon={<TrendingDown size={20} />}
         />
         <KPICard
