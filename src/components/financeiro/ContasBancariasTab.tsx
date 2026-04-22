@@ -276,10 +276,21 @@ export function ContasBancariasTab() {
               )}
               {allBankAccounts.map((acc) => {
                 const limTotal = acc.limite_credito || 0;
-                const limUsado = acc.limite_utilizado || 0;
-                const limDisp = Math.max(0, limTotal - limUsado);
-                const disponivel = (acc.saldo_atual || 0) + limDisp;
+                const tipoLim = (acc.limite_tipo || "cheque_especial") as any;
+                const av = calculateAvailability({
+                  saldoAtual: acc.saldo_atual || 0,
+                  limiteTotal: limTotal,
+                  limiteUtilizado: acc.limite_utilizado || 0,
+                  limiteTipo: tipoLim,
+                });
+                const limUsado = av.usoLimiteAtual;
+                const limDisp = av.limiteDisponivel;
+                const disponivel = av.capitalGiroDisponivel;
                 const usoPct = limTotal > 0 ? (limUsado / limTotal) * 100 : 0;
+                const isOverdraft = tipoLim === "cheque_especial";
+                const jurosMes = isOverdraft && limUsado > 0
+                  ? estimateMonthlyClosingCharge(limUsado, acc.limite_taxa_juros_mensal || 0, 30)
+                  : 0;
 
                 return (
                   <TableRow key={acc.id}>
