@@ -2,10 +2,16 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEmployees, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { DPExportButton } from "./DPExportButton";
+import { generateDPExcelReport, generateDPPdfReport } from "@/lib/dpExports";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function DPEncargos() {
   const { data: employees = [] } = useEmployees();
   const { data: dpConfig } = useDPConfig();
+  const { currentOrg } = useOrganization();
 
   const activeEmps = employees.filter((e: any) => e.status === "ativo");
 
@@ -30,8 +36,50 @@ export default function DPEncargos() {
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  const period = format(new Date(), "MMMM/yyyy", { locale: ptBR });
+
+  const exportPdf = () => {
+    generateDPPdfReport({
+      title: "Encargos Sociais Patronais",
+      orgName: currentOrg?.name || "—",
+      period,
+      summary: [
+        { label: "INSS Patronal", value: fmt(totals.inssPatronal) },
+        { label: "RAT", value: fmt(totals.rat) },
+        { label: "FGTS", value: fmt(totals.fgts) },
+        { label: "Terceiros", value: fmt(totals.terceiros) },
+        { label: "Total", value: fmt(totals.total) },
+      ],
+      columns: ["Colaborador", "Salário", "INSS Patr.", "RAT", "FGTS", "Terceiros", "Total"],
+      rows: encargosData.map((e) => [e.name, fmt(e.salario), fmt(e.inssPatronal), fmt(e.rat), fmt(e.fgts), fmt(e.terceiros), fmt(e.total)]),
+    });
+  };
+
+  const exportExcel = () => {
+    generateDPExcelReport({
+      title: "Encargos Sociais",
+      sheets: [
+        {
+          name: "Encargos por Colaborador",
+          rows: [
+            ["Colaborador", "Tipo Contrato", "Salário", "INSS Patronal", "RAT", "FGTS", "Terceiros", "Total Encargos", "% sobre Salário"],
+            ...encargosData.map((e: any) => [
+              e.name, e.contract_type, e.salario, e.inssPatronal, e.rat, e.fgts, e.terceiros, e.total,
+              e.salario > 0 ? Number(((e.total / e.salario) * 100).toFixed(2)) : 0,
+            ]),
+            ["TOTAL", "", totals.salario, totals.inssPatronal, totals.rat, totals.fgts, totals.terceiros, totals.total, ""],
+          ],
+        },
+      ],
+    });
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-end">
+        <DPExportButton onPdf={exportPdf} onExcel={exportExcel} disabled={encargosData.length === 0} />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-4">
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">INSS Patronal</p><p className="font-bold text-foreground">{fmt(totals.inssPatronal)}</p><p className="text-[10px] text-muted-foreground">{dpConfig?.inss_patronal_pct ?? 20}%</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">RAT</p><p className="font-bold text-foreground">{fmt(totals.rat)}</p><p className="text-[10px] text-muted-foreground">{dpConfig?.rat_pct ?? 2}%</p></CardContent></Card>

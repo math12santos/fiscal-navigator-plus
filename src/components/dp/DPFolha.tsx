@@ -4,12 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calculator, Lock } from "lucide-react";
-import { useEmployees, usePayrollRuns, usePayrollItems, useMutatePayroll, useDPConfig, calcINSSEmpregado, calcIRRF, calcEncargosPatronais } from "@/hooks/useDP";
+import { Plus, Calculator, Lock, FileText } from "lucide-react";
+import { useEmployees, usePayrollRuns, usePayrollItems, useMutatePayroll, useDPConfig, calcINSSEmpregado, calcIRRF, calcEncargosPatronais, usePositions } from "@/hooks/useDP";
+import { useCostCenters } from "@/hooks/useCostCenters";
 import { getBusinessDays } from "@/hooks/usePayrollProjections";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { DPExportButton } from "./DPExportButton";
+import { generateDPExcelReport, generateDPPdfReport, generatePaystubPdf } from "@/lib/dpExports";
 
 export default function DPFolha() {
   const { data: employees = [] } = useEmployees();
@@ -17,6 +21,9 @@ export default function DPFolha() {
   const { data: dpConfig } = useDPConfig();
   const { createRun, updateRun } = useMutatePayroll();
   const { toast } = useToast();
+  const { currentOrg } = useOrganization();
+  const { data: positions = [] } = usePositions();
+  const { costCenters = [] } = useCostCenters();
   const [selectedRunId, setSelectedRunId] = useState<string>("");
 
   const activeEmployees = employees.filter((e: any) => e.status === "ativo");
