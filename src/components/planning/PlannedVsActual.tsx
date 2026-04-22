@@ -29,7 +29,10 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
   const { entries } = useCashFlow(startDate, endDate);
   const budgetLinesQuery = useBudgetLines(budgetVersionId);
   const { accounts } = useChartOfAccounts();
-  const { payrollProjections } = usePayrollProjections(startDate, endDate);
+  const { avgMonthlyPayroll, payrollProjections } = usePayrollProjections(startDate, endDate);
+  const { contracts } = useContracts();
+  const { opportunities } = useCRMOpportunities();
+  const { stages } = usePipelineStages();
 
   const budgetLines = (budgetLinesQuery.data ?? []) as BudgetLine[];
 
