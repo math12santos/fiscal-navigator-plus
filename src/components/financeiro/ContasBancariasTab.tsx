@@ -427,6 +427,19 @@ export function ContasBancariasTab() {
             <p className="text-xs text-muted-foreground">
               Este saldo será a verdade absoluta para disponibilidade de caixa no Aging List e referência para conciliações futuras.
             </p>
+            {balanceAccount &&
+              (balanceAccount.limite_tipo || "cheque_especial") === "cheque_especial" &&
+              (balanceAccount.limite_credito || 0) > 0 &&
+              parseFloat(balanceValue.replace(",", ".") || "0") < 0 && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Saldo negativo + cheque especial: ao salvar, você poderá separar
+                    o valor entre <strong>uso de limite</strong> (gera juros) e
+                    <strong> provisão de pagamentos</strong> (não gera juros).
+                  </AlertDescription>
+                </Alert>
+              )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBalanceAccount(null)}>Cancelar</Button>
