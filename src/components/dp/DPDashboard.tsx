@@ -92,8 +92,78 @@ export default function DPDashboard() {
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  // ---------- Exports ----------
+  const exportPdf = () => {
+    const period = format(new Date(), "MMMM/yyyy", { locale: ptBR });
+    generateDPPdfReport({
+      title: "Headcount e Custos por Centro de Custo",
+      orgName: currentOrg?.name || "—",
+      period,
+      summary: [
+        { label: "Headcount Ativo", value: String(activeEmployees.length) },
+        { label: "Folha Bruta", value: fmt(totalFolhaBruta) },
+        { label: "Encargos", value: fmt(encargosTotal) },
+        { label: "Custo Médio", value: fmt(custoMedioPorColab) },
+      ],
+      columns: ["Centro de Custo", "Custo Mensal (R$)", "% do Total"],
+      rows: custoPorCC.map((cc) => [
+        cc.name,
+        fmt(cc.value),
+        totalFolhaBruta > 0 ? `${((cc.value / totalFolhaBruta) * 100).toFixed(1)}%` : "0%",
+      ]),
+    });
+  };
+
+  const exportExcel = () => {
+    generateDPExcelReport({
+      title: "Headcount e Custos DP",
+      sheets: [
+        {
+          name: "Resumo",
+          rows: [
+            ["Indicador", "Valor"],
+            ["Headcount Ativo", activeEmployees.length],
+            ["Folha Bruta Total", totalFolhaBruta],
+            ["Encargos Totais", encargosTotal],
+            ["Custo Médio por Colaborador", custoMedioPorColab],
+            ["Custo Total Estimado", totalFolhaBruta + encargosTotal],
+          ],
+        },
+        {
+          name: "Por Centro de Custo",
+          rows: [
+            ["Centro de Custo", "Custo Mensal", "% do Total"],
+            ...custoPorCC.map((cc) => [
+              cc.name,
+              cc.value,
+              totalFolhaBruta > 0 ? Number(((cc.value / totalFolhaBruta) * 100).toFixed(2)) : 0,
+            ]),
+          ],
+        },
+        {
+          name: "Por Colaborador",
+          rows: [
+            ["Colaborador", "Salário Base", "Encargos", "Custo Total"],
+            ...activeEmployees.map((e: any) => {
+              const sal = Number(e.salary_base || 0);
+              const enc = calcEncargosPatronais(sal, dpConfig, e.contract_type);
+              return [e.name, sal, enc.total, sal + enc.total];
+            }),
+          ],
+        },
+      ],
+    });
+  };
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-muted-foreground">
+          Visão consolidada de pessoal — {format(new Date(), "MMMM/yyyy", { locale: ptBR })}
+        </div>
+        <DPExportButton onPdf={exportPdf} onExcel={exportExcel} disabled={activeEmployees.length === 0} />
+      </div>
+
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard icon={Users} label="Headcount Ativo" value={String(activeEmployees.length)} />
