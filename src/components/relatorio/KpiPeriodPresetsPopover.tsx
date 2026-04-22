@@ -219,6 +219,15 @@ export function KpiPeriodPresetsPopover({ currentFrom, currentTo, onApply, disab
                   {fmtRange(currentFrom, currentTo)}
                 </span>
               </p>
+              {!rangeValidation.ok && (
+                <p
+                  className="text-xs text-destructive"
+                  role="alert"
+                  aria-live="polite"
+                >
+                  {rangeValidation.message}
+                </p>
+              )}
               <Input
                 ref={nameInputRef}
                 value={name}
@@ -226,8 +235,9 @@ export function KpiPeriodPresetsPopover({ currentFrom, currentTo, onApply, disab
                 placeholder="Ex.: Operações do 1º semestre"
                 className="h-9"
                 maxLength={60}
+                disabled={!rangeValidation.ok}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && name.trim()) handleSave();
+                  if (e.key === "Enter" && name.trim() && rangeValidation.ok) handleSave();
                   if (e.key === "Escape") {
                     setShowForm(false);
                     setName("");
@@ -252,7 +262,7 @@ export function KpiPeriodPresetsPopover({ currentFrom, currentTo, onApply, disab
                     size="sm"
                     className="h-8"
                     onClick={handleSave}
-                    disabled={!name.trim() || isSaving}
+                    disabled={!name.trim() || isSaving || !rangeValidation.ok}
                   >
                     Salvar
                   </Button>
