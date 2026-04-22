@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { CalendarIcon, Settings, Sparkles } from "lucide-react";
+import { CalendarIcon, Settings, Sparkles, FileDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import PlanningCockpit, { PLANNING_NAV_EVENT } from "@/components/planning/PlanningCockpit";
@@ -18,6 +18,8 @@ import PlanningScenariosRisk from "@/components/planning/PlanningScenariosRisk";
 import PlanningOperational from "@/components/planning/PlanningOperational";
 import PlanningSettingsDialog from "@/components/planning/PlanningSettingsDialog";
 import { PlanningScenarioProvider, usePlanningScenarioContext } from "@/contexts/PlanningScenarioContext";
+import { usePlanningPdfReport } from "@/hooks/usePlanningPdfReport";
+import { toast } from "sonner";
 
 function ScenarioPicker() {
   const { scenarios, activeScenarioId, setActiveScenarioId, activeScenario } = usePlanningScenarioContext();
@@ -46,6 +48,46 @@ function ScenarioPicker() {
         </SelectContent>
       </Select>
     </div>
+  );
+}
+
+interface ExportPdfButtonProps {
+  startDate: Date;
+  endDate: Date;
+  budgetVersionId: string | null;
+}
+
+function ExportPdfButton({ startDate, endDate, budgetVersionId }: ExportPdfButtonProps) {
+  const { generatePdf, isReady } = usePlanningPdfReport({ startDate, endDate, budgetVersionId });
+  const [busy, setBusy] = useState(false);
+
+  const handleClick = async () => {
+    if (!isReady || busy) return;
+    try {
+      setBusy(true);
+      // Defer to next tick so the button can show its loading state
+      await new Promise((r) => setTimeout(r, 0));
+      generatePdf();
+      toast.success("PDF gerado com sucesso");
+    } catch (e: any) {
+      toast.error("Falha ao gerar PDF", { description: e?.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleClick}
+      disabled={!isReady || busy}
+      className="gap-1.5"
+      title="Exportar Cockpit + Plan×Real×Projetado para PDF"
+    >
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+      <span className="hidden sm:inline">Exportar PDF</span>
+    </Button>
   );
 }
 
@@ -169,6 +211,12 @@ export default function Planejamento() {
         </span>
 
         <ScenarioPicker />
+
+        <ExportPdfButton
+          startDate={startDate}
+          endDate={endDate}
+          budgetVersionId={budgetVersionId}
+        />
 
         <Button
           variant="outline"
