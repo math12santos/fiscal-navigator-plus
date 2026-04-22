@@ -409,8 +409,9 @@ export default function RelatorioKpi() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
           <ArrowLeft size={14} className="mr-2" /> Voltar ao Dashboard
         </Button>
-        <Button variant="outline" size="sm" onClick={exportCsv} disabled={rows.items.length === 0}>
-          <Download size={14} className="mr-2" /> Exportar CSV
+        <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredItems.length === 0}>
+          <Download size={14} className="mr-2" />
+          {isFiltering ? "Exportar CSV (filtrado)" : "Exportar CSV"}
         </Button>
       </div>
 
@@ -429,33 +430,156 @@ export default function RelatorioKpi() {
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold text-foreground">
-              {rows.kind === "crm" || rows.kind === "contracts" || rows.kind === "payroll" || rows.kind === "liabilities"
-                ? fmt(rows.total)
-                : fmt(rows.total)}
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              {isFiltering ? "Total filtrado" : "Total"}
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">{rows.items.length} item(ns)</p>
+            <p className="text-2xl font-bold text-foreground">
+              {fmt(isFiltering ? filteredTotal : rows.total)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isFiltering
+                ? `${filteredItems.length} de ${rows.items.length} item(ns)`
+                : `${rows.items.length} item(ns)`}
+            </p>
           </div>
         </div>
       </section>
 
       <section className="glass-card p-0 overflow-hidden">
+        {/* Toolbar: busca + page size — sempre visível quando há dados na composição */}
+        {rows.items.length > 0 && (
+          <div className="flex items-center justify-between gap-3 flex-wrap p-4 border-b border-border/60">
+            <div className="relative flex-1 min-w-[220px] max-w-md">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por descrição, categoria, origem…"
+                className="pl-9 pr-9 h-9"
+                aria-label="Buscar nos itens da composição"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted text-muted-foreground"
+                  aria-label="Limpar busca"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Itens por página</span>
+              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                <SelectTrigger className="h-9 w-[80px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
         {rows.items.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
             Nenhum item compõe esse KPI no período selecionado.
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>{renderHeader(rows.kind)}</TableHeader>
-              <TableBody>{rows.items.map((r, i) => renderRow(rows.kind, r, i))}</TableBody>
-            </Table>
+        ) : filteredItems.length === 0 ? (
+          <div className="p-10 text-center text-sm text-muted-foreground space-y-3">
+            <p>
+              Nenhum item corresponde à busca{" "}
+              <span className="font-medium text-foreground">"{search}"</span>.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => setSearch("")}>
+              Limpar busca
+            </Button>
           </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>{renderHeader(rows.kind)}</TableHeader>
+                <TableBody>
+                  {pagedItems.map((r, i) => renderRow(rows.kind, r, (page - 1) * pageSize + i))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 flex-wrap p-4 border-t border-border/60">
+              <p className="text-xs text-muted-foreground">
+                Mostrando <span className="font-medium text-foreground">{showingFrom}</span>–
+                <span className="font-medium text-foreground">{showingTo}</span> de{" "}
+                <span className="font-medium text-foreground">{filteredItems.length}</span>
+              </p>
+              {totalPages > 1 && (
+                <Pagination className="mx-0 w-auto justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (page > 1) setPage(page - 1);
+                        }}
+                        className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                    {buildPageList(page, totalPages).map((p, idx) =>
+                      p === "…" ? (
+                        <PaginationItem key={`e-${idx}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      ) : (
+                        <PaginationItem key={p}>
+                          <PaginationLink
+                            isActive={p === page}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setPage(p as number);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            {p}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ),
+                    )}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (page < totalPages) setPage(page + 1);
+                        }}
+                        className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+            </div>
+          </>
         )}
       </section>
     </div>
   );
+}
+
+/** Compacta a lista de páginas: 1 … (p-1) p (p+1) … N */
+function buildPageList(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "…")[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) pages.push("…");
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total - 1) pages.push("…");
+  pages.push(total);
+  return pages;
 }
 
 // ===== Helpers de renderização por tipo de relatório =====
