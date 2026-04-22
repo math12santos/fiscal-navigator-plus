@@ -196,8 +196,11 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
     <div className="space-y-6">
       {/* Chart */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Orçado × Realizado</h3>
-        <ResponsiveContainer width="100%" height={320}>
+        <h3 className="text-sm font-semibold text-foreground mb-4">Orçado × Realizado × Projetado</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Projetado combina contratos recorrentes ativos, projeções de folha (DP) e pipeline ponderado do CRM.
+        </p>
+        <ResponsiveContainer width="100%" height={340}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="mes" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
@@ -214,8 +217,10 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
             <Bar dataKey="Orçado (Receita)" fill="hsl(var(--primary) / 0.4)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Projetado (Receita)" fill="hsl(var(--primary) / 0.7)" radius={[4, 4, 0, 0]} />
             <Bar dataKey="Realizado (Entrada)" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
             <Bar dataKey="Orçado (Gasto)" fill="hsl(var(--warning) / 0.4)" radius={[0, 0, 4, 4]} />
+            <Bar dataKey="Projetado (Gasto)" fill="hsl(var(--warning) / 0.7)" radius={[0, 0, 4, 4]} />
             <Bar dataKey="Realizado (Saída)" fill="hsl(var(--destructive))" radius={[0, 0, 4, 4]} />
           </BarChart>
         </ResponsiveContainer>
