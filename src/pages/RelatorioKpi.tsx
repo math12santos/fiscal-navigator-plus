@@ -563,7 +563,10 @@ export default function RelatorioKpi() {
 
   /** Granularidade aplicável apenas a KPIs com dimensão temporal de fluxo. */
   const supportsQuarterly = rows.kind === "cashflow" || rows.kind === "result";
+  /** Granularidade visível imediatamente (URL/toggle) — usada apenas para CSS/labels. */
   const isQuarterly = supportsQuarterly && granularity === "trimestral";
+  /** Granularidade efetivamente aplicada à tabela (pode atrasar 1 frame durante transição). */
+  const isQuarterlyApplied = supportsQuarterly && deferredGranularity === "trimestral";
 
   /**
    * Quando trimestral está ativo e o KPI é de fluxo/resultado, agregamos
@@ -572,7 +575,7 @@ export default function RelatorioKpi() {
    * apresentação.
    */
   const aggregatedRows = useMemo(() => {
-    if (!isQuarterly) return filteredItems;
+    if (!isQuarterlyApplied) return filteredItems;
     const buckets = new Map<
       string,
       { period: string; label: string; count: number; entradas: number; saidas: number; valor: number }
@@ -610,9 +613,9 @@ export default function RelatorioKpi() {
       buckets.set(key, bucket);
     }
     return Array.from(buckets.values()).sort((a, b) => a.period.localeCompare(b.period));
-  }, [filteredItems, isQuarterly, rows.kind]);
+  }, [filteredItems, isQuarterlyApplied, rows.kind]);
 
-  const displayKind = isQuarterly
+  const displayKind = isQuarterlyApplied
     ? rows.kind === "result"
       ? "result-quarter"
       : "cashflow-quarter"
@@ -628,7 +631,7 @@ export default function RelatorioKpi() {
   // Reseta página ao mudar busca, métrica, tamanho de página ou granularidade
   useEffect(() => {
     setPage(1);
-  }, [search, metric, pageSize, isQuarterly]);
+  }, [search, metric, pageSize, isQuarterlyApplied]);
 
   // Garante que a página atual existe após mudanças no dataset
   useEffect(() => {
