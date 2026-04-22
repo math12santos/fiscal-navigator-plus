@@ -1,60 +1,70 @@
 
 
-# Plano: Eliminar divergências de totais entre Cockpit, Plan×Real×Projetado e PDF
+# Plano: Seleção múltipla para Conta Bancária e Centro de Custo nos filtros
 
-## Diagnóstico — divergências reais hoje
+## Objetivo
 
-Após revisar os três pontos de cálculo (`PlanningCockpit.tsx`, `useFinancialSummary.ts`, `usePlanningPdfReport.ts`) e o componente `PlannedVsActual.tsx`, encontrei **4 inconsistências numéricas** que aparecem ao trocar filtros:
+Permitir comparar rapidamente recortes compostos (ex.: duas filiais + três centros de custo) sem precisar exportar várias vezes. Hoje cada dimensão aceita apenas um valor; vamos transformar **Conta Bancária** e **Centro de Custo** em multi-seleção, mantendo **Unidade (subsidiária)** como single-select (faz parte do contexto de holding e não admite mistura).
 
-| # | Sintoma | Causa |
-|---|---------|-------|
-| 1 | "Burn Mensal Médio" (KPI) ≠ burn citado no alerta de Runway | Cockpit divide por **todos os meses do horizonte**; `useFinancialSummary` divide só por **meses com saída** |
-| 2 | PDF mostra "Passivos (total)" global mesmo com filtro ativo | PDF lê `useLiabilities().totals` em vez do `liabTotals` já filtrado de `useFinancialSummary` |
-| 3 | "Projetado" no PDF e em Plan×Real pode somar folha já paga (materializada) | `payrollProjections` é usado bruto, sem subtrair DP entries já materializadas — `useCashFlow` faz esse dedup, mas só para o stream consolidado |
-| 4 | "Custo Folha/mês" filtrado por CC drifta | Cockpit usa divisor aproximado `(endDate - startDate) / 30` em vez de `horizonMonths.length` |
+## Comportamento esperado
 
-Itens 1, 2 e 4 são **bugs de cálculo**. Item 3 é **risco de dupla contagem** entre Realizado e Projetado quando o usuário materializa folha do mês corrente.
-
-## Comportamento esperado após correção
-
-- O número exibido em **Burn Mensal Médio** é exatamente o mesmo divisor usado para calcular **Runway** e a descrição do alerta de runway.
-- KPIs do PDF refletem os mesmos filtros aplicados na tela — incluindo Passivos.
-- Projetado nunca soma mais folha do que efetivamente projetada para o mês: se já foi materializada (paga), entra em Realizado e sai do Projetado.
-- Divisores mensais (folha, burn, stress) usam **a mesma contagem `horizonMonths.length`** em todo lugar.
+- **Filtro de Conta Bancária**: lista de checkboxes com busca; usuário marca quantas contas quiser. Sem nada marcado = "Todas".
+- **Filtro de Centro de Custo**: idem, com busca por código/nome.
+- **Badge no botão "Filtros"** continua mostrando o total de dimensões com filtro ativo (não a soma de itens).
+- **Resumo no PDF e no histórico**: passa a listar os nomes selecionados separados por vírgula. Se houver mais de 3 itens em uma dimensão, exibe os 2 primeiros + "(+N)" para evitar estouro de linha.
+- **URL compartilhável**: `?conta=<uuid1>,<uuid2>&cc=<uuid3>,<uuid4>` — ainda permite recarregar e compartilhar a mesma visão.
+- **Sem regressão**: filtros existentes salvos como string única no histórico continuam sendo lidos corretamente (compatibilidade ascendente).
 
 ## Mudanças técnicas
 
-### 1. `src/hooks/useFinancialSummary.ts`
-- `monthlyBurn`: dividir por **número de meses do horizonte** (não por meses com saída). Calcular `horizonMonths` a partir de `rangeFrom`/`rangeTo` e usar como divisor — mesmo padrão do Cockpit.
-- Garante que `runway = saldo / monthlyBurn` use o mesmo burn que o Cockpit exibe.
+### 1. `src/lib/planningFilters.ts` — modelo
+```ts
+export interface PlanningFilters {
+  subsidiaryOrgId: string | null;        // segue single
+  bankAccountIds: string[];              // [] = todas
+  costCenterIds: string[];               // [] = todos
+}
+```
+- `EMPTY_PLANNING_FILTERS` usa arrays vazios.
+- `hasAnyFilter`: true se qualquer dimensão tem valor.
+- `entryMatchesFilters` / `contractMatchesFilters`: trocam `===` por `array.includes()` (com early-return se array vazio = "sem filtro").
 
-### 2. `src/components/planning/PlanningCockpit.tsx`
-- Remover o cálculo local `avgMonthlySaida` e passar a consumir `monthlyBurn` retornado por `useFinancialSummary`. KPI "Burn Mensal Médio" passa a usar `monthlyBurn` (já alinhado ao runway).
-- Substituir o divisor `(endDate - startDate) / (1000*60*60*24*30)` por `horizonMonths.length` no cálculo de `avgMonthlyPayroll` filtrado.
+### 2. `src/pages/Planejamento.tsx` — URL + UI
+- **Serialização URL**: `params.set("conta", ids.join(","))` quando `ids.length > 0`; `params.delete("conta")` quando vazio. Idem para `cc`. Leitura: `searchParams.get("conta")?.split(",").filter(Boolean) ?? []`.
+- **`FilterPopover`**: substituir os dois `Select` por um componente simples de **multi-select com checkbox + busca** inline (sem nova dependência — usar `Popover` interno ou lista com `Checkbox` já existentes em `@/components/ui/checkbox` + `Input` de busca). Cabeçalho de cada dimensão mostra "Todas" / "N selecionadas".
+- **Badge contador** continua somando dimensões ativas (não itens).
 
-### 3. `src/hooks/usePlanningPdfReport.ts`
-- **Passivos**: trocar `useLiabilities().totals` por `liabTotals` retornado por `useFinancialSummary(startDate, endDate, filters)` (que já está sendo chamado na linha 58).
-- **Burn / Runway**: consumir `monthlyBurn` e `runway` diretamente de `useFinancialSummary` (mesmos números do Cockpit).
-- **Folha no Projetado**: filtrar `payrollProjections` removendo aquelas cuja `source_ref` já apareça em `materializedEntries` — mesma lógica que `useCashFlow` aplica para o stream consolidado. Isso elimina dupla contagem entre Realizado e Projetado.
-- **Folha por CC**: usar `monthsCount` (= `Object.keys(monthly).length`) como divisor, não fórmula de 30 dias.
+### 3. `src/hooks/useFinancialSummary.ts` / `PlanningCockpit.tsx` / `PlannedVsActual.tsx`
+- Nenhuma mudança de lógica de cálculo — basta consumir os matchers atualizados (que agora aceitam arrays). Como já passam `filters` para `entryMatchesFilters`/`contractMatchesFilters`, a propagação é automática.
 
-### 4. `src/components/planning/PlannedVsActual.tsx`
-- Mesmo dedup de folha materializada que o PDF: filtrar `payrollProjections` por `source_ref` ausente em `materializedEntries` antes de somar em `projectedByMonth.gasto`. Caso contrário, ao confirmar um pagamento de folha, o gráfico passa a contar duas vezes.
+### 4. `src/hooks/usePlanningPdfReport.ts` — resumo
+- Trocar bloco de `filterParts` para mapear arrays:
+```ts
+const fmt = (ids, lookup, label) => {
+  if (ids.length === 0) return null;
+  const names = ids.map(id => lookup(id)).filter(Boolean);
+  const head = names.slice(0, 2).join(", ");
+  const tail = names.length > 2 ? ` (+${names.length - 2})` : "";
+  return `${label}: ${head}${tail}`;
+};
+```
+- Aplica para Conta e CC; Unidade segue single.
 
-### 5. Pequena helper compartilhada
-- Criar `getHorizonMonths(start, end): string[]` em `src/lib/planningFilters.ts` (ou novo `src/lib/planningHorizon.ts`) e reutilizar nas 4 superfícies acima — única fonte de verdade para o array de chaves `yyyy-MM` e contagem.
-
-## Garantias
-
-- **Consistência cruzada**: Cockpit, Plan×Real×Projetado e PDF passam a derivar Burn, Runway, Passivos, Folha e totais filtrados das **mesmas funções**, com os **mesmos divisores** e o **mesmo conjunto deduplicado** de projeções.
-- **Nenhuma regressão visual**: comportamento sem filtros permanece idêntico; mudanças afetam apenas o que já estava divergindo.
-- **Auditável**: o PDF salvo no histórico mostra os mesmos números que estavam na tela no momento da exportação — pré-requisito do princípio "o passado é imutável".
+### 5. `PlanningReportHistory.tsx` / `usePlanningReportExports.ts`
+- Sem mudança de schema (`filters` é `Json`, suporta arrays). O campo `filters_summary` já é texto livre — herda o novo formato automaticamente.
+- **Compatibilidade com histórico antigo**: ao reabrir um registro salvo no formato antigo (com `bankAccountId: "uuid"`), normalizamos no momento da leitura: se for string, vira `[string]`; se ausente/null, vira `[]`. Adicionamos um pequeno helper `normalizeFilters()` em `planningFilters.ts` e usamos em `RedownloadRow`.
 
 ## Arquivos afetados
 
-- **Editado:** `src/hooks/useFinancialSummary.ts`
-- **Editado:** `src/components/planning/PlanningCockpit.tsx`
-- **Editado:** `src/components/planning/PlannedVsActual.tsx`
-- **Editado:** `src/hooks/usePlanningPdfReport.ts`
-- **Editado (novo helper):** `src/lib/planningFilters.ts`
+- **Editado:** `src/lib/planningFilters.ts` (modelo, matchers, helper `normalizeFilters`)
+- **Editado:** `src/pages/Planejamento.tsx` (URL + nova UI multi-select no `FilterPopover`)
+- **Editado:** `src/hooks/usePlanningPdfReport.ts` (resumo de filtros)
+- **Editado:** `src/components/planning/PlanningReportHistory.tsx` (normaliza filtros antigos antes de regerar)
+- **Sem mudanças funcionais (apenas tipo):** `useFinancialSummary.ts`, `PlanningCockpit.tsx`, `PlannedVsActual.tsx` — já consomem os matchers via `filters`.
+
+## Garantias
+
+- **Comparação rápida**: usuário marca várias contas/CCs, vê tudo consolidado em uma só visão e exporta um único PDF representando a combinação.
+- **Coerência total**: como o filtro flui pelo mesmo `useFinancialSummary` que já alimenta Cockpit, Plan×Real×Projetado e PDF, todos os números continuam batendo (princípio reforçado nas iterações anteriores).
+- **Nenhuma quebra de histórico**: PDFs antigos continuam re-baixáveis graças ao `normalizeFilters`.
 
