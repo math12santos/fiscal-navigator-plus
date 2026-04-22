@@ -81,9 +81,18 @@ export function KPICard({ title, value, change, subtitle, icon, groupShare, onCl
             </div>
           )}
         </div>
-        {icon && (
-          <div className="rounded-lg bg-primary/10 p-2.5 text-primary">{icon}</div>
-        )}
+        <div className="flex items-start gap-1.5">
+          {icon && (
+            <div className="rounded-lg bg-primary/10 p-2.5 text-primary">{icon}</div>
+          )}
+          {clickable && (
+            <ChevronRight
+              size={14}
+              className="text-muted-foreground/60 mt-1 shrink-0"
+              aria-hidden
+            />
+          )}
+        </div>
       </div>
     </div>
   );
