@@ -5,6 +5,11 @@ import { useEmployeeBenefits, useDPBenefits } from "@/hooks/useDPBenefits";
 import { Users, DollarSign, TrendingUp, Percent, Bus, UtensilsCrossed, HeartPulse } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useCostCenters } from "@/hooks/useCostCenters";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { DPExportButton } from "./DPExportButton";
+import { dpFmt, generateDPExcelReport, generateDPPdfReport } from "@/lib/dpExports";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "hsl(var(--accent))", "#8884d8", "#82ca9d", "#ffc658"];
 const DIAS_UTEIS_MES = 22;
