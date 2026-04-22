@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useKpiPeriodPresets, type KpiPeriodPreset } from "@/hooks/useKpiPeriodPresets";
+import { validateRange } from "@/lib/kpiRangeValidation";
 import { cn } from "@/lib/utils";
 
 interface Props {
