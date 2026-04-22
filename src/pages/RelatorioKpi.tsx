@@ -1010,6 +1010,14 @@ function renderRow(kind: string, r: any, i: number) {
           <TableCell className="text-right font-mono">{fmt(r.valor)}</TableCell>
         </TableRow>
       );
+    case "cashflow-quarter":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium capitalize">{r.label}</TableCell>
+          <TableCell className="text-right text-muted-foreground">{r.count}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
     case "result":
       return (
         <TableRow key={i}>
@@ -1022,6 +1030,18 @@ function renderRow(kind: string, r: any, i: number) {
           </TableCell>
           <TableCell className="text-muted-foreground">{r.categoria}</TableCell>
           <TableCell className={`text-right font-mono ${r.valor < 0 ? "text-destructive" : "text-success"}`}>
+            {fmt(r.valor)}
+          </TableCell>
+        </TableRow>
+      );
+    case "result-quarter":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium capitalize">{r.label}</TableCell>
+          <TableCell className="text-right text-muted-foreground">{r.count}</TableCell>
+          <TableCell className="text-right font-mono text-success">{fmt(r.entradas)}</TableCell>
+          <TableCell className="text-right font-mono text-destructive">{fmt(r.saidas)}</TableCell>
+          <TableCell className={`text-right font-mono font-semibold ${r.valor < 0 ? "text-destructive" : "text-success"}`}>
             {fmt(r.valor)}
           </TableCell>
         </TableRow>
