@@ -3,103 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calculator, AlertTriangle } from "lucide-react";
-import { useEmployees, useTerminations, useMutateTermination, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
-import { useToast } from "@/hooks/use-toast";
-import { differenceInMonths, format } from "date-fns";
-
-const TERM_TYPES = [
-  { value: "sem_justa_causa", label: "Sem justa causa" },
-  { value: "com_justa_causa", label: "Com justa causa" },
-  { value: "pedido_demissao", label: "Pedido de demissão" },
-  { value: "acordo", label: "Acordo (reforma)" },
-];
+import { Calculator } from "lucide-react";
+import { useEmployees, useTerminations } from "@/hooks/useDP";
+import { format } from "date-fns";
+import TerminationSimulatorDialog, { TERM_TYPES } from "./TerminationSimulatorDialog";
 
 export default function DPRescisoes() {
   const { data: employees = [] } = useEmployees();
   const { data: terminations = [] } = useTerminations();
-  const { data: dpConfig } = useDPConfig();
-  const { create } = useMutateTermination();
-  const { toast } = useToast();
 
   const [simOpen, setSimOpen] = useState(false);
-  const [selectedEmpId, setSelectedEmpId] = useState("");
-  const [termType, setTermType] = useState("sem_justa_causa");
-  const [termDate, setTermDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [simResult, setSimResult] = useState<any>(null);
 
-  const activeEmps = employees.filter((e: any) => e.status === "ativo");
   const empMap = useMemo(() => {
     const m: Record<string, any> = {};
     employees.forEach((e: any) => { m[e.id] = e; });
     return m;
   }, [employees]);
-
-  const handleSimulate = () => {
-    const emp = empMap[selectedEmpId];
-    if (!emp) return;
-
-    const salario = Number(emp.salary_base || 0);
-    const admDate = new Date(emp.admission_date);
-    const tDate = new Date(termDate);
-    const monthsWorked = differenceInMonths(tDate, admDate);
-    const currentMonthDay = tDate.getDate();
-
-    // Saldo de salário (dias trabalhados no mês)
-    const saldoSalario = (salario / 30) * currentMonthDay;
-
-    // Aviso prévio (30 dias + 3 por ano trabalhado)
-    const anosCompletos = Math.floor(monthsWorked / 12);
-    const diasAviso = termType === "sem_justa_causa" ? 30 + (anosCompletos * 3) : 0;
-    const avisoPrevio = termType === "sem_justa_causa" ? (salario / 30) * diasAviso : 0;
-
-    // Férias proporcionais
-    const mesesDesdeUltimasFerrias = monthsWorked % 12;
-    const feriasProporcionais = termType !== "com_justa_causa" ? (salario / 12) * mesesDesdeUltimasFerrias : 0;
-    const tercoFerias = feriasProporcionais / 3;
-
-    // 13º proporcional
-    const meses13 = tDate.getMonth() + 1;
-    const decimoTerceiro = termType !== "com_justa_causa" ? (salario / 12) * meses13 : 0;
-
-    // Multa FGTS
-    const fgtsMensal = salario * ((dpConfig?.fgts_pct ?? 8) / 100);
-    const fgtsAcumulado = fgtsMensal * monthsWorked;
-    const multaFGTS = termType === "sem_justa_causa" ? fgtsAcumulado * 0.4
-      : termType === "acordo" ? fgtsAcumulado * 0.2 : 0;
-
-    const total = saldoSalario + avisoPrevio + feriasProporcionais + tercoFerias + decimoTerceiro + multaFGTS;
-
-    setSimResult({
-      saldo_salario: Math.round(saldoSalario * 100) / 100,
-      aviso_previo: Math.round(avisoPrevio * 100) / 100,
-      ferias_proporcionais: Math.round(feriasProporcionais * 100) / 100,
-      terco_ferias: Math.round(tercoFerias * 100) / 100,
-      decimo_terceiro_proporcional: Math.round(decimoTerceiro * 100) / 100,
-      multa_fgts: Math.round(multaFGTS * 100) / 100,
-      total_rescisao: Math.round(total * 100) / 100,
-    });
-  };
-
-  const handleSaveTermination = () => {
-    if (!simResult || !selectedEmpId) return;
-    create.mutate({
-      employee_id: selectedEmpId,
-      termination_date: termDate,
-      type: termType,
-      ...simResult,
-    }, {
-      onSuccess: () => {
-        toast({ title: "Rescisão registrada" });
-        setSimOpen(false);
-        setSimResult(null);
-      },
-    });
-  };
 
   const fmt = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
