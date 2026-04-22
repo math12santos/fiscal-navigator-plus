@@ -1,165 +1,163 @@
 
 
-# Varredura do Módulo Planejamento — Limpeza Visual e Mapa de Integrações
+# Plano: Engenharia anti-duplicidade e unificação de cálculos financeiros
 
-## Diagnóstico
+## 1. Diagnóstico — onde duplicidades e divergências nascem hoje
 
-O módulo Planejamento tem **8 abas paralelas** (Visão Geral, Orçamento, Cenários, Plan×Real, Liquidez, Passivos, RH, Comercial), causando sobrecarga cognitiva. O conteúdo é poderoso, mas a navegação é "horizontal demais", duplicações existem (KPI de runway aparece em 3 lugares com cálculos próprios), e várias integrações com outros módulos estão **subutilizadas ou implícitas**.
+O sistema mistura **lançamentos reais** (DB) com **projeções virtuais** (`id` prefixado `proj-`) em vários hooks. A integridade depende de chaves de deduplicação espalhadas por arquivos diferentes — e elas **não concordam entre si**.
 
-### Problemas identificados
+### 1.1 Duplicidade entre módulos (lançamentos)
 
-1. **Sobreposição de KPIs e conceitos** — Runway, Saldo Mínimo, Burn Mensal e Custo Folha aparecem em Visão Geral, Liquidez, Passivos e Dashboard com cálculos próprios em cada lugar (risco de divergência numérica entre telas).
-2. **Aba "Liquidez" é só configuração** — apenas três inputs (saldo mínimo / colchão / alerta runway). Não justifica uma aba dedicada — pertence a Configurações do módulo.
-3. **Cenários não materializam impacto** — variações de receita/custo são aplicadas apenas no gráfico de saldo líquido, sem propagar para Orçamento, Plan×Real, RH, Passivos.
-4. **Plan×Real só compara orçamento vs. realizado** — não considera contratos projetados, folha projetada, nem CRM ponderado.
-5. **Comercial é uma "ilha"** — tem orçamento próprio, cenários próprios, sem cruzamento com o orçamento principal nem com CRM real.
-6. **Passivos está descontextualizado** — KPIs aparecem mas não impactam o gráfico de cenários nem o runway.
-7. **Filtro de horizonte global** muda KPIs mas em algumas abas (Liquidez, Passivos) não tem efeito visual.
+| Caminho | Como duplica hoje |
+|---|---|
+| **Contrato → Fluxo** | `useCashFlow` deduplica por `${contract_id}-${data_prevista}`; `useFinanceiro` faz o mesmo, mas só para `source='contrato'`. Se o usuário materializar com `source` diferente, projeção volta a aparecer. |
+| **Parcela de contrato → Fluxo** | Em `useCashFlow` deduplica por `${contract_id}-${data_vencimento}`; em `useFinanceiro` usa `contract_installment_id`. As duas chaves não conversam — uma parcela materializada pela tabela `cashflow_entries` sem `contract_installment_id` (caso do `markAsPaid` antigo) reaparece como projeção. |
+| **DP/Folha → Fluxo** | `useCashFlow` simplesmente concatena `payrollProjections` (não dedup). `useFinanceiro` dedup por `month` se já existe **qualquer** entrada `source='dp'` no mês — derruba projeções legítimas de outros funcionários. |
+| **CRM ganho → Fluxo** | `useCRM.moveToStage` insere `cashflow_entries` com marcador `notes ILIKE '%opp:<id>%'`. Não há índice; concorrência (dois cliques rápidos) cria duas entradas. |
+| **Planejamento RH → Fluxo** | `useDP.execute` insere com `notes` contendo `Item: <id>`. Sem checagem de existência → executar duas vezes duplica. |
+| **Importação CSV → Fluxo** | `useFinanceiroImport` insere todas as linhas como `source='importacao'` sem cruzar com lançamentos manuais existentes do mesmo período/valor/fornecedor. |
+| **Materialização (markAsPaid)** | `useFinanceiro.markAsPaid` para uma projeção **insere uma nova linha** em vez de marcar a projeção como materializada. Se o usuário marcar 2 vezes (clique duplo), gera 2 lançamentos pagos. |
+
+### 1.2 Divergências de cálculo (mesmos KPIs, números diferentes)
+
+| KPI | Onde calcula | Divergência |
+|---|---|---|
+| **Burn / Runway** | `useFinancialSummary.monthlyBurn` (sobre `entries` mesclado) **vs** `PlanningCockpit.avgMonthlySaida` (sobre `monthlyData` local) | Dashboard mostra X, Cockpit mostra Y — fórmulas equivalentes mas com basements diferentes (uma inclui projeções, outra também, mas o `entries` pode ter dedup distinta). |
+| **Custo Folha/mês** | `usePayrollProjections.avgMonthlyPayroll = total/monthCount` **vs** `useGroupTotals.payrollTotal` | Divisor diferente (uma usa meses do horizonte, outra soma bruta) → `groupShare` percentuais errados. |
+| **Saldo / Totais** | `useCashFlow.totals` soma `valor_realizado ?? valor_previsto` para tudo. Inclui projeções **e** materializações. Conta dobrado quando ambas existem por janela de tempo na borda. |
+| **Plan×Real "Realizado"** | Já corrigido (usa `materializedEntries` + filtro de status). Mas Cockpit e Dashboard ainda usam `entries` (mesclado). |
+| **Total previsto AP/AR** | `useFinanceiro.totals.total_previsto` soma **todas** as entradas (incluindo já pagas). Subestima "pendente" e infla "previsto". |
+
+### 1.3 Risco arquitetural
+
+Não existe **uma única função** que decida se uma entrada virtual deve ou não ser apresentada. A lógica vive duplicada em `useCashFlow`, `useFinanceiro`, `PendenciasPanel`, `PlannedVsActual`, `usePlanningPdfReport` — cinco implementações divergentes.
 
 ---
 
-## Proposta — Reorganização em 4 Abas + Configurações
+## 2. Solução — três camadas
 
-```text
-ANTES (8 abas):
-Visão Geral | Orçamento | Cenários | Plan×Real | Liquidez | Passivos | RH | Comercial
+### Camada A · Origem única de verdade para projeções (`src/lib/projectionRegistry.ts` – novo)
 
-DEPOIS (4 abas + ícone de configuração):
-Cockpit | Orçamento & Realizado | Cenários & Risco | Operacional        ⚙ Config
+Centraliza **todas** as fontes de projeção e suas chaves de deduplicação canônicas:
+
+```ts
+type ProjectionSource = "contrato" | "contrato_parcela" | "dp" | "crm_won" | "hr_planning";
+
+interface ProjectionKey {
+  source: ProjectionSource;
+  // chave estável usada para casar projeção ↔ realização
+  dedupKey: string; // ex.: "contrato:<id>:2025-03-15"
+  // chave secundária para deduplicar entre projeção e DB
+  externalRef: string; // colocada em notes/metadata: "ref:contrato:<id>:2025-03-15"
+}
+
+export function buildProjections(ctx: ProjectionContext): VirtualEntry[];
+export function dedupAgainstMaterialized(virtual, materialized): VirtualEntry[];
 ```
 
-### Aba 1 — Cockpit (substitui Visão Geral)
+Regras MECE definitivas:
+- **Contrato recorrente** → chave `contrato:<id>:<yyyy-MM-dd>`
+- **Parcela** → chave `parcela:<installment_id>` (quando existir) **OU** `contrato:<id>:<vencimento>` (fallback)
+- **Folha DP** → chave `dp:<employee_id>:<sub_category>:<yyyy-MM>` (granular, não por mês inteiro)
+- **CRM ganho** → chave `crm:<opportunity_id>` (única por oportunidade)
+- **Planejamento RH** → chave `hr:<item_id>`
 
-Visão consolidada e única fonte de verdade dos KPIs, hierarquia executiva CFO-first:
-- Linha topo (4 KPIs principais): Saldo Projetado · Runway · Burn Mensal · Receita Projetada × Despesa Projetada
-- Mini-cards secundários: Custo Folha/mês · Contratos Ativos · Passivos Total · Pipeline Ponderado (CRM)
-- Gráfico unificado: barras Entradas/Saídas + linha Saldo Acumulado + linha tracejada do Saldo Mínimo
-- Lista de alertas (vinda de `useFinancialSummary` — já existe)
+### Camada B · Marcador persistente de origem (migração SQL)
 
-### Aba 2 — Orçamento & Realizado (funde Orçamento + Plan×Real)
+Adicionar 2 colunas em `cashflow_entries`:
+- `source_ref TEXT` — guarda o `dedupKey` quando a entrada nasce de uma projeção materializada
+- `dedup_hash TEXT` — hash determinístico de `(organization_id, source, source_ref)` com **índice UNIQUE parcial** `WHERE source_ref IS NOT NULL`
 
-- Topo: seletor de versão de orçamento + status (Rascunho/Aprovado/Arquivado)
-- Sub-abas internas leves (`Tabs`): "Linhas do Orçamento" | "Comparativo Plan×Real"
-- O comparativo passa a incluir 3 séries: **Orçado · Realizado · Projetado** (somando contratos recorrentes + folha + projeções de CRM ganho)
-- Quando não há orçamento, mostra estado vazio com CTA para criar ou importar do anterior
+Isso transforma deduplicação em garantia de banco, não suposição de UI. Substitui os `ILIKE '%opp:%'`, regex em `notes` e `Set<string>` espalhados.
 
-### Aba 3 — Cenários & Risco (funde Cenários + Passivos)
+```sql
+ALTER TABLE cashflow_entries
+  ADD COLUMN source_ref TEXT,
+  ADD COLUMN dedup_hash TEXT GENERATED ALWAYS AS (
+    CASE WHEN source_ref IS NOT NULL
+      THEN md5(organization_id::text || '|' || source || '|' || source_ref)
+    END
+  ) STORED;
 
-- Bloco superior: seletor de cenários ativos (Base/Otimista/Conservador/Stress) com cards compactos
-- Bloco inferior: **Passivos** apresentados como contribuintes ao stress (não como tabela isolada). Cada passivo "ativo" ou "judicial" alimenta automaticamente o cenário Stress via `impacto_stress`
-- Gráfico único: linhas de saldo por cenário **+ banda de risco de passivos**
-- Tabela colapsável com lista de passivos, KPIs (Total · Dívidas · Contingências Prováveis · Exposição Stress · Contas a Pagar)
-
-### Aba 4 — Operacional (funde RH + Comercial)
-
-- Sub-abas internas: "Planejamento RH" | "Plano Comercial"
-- Mantém funcionalidades atuais sem perda
-- Adiciona no topo de cada sub-aba uma linha de "impacto no caixa" que conecta com o Cockpit (ex: "Headcount adicional → +R$ X/mês no burn")
-
-### Configurações (botão ⚙ ao lado do filtro de horizonte)
-
-- Recebe a antiga aba "Liquidez": Saldo Mínimo · Colchão · Alerta Runway
-- Adiciona "Importar do realizado": botão para gerar primeira versão de orçamento usando média dos últimos 12 meses (acelera entrada de dados)
-
----
-
-## Limpeza Visual
-
-- **Padronizar cards de KPI** em uma altura única e ícones consistentes (atualmente alguns cards usam `glass-card` direto, outros usam `KPICard`)
-- **Reduzir o número de cards exibidos simultaneamente** nas grids de cenário (atualmente 4 cards horizontais ficam apertados em telas médias) — usar grid 2×2 quando ≥3 cenários ativos
-- **Remover redundância visual**: badges "+X% rec" no toggle de cenário + KPI no card de cenário mostram a mesma info — manter só um
-- **Filtro de horizonte fixo no topo** (sticky) para não perder ao rolar
-- **Mensagens de estado vazio** unificadas (ícone + título + CTA), substituindo as várias variações atuais
-
----
-
-## Mapa de Integrações Financeiro & Planejamento × Outros Módulos
-
-```text
-                     ┌───────────────────────────────┐
-                     │   Plano de Contas (estrutura) │
-                     │   Centros de Custo            │
-                     └───────────────┬───────────────┘
-                                     │ classifica
-                                     ▼
-┌──────────┐   gera projeção   ┌──────────────┐   alimenta   ┌─────────────┐
-│Contratos │ ────────────────► │ cashflow_    │ ───────────► │ Financeiro  │
-│ (recorr.)│                   │ entries      │              │ (AP/AR)     │
-└──────────┘                   │ + virtuais   │              └─────────────┘
-                               │ proj-*       │                     │
-┌──────────┐   gera projeção   │              │                     │
-│   DP     │ ────────────────► │              │                     │
-│ (folha)  │                   │              │                     │
-└──────────┘                   └──────┬───────┘                     │
-                                      │                             │
-┌──────────┐   pondera           ┌────▼──────┐    consome     ┌─────▼──────┐
-│   CRM    │ ──────────────────►│ Cockpit   │◄──────────────│Conciliação │
-│(pipeline)│   ganho → contrato  │  /        │                └────────────┘
-└──────────┘                     │ Cenários  │                ┌─────────────┐
-                                 │           │◄───────────────│Fluxo Caixa  │
-┌──────────┐   alimenta stress   │           │                └─────────────┘
-│ Passivos │ ───────────────────►│           │
-│(div/cont)│                     └───────────┘
-└──────────┘                          ▲
-                                      │ versão de orçamento
-                              ┌───────┴────────┐
-                              │  Orçamento     │
-                              │ (budget_lines) │
-                              └────────────────┘
-
-Tarefas/Solicitações ──► gera lançamento financeiro (ExpenseRequest aprovado)
-Backoffice          ──► define visibilidade de abas/módulos
-Holding             ──► consolida métricas de subsidiárias no Cockpit
+CREATE UNIQUE INDEX cashflow_entries_dedup_uq
+  ON cashflow_entries (dedup_hash)
+  WHERE dedup_hash IS NOT NULL;
 ```
 
-### Integrações já existentes (ativas)
-- Contratos recorrentes → projeções no `cashflow_entries` (virtuais `proj-`)
-- DP → projeções de folha mensal via `usePayrollProjections`
-- CRM → pipeline ponderado em `useFinancialSummary` (Dashboard) e oportunidades ganhas geram contrato
-- Passivos → KPI de Contas a Pagar via `useFinanceiro("saida")`
-- Solicitações de despesa → lançamento financeiro após aprovação
+Backfill: extrair `opp:<id>` e `Item: <id>` de `notes` para `source_ref` no script de migração.
 
-### Integrações ausentes ou fracas (a fortalecer)
-1. **Cenários × Passivos** — `impacto_stress` dos passivos não é aplicado ao cenário Stress; passa a entrar como ajuste adicional de saídas
-2. **Cenários × Orçamento** — variação de cenário não recalcula linhas do orçamento; adicionar visualização "orçamento sob cenário X"
-3. **Plan×Real × Projeções** — comparativo só usa orçamento e realizado; adicionar série "Projetado" (contratos + folha + CRM ponderado)
-4. **Comercial × CRM** — plano comercial define metas, mas não compara com pipeline real do CRM; adicionar widget "Pipeline real vs. meta de receita"
-5. **Comercial × Orçamento principal** — orçamento comercial fica isolado; adicionar opção "consolidar no orçamento principal" ao aprovar plano
-6. **Tarefas × Planejamento** — itens de planejamento RH (contratações futuras) não geram tarefa no calendário do RH; adicionar trigger
-7. **Onboarding × Planejamento** — diagnóstico de maturidade do onboarding não direciona o usuário para configurar Saldo Mínimo / Cenários quando o score é baixo nessa seção
+### Camada C · Hook único de cálculo (`src/hooks/useFinancialMetrics.ts` – novo)
 
----
+Substitui as 3+ implementações de burn/runway/totais. Expõe:
 
-## Arquivos Envolvidos
+```ts
+useFinancialMetrics(rangeFrom, rangeTo) → {
+  realized: { entradas, saidas, saldo, byMonth },        // só DB com status realizado
+  projected: { entradas, saidas, saldo, byMonth },        // só virtuais (sem dupla)
+  consolidated: { entradas, saidas, saldo, byMonth },     // realized + projected sem overlap
+  burn: { atual, projetado, media12m },                   // 3 visões nomeadas
+  runway: { conservador, base, otimista },                // por cenário
+  payroll: { mensalMedio, fonte: "dp_real" | "dp_proj" }
+}
+```
 
-### Reestruturação visual
-- `src/pages/Planejamento.tsx` — reduzir de 8 para 4 abas + botão de configurações
-- `src/components/planning/PlanningOverview.tsx` → renomear para `PlanningCockpit.tsx` e absorver KPIs adicionais
-- `src/components/planning/BudgetTab.tsx` + `PlannedVsActual.tsx` → fundir em `PlanningBudget.tsx` com sub-abas internas
-- `src/components/planning/PlanningScenarios.tsx` + `PlanningLiabilities.tsx` → fundir em `PlanningScenariosRisk.tsx`
-- `src/components/planning/PlanningHR.tsx` + `PlanningCommercial.tsx` → manter arquivos, expor via aba "Operacional" com sub-abas
-- `src/components/planning/PlanningLiquidity.tsx` → mover para um `PlanningSettingsDialog.tsx` acionado pelo botão ⚙
-- Ajustes de grid/spacing conforme princípios de limpeza visual
-
-### Novas integrações
-- `src/hooks/useFinancialSummary.ts` — adicionar série "projetado" (somar contratos+folha+CRM)
-- `src/components/planning/PlanningScenariosRisk.tsx` — aplicar `impacto_stress` dos passivos no cenário Stress
-- `src/components/planning/PlanningCommercial.tsx` — novo widget "Pipeline real vs. meta" usando `useCRMOpportunities`
-- `src/hooks/useCommercialPlanning.ts` — flag de "consolidação" para refletir no orçamento principal
-
-### Sem migrações SQL
-Nenhuma alteração no schema. Toda a refatoração reaproveita tabelas e hooks existentes.
+`useFinancialSummary`, `PlanningCockpit`, `Dashboard`, `FluxoCaixa`, `PlannedVsActual` e `usePlanningPdfReport` passam a consumir este hook → garante 1 número, 1 fórmula, 1 valor exibido.
 
 ---
 
-## Resultado Esperado
+## 3. Correções pontuais por hook
+
+| Arquivo | Correção |
+|---|---|
+| `useCashFlow.ts` | Remover dedup local; delegar a `projectionRegistry`. `totals` passa a usar `useFinancialMetrics`. |
+| `useFinanceiro.ts` | `markAsPaid` em projeção → **upsert por `source_ref`** em vez de insert puro (idempotente). `totals.pendente` passa a excluir status `pago/recebido/conciliado`. |
+| `useCRM.ts` | `moveToStage` Won → `upsert(..., { onConflict: 'dedup_hash' })` em vez de `select+insert`. |
+| `useDP.ts` | `execute` planejamento RH → mesmo upsert idempotente. |
+| `useFinanceiroImport.ts` | Antes do insert em massa: rodar `detectImportDuplicates` **server-side** (RPC) e oferecer skip/merge na revisão. |
+| `usePayrollProjections.ts` | Manter granularidade por funcionário+sub_categoria (já correta). Documentar chave canônica. |
+| `useFinancialSummary.ts` | Reescrito sobre `useFinancialMetrics`. Burn/runway alinhados ao Cockpit. |
+| `useGroupTotals.ts` | `payrollTotal` passa a usar `monthlyPayrollTotal` (não `avg`) para o denominador de share. |
+
+---
+
+## 4. Detecção em runtime (já parcial, completar)
+
+`useDuplicateDetection` ganha uma 6ª categoria: **`source_ref_collision`** — entradas com mesmo `(source, source_ref)` que escaparam do índice (ex.: dados pré-migração). Severity = `high`, ação direta de exclusão da mais nova.
+
+Banner persistente no header do Financeiro quando houver ≥1 colisão de `source_ref` no escopo ativo.
+
+---
+
+## 5. Migração e ordem de execução
+
+1. **SQL** — colunas `source_ref` + `dedup_hash` + índice + backfill (`opp:` e `Item:`).
+2. **`projectionRegistry.ts`** — extrair lógica atual e padronizar chaves.
+3. **`useFinancialMetrics.ts`** — novo hook único.
+4. **Refatorar** `useCashFlow`/`useFinanceiro` para consumir A+C.
+5. **Idempotência** — converter os 3 inserts (CRM, RH, materialização) para upsert por `source_ref`.
+6. **Migrar consumidores** (Dashboard, Cockpit, FluxoCaixa, PlannedVsActual, PDF) para `useFinancialMetrics`.
+7. **Importação** — RPC server-side de pré-checagem + UI de skip/merge.
+8. **Detecção runtime** — adicionar 6ª categoria + banner.
+
+---
+
+## 6. Detalhes técnicos relevantes
+
+- **Sem breaking change visível**: telas continuam mostrando os mesmos campos; apenas valores ficam consistentes entre módulos.
+- **Hist comp**: backfill preserva entradas já existentes; `dedup_hash` só impede **futuras** duplicatas.
+- **RLS**: nova coluna herda políticas existentes (já scoped por `organization_id`).
+- **Performance**: `dedup_hash` é `STORED` → índice rápido; substitui scans `ILIKE '%opp:%'` (full table scan hoje).
+- **Compatibilidade Holding**: chaves incluem `organization_id` no hash → não há colisão cruzada entre subsidiárias.
+- **Testes**: criar `src/test/projectionRegistry.test.ts` cobrindo cada uma das 5 fontes + colisões.
+
+## 7. Resultado esperado
 
 | Antes | Depois |
-|-------|--------|
-| 8 abas, sobrecarga visual | 4 abas + ⚙ Configurações |
-| KPIs duplicados em 3 telas | Cockpit como fonte única |
-| Cenários só no gráfico | Cenários propagam em orçamento + passivos |
-| Plan×Real ignora projeções | Plan×Real inclui Orçado/Realizado/Projetado |
-| Comercial isolado | Comercial conectado a CRM real e orçamento principal |
-| Passivos como tabela solta | Passivos como vetor de risco no cenário Stress |
+|---|---|
+| 5 lugares fazem dedup com chaves diferentes | 1 registry + 1 índice DB |
+| Burn/Runway diferem entre Dashboard, Cockpit e PDF | Mesmo número em todas as telas |
+| Clique duplo cria duplicata em CRM/RH | Upsert idempotente garantido pelo banco |
+| `notes ILIKE '%opp:%'` (lento) | Lookup por `dedup_hash` (UNIQUE index) |
+| Custo Folha/mês com 2 fórmulas | 1 fonte (`useFinancialMetrics.payroll.mensalMedio`) |
+| Materialização repetida vira 2 pagos | Upsert por `source_ref` impede |
 
