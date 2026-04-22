@@ -13,6 +13,29 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { EMPTY_PLANNING_FILTERS, withFilterDefaults, type PlanningFilters } from "@/lib/planningFilters";
 
+/**
+ * Snapshot dos nomes legíveis das dimensões filtradas no momento da exportação.
+ * Mantido em coluna separada (em vez de derivar dos IDs no momento da leitura)
+ * para preservar o contexto histórico mesmo se as entidades forem renomeadas
+ * ou excluídas depois.
+ */
+export interface PlanningExportFilterLabels {
+  subsidiary?: string | null;
+  bankAccounts?: string[];
+  costCenters?: string[];
+}
+
+/**
+ * Motivo do recorte vazio (NULL quando o PDF saiu com dados). Permite
+ * comparar exportações vazias entre si — ex: "todas as exportações de
+ * Marketing/2024 ficaram vazias por filtros_excluded_all".
+ */
+export type PlanningEmptyReason =
+  | "no_period_data"        // organização sem lançamentos/contratos no período
+  | "filters_excluded_all"  // existiam dados, mas filtros eliminaram tudo
+  | "no_budget_version"     // não havia versão orçamentária ativa
+  | "other";
+
 export interface PlanningReportExport {
   id: string;
   organization_id: string;
@@ -26,6 +49,9 @@ export interface PlanningReportExport {
   end_date: string;
   filters: PlanningFilters;
   filters_summary: string | null;
+  filter_labels: PlanningExportFilterLabels;
+  had_data: boolean;
+  empty_reason: PlanningEmptyReason | null;
   created_at: string;
 }
 
@@ -38,6 +64,12 @@ export interface RecordPlanningExportInput {
   budgetVersionId: string | null;
   budgetVersionName: string | null;
   filtersSummary: string;
+  /** Nomes resolvidos das dimensões filtradas (para auditoria histórica). */
+  filterLabels?: PlanningExportFilterLabels;
+  /** Se o PDF foi gerado com pelo menos uma fonte de dados. */
+  hadData?: boolean;
+  /** Quando `hadData=false`, classificação do motivo. */
+  emptyReason?: PlanningEmptyReason | null;
   reportType?: string;
 }
 
