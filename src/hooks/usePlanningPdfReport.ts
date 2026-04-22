@@ -40,7 +40,7 @@ export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: Pd
   const { avgMonthlyPayroll, payrollProjections } = usePayrollProjections(startDate, endDate);
   const { totals: liabTotals } = useLiabilities();
   const { crmWeightedValue, alerts } = useFinancialSummary(startDate, endDate);
-  const { versionsQuery } = useBudget();
+  const { versions, isLoadingVersions } = useBudget();
   const budgetLinesQuery = useBudgetLines(budgetVersionId);
   const { opportunities } = useCRMOpportunities();
   const { stages } = usePipelineStages();
