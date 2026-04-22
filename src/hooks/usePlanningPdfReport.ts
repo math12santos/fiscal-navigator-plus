@@ -192,8 +192,19 @@ export function usePlanningPdfReport({
     // ============= Build PDF =============
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 36;
+    const footerHeight = 28; // espaço reservado ao rodapé em todas as páginas
+    const bottomLimit = pageHeight - margin - footerHeight; // limite seguro para conteúdo
     let y = margin;
+
+    // Garante que há `needed` pontos disponíveis antes de desenhar; senão, nova página.
+    const ensureSpace = (needed: number) => {
+      if (y + needed > bottomLimit) {
+        doc.addPage();
+        y = margin;
+      }
+    };
 
     // ----- Header -----
     doc.setFont("helvetica", "bold");
@@ -272,20 +283,24 @@ export function usePlanningPdfReport({
         ["Saldo mínimo configurado", fmt(config?.saldo_minimo ?? 0)],
         ["Alerta de runway (meses)", String(config?.runway_alerta_meses ?? 3)],
       ],
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, bottom: margin + footerHeight },
+      // Repete o cabeçalho da tabela em cada página e evita cortar linhas
+      showHead: "everyPage",
+      rowPageBreak: "avoid",
+      pageBreak: "auto",
     });
     y = (doc as any).lastAutoTable.finalY + 18;
 
     // ----- Strategic Alerts -----
     if (alerts.length > 0) {
-      if (y > 720) { doc.addPage(); y = margin; }
+      ensureSpace(40); // título + primeira linha
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
       doc.text(`Alertas Estratégicos (${alerts.length})`, margin, y);
       autoTable(doc, {
         startY: y + 6,
         theme: "striped",
-        styles: { fontSize: 8, cellPadding: 5 },
+        styles: { fontSize: 8, cellPadding: 5, overflow: "linebreak" },
         headStyles: { fillColor: [40, 50, 70], textColor: 255 },
         head: [["Tipo", "Categoria", "Título", "Descrição"]],
         body: alerts.map((a) => [
@@ -300,7 +315,10 @@ export function usePlanningPdfReport({
           2: { cellWidth: 160 },
           3: { cellWidth: "auto" },
         },
-        margin: { left: margin, right: margin },
+        margin: { left: margin, right: margin, bottom: margin + footerHeight },
+        showHead: "everyPage",
+        rowPageBreak: "avoid",
+        pageBreak: "auto",
       });
       y = (doc as any).lastAutoTable.finalY + 18;
     }
@@ -352,26 +370,34 @@ export function usePlanningPdfReport({
       columnStyles: { 0: { halign: "left", cellWidth: 60 } },
       head: [["Mês", "Orçado", "Sob Cenário", "Projetado", "Realizado", "Diferença", "Variação"]],
       body: rows,
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, bottom: margin + footerHeight },
+      // Para horizontes longos, repete o cabeçalho e mantém cada linha íntegra
+      showHead: "everyPage",
+      rowPageBreak: "avoid",
+      pageBreak: "auto",
     });
 
-    // ----- Footer on every page -----
+    // ----- Footer on every page (desenhado depois de todo o conteúdo) -----
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      // Linha divisória sutil acima do rodapé
+      doc.setDrawColor(230);
+      doc.line(margin, pageHeight - footerHeight, pageWidth - margin, pageHeight - footerHeight);
       doc.setFontSize(8);
       doc.setTextColor(140);
       doc.text(
         `Colli FinCore · ${orgName} · ${generatedAt}`,
         margin,
-        doc.internal.pageSize.getHeight() - 18
+        pageHeight - 12
       );
       doc.text(
         `Página ${i}/${pageCount}`,
         pageWidth - margin,
-        doc.internal.pageSize.getHeight() - 18,
+        pageHeight - 12,
         { align: "right" }
       );
+      doc.setTextColor(0);
     }
 
     const fileName = `planejamento_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
