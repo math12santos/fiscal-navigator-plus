@@ -69,6 +69,23 @@ export function usePlanningPdfReport({
     const budgetVersion = versions.find((v) => v.id === budgetVersionId) ?? null;
     const budgetLines = (budgetLinesQuery.data ?? []) as BudgetLine[];
 
+    // ===== Apply operational filters (mirror Cockpit & PlannedVsActual) =====
+    const entries = rawEntries.filter((e) => entryMatchesFilters(e as any, filters));
+    const materializedEntries = rawMaterialized.filter((e) => entryMatchesFilters(e as any, filters));
+    const contracts = rawContracts.filter((c) => contractMatchesFilters(c as any, filters));
+    const payrollProjections = filters.costCenterId
+      ? rawPayroll.filter((p) => (p as any).cost_center_id === filters.costCenterId)
+      : rawPayroll;
+
+    // Recompute totals over filtered entries
+    let entradasTot = 0, saidasTot = 0;
+    for (const e of entries) {
+      const v = Number(e.valor_realizado ?? e.valor_previsto);
+      if (e.tipo === "entrada") entradasTot += v;
+      else saidasTot += v;
+    }
+    const totals = { entradas: entradasTot, saidas: saidasTot, saldo: entradasTot - saidasTot };
+
     // ============= Aggregations (mirroring Cockpit & PlannedVsActual) =============
     const monthly: Record<string, { entradas: number; saidas: number }> = {};
     let cursor = startOfMonth(startDate);
@@ -92,6 +109,9 @@ export function usePlanningPdfReport({
     const runway =
       avgMonthlySaida > 0 ? Math.floor(totals.saldo / avgMonthlySaida) : Infinity;
     const activeContracts = contracts.filter((c) => c.status === "Ativo").length;
+    const avgMonthlyPayroll = filters.costCenterId
+      ? payrollProjections.reduce((s, p) => s + Number(p.valor_previsto), 0) / monthsCount
+      : rawAvgPayroll;
 
     // Budget aggregation by month
     const budgetedByMonth: Record<string, { receita: number; gasto: number }> = {};
