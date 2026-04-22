@@ -234,6 +234,7 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
             <TableRow>
               <TableHead>Mês</TableHead>
               <TableHead className="text-right">Orçado</TableHead>
+              <TableHead className="text-right">Projetado</TableHead>
               <TableHead className="text-right">Realizado</TableHead>
               <TableHead className="text-right">Custo DP</TableHead>
               <TableHead className="text-right">Diferença</TableHead>
@@ -245,6 +246,7 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
               <TableRow key={row.mes}>
                 <TableCell className="font-medium">{row.mes}</TableCell>
                 <TableCell className="text-right">{fmt(row.orcado)}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{fmt(row.projetado)}</TableCell>
                 <TableCell className="text-right">{fmt(row.realizado)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{fmt(row.dp)}</TableCell>
                 <TableCell className={`text-right font-medium ${row.diferenca >= 0 ? "text-success" : "text-destructive"}`}>
