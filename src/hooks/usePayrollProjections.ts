@@ -3,6 +3,7 @@ import { format, addMonths, startOfMonth, endOfMonth, isAfter, isBefore, eachDay
 import { useEmployees, useDPConfig, calcINSSEmpregado, calcIRRF } from "@/hooks/useDP";
 import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import type { CashFlowEntry } from "@/hooks/useCashFlow";
+import { projectionKey } from "@/lib/projectionRegistry";
 
 /** Count Mon–Fri business days in a given month */
 export function getBusinessDays(monthStart: Date): number {
