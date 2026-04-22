@@ -1063,3 +1063,164 @@ function ReconciliationPanel({
     </section>
   );
 }
+
+// ===== Seletor de período (from/to) =====
+//
+// Inline na página: combina presets rápidos (3M, 6M, 12M, YTD, mês corrente)
+// com seleção fina via Calendar duplo. As mudanças vão para a query string,
+// disparando o reload de useFinancialSummary sem unmount da página.
+function RangePicker({
+  from,
+  to,
+  onApply,
+  isCustom,
+  onReset,
+}: {
+  from: Date;
+  to: Date;
+  onApply: (from: Date, to: Date) => void;
+  isCustom: boolean;
+  onReset: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draftFrom, setDraftFrom] = useState<Date | undefined>(from);
+  const [draftTo, setDraftTo] = useState<Date | undefined>(to);
+
+  // Sincroniza o draft sempre que abre o popover ou o range externo muda.
+  useEffect(() => {
+    if (open) {
+      setDraftFrom(from);
+      setDraftTo(to);
+    }
+  }, [open, from, to]);
+
+  const label = `${format(from, "dd MMM yy", { locale: ptBR })} – ${format(to, "dd MMM yy", { locale: ptBR })}`;
+
+  const presets: { label: string; build: () => [Date, Date] }[] = [
+    { label: "Mês corrente", build: () => [startOfMonth(new Date()), endOfMonth(new Date())] },
+    { label: "Últimos 3 meses", build: () => [startOfMonth(subMonths(new Date(), 2)), endOfMonth(new Date())] },
+    { label: "Últimos 6 meses", build: () => [startOfMonth(subMonths(new Date(), 5)), endOfMonth(new Date())] },
+    { label: "Últimos 12 meses", build: () => [startOfMonth(subMonths(new Date(), 11)), endOfMonth(new Date())] },
+    { label: "Ano atual (YTD)", build: () => [new Date(new Date().getFullYear(), 0, 1), endOfMonth(new Date())] },
+  ];
+
+  const applyPreset = (build: () => [Date, Date]) => {
+    const [f, t] = build();
+    setDraftFrom(f);
+    setDraftTo(t);
+    onApply(f, t);
+    setOpen(false);
+  };
+
+  const canApply =
+    draftFrom &&
+    draftTo &&
+    !isAfter(draftFrom, draftTo) &&
+    (draftFrom.getTime() !== from.getTime() || draftTo.getTime() !== to.getTime());
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn("h-8 px-3 text-xs font-medium gap-2", isCustom && "border-primary/40 text-primary")}
+            aria-label="Alterar período do relatório"
+          >
+            <CalendarIcon size={13} />
+            {label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="flex flex-col sm:flex-row">
+            <div className="border-b sm:border-b-0 sm:border-r border-border p-2 min-w-[170px]">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 pt-1 pb-2">
+                Atalhos
+              </p>
+              <div className="flex flex-col gap-0.5">
+                {presets.map((p) => (
+                  <Button
+                    key={p.label}
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start h-8 text-xs font-normal"
+                    onClick={() => applyPreset(p.build)}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="px-3 pt-3 pb-1 flex items-center gap-3 text-xs text-muted-foreground">
+                <span>
+                  De: <span className="font-medium text-foreground">
+                    {draftFrom ? format(draftFrom, "dd/MM/yyyy") : "—"}
+                  </span>
+                </span>
+                <span>
+                  Até: <span className="font-medium text-foreground">
+                    {draftTo ? format(draftTo, "dd/MM/yyyy") : "—"}
+                  </span>
+                </span>
+              </div>
+              <Calendar
+                mode="range"
+                selected={{ from: draftFrom, to: draftTo }}
+                onSelect={(r) => {
+                  setDraftFrom(r?.from);
+                  setDraftTo(r?.to);
+                }}
+                numberOfMonths={2}
+                defaultMonth={draftFrom ?? from}
+                disabled={(date) => isBefore(date, new Date(2000, 0, 1)) || isAfter(date, new Date(2099, 11, 31))}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+              <div className="flex items-center justify-between gap-2 border-t border-border p-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    setDraftFrom(from);
+                    setDraftTo(to);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8 text-xs"
+                  disabled={!canApply}
+                  onClick={() => {
+                    if (draftFrom && draftTo) {
+                      onApply(draftFrom, draftTo);
+                      setOpen(false);
+                    }
+                  }}
+                >
+                  Aplicar período
+                </Button>
+              </div>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {isCustom && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-xs text-muted-foreground"
+          onClick={onReset}
+          title="Voltar ao período padrão (últimos 6 meses)"
+        >
+          <RotateCcw size={12} className="mr-1" />
+          Padrão
+        </Button>
+      )}
+    </div>
+  );
+}
