@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { KpiPeriodPresetsPopover } from "@/components/relatorio/KpiPeriodPresetsPopover";
 import { KpiRangePicker } from "@/components/relatorio/KpiRangePicker";
-import { ArrowLeft, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { ArrowLeft, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info, Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { startOfMonth, endOfMonth, subMonths, format, parseISO, getQuarter } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
@@ -160,12 +161,26 @@ export default function RelatorioKpi() {
     return g === "trimestral" ? "trimestral" : "mensal";
   }, [searchParams]);
 
+  /**
+   * Granularidade "diferida" para reagregação não bloqueante. O valor da URL
+   * (`granularity`) muda imediatamente — usado para refletir o toggle visual e
+   * o link compartilhável. O cálculo pesado (`aggregatedRows`) escuta o valor
+   * deferido, permitindo que o card de Total e a Reconciliação permaneçam
+   * estáveis enquanto a tabela recompõe em background.
+   */
+  const deferredGranularity = useDeferredValue(granularity);
+  const [isGranularityPending, startGranularityTransition] = useTransition();
+
   const applyGranularity = useCallback(
     (g: "mensal" | "trimestral") => {
+      // URL é síncrona — mantém link compartilhável e reflete o toggle no ato.
       const next = new URLSearchParams(searchParams);
       if (g === "mensal") next.delete("gran");
       else next.set("gran", g);
-      setSearchParams(next, { replace: true });
+      // O trabalho pesado de reagregação fica em transição (não bloqueia UI).
+      startGranularityTransition(() => {
+        setSearchParams(next, { replace: true });
+      });
     },
     [searchParams, setSearchParams],
   );
@@ -548,7 +563,10 @@ export default function RelatorioKpi() {
 
   /** Granularidade aplicável apenas a KPIs com dimensão temporal de fluxo. */
   const supportsQuarterly = rows.kind === "cashflow" || rows.kind === "result";
+  /** Granularidade visível imediatamente (URL/toggle) — usada apenas para CSS/labels. */
   const isQuarterly = supportsQuarterly && granularity === "trimestral";
+  /** Granularidade efetivamente aplicada à tabela (pode atrasar 1 frame durante transição). */
+  const isQuarterlyApplied = supportsQuarterly && deferredGranularity === "trimestral";
 
   /**
    * Quando trimestral está ativo e o KPI é de fluxo/resultado, agregamos
@@ -557,7 +575,7 @@ export default function RelatorioKpi() {
    * apresentação.
    */
   const aggregatedRows = useMemo(() => {
-    if (!isQuarterly) return filteredItems;
+    if (!isQuarterlyApplied) return filteredItems;
     const buckets = new Map<
       string,
       { period: string; label: string; count: number; entradas: number; saidas: number; valor: number }
@@ -595,9 +613,9 @@ export default function RelatorioKpi() {
       buckets.set(key, bucket);
     }
     return Array.from(buckets.values()).sort((a, b) => a.period.localeCompare(b.period));
-  }, [filteredItems, isQuarterly, rows.kind]);
+  }, [filteredItems, isQuarterlyApplied, rows.kind]);
 
-  const displayKind = isQuarterly
+  const displayKind = isQuarterlyApplied
     ? rows.kind === "result"
       ? "result-quarter"
       : "cashflow-quarter"
@@ -613,7 +631,7 @@ export default function RelatorioKpi() {
   // Reseta página ao mudar busca, métrica, tamanho de página ou granularidade
   useEffect(() => {
     setPage(1);
-  }, [search, metric, pageSize, isQuarterly]);
+  }, [search, metric, pageSize, isQuarterlyApplied]);
 
   // Garante que a página atual existe após mudanças no dataset
   useEffect(() => {
@@ -747,11 +765,29 @@ export default function RelatorioKpi() {
                   aria-label="Granularidade da composição"
                   className="ml-1"
                 >
-                  <ToggleGroupItem value="mensal" aria-label="Visão mensal" className="h-6 px-2 text-[11px]">
+                  <ToggleGroupItem
+                    value="mensal"
+                    aria-label="Visão mensal"
+                    aria-busy={isGranularityPending && granularity === "mensal"}
+                    className="h-6 px-2 text-[11px] data-[state=on]:data-[busy=true]:opacity-70"
+                    data-busy={isGranularityPending && granularity === "mensal" ? "true" : undefined}
+                  >
                     Mensal
+                    {isGranularityPending && granularity === "mensal" && (
+                      <Loader2 className="ml-1 h-3 w-3 animate-spin" aria-hidden />
+                    )}
                   </ToggleGroupItem>
-                  <ToggleGroupItem value="trimestral" aria-label="Visão trimestral" className="h-6 px-2 text-[11px]">
+                  <ToggleGroupItem
+                    value="trimestral"
+                    aria-label="Visão trimestral"
+                    aria-busy={isGranularityPending && granularity === "trimestral"}
+                    className="h-6 px-2 text-[11px] data-[state=on]:data-[busy=true]:opacity-70"
+                    data-busy={isGranularityPending && granularity === "trimestral" ? "true" : undefined}
+                  >
                     Trimestral
+                    {isGranularityPending && granularity === "trimestral" && (
+                      <Loader2 className="ml-1 h-3 w-3 animate-spin" aria-hidden />
+                    )}
                   </ToggleGroupItem>
                 </ToggleGroup>
               )}
@@ -851,7 +887,17 @@ export default function RelatorioKpi() {
               <Table>
                 <TableHeader>{renderHeader(displayKind)}</TableHeader>
                 <TableBody>
-                  {pagedItems.map((r, i) => renderRow(displayKind, r, (page - 1) * pageSize + i))}
+                  {isGranularityPending && supportsQuarterly
+                    ? Array.from({ length: Math.min(pageSize, 8) }).map((_, i) => (
+                        <TableRow key={`sk-${i}`}>
+                          {Array.from({ length: getColumnCount(displayKind) }).map((__, c) => (
+                            <TableCell key={c}>
+                              <Skeleton className="h-4 w-full" />
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    : pagedItems.map((r, i) => renderRow(displayKind, r, (page - 1) * pageSize + i))}
                 </TableBody>
               </Table>
             </div>
@@ -929,6 +975,20 @@ function buildPageList(current: number, total: number): (number | "…")[] {
 }
 
 // ===== Helpers de renderização por tipo de relatório =====
+
+function getColumnCount(kind: string): number {
+  switch (kind) {
+    case "cashflow": return 5;
+    case "cashflow-quarter": return 3;
+    case "result": return 5;
+    case "result-quarter": return 5;
+    case "contracts": return 6;
+    case "payroll": return 5;
+    case "liabilities": return 5;
+    case "crm": return 5;
+    default: return 5;
+  }
+}
 
 function renderHeader(kind: string) {
   switch (kind) {
