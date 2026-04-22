@@ -28,6 +28,7 @@ export interface CashFlowEntry {
   status: string;
   account_id: string | null;
   cost_center_id: string | null;
+  conta_bancaria_id?: string | null;
   entity_id: string | null;
   notes: string | null;
   source: string;

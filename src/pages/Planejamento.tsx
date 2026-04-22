@@ -10,7 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { CalendarIcon, Settings, Sparkles, FileDown, Loader2 } from "lucide-react";
+import { CalendarIcon, Settings, Sparkles, FileDown, Loader2, Filter, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import PlanningCockpit, { PLANNING_NAV_EVENT } from "@/components/planning/PlanningCockpit";
@@ -21,6 +21,13 @@ import PlanningSettingsDialog from "@/components/planning/PlanningSettingsDialog
 import { PlanningScenarioProvider, usePlanningScenarioContext } from "@/contexts/PlanningScenarioContext";
 import { usePlanningPdfReport } from "@/hooks/usePlanningPdfReport";
 import { toast } from "sonner";
+import { useCostCenters } from "@/hooks/useCostCenters";
+import { useBankAccounts } from "@/hooks/useBankAccounts";
+import { useHolding } from "@/contexts/HoldingContext";
+import { Badge } from "@/components/ui/badge";
+import {
+  PlanningFilters, EMPTY_PLANNING_FILTERS, hasAnyFilter,
+} from "@/lib/planningFilters";
 
 function ScenarioPicker() {
   const { scenarios, activeScenarioId, setActiveScenarioId, activeScenario } = usePlanningScenarioContext();
@@ -52,21 +59,143 @@ function ScenarioPicker() {
   );
 }
 
+/**
+ * Pop-over com 3 selects (unidade / conta bancária / centro de custo).
+ * Sentinela "__all__" representa "Todos" (Radix Select não aceita value="").
+ */
+function FilterPopover({
+  filters, setFilters,
+}: {
+  filters: PlanningFilters;
+  setFilters: (f: PlanningFilters) => void;
+}) {
+  const { costCenters } = useCostCenters();
+  const { allBankAccounts } = useBankAccounts();
+  const { isHolding, subsidiaryOrgs } = useHolding();
+  const ALL = "__all__";
+  const activeCount =
+    (filters.subsidiaryOrgId ? 1 : 0) +
+    (filters.bankAccountId ? 1 : 0) +
+    (filters.costCenterId ? 1 : 0);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Filter className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Filtros</span>
+          {activeCount > 0 && (
+            <Badge variant="secondary" className="h-4 px-1 text-[10px] tabular-nums">
+              {activeCount}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 space-y-3" align="end">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Filtrar visões</p>
+          {hasAnyFilter(filters) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => setFilters(EMPTY_PLANNING_FILTERS)}
+            >
+              <X className="h-3 w-3" />
+              Limpar
+            </Button>
+          )}
+        </div>
+
+        {isHolding && subsidiaryOrgs.length > 0 && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Unidade</label>
+            <Select
+              value={filters.subsidiaryOrgId ?? ALL}
+              onValueChange={(v) =>
+                setFilters({ ...filters, subsidiaryOrgId: v === ALL ? null : v })
+              }
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Todas as unidades</SelectItem>
+                {subsidiaryOrgs.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Conta bancária</label>
+          <Select
+            value={filters.bankAccountId ?? ALL}
+            onValueChange={(v) =>
+              setFilters({ ...filters, bankAccountId: v === ALL ? null : v })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas as contas</SelectItem>
+              {allBankAccounts.map((b) => (
+                <SelectItem key={b.id} value={b.id}>
+                  {b.nome}{b.banco ? ` · ${b.banco}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Centro de custo</label>
+          <Select
+            value={filters.costCenterId ?? ALL}
+            onValueChange={(v) =>
+              setFilters({ ...filters, costCenterId: v === ALL ? null : v })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todos os centros</SelectItem>
+              {costCenters.filter((c) => c.active).map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.code} · {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <p className="text-[10px] text-muted-foreground pt-1 border-t border-border">
+          Filtros refletem em Cockpit, Plan×Real×Projetado e no PDF exportado.
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface ExportPdfButtonProps {
   startDate: Date;
   endDate: Date;
   budgetVersionId: string | null;
+  filters: PlanningFilters;
 }
 
-function ExportPdfButton({ startDate, endDate, budgetVersionId }: ExportPdfButtonProps) {
-  const { generatePdf, isReady } = usePlanningPdfReport({ startDate, endDate, budgetVersionId });
+function ExportPdfButton({ startDate, endDate, budgetVersionId, filters }: ExportPdfButtonProps) {
+  const { generatePdf, isReady } = usePlanningPdfReport({ startDate, endDate, budgetVersionId, filters });
   const [busy, setBusy] = useState(false);
 
   const handleClick = async () => {
     if (!isReady || busy) return;
     try {
       setBusy(true);
-      // Defer to next tick so the button can show its loading state
       await new Promise((r) => setTimeout(r, 0));
       generatePdf();
       toast.success("PDF gerado com sucesso");

@@ -18,6 +18,12 @@ import {
   TrendingDown, Target, ArrowRight, Info,
 } from "lucide-react";
 import type { PlanningTab } from "@/hooks/useFinancialSummary";
+import {
+  PlanningFilters,
+  EMPTY_PLANNING_FILTERS,
+  entryMatchesFilters,
+  contractMatchesFilters,
+} from "@/lib/planningFilters";
 
 /** Custom event fired by alert action buttons to switch the active planning tab. */
 export const PLANNING_NAV_EVENT = "planning:navigate";
@@ -31,15 +37,49 @@ const fmt = (v: number) =>
 interface Props {
   startDate: Date;
   endDate: Date;
+  filters?: PlanningFilters;
 }
 
-export default function PlanningCockpit({ startDate, endDate }: Props) {
-  const { entries, totals } = useCashFlow(startDate, endDate);
-  const { contracts } = useContracts();
+export default function PlanningCockpit({ startDate, endDate, filters = EMPTY_PLANNING_FILTERS }: Props) {
+  const { entries: rawEntries, totals: rawTotals } = useCashFlow(startDate, endDate);
+  const { contracts: rawContracts } = useContracts();
   const { config } = usePlanningConfig();
-  const { avgMonthlyPayroll } = usePayrollProjections(startDate, endDate);
+  const { avgMonthlyPayroll: rawAvgPayroll, payrollProjections } = usePayrollProjections(startDate, endDate);
   const { totals: liabTotals } = useLiabilities();
   const { crmWeightedValue, alerts } = useFinancialSummary(startDate, endDate);
+
+  // Apply operational filters consistently across every aggregation below.
+  const entries = useMemo(
+    () => rawEntries.filter((e) => entryMatchesFilters(e as any, filters)),
+    [rawEntries, filters],
+  );
+  const contracts = useMemo(
+    () => rawContracts.filter((c) => contractMatchesFilters(c as any, filters)),
+    [rawContracts, filters],
+  );
+
+  // Recompute totals when filters narrow the dataset.
+  const totals = useMemo(() => {
+    if (entries === rawEntries) return rawTotals;
+    let entradas = 0, saidas = 0;
+    for (const e of entries) {
+      const v = Number(e.valor_realizado ?? e.valor_previsto);
+      if (e.tipo === "entrada") entradas += v;
+      else saidas += v;
+    }
+    return { entradas, saidas, saldo: entradas - saidas };
+  }, [entries, rawEntries, rawTotals]);
+
+  // Custo Folha: when a cost center is selected, restrict payroll average to it.
+  const avgMonthlyPayroll = useMemo(() => {
+    if (!filters.costCenterId) return rawAvgPayroll;
+    const monthsCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+    const total = payrollProjections
+      .filter((p) => (p as any).cost_center_id === filters.costCenterId)
+      .reduce((s, p) => s + Number(p.valor_previsto), 0);
+    return total / monthsCount;
+  }, [rawAvgPayroll, filters.costCenterId, payrollProjections, startDate, endDate]);
+
 
   // Monthly aggregation
   const monthlyData = useMemo(() => {
