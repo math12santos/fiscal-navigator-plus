@@ -97,6 +97,25 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         }
 
         const salary = Number(emp.salary_base);
+        const isPJ = emp.contract_type === "PJ";
+        const isEstagio = emp.contract_type === "estagio";
+
+        // PJ: pagamento bruto único (NF de serviço), sem INSS empregado, IRRF de pessoa jurídica
+        // tratado em outro fluxo, sem FGTS, sem provisões trabalhistas.
+        if (isPJ) {
+          const base = { contract_id: null, contract_installment_id: null, tipo: "saida" as const, categoria: "Pessoal", valor_realizado: null, data_prevista: monthDate, data_realizada: null, status: "previsto", account_id: null, cost_center_id: emp.cost_center_id ?? null, entity_id: null, source: "dp", created_at: now, updated_at: now };
+          entries.push({
+            ...base,
+            id: `proj-dp-pj-${emp.id}-${monthKey}`,
+            descricao: `Prestação de Serviço PJ — ${emp.name}`,
+            valor_previsto: Math.round(salary * 100) / 100,
+            notes: `Pagamento bruto contratual — sem encargos trabalhistas`,
+            dp_sub_category: "salario_liquido",
+            source_ref: projectionKey.payroll(emp.id, "salario_liquido", monthKey),
+          } as any);
+          continue;
+        }
+
         const inssEmp = calcINSSEmpregado(salary);
         const baseIRRF = salary - inssEmp;
         const irrf = calcIRRF(baseIRRF);
@@ -110,10 +129,11 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         }
 
         const netSalary = salary - inssEmp - irrf - vtDesconto;
-        const fgtsVal = salary * fgtsPct;
-        const inssPatronalVal = salary * inssPatronalPct;
-        const ratVal = salary * ratPct;
-        const terceirosVal = salary * terceirosPct;
+        // Estágio: sem FGTS, sem encargos patronais, sem provisões 13/férias.
+        const fgtsVal = isEstagio ? 0 : salary * fgtsPct;
+        const inssPatronalVal = isEstagio ? 0 : salary * inssPatronalPct;
+        const ratVal = isEstagio ? 0 : salary * ratPct;
+        const terceirosVal = isEstagio ? 0 : salary * terceirosPct;
         const gpsTotal = inssPatronalVal + inssEmp + ratVal + terceirosVal;
 
         const base = { contract_id: null, contract_installment_id: null, tipo: "saida" as const, categoria: "Pessoal", valor_realizado: null, data_prevista: monthDate, data_realizada: null, status: "previsto", account_id: null, cost_center_id: emp.cost_center_id ?? null, entity_id: null, source: "dp", created_at: now, updated_at: now };
@@ -182,8 +202,8 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           } as any);
         }
 
-        // Provisions (13th + vacation)
-        const provisoes = salary * (provisao13Pct + provisaoFeriasPct);
+        // Provisions (13th + vacation) — somente CLT (estágio não tem 13/férias remuneradas)
+        const provisoes = isEstagio ? 0 : salary * (provisao13Pct + provisaoFeriasPct);
         if (provisoes > 0) {
           entries.push({
             id: `proj-dp-provisoes-${emp.id}-${monthKey}`,
