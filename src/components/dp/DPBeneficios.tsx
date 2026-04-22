@@ -23,6 +23,9 @@ const BENEFIT_TYPES = [
 export default function DPBeneficios() {
   const { data: benefits = [], isLoading } = useDPBenefits();
   const { create, update, remove } = useMutateDPBenefit();
+  const { data: employees = [] } = useEmployees();
+  const { data: empBenefits = [] } = useEmployeeBenefits();
+  const { currentOrg } = useOrganization();
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
