@@ -28,6 +28,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   PlanningFilters, EMPTY_PLANNING_FILTERS, hasAnyFilter,
 } from "@/lib/planningFilters";
+import PlanningReportHistory from "@/components/planning/PlanningReportHistory";
+import { usePlanningReportExports } from "@/hooks/usePlanningReportExports";
 
 function ScenarioPicker() {
   const { scenarios, activeScenarioId, setActiveScenarioId, activeScenario } = usePlanningScenarioContext();
