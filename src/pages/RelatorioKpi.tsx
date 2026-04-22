@@ -535,17 +535,74 @@ export default function RelatorioKpi() {
     );
   }, [rows.items, search]);
 
+  /** Granularidade aplicável apenas a KPIs com dimensão temporal de fluxo. */
+  const supportsQuarterly = rows.kind === "cashflow" || rows.kind === "result";
+  const isQuarterly = supportsQuarterly && granularity === "trimestral";
+
+  /**
+   * Quando trimestral está ativo e o KPI é de fluxo/resultado, agregamos
+   * `filteredItems` por trimestre (`yyyy-Qn`). O valor total do horizonte
+   * (`rows.total`) e a reconciliação não mudam — granularidade é apenas
+   * apresentação.
+   */
+  const aggregatedRows = useMemo(() => {
+    if (!isQuarterly) return filteredItems;
+    const buckets = new Map<
+      string,
+      { period: string; label: string; count: number; entradas: number; saidas: number; valor: number }
+    >();
+    for (const item of filteredItems as any[]) {
+      if (!item.data) continue;
+      const d = parseISO(item.data);
+      const q = getQuarter(d);
+      const y = d.getFullYear();
+      const key = `${y}-Q${q}`;
+      const monthStart = (q - 1) * 3;
+      const months = [monthStart, monthStart + 1, monthStart + 2]
+        .map((m) => format(new Date(y, m, 1), "MMM", { locale: ptBR }))
+        .join("–");
+      const label = `${key} — ${months}/${y}`;
+      const bucket = buckets.get(key) ?? {
+        period: key,
+        label,
+        count: 0,
+        entradas: 0,
+        saidas: 0,
+        valor: 0,
+      };
+      bucket.count += 1;
+      if (rows.kind === "result") {
+        // Em "result", `valor` já vem com sinal (entrada positiva, saída negativa).
+        const v = Number(item.valor) || 0;
+        if (v >= 0) bucket.entradas += v;
+        else bucket.saidas += Math.abs(v);
+        bucket.valor += v;
+      } else {
+        const v = Number(item.valor) || 0;
+        bucket.valor += v;
+      }
+      buckets.set(key, bucket);
+    }
+    return Array.from(buckets.values()).sort((a, b) => a.period.localeCompare(b.period));
+  }, [filteredItems, isQuarterly, rows.kind]);
+
+  const displayKind = isQuarterly
+    ? rows.kind === "result"
+      ? "result-quarter"
+      : "cashflow-quarter"
+    : rows.kind;
+
   const filteredTotal = useMemo(
     () => filteredItems.reduce((s: number, i: any) => s + Number(i.valor ?? i.mensal ?? i.ponderado ?? i.salario ?? 0), 0),
     [filteredItems],
   );
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(aggregatedRows.length / pageSize));
 
-  // Reseta página ao mudar busca, métrica ou tamanho de página
+  // Reseta página ao mudar busca, métrica, tamanho de página ou granularidade
   useEffect(() => {
     setPage(1);
-  }, [search, metric, pageSize]);
+  }, [search, metric, pageSize, isQuarterly]);
 
   // Garante que a página atual existe após mudanças no dataset
   useEffect(() => {
@@ -554,12 +611,12 @@ export default function RelatorioKpi() {
 
   const pagedItems = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filteredItems.slice(start, start + pageSize);
-  }, [filteredItems, page, pageSize]);
+    return aggregatedRows.slice(start, start + pageSize);
+  }, [aggregatedRows, page, pageSize]);
 
   const isFiltering = search.trim().length > 0;
-  const showingFrom = filteredItems.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const showingTo = Math.min(page * pageSize, filteredItems.length);
+  const showingFrom = aggregatedRows.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const showingTo = Math.min(page * pageSize, aggregatedRows.length);
 
   const exportCsv = () => {
     if (filteredItems.length === 0) return;
