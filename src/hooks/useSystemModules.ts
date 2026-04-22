@@ -22,7 +22,7 @@ export function useSystemModules() {
       if (error) throw error;
       return (data ?? []) as SystemModule[];
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }
 

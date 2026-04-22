@@ -28,19 +28,35 @@ function lazyRetry(factory: () => Promise<{ default: React.ComponentType<any> }>
 const AppLayout = lazyRetry(() => import("@/components/AppLayout"));
 const BackofficeLayout = lazyRetry(() => import("@/components/BackofficeLayout"));
 
-// Lazy-loaded pages
-const Dashboard = lazyRetry(() => import("@/pages/Dashboard"));
-const Contratos = lazyRetry(() => import("@/pages/Contratos"));
-const Planejamento = lazyRetry(() => import("@/pages/Planejamento"));
+// Lazy page factories — exported so AppLayout can prefetch on hover
+export const pageFactories = {
+  dashboard: () => import("@/pages/Dashboard"),
+  contratos: () => import("@/pages/Contratos"),
+  planejamento: () => import("@/pages/Planejamento"),
+  tarefas: () => import("@/pages/Tarefas"),
+  integracoes: () => import("@/pages/Integracoes"),
+  ia: () => import("@/pages/IAFinanceira"),
+  configuracoes: () => import("@/pages/Configuracoes"),
+  dp: () => import("@/pages/DepartamentoPessoal"),
+  crm: () => import("@/pages/CRM"),
+  financeiro: () => import("@/pages/Financeiro"),
+  relatorioKpi: () => import("@/pages/RelatorioKpi"),
+  onboardingGuiado: () => import("@/pages/OnboardingGuiado"),
+} as const;
 
-const Tarefas = lazyRetry(() => import("@/pages/Tarefas"));
-const Integracoes = lazyRetry(() => import("@/pages/Integracoes"));
-const IAFinanceira = lazyRetry(() => import("@/pages/IAFinanceira"));
-const Configuracoes = lazyRetry(() => import("@/pages/Configuracoes"));
-const DepartamentoPessoal = lazyRetry(() => import("@/pages/DepartamentoPessoal"));
-const CRM = lazyRetry(() => import("@/pages/CRM"));
-const Financeiro = lazyRetry(() => import("@/pages/Financeiro"));
-const RelatorioKpi = lazyRetry(() => import("@/pages/RelatorioKpi"));
+// Lazy-loaded pages
+const Dashboard = lazyRetry(pageFactories.dashboard);
+const Contratos = lazyRetry(pageFactories.contratos);
+const Planejamento = lazyRetry(pageFactories.planejamento);
+const Tarefas = lazyRetry(pageFactories.tarefas);
+const Integracoes = lazyRetry(pageFactories.integracoes);
+const IAFinanceira = lazyRetry(pageFactories.ia);
+const Configuracoes = lazyRetry(pageFactories.configuracoes);
+const DepartamentoPessoal = lazyRetry(pageFactories.dp);
+const CRM = lazyRetry(pageFactories.crm);
+const Financeiro = lazyRetry(pageFactories.financeiro);
+const RelatorioKpi = lazyRetry(pageFactories.relatorioKpi);
+const OnboardingGuiado = lazyRetry(pageFactories.onboardingGuiado);
 const CreateOrganization = lazyRetry(() => import("@/pages/CreateOrganization"));
 const Onboarding = lazyRetry(() => import("@/pages/Onboarding"));
 const BackofficeDashboard = lazyRetry(() => import("@/pages/BackofficeDashboard"));
@@ -50,16 +66,40 @@ const BackofficeAudit = lazyRetry(() => import("@/pages/BackofficeAudit"));
 const BackofficeConfig = lazyRetry(() => import("@/pages/BackofficeConfig"));
 const BackofficeSystem = lazyRetry(() => import("@/pages/BackofficeSystem"));
 const BackofficeOnboarding = lazyRetry(() => import("@/pages/BackofficeOnboarding"));
-const OnboardingGuiado = lazyRetry(() => import("@/pages/OnboardingGuiado"));
 const Auth = lazyRetry(() => import("@/pages/Auth"));
 const NotFound = lazyRetry(() => import("@/pages/NotFound"));
 const ModuleMaintenanceGuard = lazyRetry(() => import("@/components/ModuleMaintenanceGuard"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      retry: 1,
+    },
+  },
+});
 
-const LoadingFallback = () => (
+/** Full-screen fallback used only for top-level auth/onboarding gates */
+const FullScreenLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
     <div className="text-primary animate-pulse text-lg font-semibold">Carregando...</div>
+  </div>
+);
+
+/** Lightweight content-area skeleton — preserves sidebar/header during route transitions */
+const ContentSkeleton = () => (
+  <div className="space-y-4 animate-pulse" aria-hidden="true">
+    <div className="h-8 w-64 rounded-md bg-muted/60" />
+    <div className="h-4 w-96 rounded-md bg-muted/40" />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+      <div className="h-28 rounded-xl bg-muted/40" />
+      <div className="h-28 rounded-xl bg-muted/40" />
+      <div className="h-28 rounded-xl bg-muted/40" />
+    </div>
+    <div className="h-64 rounded-xl bg-muted/30 mt-4" />
   </div>
 );
 
@@ -98,30 +138,34 @@ function ProtectedRoutes() {
   const { loading: orgLoading } = useOrganization();
   const { loading: onboardingLoading, needs: needsOnboarding } = useNeedsOnboarding();
 
-  if (authLoading || orgLoading || onboardingLoading) return <LoadingFallback />;
+  if (authLoading || orgLoading || onboardingLoading) return <FullScreenLoader />;
   if (!user) return <Navigate to="/auth" replace />;
   if (needsOnboarding) return <Navigate to="/onboarding" replace />;
 
+  // Single Suspense at the AppLayout level — sidebar/header stay mounted across route changes.
+  // Inner routes use a lightweight content skeleton so only the main area "blinks".
   return (
-    <Suspense fallback={<LoadingFallback />}>
+    <Suspense fallback={<FullScreenLoader />}>
       <AppLayout>
-        <Routes>
-          <Route path="/" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/financeiro" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/fluxo-caixa" element={<Navigate to="/financeiro" replace />} />
-          <Route path="/conciliacao" element={<Navigate to="/financeiro" replace />} />
-          <Route path="/contratos" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/planejamento" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/tarefas" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/integracoes" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/ia" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/configuracoes" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/dp" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/crm" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="/nova-empresa" element={<Suspense fallback={<LoadingFallback />}><CreateOrganization /></Suspense>} />
-          <Route path="/relatorios/kpi/:metric" element={<Suspense fallback={<LoadingFallback />}><ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard></Suspense>} />
-          <Route path="*" element={<Suspense fallback={<LoadingFallback />}><NotFound /></Suspense>} />
-        </Routes>
+        <Suspense fallback={<ContentSkeleton />}>
+          <Routes>
+            <Route path="/" element={<ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard>} />
+            <Route path="/financeiro" element={<ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard>} />
+            <Route path="/fluxo-caixa" element={<Navigate to="/financeiro" replace />} />
+            <Route path="/conciliacao" element={<Navigate to="/financeiro" replace />} />
+            <Route path="/contratos" element={<ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard>} />
+            <Route path="/planejamento" element={<ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard>} />
+            <Route path="/tarefas" element={<ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard>} />
+            <Route path="/integracoes" element={<ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard>} />
+            <Route path="/ia" element={<ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard>} />
+            <Route path="/configuracoes" element={<ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard>} />
+            <Route path="/dp" element={<ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard>} />
+            <Route path="/crm" element={<ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard>} />
+            <Route path="/nova-empresa" element={<CreateOrganization />} />
+            <Route path="/relatorios/kpi/:metric" element={<ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </AppLayout>
     </Suspense>
   );
@@ -132,12 +176,12 @@ function OnboardingRoute() {
   const { loading: orgLoading } = useOrganization();
   const { loading: onboardingLoading, needs: needsOnboarding } = useNeedsOnboarding();
 
-  if (authLoading || orgLoading || onboardingLoading) return <LoadingFallback />;
+  if (authLoading || orgLoading || onboardingLoading) return <FullScreenLoader />;
   if (!user) return <Navigate to="/auth" replace />;
   if (!needsOnboarding) return <Navigate to="/" replace />;
 
   return (
-    <Suspense fallback={<LoadingFallback />}>
+    <Suspense fallback={<FullScreenLoader />}>
       <Onboarding />
     </Suspense>
   );
@@ -158,23 +202,25 @@ function BackofficeRoutes() {
       .then(({ data }) => setIsMaster(!!data));
   }, [user]);
 
-  if (authLoading || isMaster === null) return <LoadingFallback />;
+  if (authLoading || isMaster === null) return <FullScreenLoader />;
   if (!user) return <Navigate to="/auth" replace />;
   if (!isMaster) return <Navigate to="/" replace />;
 
   return (
-    <Suspense fallback={<LoadingFallback />}>
+    <Suspense fallback={<FullScreenLoader />}>
       <BackofficeLayout>
-        <Routes>
-          <Route path="/" element={<Suspense fallback={<LoadingFallback />}><BackofficeDashboard /></Suspense>} />
-          <Route path="/usuarios" element={<Suspense fallback={<LoadingFallback />}><BackofficeUsers /></Suspense>} />
-          <Route path="/sistema" element={<Suspense fallback={<LoadingFallback />}><BackofficeSystem /></Suspense>} />
-          <Route path="/auditoria" element={<Suspense fallback={<LoadingFallback />}><BackofficeAudit /></Suspense>} />
-          <Route path="/config" element={<Suspense fallback={<LoadingFallback />}><BackofficeConfig /></Suspense>} />
-          <Route path="/empresa/:orgId" element={<Suspense fallback={<LoadingFallback />}><BackofficeCompany /></Suspense>} />
-          <Route path="/onboarding" element={<Suspense fallback={<LoadingFallback />}><BackofficeOnboarding /></Suspense>} />
-          <Route path="*" element={<Suspense fallback={<LoadingFallback />}><NotFound /></Suspense>} />
-        </Routes>
+        <Suspense fallback={<ContentSkeleton />}>
+          <Routes>
+            <Route path="/" element={<BackofficeDashboard />} />
+            <Route path="/usuarios" element={<BackofficeUsers />} />
+            <Route path="/sistema" element={<BackofficeSystem />} />
+            <Route path="/auditoria" element={<BackofficeAudit />} />
+            <Route path="/config" element={<BackofficeConfig />} />
+            <Route path="/empresa/:orgId" element={<BackofficeCompany />} />
+            <Route path="/onboarding" element={<BackofficeOnboarding />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </BackofficeLayout>
     </Suspense>
   );
@@ -182,10 +228,10 @@ function BackofficeRoutes() {
 
 function GuidedOnboardingRoute() {
   const { user, loading: authLoading } = useAuth();
-  if (authLoading) return <LoadingFallback />;
+  if (authLoading) return <FullScreenLoader />;
   if (!user) return <Navigate to="/auth" replace />;
   return (
-    <Suspense fallback={<LoadingFallback />}>
+    <Suspense fallback={<FullScreenLoader />}>
       <OnboardingGuiado />
     </Suspense>
   );
@@ -212,7 +258,7 @@ function AuthRoute() {
   if (user) return <Navigate to="/" replace />;
 
   return (
-    <Suspense fallback={<LoadingFallback />}>
+    <Suspense fallback={<FullScreenLoader />}>
       <Auth />
     </Suspense>
   );

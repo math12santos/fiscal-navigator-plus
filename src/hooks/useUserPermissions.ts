@@ -30,7 +30,7 @@ export function useUserPermissions() {
       return (data ?? []) as Permission[];
     },
     enabled: !!user && !!orgId,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 
   // Check if user has a master role (bypasses all permissions)
@@ -47,7 +47,7 @@ export function useUserPermissions() {
       return !!data;
     },
     enabled: !!user,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
 
   // Check if user is a backoffice operator with access to this org
@@ -76,7 +76,7 @@ export function useUserPermissions() {
       return !!access;
     },
     enabled: !!user,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
 
   // Owners and admins always have full access
@@ -97,7 +97,7 @@ export function useUserPermissions() {
       return (data ?? []).map((d: any) => d.cost_center_id as string);
     },
     enabled: !!user && !!orgId && !hasFullAccess,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 
   const hasFullScope = hasFullAccess || ccAccessIds.length === 0;
