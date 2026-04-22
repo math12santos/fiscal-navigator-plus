@@ -192,8 +192,19 @@ export function usePlanningPdfReport({
     // ============= Build PDF =============
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 36;
+    const footerHeight = 28; // espaço reservado ao rodapé em todas as páginas
+    const bottomLimit = pageHeight - margin - footerHeight; // limite seguro para conteúdo
     let y = margin;
+
+    // Garante que há `needed` pontos disponíveis antes de desenhar; senão, nova página.
+    const ensureSpace = (needed: number) => {
+      if (y + needed > bottomLimit) {
+        doc.addPage();
+        y = margin;
+      }
+    };
 
     // ----- Header -----
     doc.setFont("helvetica", "bold");
