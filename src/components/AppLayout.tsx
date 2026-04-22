@@ -5,7 +5,6 @@ import {
   FileText,
   DollarSign,
   Target,
-  
   CheckSquare,
   Plug,
   Brain,
@@ -28,19 +27,37 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
+import { pageFactories } from "@/App";
 
-const navItems = [
-  { path: "/", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
-  { path: "/financeiro", label: "Financeiro", icon: DollarSign, module: "financeiro" },
-  { path: "/contratos", label: "Contratos", icon: FileText, module: "contratos" },
-  { path: "/planejamento", label: "Planejamento", icon: Target, module: "planejamento" },
-  { path: "/dp", label: "Depto. Pessoal", icon: Users, module: "dp" },
-  { path: "/crm", label: "CRM", icon: Handshake, module: "crm" },
-  { path: "/tarefas", label: "Tarefas", icon: CheckSquare, module: "tarefas" },
-  { path: "/integracoes", label: "Integrações", icon: Plug, module: "integracoes" },
-  { path: "/ia", label: "IA Financeira", icon: Brain, module: "ia" },
-  { path: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes" },
+type PageFactoryKey = keyof typeof pageFactories;
+
+const navItems: Array<{
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  module: string;
+  prefetch?: PageFactoryKey;
+}> = [
+  { path: "/", label: "Dashboard", icon: LayoutDashboard, module: "dashboard", prefetch: "dashboard" },
+  { path: "/financeiro", label: "Financeiro", icon: DollarSign, module: "financeiro", prefetch: "financeiro" },
+  { path: "/contratos", label: "Contratos", icon: FileText, module: "contratos", prefetch: "contratos" },
+  { path: "/planejamento", label: "Planejamento", icon: Target, module: "planejamento", prefetch: "planejamento" },
+  { path: "/dp", label: "Depto. Pessoal", icon: Users, module: "dp", prefetch: "dp" },
+  { path: "/crm", label: "CRM", icon: Handshake, module: "crm", prefetch: "crm" },
+  { path: "/tarefas", label: "Tarefas", icon: CheckSquare, module: "tarefas", prefetch: "tarefas" },
+  { path: "/integracoes", label: "Integrações", icon: Plug, module: "integracoes", prefetch: "integracoes" },
+  { path: "/ia", label: "IA Financeira", icon: Brain, module: "ia", prefetch: "ia" },
+  { path: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes", prefetch: "configuracoes" },
 ];
+
+/** Trigger the dynamic import for a page chunk. Browser caches the module
+ *  on first call, so the second mount (the actual click) is instant. */
+const prefetched = new Set<string>();
+function prefetchPage(key?: PageFactoryKey) {
+  if (!key || prefetched.has(key)) return;
+  prefetched.add(key);
+  pageFactories[key]().catch(() => prefetched.delete(key));
+}
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -89,6 +106,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.path}
                 to={item.path}
+                onMouseEnter={() => prefetchPage(item.prefetch)}
+                onFocus={() => prefetchPage(item.prefetch)}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive
@@ -104,6 +123,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           {showOnboardingLink && (
             <Link
               to="/onboarding-guiado"
+              onMouseEnter={() => prefetchPage("onboardingGuiado")}
+              onFocus={() => prefetchPage("onboardingGuiado")}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 location.pathname === "/onboarding-guiado"

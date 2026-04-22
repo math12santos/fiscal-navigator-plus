@@ -31,7 +31,7 @@ export function useOrgModules(orgId?: string) {
       return (data ?? []) as unknown as OrgModule[];
     },
     enabled: !!resolvedOrgId,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 
   const hasModuleConfig = modules.length > 0;

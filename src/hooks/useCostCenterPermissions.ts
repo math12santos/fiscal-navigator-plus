@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -29,7 +30,7 @@ export function useCostCenterPermissions(costCenterId?: string | null) {
       return (data ?? []) as unknown as CostCenterPermission[];
     },
     enabled: !!costCenterId && !!orgId,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 
   return { permissions, isLoading };
@@ -71,19 +72,29 @@ export async function saveCostCenterPermissions(
  * Fetch all cost_center_permissions for multiple cost centers at once.
  */
 export function useCostCenterPermissionsBulk(costCenterIds: string[]) {
+  // Stable, deduplicated, sorted key — array reordering on the caller side
+  // must NOT invalidate the cache. We snapshot once per unique set of ids.
+  const stableKey = useMemo(() => {
+    const unique = Array.from(new Set(costCenterIds));
+    unique.sort();
+    return unique.join(",");
+  }, [costCenterIds]);
+
+  const stableIds = useMemo(() => (stableKey ? stableKey.split(",") : []), [stableKey]);
+
   const { data: permissions = [], isLoading } = useQuery({
-    queryKey: ["cost_center_permissions_bulk", costCenterIds.sort().join(",")],
+    queryKey: ["cost_center_permissions_bulk", stableKey],
     queryFn: async () => {
-      if (costCenterIds.length === 0) return [];
+      if (stableIds.length === 0) return [];
       const { data, error } = await supabase
         .from("cost_center_permissions" as any)
         .select("*")
-        .in("cost_center_id", costCenterIds);
+        .in("cost_center_id", stableIds);
       if (error) throw error;
       return (data ?? []) as unknown as CostCenterPermission[];
     },
-    enabled: costCenterIds.length > 0,
-    staleTime: 30_000,
+    enabled: stableIds.length > 0,
+    staleTime: 5 * 60_000,
   });
 
   return { permissions, isLoading };

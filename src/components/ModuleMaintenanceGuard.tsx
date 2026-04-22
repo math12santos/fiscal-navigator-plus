@@ -13,7 +13,10 @@ export default function ModuleMaintenanceGuard({ moduleKey, children }: ModuleMa
   const { isEnabled: systemEnabled, isLoading: systemLoading, maintenanceMessage } = useIsModuleEnabled(moduleKey);
   const { isModuleEnabled: orgEnabled, isLoading: orgLoading } = useOrgModules();
 
-  if (systemLoading || orgLoading) return null;
+  // While loading, render children — pages have their own skeletons.
+  // We only block once we have a confirmed disabled state. Avoids the
+  // "double white-flash" between Suspense fallback and guard fallback.
+  if (systemLoading || orgLoading) return <>{children}</>;
 
   // System-wide maintenance takes priority
   if (!systemEnabled) {
