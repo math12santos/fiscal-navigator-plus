@@ -18,6 +18,8 @@ export interface BankAccount {
   active: boolean;
   created_at: string;
   saldo_atual: number;
+  saldo_atualizado_em: string | null;
+  saldo_atualizado_por: string | null;
   limite_credito: number;
   limite_tipo: string | null;
   limite_taxa_juros_mensal: number | null;
