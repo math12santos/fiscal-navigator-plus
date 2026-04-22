@@ -9,6 +9,8 @@ import { useCashFlow } from "@/hooks/useCashFlow";
 import { useBudget, useBudgetLines, BudgetLine } from "@/hooks/useBudget";
 import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
+import { useContracts } from "@/hooks/useContracts";
+import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
