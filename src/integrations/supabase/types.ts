@@ -1772,6 +1772,7 @@ export type Database = {
           id: string
           inss_patronal_pct: number | null
           organization_id: string | null
+          pending_holding_suggestion: Json | null
           provisao_13_pct: number | null
           provisao_ferias_pct: number | null
           rat_pct: number | null
@@ -1787,6 +1788,7 @@ export type Database = {
           id?: string
           inss_patronal_pct?: number | null
           organization_id?: string | null
+          pending_holding_suggestion?: Json | null
           provisao_13_pct?: number | null
           provisao_ferias_pct?: number | null
           rat_pct?: number | null
@@ -1802,6 +1804,7 @@ export type Database = {
           id?: string
           inss_patronal_pct?: number | null
           organization_id?: string | null
+          pending_holding_suggestion?: Json | null
           provisao_13_pct?: number | null
           provisao_ferias_pct?: number | null
           rat_pct?: number | null
