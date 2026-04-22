@@ -1,122 +1,128 @@
 
 
-## Shell-first loading + indicador global de cálculo nas páginas
+## Revisão completa do módulo DP — melhorias e exportações
 
-Reduzir a sensação de lentidão ao trocar de módulo exibindo **imediatamente o "esqueleto" da página** (cabeçalho, abas, cards, gráficos vazios) e um **marcador global de "calculando"** enquanto os dados são buscados. O usuário deixa de ver tela em branco ou skeletons genéricos e passa a ver a estrutura real da página com placeholders animados + um indicador claro de progresso.
+Análise do módulo atual identificou pontos fortes (cálculo de encargos, rescisão com simulador, integração com cashflow e planejamento de RH, propagação Holding) e lacunas relevantes para um módulo DP de cockpit financeiro. Abaixo, o plano organizado por **camadas de prioridade**, todas opcionais — você pode aprovar tudo ou apenas as fases que fizerem sentido.
 
-### O que o usuário verá
+---
 
-**1. Ao clicar em qualquer módulo da sidebar**
+### O que existe hoje
+- **Dashboard** com KPIs (headcount, folha bruta, encargos, custo médio) e cards de VT/VA/Saúde.
+- **Colaboradores** com cadastro, comissão, VT, vínculo de benefícios e desligamento via simulador.
+- **Folha** mensal com cálculo de INSS/IRRF/VT e fechamento (lock).
+- **Férias/13º** com provisões e prazos legais.
+- **Rescisões** com simulador, integração com planejamento e materialização em cashflow.
+- **Encargos** com detalhamento por colaborador (INSS patronal, RAT, FGTS, terceiros).
+- **Cargos & Rotinas** com organograma e SLA das rotinas.
+- **Benefícios** cadastrados e atribuídos por colaborador.
+- **Configurações** com Encargos, Provisionamentos, Descontos, propagação para subsidiárias.
 
-A área central troca instantaneamente para um esqueleto **fiel ao layout final**:
-- Linha do título da página (com nome real do módulo) + descrição cinza
-- Linha de abas (quando o módulo tem abas, ex.: Financeiro, Planejamento, DP, CRM)
-- Grid de KPIs cinza (4–6 cards retangulares)
-- Bloco de gráfico/tabela cinza ocupando o resto da viewport
+### O que falta (lacunas identificadas)
+- Nenhuma exportação de relatório (PDF/Excel/CSV).
+- Sem holerite/recibo individual do colaborador.
+- Sem dossiê do colaborador (anexos: contrato, RG, CPF, CTPS, exames).
+- Sem eventos variáveis de folha (horas extras, faltas, adicionais, descontos pontuais).
+- Sem absenteísmo / banco de horas.
+- Sem dissídio coletivo / reajuste em massa.
+- Sem aniversariantes, tempo de casa, aniversário de admissão.
+- Sem importação em lote de colaboradores (CSV/XLSX).
+- Sem alertas proativos (férias vencendo, exames a renovar, contratos de experiência expirando).
+- Sem comparativo histórico (folha mês vs mês, headcount evolução).
+- Integração com Tarefas para rotinas existe, mas sem visão consolidada de pendências do DP no Dashboard.
 
-Sem mais "flash" da `ContentSkeleton` genérica seguida de tela vazia — o esqueleto **já tem o formato do módulo**.
+---
 
-**2. Marcador global "Calculando…" no topo da área central**
+## Fase 1 — Exportação de relatórios (foco do pedido)
 
-Um badge fixo no canto direito do header (ao lado de Tema/Notificações):
-- Aparece com `Loader2` girando + texto "Calculando…" sempre que **qualquer query do React Query** estiver `isFetching` (não só na primeira carga, mas também em refetches manuais).
-- Soma o número de queries ativas (ex.: "Calculando… (3)") para dar feedback do volume.
-- Some sozinho quando todas as queries terminam.
-- Tooltip mostra "Buscando dados do servidor" para deixar claro o que está acontecendo.
+Adicionar exportação **PDF executivo** e **Excel detalhado** em pontos-chave do módulo, reutilizando `jsPDF + jspdf-autotable` (já no projeto) e `xlsx` (já no projeto via `useFinanceiroImport`).
 
-Implementação: usa `useIsFetching()` do `@tanstack/react-query` — zero overhead, já vem do provider existente.
+**Relatórios disponíveis:**
 
-**3. Cards e gráficos preenchem progressivamente**
+| Relatório | PDF | Excel | Origem |
+|---|---|---|---|
+| **Folha de pagamento** (resumo + analítico por colaborador) | ✅ | ✅ | aba Folha, por `payroll_run` |
+| **Holerite individual** (contracheque PDF) | ✅ | — | aba Folha, item selecionado |
+| **Encargos sociais** (mensal por colaborador) | ✅ | ✅ | aba Encargos |
+| **Provisões de Férias e 13º** | ✅ | ✅ | aba Férias |
+| **Rescisões** (período) com totais e multa FGTS | ✅ | ✅ | aba Rescisões |
+| **Headcount e custos por CC** | ✅ | ✅ | Dashboard |
+| **Lista de colaboradores** (cadastro completo) | — | ✅ | aba Colaboradores |
+| **Benefícios atribuídos** (matriz colaborador × benefício) | — | ✅ | aba Benefícios |
 
-Quando `isLoading` de cada hook resolve, o card real substitui o skeleton individualmente. A página não "pisca" nem reorganiza — o esqueleto reserva o espaço exato.
+**Onde aparece:** botão **"Exportar"** no canto superior direito de cada aba (dropdown PDF/Excel). Holerite individual: ícone de download na linha do colaborador na aba Folha.
 
-### Como funciona (técnico)
+**Padrão visual do PDF:** cabeçalho com nome da empresa, período, logo placeholder; rodapé com "Gerado por Colli FinCore — DD/MM/AAAA HH:mm"; tabelas com zebra striping; resumo executivo no topo (totais).
 
-**A. Skeletons por módulo (`src/components/skeletons/`)**
+---
 
-Criar um arquivo de skeletons específicos, mínimos e síncronos (sem fetches, sem hooks pesados):
+## Fase 2 — Dossiê e ciclo de vida do colaborador
 
-- `DashboardSkeleton.tsx`: header + 6 KPIs + 2 gráficos lado a lado + 1 tabela.
-- `FinanceiroSkeleton.tsx`: header + barra de abas + 4 KPIs + tabela longa.
-- `PlanejamentoSkeleton.tsx`: header + abas + 3 cards de orçamento + área de gráfico.
-- `DpSkeleton.tsx`, `CrmSkeleton.tsx`, `ContratosSkeleton.tsx`, `RelatorioKpiSkeleton.tsx`: cada um espelhando a estrutura real.
-- `GenericPageSkeleton.tsx`: fallback (header + 4 KPIs + bloco), substituindo o `ContentSkeleton` genérico atual.
+**a) Dossiê do colaborador (drawer lateral)**
+Ao clicar no nome do colaborador, abrir drawer com 4 abas:
+- **Dados** — cadastrais + cargo + CC.
+- **Histórico de salário** — usa `employee_compensations` (já existe, mas sem UI de visualização).
+- **Documentos** — upload de RG, CPF, CTPS, contrato, exames admissional/periódico (Storage bucket `employee-documents` com isolamento por org).
+- **Histórico de folha** — todas as folhas em que apareceu, com link para o holerite.
 
-Cada skeleton usa `<Skeleton>` do shadcn (já existe em `src/components/ui/skeleton.tsx`), portanto consistente com o tema dark/light.
+**b) Eventos variáveis de folha**
+Nova tabela `payroll_events` (employee_id, payroll_run_id, type, description, value, signal +/−).
+Tipos: hora extra 50%, hora extra 100%, adicional noturno, faltas, atrasos, desconto pontual, bônus, comissão variável.
+UI: dentro do detalhe da folha, botão "+ Lançamento variável" que entra no cálculo do líquido.
 
-**B. Mapear cada rota ao seu skeleton no `Suspense` interno (`src/App.tsx`)**
+**c) Reajuste em massa (dissídio)**
+Modal "Aplicar reajuste" filtrando por cargo/CC, aplicando % ou valor fixo. Cria automaticamente registros em `employee_compensations` com motivo = "dissídio".
 
-Hoje há um único `<Suspense fallback={<ContentSkeleton />}>` cobrindo todas as rotas. Em vez disso, envolver cada `<Route element={...}>` em um `<Suspense>` com fallback específico do módulo. Exemplo:
+---
 
-```tsx
-<Route path="/financeiro" element={
-  <Suspense fallback={<FinanceiroSkeleton />}>
-    <ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard>
-  </Suspense>
-} />
-```
+## Fase 3 — Inteligência e alertas
 
-A nota de memória `performance-optimization` diz "não usar Suspense aninhado por rota" para não desmontar sidebar/header — **isso continua respeitado**: a sidebar/header ficam fora, no `AppLayout`. O Suspense aninhado fica apenas dentro da área central, exatamente como o `ContentSkeleton` atual já faz, só que agora com fallback fiel ao módulo.
+**a) Painel de pendências DP no Dashboard:**
+- Férias vencendo nos próximos 30/60 dias (já calculado, falta destaque).
+- Contratos de experiência (45/90 dias) expirando.
+- Exames periódicos vencidos (depende da Fase 2 — documentos com data).
+- Aniversariantes do mês + aniversário de admissão.
+- Folhas pendentes de fechamento.
 
-A memória será atualizada para refletir: "Suspense interno usa skeleton específico por rota; nunca envolve `AppLayout`."
+**b) Comparativos históricos:**
+- Gráfico "Evolução da folha bruta" (últimos 12 meses).
+- Gráfico "Evolução do headcount" (admitidos vs desligados por mês).
+- Card "Turnover anualizado" (desligamentos / headcount médio).
 
-**C. Indicador global "Calculando…" (`src/components/GlobalFetchingIndicator.tsx`)**
+**c) Importação em lote de colaboradores:**
+Reaproveitar o padrão `ImportDialog` do Financeiro (CSV/XLSX → mapeamento IA → preview → confirmar). Coluna obrigatória: nome, CPF, admissão, salário.
 
-```tsx
-import { useIsFetching } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+---
 
-export function GlobalFetchingIndicator() {
-  const count = useIsFetching();
-  if (count === 0) return null;
-  return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs"
-         title="Buscando dados do servidor">
-      <Loader2 size={12} className="animate-spin" />
-      <span>Calculando{count > 1 ? ` (${count})` : "…"}</span>
-    </div>
-  );
-}
-```
+## Fase 4 — Integrações (melhorias nas existentes)
 
-Inserir em `AppLayout.tsx` no header (linha 176), antes do `ThemeToggle`. Mesma coisa em `BackofficeLayout.tsx`.
+| Integração | Status atual | Melhoria proposta |
+|---|---|---|
+| **Cashflow** (rescisões) | OK, materializa via `dedup_hash` | Estender para folha mensal: ao **fechar** uma `payroll_run`, materializar 1 entry por sub_category (já existe lógica em `usePayrollProjections` — falta o "promote to real"). |
+| **Planejamento RH** | OK (rescisão fecha ciclo) | Estender: admissões planejadas → quando colaborador for cadastrado a partir de um item, marcar `hr_planning_item` como executado. |
+| **Tarefas** (rotinas DP) | OK | Adicionar widget "Rotinas DP de hoje" no Dashboard do DP (atualmente só aparece em Tarefas). |
+| **Centros de Custo** | OK | Adicionar visão "DRE de pessoal por CC" (rateio quando colaborador atende +1 CC). |
+| **Contratos** | Ligação `contract_id` existe na tabela `employees` mas **não tem UI** | Selector de contrato no cadastro do colaborador — útil para terceirizados/PJ ligados a um contrato de prestação. |
 
-**D. Skeleton dentro das páginas (refinamento mínimo, opcional por módulo)**
+---
 
-Hoje vários módulos retornam `null` ou vazio durante `isLoading`. Para os módulos críticos (Dashboard, Financeiro, Planejamento, DP), substituir os retornos vazios por **skeletons inline dos KPIs/tabelas** — assim, mesmo após o chunk carregar, o usuário vê estrutura enquanto o React Query traz os dados. O `GlobalFetchingIndicator` complementa avisando que algo está rodando.
+## Sugestão de priorização
 
-Esta etapa é incremental: começamos por `Dashboard.tsx` e `Financeiro.tsx`. Outros módulos podem ser feitos depois se necessário.
+Para não comprometer o cronograma, sugiro **3 sprints**:
 
-### Resultado esperado
+1. **Sprint 1 (foco do pedido):** Fase 1 completa — todos os exports.
+2. **Sprint 2:** Fase 3 (alertas, comparativos, importação em lote) + Fase 4 (widget de rotinas no Dashboard, link de contrato).
+3. **Sprint 3:** Fase 2 (dossiê + eventos variáveis + dissídio) — maior, demanda novas tabelas e Storage.
 
-| Antes | Depois |
-|---|---|
-| Clica → skeleton genérico de 3 blocos → tela em branco → conteúdo aparece | Clica → esqueleto fiel ao módulo aparece imediatamente → badge "Calculando…" indica fetch em andamento → cards preenchem in-place |
-| Sem feedback visual durante refetches | Badge "Calculando…" no header sempre que qualquer query roda |
-| Sensação de "travado" | Sensação de "está vindo" |
+---
 
-### Arquivos
+## Decisão necessária
 
-**Criar:**
-- `src/components/GlobalFetchingIndicator.tsx`
-- `src/components/skeletons/GenericPageSkeleton.tsx`
-- `src/components/skeletons/DashboardSkeleton.tsx`
-- `src/components/skeletons/FinanceiroSkeleton.tsx`
-- `src/components/skeletons/PlanejamentoSkeleton.tsx`
-- `src/components/skeletons/ContratosSkeleton.tsx`
-- `src/components/skeletons/DpSkeleton.tsx`
-- `src/components/skeletons/CrmSkeleton.tsx`
-- `src/components/skeletons/RelatorioKpiSkeleton.tsx`
+Para eu começar, escolha o escopo:
 
-**Editar:**
-- `src/App.tsx` — Suspense por rota com fallback de skeleton específico (manter um único nível interno; sidebar/header permanecem fora).
-- `src/components/AppLayout.tsx` — adicionar `<GlobalFetchingIndicator />` no header.
-- `src/components/BackofficeLayout.tsx` — mesma adição no header do backoffice.
-- `src/pages/Dashboard.tsx` — substituir retorno vazio durante `isLoading` por `<DashboardSkeleton />` inline (estrutura preservada).
-- `src/pages/Financeiro.tsx` — idem com `<FinanceiroSkeleton />`.
+- **(A)** Apenas Fase 1 — exportações de relatórios (recomendo começar por aqui).
+- **(B)** Fase 1 + Fase 3 (exports + alertas/comparativos/importação).
+- **(C)** Tudo (Fases 1 a 4) em sprints sequenciais.
+- **(D)** Outro recorte — me diga quais itens da lista priorizar.
 
-**Memória:**
-- Atualizar `mem://architecture/performance-optimization` para registrar: "Skeletons fiéis por rota + `useIsFetching` no header" como padrão oficial.
-
-Sem mudanças de schema, sem mudanças de lógica de negócio, sem alterar hooks de dados — apenas camada visual de carregamento e indicador global.
+Sem mudanças destrutivas em qualquer fase: novas tabelas e colunas são aditivas; UI nova convive com a existente; integrações respeitam o padrão MECE de materialização (sem duplicatas).
 
