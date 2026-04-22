@@ -316,6 +316,142 @@ export default function RelatorioKpi() {
     }
   }, [metric, meta, summary.entries, contracts, employees, liabilities, opportunities, stages, curMonthStart, curMonthEnd]);
 
+  // ===== Validação cruzada com o KPI canônico do Dashboard =====
+  // Para cada métrica, comparamos a soma dos itens detalhados (rows.total) com
+  // o valor agregado que o Dashboard exibe — ambos derivados de
+  // `useFinancialSummary` para garantir reproducibilidade. Diferenças <= 1
+  // centavo são consideradas igualdade (arredondamento de ponto flutuante).
+  // KPIs que dependem de cálculos derivados sem fonte 1:1 (ex.: runway, custo
+  // de folha com encargos) são marcados como "informativos" — exibimos o valor
+  // referencial sem aviso de erro.
+  const reconciliation = useMemo(() => {
+    if (!meta) return null;
+    const m = metric as KpiMetric;
+
+    type Recon = {
+      dashboardLabel: string;
+      dashboardValue: number;
+      drilldownValue: number;
+      mode: "exact" | "informative";
+      note?: string;
+    };
+
+    const drilldownValue = rows.total;
+
+    switch (m) {
+      case "receita-mensal":
+      case "despesas-mensais":
+      case "resultado-mensal": {
+        // O Dashboard mostra o valor do MÊS CORRENTE para esses 3 KPIs.
+        // useFinancialSummary expõe entradas/saídas do horizonte inteiro;
+        // recalculamos só o mês corrente sobre `summary.entries` (mesma fonte).
+        let entradas = 0;
+        let saidas = 0;
+        for (const e of summary.entries) {
+          if (e.data_prevista < curMonthStart || e.data_prevista > curMonthEnd) continue;
+          const v = Number(e.valor_realizado ?? e.valor_previsto);
+          if (e.tipo === "entrada") entradas += v;
+          else saidas += v;
+        }
+        const dashboardValue =
+          m === "receita-mensal" ? entradas :
+          m === "despesas-mensais" ? saidas :
+          entradas - saidas;
+        return {
+          dashboardLabel: "KPI do Dashboard (mês corrente)",
+          dashboardValue,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "saldo-periodo": {
+        return {
+          dashboardLabel: "KPI do Dashboard (saldo do horizonte)",
+          dashboardValue: summary.cashflowTotals.saldo,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "contratos-ativos": {
+        return {
+          dashboardLabel: "KPI do Dashboard (valor mensalizado)",
+          dashboardValue: summary.monthlyContractValue,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "passivos": {
+        return {
+          dashboardLabel: "KPI do Dashboard (passivos atualizados)",
+          dashboardValue: summary.liabTotals.total,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "crm-pipeline": {
+        return {
+          dashboardLabel: "KPI do Dashboard (pipeline ponderado)",
+          dashboardValue: summary.crmWeightedValue,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "custo-folha": {
+        // O drill-down lista salário base. O Dashboard exibe a folha média
+        // mensal (salário + benefícios + encargos). Mostramos os dois valores
+        // como "informativo" para o usuário entender a diferença.
+        return {
+          dashboardLabel: "KPI do Dashboard (folha média c/ encargos)",
+          dashboardValue: summary.avgMonthlyPayroll,
+          drilldownValue,
+          mode: "informative" as const,
+          note: "O drill-down lista o salário base de cada colaborador. O KPI do Dashboard inclui benefícios e encargos patronais sobre toda a folha — por isso os valores costumam diferir.",
+        } satisfies Recon;
+      }
+
+      case "runway": {
+        // Drill-down soma despesas do horizonte. Dashboard mostra meses
+        // (saldo / burn médio). Exibimos burn médio como referência.
+        return {
+          dashboardLabel: "Burn médio do horizonte",
+          dashboardValue: summary.monthlyBurn,
+          drilldownValue,
+          mode: "informative" as const,
+          note: "A soma das saídas do horizonte ÷ nº de meses = burn médio. O KPI do Dashboard mostra runway em meses (saldo ÷ burn).",
+        } satisfies Recon;
+      }
+
+      default:
+        return null;
+    }
+  }, [
+    meta,
+    metric,
+    rows.total,
+    summary.entries,
+    summary.cashflowTotals.saldo,
+    summary.monthlyContractValue,
+    summary.liabTotals.total,
+    summary.crmWeightedValue,
+    summary.avgMonthlyPayroll,
+    summary.monthlyBurn,
+    curMonthStart,
+    curMonthEnd,
+  ]);
+
+  // Status: "match" (bate até 1 centavo), "mismatch" (diverge), "info" (modo informativo).
+  const reconciliationStatus = useMemo(() => {
+    if (!reconciliation) return null;
+    if (reconciliation.mode === "informative") return "info" as const;
+    const diff = Math.abs(reconciliation.dashboardValue - reconciliation.drilldownValue);
+    return diff <= 0.01 ? ("match" as const) : ("mismatch" as const);
+  }, [reconciliation]);
+
   // ===== Busca + paginação =====
   // Filtro textual sobre todos os campos string/number do item. Total e CSV
   // são derivados do conjunto filtrado, mantendo a auditabilidade ("o que
