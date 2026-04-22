@@ -11,7 +11,11 @@ export default function DPFerias() {
   const { data: vacations = [] } = useVacations();
   const { data: dpConfig } = useDPConfig();
 
-  const activeEmployees = employees.filter((e: any) => e.status === "ativo");
+  // Apenas CLT tem direito a férias remuneradas e 13º com provisão patronal.
+  // PJ é regido pelo contrato cível; estagiário tem recesso (Lei 11.788) sem 13º.
+  const activeEmployees = employees.filter(
+    (e: any) => e.status === "ativo" && e.contract_type !== "PJ" && e.contract_type !== "estagio",
+  );
 
   // Calculate vacation status for each active employee
   const vacationData = useMemo(() => {

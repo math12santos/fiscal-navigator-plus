@@ -39,6 +39,7 @@ export default function DPRescisoes() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Colaborador</TableHead>
+                  <TableHead>Regime</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Total Rescisão</TableHead>
@@ -48,18 +49,25 @@ export default function DPRescisoes() {
               </TableHeader>
               <TableBody>
                 {terminations.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma rescisão registrada</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma rescisão registrada</TableCell></TableRow>
                 ) : (
-                  terminations.map((t: any) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-medium text-foreground">{empMap[t.employee_id]?.name || "—"}</TableCell>
-                      <TableCell className="text-xs">{format(new Date(t.termination_date), "dd/MM/yyyy")}</TableCell>
-                      <TableCell><Badge variant="outline">{TERM_TYPES.find((tt) => tt.value === t.type)?.label || t.type}</Badge></TableCell>
-                      <TableCell className="font-mono font-bold">{fmt(t.total_rescisao)}</TableCell>
-                      <TableCell className="font-mono text-destructive">{fmt(t.multa_fgts)}</TableCell>
-                      <TableCell><Badge variant={t.status === "simulacao" ? "secondary" : "default"}>{t.status}</Badge></TableCell>
-                    </TableRow>
-                  ))
+                  terminations.map((t: any) => {
+                    const emp = empMap[t.employee_id];
+                    const regime = emp?.contract_type || "—";
+                    return (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-medium text-foreground">{emp?.name || "—"}</TableCell>
+                        <TableCell><Badge variant="secondary" className="text-[10px]">{regime}</Badge></TableCell>
+                        <TableCell className="text-xs">{format(new Date(t.termination_date), "dd/MM/yyyy")}</TableCell>
+                        <TableCell><Badge variant="outline">{ALL_TYPE_LABELS[t.type] || t.type}</Badge></TableCell>
+                        <TableCell className="font-mono font-bold">{fmt(t.total_rescisao)}</TableCell>
+                        <TableCell className="font-mono text-destructive">
+                          {regime === "PJ" || regime === "estagio" ? <span className="text-muted-foreground">—</span> : fmt(t.multa_fgts)}
+                        </TableCell>
+                        <TableCell><Badge variant={t.status === "simulacao" ? "secondary" : "default"}>{t.status}</Badge></TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
