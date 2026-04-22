@@ -567,9 +567,14 @@ export default function RelatorioKpi() {
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">
-              {isFiltering ? "Total filtrado" : "Total"}
-            </p>
+            <div className="flex items-center justify-end gap-2">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                {isFiltering ? "Total filtrado" : "Total"}
+              </p>
+              {!isFiltering && reconciliationStatus && (
+                <ReconciliationBadge status={reconciliationStatus} />
+              )}
+            </div>
             <p className="text-2xl font-bold text-foreground">
               {fmt(isFiltering ? filteredTotal : rows.total)}
             </p>
