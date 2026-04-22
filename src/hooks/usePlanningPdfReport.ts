@@ -440,6 +440,36 @@ export function usePlanningPdfReport({
     const fileName = `planejamento_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
     doc.save(fileName);
 
+    // Calcula nomes legíveis dos filtros (preserva contexto histórico
+    // mesmo se as entidades forem renomeadas/excluídas depois).
+    const labelSubsidiary = filters.subsidiaryOrgId
+      ? subsidiaryOrgs.find((o) => o.id === filters.subsidiaryOrgId)?.name ?? null
+      : null;
+    const labelBanks = filters.bankAccountIds
+      .map((id) => allBankAccounts.find((b) => b.id === id)?.nome)
+      .filter((n): n is string => !!n);
+    const labelCcs = filters.costCenterIds
+      .map((id) => costCenters.find((c) => c.id === id)?.name)
+      .filter((n): n is string => !!n);
+
+    // Classifica recorte vazio para auditoria comparativa entre exportações.
+    const totalRows = entries.length + materializedEntries.length + contracts.length + payrollProjections.length;
+    const hadData = totalRows > 0;
+    let emptyReason: "no_period_data" | "filters_excluded_all" | "no_budget_version" | "other" | null = null;
+    if (!hadData) {
+      const anyUnfiltered =
+        rawEntries.length > 0 || rawMaterialized.length > 0 || rawContracts.length > 0 || (rawPayroll as any[]).length > 0;
+      if (hasAnyFilter(filters) && anyUnfiltered) {
+        emptyReason = "filters_excluded_all";
+      } else if (!budgetVersion && !anyUnfiltered) {
+        emptyReason = "no_budget_version";
+      } else if (!anyUnfiltered) {
+        emptyReason = "no_period_data";
+      } else {
+        emptyReason = "other";
+      }
+    }
+
     // Retorna metadados de auditoria para que o chamador possa registrar
     // a exportação no histórico (mesmos textos exibidos no cabeçalho do PDF).
     return {
@@ -450,6 +480,13 @@ export function usePlanningPdfReport({
       scenarioId: activeScenario?.id ?? null,
       budgetVersionId: budgetVersion?.id ?? null,
       budgetVersionName: budgetVersion?.name ?? null,
+      filterLabels: {
+        subsidiary: labelSubsidiary,
+        bankAccounts: labelBanks,
+        costCenters: labelCcs,
+      },
+      hadData,
+      emptyReason,
     };
   }, [
     versions,
