@@ -3408,13 +3408,6 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "planning_report_exports_scenario_id_fkey"
-            columns: ["scenario_id"]
-            isOneToOne: false
-            referencedRelation: "commercial_scenarios"
-            referencedColumns: ["id"]
-          },
         ]
       }
       planning_scenarios: {
