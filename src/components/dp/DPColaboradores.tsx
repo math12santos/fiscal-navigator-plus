@@ -43,6 +43,7 @@ export default function DPColaboradores() {
   const { data: allEmployeeBenefits = [] } = useEmployeeBenefits();
   const { assign: assignBenefits } = useMutateEmployeeBenefit();
   const { toast } = useToast();
+  const { currentOrg } = useOrganization();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("__all__");
