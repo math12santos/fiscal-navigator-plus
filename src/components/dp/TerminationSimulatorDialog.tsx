@@ -56,10 +56,10 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
     if (open) {
       setSelectedEmpId(initialEmployeeId || "");
       setTermType("sem_justa_causa");
-      setTermDate(format(new Date(), "yyyy-MM-dd"));
+      setTermDate(initialTerminationDate || format(new Date(), "yyyy-MM-dd"));
       setSimResult(null);
     }
-  }, [open, initialEmployeeId]);
+  }, [open, initialEmployeeId, initialTerminationDate]);
 
   const selectedEmp = empMap[selectedEmpId];
   const isPJ = selectedEmp?.contract_type === "PJ";
@@ -155,14 +155,18 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
   const handleSaveTermination = () => {
     if (!simResult || !selectedEmpId) return;
     // contract_type agora é persistido como snapshot imutável do regime na data da rescisão.
+    // hr_planning_item_id fecha o ciclo planejamento → execução (quando aplicável).
     create.mutate({
       employee_id: selectedEmpId,
       termination_date: termDate,
       type: termType,
+      hr_planning_item_id: hrPlanningItemId,
       ...simResult,
     }, {
       onSuccess: () => {
-        toast({ title: "Rescisão registrada" });
+        toast({
+          title: hrPlanningItemId ? "Rescisão registrada e item de planejamento concluído" : "Rescisão registrada",
+        });
         onOpenChange(false);
       },
     });
