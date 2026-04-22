@@ -3383,9 +3383,12 @@ export type Database = {
           budget_version_id: string | null
           budget_version_name: string | null
           created_at: string
+          empty_reason: string | null
           end_date: string
+          filter_labels: Json
           filters: Json
           filters_summary: string | null
+          had_data: boolean
           id: string
           organization_id: string
           report_type: string
@@ -3398,9 +3401,12 @@ export type Database = {
           budget_version_id?: string | null
           budget_version_name?: string | null
           created_at?: string
+          empty_reason?: string | null
           end_date: string
+          filter_labels?: Json
           filters?: Json
           filters_summary?: string | null
+          had_data?: boolean
           id?: string
           organization_id: string
           report_type?: string
@@ -3413,9 +3419,12 @@ export type Database = {
           budget_version_id?: string | null
           budget_version_name?: string | null
           created_at?: string
+          empty_reason?: string | null
           end_date?: string
+          filter_labels?: Json
           filters?: Json
           filters_summary?: string | null
+          had_data?: boolean
           id?: string
           organization_id?: string
           report_type?: string

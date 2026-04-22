@@ -14,11 +14,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { History, FileDown, Trash2, Loader2 } from "lucide-react";
+import { History, FileDown, Trash2, Loader2, AlertTriangle, Building2, Wallet, Layers } from "lucide-react";
 import { toast } from "sonner";
-import { usePlanningReportExports } from "@/hooks/usePlanningReportExports";
+import {
+  usePlanningReportExports,
+  type PlanningEmptyReason,
+  type PlanningExportFilterLabels,
+} from "@/hooks/usePlanningReportExports";
 import { usePlanningPdfReport } from "@/hooks/usePlanningPdfReport";
 import { EMPTY_PLANNING_FILTERS, withFilterDefaults, type PlanningFilters } from "@/lib/planningFilters";
+
+const EMPTY_REASON_LABEL: Record<PlanningEmptyReason, string> = {
+  no_period_data: "Sem lançamentos no período",
+  filters_excluded_all: "Filtros eliminaram todos os dados",
+  no_budget_version: "Sem versão orçamentária ativa",
+  other: "Recorte vazio",
+};
 
 /**
  * Botão "Re-baixar" — instancia o hook de PDF com os parâmetros salvos
@@ -63,6 +74,67 @@ function RedownloadRow({
   );
 }
 
+/**
+ * Renderiza o snapshot de filtros nomeados salvo na exportação. Cai
+ * para o resumo textual antigo (`filters_summary`) quando o registro
+ * é anterior à coluna `filter_labels` (compatibilidade com histórico
+ * existente).
+ */
+function FilterLabelsBlock({
+  labels,
+  fallbackSummary,
+}: {
+  labels: PlanningExportFilterLabels | null | undefined;
+  fallbackSummary: string | null;
+}) {
+  const subsidiary = labels?.subsidiary ?? null;
+  const banks = labels?.bankAccounts ?? [];
+  const ccs = labels?.costCenters ?? [];
+  const hasNamed = !!subsidiary || banks.length > 0 || ccs.length > 0;
+
+  if (!hasNamed) {
+    if (fallbackSummary && fallbackSummary !== "Nenhum") {
+      return (
+        <p className="text-[11px] text-muted-foreground">
+          Filtros: {fallbackSummary}
+        </p>
+      );
+    }
+    return (
+      <p className="text-[11px] text-muted-foreground italic">
+        Sem filtros aplicados
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+        Filtros aplicados
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {subsidiary && (
+          <Badge variant="secondary" className="font-normal gap-1 text-[11px]">
+            <Building2 className="h-3 w-3" />
+            {subsidiary}
+          </Badge>
+        )}
+        {banks.map((b) => (
+          <Badge key={`b-${b}`} variant="secondary" className="font-normal gap-1 text-[11px]">
+            <Wallet className="h-3 w-3" />
+            {b}
+          </Badge>
+        ))}
+        {ccs.map((c) => (
+          <Badge key={`c-${c}`} variant="secondary" className="font-normal gap-1 text-[11px]">
+            <Layers className="h-3 w-3" />
+            {c}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
 export default function PlanningReportHistory() {
   const { list, remove } = usePlanningReportExports();
   const [open, setOpen] = useState(false);
@@ -145,13 +217,19 @@ export default function PlanningReportHistory() {
                       <Badge variant="outline" className="font-normal">
                         Versão: {item.budget_version_name ?? "—"}
                       </Badge>
+                      {item.had_data === false && (
+                        <Badge
+                          variant="outline"
+                          className="font-normal border-warning/40 text-warning gap-1"
+                          title="Esta exportação foi gerada sem dados"
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          {EMPTY_REASON_LABEL[item.empty_reason ?? "other"]}
+                        </Badge>
+                      )}
                     </div>
 
-                    {item.filters_summary && item.filters_summary !== "Nenhum" && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Filtros: {item.filters_summary}
-                      </p>
-                    )}
+                    <FilterLabelsBlock labels={item.filter_labels} fallbackSummary={item.filters_summary} />
 
                     <div className="flex justify-end pt-1">
                       <RedownloadRow
