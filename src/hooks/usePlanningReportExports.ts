@@ -112,6 +112,9 @@ export function usePlanningReportExports() {
         end_date: isoDate(input.endDate),
         filters: safeFilters as any,
         filters_summary: input.filtersSummary,
+        filter_labels: (input.filterLabels ?? {}) as any,
+        had_data: input.hadData ?? true,
+        empty_reason: input.hadData === false ? input.emptyReason ?? "other" : null,
       };
       const { error } = await supabase
         .from("planning_report_exports" as any)
