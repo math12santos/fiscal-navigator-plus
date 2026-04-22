@@ -16,6 +16,9 @@ import { useCostCenters } from "@/hooks/useCostCenters";
 import { useDPBenefits, useEmployeeBenefits, useMutateEmployeeBenefit } from "@/hooks/useDPBenefits";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { DPExportButton } from "./DPExportButton";
+import { generateDPExcelReport } from "@/lib/dpExports";
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
   ativo: { label: "Ativo", variant: "default" },
