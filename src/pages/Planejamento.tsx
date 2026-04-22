@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { addMonths, startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
@@ -12,7 +12,7 @@ import {
 import { CalendarIcon, Settings, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
-import PlanningCockpit from "@/components/planning/PlanningCockpit";
+import PlanningCockpit, { PLANNING_NAV_EVENT } from "@/components/planning/PlanningCockpit";
 import PlanningBudget from "@/components/planning/PlanningBudget";
 import PlanningScenariosRisk from "@/components/planning/PlanningScenariosRisk";
 import PlanningOperational from "@/components/planning/PlanningOperational";
@@ -67,6 +67,19 @@ export default function Planejamento() {
   const { getAllowedTabs } = useUserPermissions();
 
   const allowedTabs = getAllowedTabs("planejamento", ALL_TABS);
+  const [activeTab, setActiveTab] = useState<string>(allowedTabs[0]?.key || "cockpit");
+
+  // Navegação programática vinda dos alertas do Cockpit
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent<{ tab: string }>).detail?.tab;
+      if (tab && allowedTabs.some((t) => t.key === tab)) {
+        setActiveTab(tab);
+      }
+    };
+    window.addEventListener(PLANNING_NAV_EVENT, handler);
+    return () => window.removeEventListener(PLANNING_NAV_EVENT, handler);
+  }, [allowedTabs]);
 
   const { startDate, endDate } = useMemo(() => {
     const now = startOfMonth(new Date());
@@ -170,7 +183,7 @@ export default function Planejamento() {
       </div>
 
       {/* Tabs — 4 main areas */}
-      <Tabs defaultValue={allowedTabs[0]?.key || "cockpit"} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex w-full flex-wrap">
           {allowedTabs.map((t) => (
             <TabsTrigger key={t.key} value={t.key} className="flex-1 min-w-[140px]">

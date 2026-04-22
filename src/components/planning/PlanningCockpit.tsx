@@ -12,10 +12,18 @@ import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { KPICard } from "@/components/KPICard";
+import { Button } from "@/components/ui/button";
 import {
   AlertTriangle, TrendingUp, Wallet, Shield, Users, FileSignature,
-  TrendingDown, Target,
+  TrendingDown, Target, ArrowRight, Info,
 } from "lucide-react";
+import type { PlanningTab } from "@/hooks/useFinancialSummary";
+
+/** Custom event fired by alert action buttons to switch the active planning tab. */
+export const PLANNING_NAV_EVENT = "planning:navigate";
+export function emitPlanningNav(tab: PlanningTab) {
+  window.dispatchEvent(new CustomEvent(PLANNING_NAV_EVENT, { detail: { tab } }));
+}
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -142,15 +150,48 @@ export default function PlanningCockpit({ startDate, endDate }: Props) {
         />
       </div>
 
-      {/* Saldo Mínimo Alert */}
-      {saldoMinimo > 0 && saldoAtual < saldoMinimo && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-          <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
-          <div className="text-sm">
-            <p className="font-medium text-destructive">Projeção abaixo do saldo mínimo</p>
-            <p className="text-muted-foreground">
-              Saldo projetado {fmt(saldoAtual)} está abaixo do mínimo configurado de {fmt(saldoMinimo)}.
-            </p>
+      {/*
+        Alertas estratégicos unificados.
+        Saldo mínimo, runway, passivos, contratos, divergências e CRM
+        agora compartilham o mesmo componente, idioma e ação sugerida.
+      */}
+      {alerts.length > 0 && (
+        <div className="glass-card p-5 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            Alertas Estratégicos ({alerts.length})
+          </h3>
+          <div className="space-y-2">
+            {alerts.map((alert, idx) => {
+              const tone =
+                alert.type === "danger"
+                  ? { wrap: "bg-destructive/5 border-destructive/20", icon: "text-destructive" }
+                  : alert.type === "warning"
+                  ? { wrap: "bg-warning/5 border-warning/20", icon: "text-warning" }
+                  : { wrap: "bg-muted/30 border-border", icon: "text-muted-foreground" };
+              const Icon = alert.type === "info" ? Info : AlertTriangle;
+              return (
+                <div
+                  key={`${alert.category}-${idx}`}
+                  className={`flex flex-wrap items-start gap-3 p-3 rounded-lg border ${tone.wrap}`}
+                >
+                  <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${tone.icon}`} />
+                  <div className="text-sm flex-1 min-w-[200px]">
+                    <p className="font-medium text-foreground">{alert.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{alert.description}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => emitPlanningNav(alert.actionTab)}
+                  >
+                    {alert.actionLabel}
+                    <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -197,43 +238,6 @@ export default function PlanningCockpit({ startDate, endDate }: Props) {
         </ResponsiveContainer>
       </div>
 
-      {/* Alerts list */}
-      {alerts.length > 0 && (
-        <div className="glass-card p-5 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-warning" />
-            Alertas Estratégicos ({alerts.length})
-          </h3>
-          <div className="space-y-2">
-            {alerts.map((alert, idx) => (
-              <div
-                key={idx}
-                className={`flex gap-3 p-3 rounded-lg border ${
-                  alert.type === "danger"
-                    ? "bg-destructive/5 border-destructive/20"
-                    : alert.type === "warning"
-                    ? "bg-warning/5 border-warning/20"
-                    : "bg-muted/30 border-border"
-                }`}
-              >
-                <AlertTriangle
-                  className={`h-4 w-4 mt-0.5 shrink-0 ${
-                    alert.type === "danger"
-                      ? "text-destructive"
-                      : alert.type === "warning"
-                      ? "text-warning"
-                      : "text-muted-foreground"
-                  }`}
-                />
-                <div className="text-sm">
-                  <p className="font-medium text-foreground">{alert.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{alert.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

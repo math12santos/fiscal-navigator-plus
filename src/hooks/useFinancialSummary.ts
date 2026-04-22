@@ -11,10 +11,29 @@ import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { format, addDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { calcEncargosPatronais } from "@/hooks/useDP";
 
-interface Alert {
+export type AlertCategory =
+  | "runway"
+  | "saldo_minimo"
+  | "passivo"
+  | "contrato"
+  | "crm"
+  | "divergencia";
+
+export type PlanningTab =
+  | "cockpit"
+  | "orcamento"
+  | "cenarios-risco"
+  | "operacional";
+
+export interface Alert {
   type: "warning" | "danger" | "info";
+  category: AlertCategory;
   title: string;
   description: string;
+  /** Tab dentro de /planejamento que resolve o alerta */
+  actionTab: PlanningTab;
+  /** Rótulo curto do botão de ação (ex.: "Abrir Cenários") */
+  actionLabel: string;
 }
 
 export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
@@ -74,8 +93,11 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
     if (expiring.length > 0) {
       list.push({
         type: "warning",
+        category: "contrato",
         title: `${expiring.length} contrato(s) vencem em 30 dias`,
         description: expiring.map((c) => c.nome).join(", "),
+        actionTab: "operacional",
+        actionLabel: "Revisar contratos",
       });
     }
 
@@ -84,8 +106,11 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
     if (runway !== Infinity && runway <= alertaRunway) {
       list.push({
         type: "danger",
+        category: "runway",
         title: `Runway de apenas ${runway} mês(es)`,
-        description: "Saldo atual dividido pelo burn rate mensal médio está abaixo do alerta configurado.",
+        description: `Saldo atual dividido pelo burn rate mensal médio (${monthlyBurn.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}/mês) está abaixo do alerta configurado de ${alertaRunway} meses.`,
+        actionTab: "cenarios-risco",
+        actionLabel: "Simular cenário",
       });
     }
 
@@ -94,9 +119,28 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
     if (saldoMinimo > 0 && totals.saldo < saldoMinimo) {
       list.push({
         type: "danger",
-        title: "Saldo abaixo do mínimo",
-        description: `Saldo projetado está abaixo do mínimo configurado.`,
+        category: "saldo_minimo",
+        title: "Saldo projetado abaixo do mínimo",
+        description: `Saldo projetado de ${totals.saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })} está abaixo do mínimo configurado de ${saldoMinimo.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}.`,
+        actionTab: "orcamento",
+        actionLabel: "Revisar orçamento",
       });
+    }
+
+    // Divergência: saídas projetadas excedem entradas projetadas no horizonte
+    if (totals.entradas > 0 && totals.saidas > totals.entradas) {
+      const gap = totals.saidas - totals.entradas;
+      const pct = (gap / totals.entradas) * 100;
+      if (pct >= 10) {
+        list.push({
+          type: pct >= 25 ? "danger" : "warning",
+          category: "divergencia",
+          title: `Saídas excedem entradas em ${pct.toFixed(0)}% no horizonte`,
+          description: `Projeção indica déficit de ${gap.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}. Avalie cortes ou novas receitas.`,
+          actionTab: "cenarios-risco",
+          actionLabel: "Avaliar cenário",
+        });
+      }
     }
 
     // Judicial liabilities
@@ -104,8 +148,11 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
     if (judiciais.length > 0) {
       list.push({
         type: "warning",
+        category: "passivo",
         title: `${judiciais.length} passivo(s) em fase judicial`,
-        description: `Valor total: R$ ${judiciais.reduce((s, l) => s + Number(l.valor_atualizado), 0).toLocaleString("pt-BR")}`,
+        description: `Valor total: ${judiciais.reduce((s, l) => s + Number(l.valor_atualizado), 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}. Considere o impacto no cenário de Stress.`,
+        actionTab: "cenarios-risco",
+        actionLabel: "Ver passivos",
       });
     }
 
@@ -114,13 +161,16 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
     if (staleOpps.length > 0) {
       list.push({
         type: "info",
+        category: "crm",
         title: `${staleOpps.length} oportunidade(s) CRM sem ação recente`,
         description: "Verifique o pipeline comercial para atualizar o status.",
+        actionTab: "operacional",
+        actionLabel: "Abrir pipeline",
       });
     }
 
     return list;
-  }, [contracts, liabilities, runway, totals.saldo, planConfig, opportunities]);
+  }, [contracts, liabilities, runway, monthlyBurn, totals.saldo, totals.entradas, totals.saidas, planConfig, opportunities, now]);
 
   // CRM pipeline weighted value
   const crmWeightedValue = useMemo(() => {
