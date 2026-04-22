@@ -218,10 +218,27 @@ export function usePlanningPdfReport({
       ? `${activeScenario.name} · ${activeScenario.variacao_receita > 0 ? "+" : ""}${activeScenario.variacao_receita}% rec / ${activeScenario.variacao_custos > 0 ? "+" : ""}${activeScenario.variacao_custos}% custo`
       : "Base";
 
+    // Filtros operacionais aplicados — refletem exatamente o que está em tela
+    const filterParts: string[] = [];
+    if (filters.subsidiaryOrgId) {
+      const sub = subsidiaryOrgs.find((s) => s.id === filters.subsidiaryOrgId);
+      filterParts.push(`Unidade: ${sub?.name ?? filters.subsidiaryOrgId.slice(0, 8)}`);
+    }
+    if (filters.bankAccountId) {
+      const ba = allBankAccounts.find((b) => b.id === filters.bankAccountId);
+      filterParts.push(`Conta: ${ba?.nome ?? filters.bankAccountId.slice(0, 8)}`);
+    }
+    if (filters.costCenterId) {
+      const cc = costCenters.find((c) => c.id === filters.costCenterId);
+      filterParts.push(`CC: ${cc ? `${cc.code} ${cc.name}` : filters.costCenterId.slice(0, 8)}`);
+    }
+    const filtersLine = filterParts.length > 0 ? filterParts.join(" · ") : "Nenhum";
+
     doc.text(`Organização: ${orgName}`, margin, y); y += 12;
     doc.text(`Horizonte: ${horizon}`, margin, y); y += 12;
     doc.text(`Versão de orçamento: ${versionLine}`, margin, y); y += 12;
     doc.text(`Cenário ativo: ${scenarioLine}`, margin, y); y += 12;
+    doc.text(`Filtros aplicados: ${filtersLine}`, margin, y); y += 12;
     doc.text(`Gerado em: ${generatedAt}`, margin, y); y += 18;
     doc.setTextColor(0);
 
