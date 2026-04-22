@@ -1767,6 +1767,7 @@ export type Database = {
       dp_config: {
         Row: {
           created_at: string
+          custom_items: Json
           fgts_pct: number | null
           id: string
           inss_patronal_pct: number | null
@@ -1781,6 +1782,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_items?: Json
           fgts_pct?: number | null
           id?: string
           inss_patronal_pct?: number | null
@@ -1795,6 +1797,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_items?: Json
           fgts_pct?: number | null
           id?: string
           inss_patronal_pct?: number | null
