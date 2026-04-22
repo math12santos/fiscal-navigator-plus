@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { addMonths, startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
@@ -12,7 +12,7 @@ import {
 import { CalendarIcon, Settings, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
-import PlanningCockpit from "@/components/planning/PlanningCockpit";
+import PlanningCockpit, { PLANNING_NAV_EVENT } from "@/components/planning/PlanningCockpit";
 import PlanningBudget from "@/components/planning/PlanningBudget";
 import PlanningScenariosRisk from "@/components/planning/PlanningScenariosRisk";
 import PlanningOperational from "@/components/planning/PlanningOperational";
