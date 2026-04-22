@@ -10,6 +10,12 @@ import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { format, addDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { calcEncargosPatronais } from "@/hooks/useDP";
+import {
+  PlanningFilters,
+  EMPTY_PLANNING_FILTERS,
+  entryMatchesFilters,
+  contractMatchesFilters,
+} from "@/lib/planningFilters";
 
 export type AlertCategory =
   | "runway"
@@ -36,14 +42,65 @@ export interface Alert {
   actionLabel: string;
 }
 
-export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
-  const { entries, totals, isLoading: cashflowLoading } = useCashFlow(rangeFrom, rangeTo);
-  const { contracts, isLoading: contractsLoading } = useContracts();
-  const { liabilities, totals: liabTotals, isLoading: liabLoading } = useLiabilities();
+export function useFinancialSummary(
+  rangeFrom: Date,
+  rangeTo: Date,
+  filters: PlanningFilters = EMPTY_PLANNING_FILTERS,
+) {
+  const { entries: rawEntries, totals: rawTotals, isLoading: cashflowLoading } = useCashFlow(rangeFrom, rangeTo);
+  const { contracts: rawContracts, isLoading: contractsLoading } = useContracts();
+  const { liabilities: rawLiabilities, isLoading: liabLoading } = useLiabilities();
   const { config: planConfig } = usePlanningConfig();
   const { avgMonthlyPayroll, isLoading: payrollLoading } = usePayrollProjections(rangeFrom, rangeTo);
-  const { opportunities } = useCRMOpportunities();
+  const { opportunities: rawOpportunities } = useCRMOpportunities();
   const { stages } = usePipelineStages();
+
+  // Apply operational filters consistently to every downstream aggregation.
+  const entries = useMemo(
+    () => rawEntries.filter((e) => entryMatchesFilters(e as any, filters)),
+    [rawEntries, filters],
+  );
+  const contracts = useMemo(
+    () => rawContracts.filter((c) => contractMatchesFilters(c as any, filters)),
+    [rawContracts, filters],
+  );
+  const liabilities = useMemo(
+    () => rawLiabilities.filter((l) => contractMatchesFilters(l as any, filters)),
+    [rawLiabilities, filters],
+  );
+  // CRM has no cost_center dimension — apply only org-level filter.
+  const opportunities = useMemo(() => {
+    if (!filters.subsidiaryOrgId) return rawOpportunities;
+    return rawOpportunities.filter(
+      (o: any) => o.organization_id === filters.subsidiaryOrgId,
+    );
+  }, [rawOpportunities, filters.subsidiaryOrgId]);
+
+  // Recompute totals when filters narrow the dataset.
+  const totals = useMemo(() => {
+    if (entries === rawEntries) return rawTotals;
+    let entradas = 0, saidas = 0;
+    for (const e of entries) {
+      const v = Number(e.valor_realizado ?? e.valor_previsto);
+      if (e.tipo === "entrada") entradas += v;
+      else saidas += v;
+    }
+    return { entradas, saidas, saldo: entradas - saidas };
+  }, [entries, rawEntries, rawTotals]);
+
+  // Filtered liability totals (subset of useLiabilities().totals).
+  const liabTotals = useMemo(() => {
+    let total = 0;
+    let judiciais = 0;
+    let contingencias_provaveis = 0;
+    for (const l of liabilities) {
+      const v = Number(l.valor_atualizado);
+      total += v;
+      if (l.status === "judicial") judiciais += v;
+      if (l.probabilidade === "provavel") contingencias_provaveis += v;
+    }
+    return { total, judiciais, contingencias_provaveis };
+  }, [liabilities]);
 
   // Active contracts
   const activeContracts = useMemo(
@@ -195,6 +252,7 @@ export function useFinancialSummary(rangeFrom: Date, rangeTo: Date) {
     avgMonthlyPayroll,
     // Liabilities
     liabilityTotals: liabTotals,
+    liabTotals,
     contingenciasProvaveis: liabTotals.contingencias_provaveis,
     // Runway
     runway,
