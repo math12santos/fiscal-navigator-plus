@@ -18,6 +18,12 @@ import { usePlanningScenarioContext } from "@/contexts/PlanningScenarioContext";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generateProjectionsFromContract } from "@/lib/contractProjections";
+import {
+  PlanningFilters,
+  EMPTY_PLANNING_FILTERS,
+  entryMatchesFilters,
+  contractMatchesFilters,
+} from "@/lib/planningFilters";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -26,20 +32,39 @@ interface Props {
   startDate: Date;
   endDate: Date;
   budgetVersionId: string | null;
+  filters?: PlanningFilters;
 }
 
-export default function PlannedVsActual({ startDate, endDate, budgetVersionId }: Props) {
+export default function PlannedVsActual({
+  startDate, endDate, budgetVersionId, filters = EMPTY_PLANNING_FILTERS,
+}: Props) {
   // IMPORTANT: use materializedEntries (DB rows) for Realizado.
   // `entries` from useCashFlow already merges recurrent contract projections + DP virtuals,
   // which would double-count against the Projetado series we recompute below.
-  const { materializedEntries } = useCashFlow(startDate, endDate);
+  const { materializedEntries: rawMaterialized } = useCashFlow(startDate, endDate);
   const budgetLinesQuery = useBudgetLines(budgetVersionId);
-  const { payrollProjections } = usePayrollProjections(startDate, endDate);
-  const { contracts } = useContracts();
+  const { payrollProjections: rawPayroll } = usePayrollProjections(startDate, endDate);
+  const { contracts: rawContracts } = useContracts();
   const { opportunities } = useCRMOpportunities();
   const { stages } = usePipelineStages();
   const { activeScenario, receitaFactor, custoFactor, stressExtraOutflow } = usePlanningScenarioContext();
   const isBaseScenario = !activeScenario || activeScenario.type === "base";
+
+  // Apply filters once — every aggregation below derives from these.
+  const materializedEntries = useMemo(
+    () => rawMaterialized.filter((e) => entryMatchesFilters(e as any, filters)),
+    [rawMaterialized, filters],
+  );
+  const contracts = useMemo(
+    () => rawContracts.filter((c) => contractMatchesFilters(c as any, filters)),
+    [rawContracts, filters],
+  );
+  const payrollProjections = useMemo(
+    () => filters.costCenterId
+      ? rawPayroll.filter((p) => (p as any).cost_center_id === filters.costCenterId)
+      : rawPayroll,
+    [rawPayroll, filters.costCenterId],
+  );
 
   // Horizon months — single source of truth for granularity & divisors
   const horizonMonths = useMemo(() => {
