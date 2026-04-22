@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useUserDataScope } from "@/hooks/useUserDataScope";
 import { useHolding } from "@/contexts/HoldingContext";
+import { projectionKey } from "@/lib/projectionRegistry";
 
 // ========== EMPLOYEES ==========
 export function useEmployees() {
