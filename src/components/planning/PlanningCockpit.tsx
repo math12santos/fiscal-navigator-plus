@@ -238,43 +238,6 @@ export default function PlanningCockpit({ startDate, endDate }: Props) {
         </ResponsiveContainer>
       </div>
 
-      {/* Alerts list */}
-      {alerts.length > 0 && (
-        <div className="glass-card p-5 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-warning" />
-            Alertas Estratégicos ({alerts.length})
-          </h3>
-          <div className="space-y-2">
-            {alerts.map((alert, idx) => (
-              <div
-                key={idx}
-                className={`flex gap-3 p-3 rounded-lg border ${
-                  alert.type === "danger"
-                    ? "bg-destructive/5 border-destructive/20"
-                    : alert.type === "warning"
-                    ? "bg-warning/5 border-warning/20"
-                    : "bg-muted/30 border-border"
-                }`}
-              >
-                <AlertTriangle
-                  className={`h-4 w-4 mt-0.5 shrink-0 ${
-                    alert.type === "danger"
-                      ? "text-destructive"
-                      : alert.type === "warning"
-                      ? "text-warning"
-                      : "text-muted-foreground"
-                  }`}
-                />
-                <div className="text-sm">
-                  <p className="font-medium text-foreground">{alert.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{alert.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
