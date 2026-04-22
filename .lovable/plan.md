@@ -1,67 +1,49 @@
 
 
-## Presets favoritos de período no Relatório KPI
+# Plano: Garantir que `filters` nunca seja `undefined` (sempre `EMPTY_PLANNING_FILTERS`)
 
-Adicionar a capacidade de **salvar, nomear, aplicar e excluir presets de período (from/to)** na página `/relatorio-kpi/:metric`, persistidos por usuário/organização no backend, com acesso rápido ao lado do seletor de período já existente.
+## Objetivo
+Endurecer todos os pontos onde `PlanningFilters` trafega para que, mesmo se um chamador esquecer de passar a prop ou passar `undefined`/`null`/objeto parcial, o sistema use silenciosamente `EMPTY_PLANNING_FILTERS`. Hoje a maioria dos consumidores já tem default, mas existem três pontos vulneráveis: a fonte (`Planejamento.tsx` lê do URL "na mão"), os hooks de export/histórico (sem default) e o `setFilters` (aceita qualquer coisa).
 
-### O que o usuário verá
+## Comportamento esperado
 
-1. **Botão "★ Presets"** ao lado do `RangePicker` no card de "Período".
-2. Ao clicar, abre um **Popover** com:
-   - **Lista dos presets salvos** (nome + range "MMM/yyyy – MMM/yyyy"), cada um clicável para aplicar imediatamente o `from/to` na URL.
-   - Ícone de **lixeira** ao lado de cada preset para excluir (com confirmação inline).
-   - Indicador visual ✓ no preset que coincide com o range atualmente aplicado.
-3. **Botão "Salvar período atual como preset"** dentro do mesmo popover:
-   - Abre um pequeno form (input de nome, ex.: "Operações do 1º semestre") + botão "Salvar".
-   - Validação: nome obrigatório, máx. 60 caracteres, sem duplicidade de nome (atualiza o existente se mesmo nome).
-   - Toast de confirmação ao salvar/excluir.
-4. **Estado vazio**: quando não houver presets, o popover exibe orientação curta ("Salve combinações de período que você usa com frequência") e foca direto no input de nome.
-5. **Escopo**: presets ficam **por usuário** e funcionam para qualquer KPI (são apenas pares from/to). Quando o usuário está em um KPI com `scopeIsCurrentMonth`, o botão fica desabilitado com tooltip explicativo ("Este KPI usa o mês corrente — presets não se aplicam").
+- **Fonte única**: o objeto `filters` derivado do URL passa por `normalizeFilters` e nunca é `undefined`/parcial — campos faltando viram defaults de `EMPTY_PLANNING_FILTERS`.
+- **Setter defensivo**: `setFilters(undefined as any)` ou `setFilters({} as any)` resulta em `EMPTY_PLANNING_FILTERS` no URL (todos os params removidos), em vez de jogar erro ou gravar `undefined`.
+- **Default uniforme**: todo consumidor (`PlanningCockpit`, `PlannedVsActual`, `PlanningBudget`, `usePlanningPdfReport`, `useFinancialSummary`, `PlanningReportHistory`, `usePlanningReportExports`) declara `filters?: PlanningFilters` com default `EMPTY_PLANNING_FILTERS` — nada de `filters: PlanningFilters` obrigatório que estoure se chamado sem prop.
+- **Helper único**: nova função `withFilterDefaults(input?)` em `planningFilters.ts` que delega para `normalizeFilters` e devolve um novo objeto seguro. Substitui pequenas variações espalhadas.
 
-### Como funciona por baixo
+## Mudanças técnicas
 
-**Backend (Lovable Cloud / Supabase)**
+### 1. `src/lib/planningFilters.ts`
+- Renomear/expor `withFilterDefaults(input?: Partial<PlanningFilters> | null | undefined): PlanningFilters` como wrapper fino sobre `normalizeFilters` (aceita explicitamente `undefined`/`null`).
+- Ajustar `normalizeFilters` para também tolerar quando `input.bankAccountIds` vier como `null` (hoje só trata array/string).
 
-Nova tabela `kpi_period_presets`:
+### 2. `src/pages/Planejamento.tsx`
+- `useMemo<PlanningFilters>` que lê o URL passa o objeto bruto por `withFilterDefaults({ subsidiaryOrgId, bankAccountIds, costCenterIds })` antes de retornar — garante shape consistente mesmo se `searchParams.get("org")` vier vazio (`""`).
+- `setFilters` interno chama `withFilterDefaults(next)` antes de serializar; `next === undefined` ou objeto parcial → URL é limpo para o estado vazio.
 
-```text
-id              uuid PK
-user_id         uuid  (auth.uid)
-organization_id uuid  (escopo multi-tenant)
-name            text  (1..60 chars, único por user_id+organization_id)
-range_from      date
-range_to        date
-created_at      timestamptz
-updated_at      timestamptz
-```
+### 3. Hooks/componentes consumidores — uniformizar default
+Tornar `filters?: PlanningFilters` opcional **e** aplicar default `EMPTY_PLANNING_FILTERS` (alguns já têm, outros não):
 
-- RLS: SELECT/INSERT/UPDATE/DELETE apenas onde `user_id = auth.uid()` E o usuário pertence à organização (padrão `has_org_access`/membership já usado no projeto).
-- Trigger `updated_at` no padrão existente.
-- Validação por **trigger** (não CHECK) para garantir `range_from <= range_to` e `name` não vazio — segue a regra do projeto de evitar CHECK com expressões mutáveis.
+- `src/hooks/usePlanningReportExports.ts`: `filters?: PlanningFilters` com default no destructuring de `recordExport({ filters = EMPTY_PLANNING_FILTERS, ... })`.
+- `src/components/planning/PlanningReportHistory.tsx`: `filters?: PlanningFilters = EMPTY_PLANNING_FILTERS` no `RedownloadRow` e na prop principal.
+- `src/components/planning/PlanningBudget.tsx`: já recebe `filters?` mas repassa cru para `PlannedVsActual` — adicionar default no destructuring e repassar `filters ?? EMPTY_PLANNING_FILTERS`.
+- `PlanningCockpit.tsx`, `PlannedVsActual.tsx`, `usePlanningPdfReport.ts`, `useFinancialSummary.ts`: já têm default, sem mudança.
 
-**Frontend**
+### 4. Sanitização (`useEffect` em `Planejamento.tsx`)
+Como `filters` agora é garantido pelo `withFilterDefaults`, a guarda `if (!hasAnyFilter(filters)) return;` continua válida e o effect fica mais previsível (sem early-undefined-crash).
 
-- Novo hook `src/hooks/useKpiPeriodPresets.ts`:
-  - `presets`, `isLoading`, `savePreset(name, from, to)`, `deletePreset(id)`.
-  - Usa React Query, escopado por `currentOrg.id` + `user.id`.
-  - Invalida cache em mutações; toasts em sucesso/erro.
-- Novo componente `src/components/relatorio/KpiPeriodPresetsPopover.tsx`:
-  - Recebe `currentFrom`, `currentTo`, `onApply(from, to)` e `disabled`.
-  - Renderiza Popover + lista + form de criação descritos acima.
-- Integração em `src/pages/RelatorioKpi.tsx`:
-  - Inserir `<KpiPeriodPresetsPopover>` adjacente ao `RangePicker` no header do card de Período.
-  - `onApply` chama o `applyRange(from, to)` já existente que atualiza `searchParams`, disparando recarga natural via `useFinancialSummary`.
-  - Desabilitado quando `meta.scopeIsCurrentMonth` é `true`.
+## Garantias
 
-### Auditabilidade & princípios do produto
+- **Zero crash por `undefined`**: nenhum chamador, novo ou antigo, consegue passar `filters` inválido — o tipo aceita `undefined` e o default cobre.
+- **Coerência visual + cálculo**: como o objeto sempre tem o mesmo shape, os matchers (`entryMatchesFilters`, `contractMatchesFilters`) nunca quebram com `Cannot read property 'includes' of undefined`.
+- **Sem regressão de URL**: filtros já compartilhados continuam sendo lidos exatamente igual; `withFilterDefaults` só preenche o que faltar.
+- **Auditável**: única fonte de defaults (`EMPTY_PLANNING_FILTERS`) reforça o princípio "uma única verdade" — qualquer alteração futura no shape do filtro propaga automaticamente.
 
-- Presets **não alteram dados** — são apenas atalhos de filtro de visualização.
-- Como a aplicação atualiza a URL (`?from=...&to=...`), qualquer preset aplicado gera uma URL compartilhável e reproduzível, mantendo o princípio "o relatório de hoje pode ser reproduzido amanhã".
-- Sem mudanças na lógica de cálculo, reconciliação ou export CSV.
-
-### Arquivos
-
-- **Migração nova**: `supabase/migrations/<timestamp>_kpi_period_presets.sql` (tabela + RLS + trigger).
-- **Criar**: `src/hooks/useKpiPeriodPresets.ts`, `src/components/relatorio/KpiPeriodPresetsPopover.tsx`.
-- **Editar**: `src/pages/RelatorioKpi.tsx` (renderizar o popover ao lado do `RangePicker` existente).
+## Arquivos afetados
+- **Editado:** `src/lib/planningFilters.ts` (novo `withFilterDefaults`, robustez do `normalizeFilters`)
+- **Editado:** `src/pages/Planejamento.tsx` (aplica `withFilterDefaults` no `useMemo` do filtro e no `setFilters`)
+- **Editado:** `src/components/planning/PlanningBudget.tsx` (default + repassa garantido)
+- **Editado:** `src/components/planning/PlanningReportHistory.tsx` (default na prop)
+- **Editado:** `src/hooks/usePlanningReportExports.ts` (default no `recordExport`)
 

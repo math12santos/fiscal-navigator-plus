@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info, Calendar as CalendarIcon, RotateCcw } from "lucide-react";
-import { startOfMonth, endOfMonth, subMonths, format, parseISO, isAfter, isBefore } from "date-fns";
+import { KpiPeriodPresetsPopover } from "@/components/relatorio/KpiPeriodPresetsPopover";
+import { ArrowLeft, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { startOfMonth, endOfMonth, subMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -136,11 +134,25 @@ export default function RelatorioKpi() {
   const navigate = useNavigate();
   const { currentOrg } = useOrganization();
 
+  /**
+   * Aplica um novo intervalo (from/to) à URL — fonte de verdade do período.
+   * Ao atualizar `?from=&to=`, os memos `rangeFrom`/`rangeTo` recalculam e
+   * `useFinancialSummary` recarrega os dados naturalmente. Mantém a URL
+   * compartilhável e reproduzível (princípio de auditabilidade).
+   */
+  const applyRange = useCallback(
+    (from: string, to: string) => {
+      const next = new URLSearchParams(searchParams);
+      next.set("from", from);
+      next.set("to", to);
+      setSearchParams(next, { replace: false });
+    },
+    [searchParams, setSearchParams],
+  );
+
   const meta = METRIC_META[metric as KpiMetric];
 
   // Período: usa query string ou default = últimos 6 meses (mesmo do Dashboard).
-  // Mantemos os valores na URL para preservar deep-link e auditabilidade —
-  // qualquer recorte do drill-down pode ser reaberto/compartilhado.
   const now = useMemo(() => new Date(), []);
   const rangeFrom = useMemo(() => {
     const q = searchParams.get("from");
@@ -150,17 +162,6 @@ export default function RelatorioKpi() {
     const q = searchParams.get("to");
     return q ? parseISO(q) : endOfMonth(now);
   }, [searchParams, now]);
-
-  // Atualiza o período na URL (dispara reload de useFinancialSummary).
-  const applyRange = useCallback(
-    (from: Date, to: Date) => {
-      const next = new URLSearchParams(searchParams);
-      next.set("from", format(from, "yyyy-MM-dd"));
-      next.set("to", format(to, "yyyy-MM-dd"));
-      setSearchParams(next, { replace: false });
-    },
-    [searchParams, setSearchParams],
-  );
 
   const summary = useFinancialSummary(rangeFrom, rangeTo);
   const { contracts } = useContracts();
@@ -574,29 +575,17 @@ export default function RelatorioKpi() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-start gap-3">
             <div className="rounded-lg bg-primary/10 p-2.5 text-primary">{meta.icon}</div>
-            <div className="space-y-1.5">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Período</p>
-              {meta.scopeIsCurrentMonth ? (
-                <>
-                  <p className="text-sm font-medium text-foreground capitalize">{periodLabel}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Este KPI sempre reflete o mês corrente — período fixo.
-                  </p>
-                </>
-              ) : (
-                <RangePicker
-                  from={rangeFrom}
-                  to={rangeTo}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Período</p>
+                <KpiPeriodPresetsPopover
+                  currentFrom={format(rangeFrom, "yyyy-MM-dd")}
+                  currentTo={format(rangeTo, "yyyy-MM-dd")}
                   onApply={applyRange}
-                  isCustom={Boolean(searchParams.get("from") || searchParams.get("to"))}
-                  onReset={() => {
-                    const next = new URLSearchParams(searchParams);
-                    next.delete("from");
-                    next.delete("to");
-                    setSearchParams(next, { replace: false });
-                  }}
+                  disabled={meta.scopeIsCurrentMonth}
                 />
-              )}
+              </div>
+              <p className="text-sm font-medium text-foreground capitalize mt-1">{periodLabel}</p>
               {currentOrg && (
                 <p className="text-xs text-muted-foreground mt-0.5">{currentOrg.name}</p>
               )}
@@ -1061,166 +1050,5 @@ function ReconciliationPanel({
         </div>
       </div>
     </section>
-  );
-}
-
-// ===== Seletor de período (from/to) =====
-//
-// Inline na página: combina presets rápidos (3M, 6M, 12M, YTD, mês corrente)
-// com seleção fina via Calendar duplo. As mudanças vão para a query string,
-// disparando o reload de useFinancialSummary sem unmount da página.
-function RangePicker({
-  from,
-  to,
-  onApply,
-  isCustom,
-  onReset,
-}: {
-  from: Date;
-  to: Date;
-  onApply: (from: Date, to: Date) => void;
-  isCustom: boolean;
-  onReset: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [draftFrom, setDraftFrom] = useState<Date | undefined>(from);
-  const [draftTo, setDraftTo] = useState<Date | undefined>(to);
-
-  // Sincroniza o draft sempre que abre o popover ou o range externo muda.
-  useEffect(() => {
-    if (open) {
-      setDraftFrom(from);
-      setDraftTo(to);
-    }
-  }, [open, from, to]);
-
-  const label = `${format(from, "dd MMM yy", { locale: ptBR })} – ${format(to, "dd MMM yy", { locale: ptBR })}`;
-
-  const presets: { label: string; build: () => [Date, Date] }[] = [
-    { label: "Mês corrente", build: () => [startOfMonth(new Date()), endOfMonth(new Date())] },
-    { label: "Últimos 3 meses", build: () => [startOfMonth(subMonths(new Date(), 2)), endOfMonth(new Date())] },
-    { label: "Últimos 6 meses", build: () => [startOfMonth(subMonths(new Date(), 5)), endOfMonth(new Date())] },
-    { label: "Últimos 12 meses", build: () => [startOfMonth(subMonths(new Date(), 11)), endOfMonth(new Date())] },
-    { label: "Ano atual (YTD)", build: () => [new Date(new Date().getFullYear(), 0, 1), endOfMonth(new Date())] },
-  ];
-
-  const applyPreset = (build: () => [Date, Date]) => {
-    const [f, t] = build();
-    setDraftFrom(f);
-    setDraftTo(t);
-    onApply(f, t);
-    setOpen(false);
-  };
-
-  const canApply =
-    draftFrom &&
-    draftTo &&
-    !isAfter(draftFrom, draftTo) &&
-    (draftFrom.getTime() !== from.getTime() || draftTo.getTime() !== to.getTime());
-
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn("h-8 px-3 text-xs font-medium gap-2", isCustom && "border-primary/40 text-primary")}
-            aria-label="Alterar período do relatório"
-          >
-            <CalendarIcon size={13} />
-            {label}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="flex flex-col sm:flex-row">
-            <div className="border-b sm:border-b-0 sm:border-r border-border p-2 min-w-[170px]">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 pt-1 pb-2">
-                Atalhos
-              </p>
-              <div className="flex flex-col gap-0.5">
-                {presets.map((p) => (
-                  <Button
-                    key={p.label}
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start h-8 text-xs font-normal"
-                    onClick={() => applyPreset(p.build)}
-                  >
-                    {p.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="px-3 pt-3 pb-1 flex items-center gap-3 text-xs text-muted-foreground">
-                <span>
-                  De: <span className="font-medium text-foreground">
-                    {draftFrom ? format(draftFrom, "dd/MM/yyyy") : "—"}
-                  </span>
-                </span>
-                <span>
-                  Até: <span className="font-medium text-foreground">
-                    {draftTo ? format(draftTo, "dd/MM/yyyy") : "—"}
-                  </span>
-                </span>
-              </div>
-              <Calendar
-                mode="range"
-                selected={{ from: draftFrom, to: draftTo }}
-                onSelect={(r) => {
-                  setDraftFrom(r?.from);
-                  setDraftTo(r?.to);
-                }}
-                numberOfMonths={2}
-                defaultMonth={draftFrom ?? from}
-                disabled={(date) => isBefore(date, new Date(2000, 0, 1)) || isAfter(date, new Date(2099, 11, 31))}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-              <div className="flex items-center justify-between gap-2 border-t border-border p-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => {
-                    setDraftFrom(from);
-                    setDraftTo(to);
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-8 text-xs"
-                  disabled={!canApply}
-                  onClick={() => {
-                    if (draftFrom && draftTo) {
-                      onApply(draftFrom, draftTo);
-                      setOpen(false);
-                    }
-                  }}
-                >
-                  Aplicar período
-                </Button>
-              </div>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      {isCustom && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2 text-xs text-muted-foreground"
-          onClick={onReset}
-          title="Voltar ao período padrão (últimos 6 meses)"
-        >
-          <RotateCcw size={12} className="mr-1" />
-          Padrão
-        </Button>
-      )}
-    </div>
   );
 }
