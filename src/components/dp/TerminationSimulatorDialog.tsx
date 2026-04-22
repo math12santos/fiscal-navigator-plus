@@ -150,11 +150,13 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
 
   const handleSaveTermination = () => {
     if (!simResult || !selectedEmpId) return;
+    // contract_type é apenas hint visual — não persiste na tabela employee_terminations.
+    const { contract_type: _ct, ...persistable } = simResult;
     create.mutate({
       employee_id: selectedEmpId,
       termination_date: termDate,
       type: termType,
-      ...simResult,
+      ...persistable,
     }, {
       onSuccess: () => {
         toast({ title: "Rescisão registrada" });
@@ -164,6 +166,9 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
   };
 
   const fmt = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const feriasLabel = isEstagio ? "Recesso Proporcional" : "Férias Proporcionais";
+  const avisoLabel = isPJ ? "Aviso Contratual" : "Aviso Prévio";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -175,16 +180,27 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
             <Select value={selectedEmpId} onValueChange={setSelectedEmpId}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
-                {activeEmps.map((e: any) => <SelectItem key={e.id} value={e.id}>{e.name} — {fmt(Number(e.salary_base))}</SelectItem>)}
+                {activeEmps.map((e: any) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.name} — {e.contract_type} — {fmt(Number(e.salary_base))}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {selectedEmp && (
+              <p className="text-[11px] text-muted-foreground">
+                Regime: <span className="font-medium text-foreground">{selectedEmp.contract_type}</span>
+                {isPJ && " · sem verbas trabalhistas (relação cível)"}
+                {isEstagio && " · sem FGTS/13º (Lei 11.788)"}
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Tipo</Label>
               <Select value={termType} onValueChange={setTermType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{TERM_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                <SelectContent>{termTypeOptions.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
@@ -199,11 +215,28 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
           {simResult && (
             <div className="border border-border rounded-lg p-4 space-y-2 bg-muted/30">
               <div className="flex justify-between text-sm"><span>Saldo de Salário</span><span className="font-mono">{fmt(simResult.saldo_salario)}</span></div>
-              <div className="flex justify-between text-sm"><span>Aviso Prévio</span><span className="font-mono">{fmt(simResult.aviso_previo)}</span></div>
-              <div className="flex justify-between text-sm"><span>Férias Proporcionais</span><span className="font-mono">{fmt(simResult.ferias_proporcionais)}</span></div>
-              <div className="flex justify-between text-sm"><span>1/3 Férias</span><span className="font-mono">{fmt(simResult.terco_ferias)}</span></div>
-              <div className="flex justify-between text-sm"><span>13º Proporcional</span><span className="font-mono">{fmt(simResult.decimo_terceiro_proporcional)}</span></div>
-              <div className="flex justify-between text-sm text-destructive"><span>Multa FGTS</span><span className="font-mono">{fmt(simResult.multa_fgts)}</span></div>
+              {simResult.aviso_previo > 0 && (
+                <div className="flex justify-between text-sm"><span>{avisoLabel}</span><span className="font-mono">{fmt(simResult.aviso_previo)}</span></div>
+              )}
+              {simResult.ferias_proporcionais > 0 && (
+                <div className="flex justify-between text-sm"><span>{feriasLabel}</span><span className="font-mono">{fmt(simResult.ferias_proporcionais)}</span></div>
+              )}
+              {simResult.terco_ferias > 0 && (
+                <div className="flex justify-between text-sm"><span>1/3 Férias</span><span className="font-mono">{fmt(simResult.terco_ferias)}</span></div>
+              )}
+              {simResult.decimo_terceiro_proporcional > 0 && (
+                <div className="flex justify-between text-sm"><span>13º Proporcional</span><span className="font-mono">{fmt(simResult.decimo_terceiro_proporcional)}</span></div>
+              )}
+              {simResult.multa_fgts > 0 && (
+                <div className="flex justify-between text-sm text-destructive"><span>Multa FGTS</span><span className="font-mono">{fmt(simResult.multa_fgts)}</span></div>
+              )}
+              {(isPJ || isEstagio) && (
+                <p className="text-[11px] text-muted-foreground italic pt-1">
+                  {isPJ
+                    ? "PJ não gera FGTS, multa rescisória, 13º ou férias — pagamentos contratuais regidos pelo contrato de prestação de serviço."
+                    : "Estagiário não gera FGTS, 13º ou multa — apenas bolsa proporcional + recesso remunerado."}
+                </p>
+              )}
               <div className="border-t border-border pt-2 flex justify-between font-bold">
                 <span>Total Rescisão</span>
                 <span className="font-mono text-lg">{fmt(simResult.total_rescisao)}</span>
