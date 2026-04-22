@@ -17,6 +17,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { GlobalFetchingIndicator } from "@/components/GlobalFetchingIndicator";
 
 const navItems = [
   { path: "/backoffice", label: "Empresas", icon: Building2 },
