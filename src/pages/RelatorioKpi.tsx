@@ -130,7 +130,7 @@ export default function RelatorioKpi() {
 
   const summary = useFinancialSummary(rangeFrom, rangeTo);
   const { contracts } = useContracts();
-  const { employees } = useEmployees();
+  const { data: employees = [] } = useEmployees();
   const { liabilities } = useLiabilities();
   const { opportunities } = useCRMOpportunities();
   const { stages } = usePipelineStages();
@@ -224,14 +224,14 @@ export default function RelatorioKpi() {
       }
 
       case "custo-folha": {
-        const items = employees
-          .filter((e: any) => e.status === "ativo")
-          .map((e: any) => ({
-            nome: e.nome,
-            cargo: e.cargo_nome || "—",
-            regime: e.regime || "—",
-            admissao: e.data_admissao || "—",
-            salario: Number(e.salario_base || 0),
+        const items = (employees as any[])
+          .filter((e) => e.status === "ativo" || e.status === "active")
+          .map((e) => ({
+            nome: e.name,
+            cargo: e.position_id || "—",
+            regime: e.contract_type || "—",
+            admissao: e.admission_date || "—",
+            salario: Number(e.salary_base || 0),
           }));
         return {
           items,
