@@ -23,9 +23,11 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, Plus, Trash2, UserPlus, UserMinus, TrendingUp, Users, DollarSign, CheckCircle2 } from "lucide-react";
+import { Loader2, Plus, Trash2, UserPlus, UserMinus, TrendingUp, Users, DollarSign, CheckCircle2, FileSignature } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { KPICard } from "@/components/KPICard";
+import TerminationSimulatorDialog from "@/components/dp/TerminationSimulatorDialog";
+import { useTerminations } from "@/hooks/useDP";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -44,7 +46,9 @@ export default function PlanningHR({ startDate, endDate }: Props) {
   const { data: dpConfig } = useDPConfig();
   const { scenarios } = usePlanningScenarios();
   const { costCenters } = useCostCenters();
+  const { data: terminations = [] } = useTerminations();
   const [showCreate, setShowCreate] = useState(false);
+  const [termSimItem, setTermSimItem] = useState<any>(null);
   const [form, setForm] = useState({
     type: "contratacao",
     position_id: "",
@@ -55,6 +59,15 @@ export default function PlanningHR({ startDate, endDate }: Props) {
     scenario_name: "Base",
     notes: "",
   });
+
+  // Mapa de itens de planejamento já efetivados em rescisões reais (fechamento do ciclo)
+  const executedPlanningIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of terminations as any[]) {
+      if (t.hr_planning_item_id) s.add(t.hr_planning_item_id);
+    }
+    return s;
+  }, [terminations]);
 
   const activeEmployees = useMemo(() => employees.filter((e: any) => e.status === "ativo"), [employees]);
 
