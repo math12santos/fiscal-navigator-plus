@@ -768,6 +768,9 @@ export default function Planejamento() {
           budgetVersionId={budgetVersionId}
           filters={filters}
           onHasFilteredDataChange={setHasFilteredData}
+          refsLoading={refsLoadingForExport}
+          invalidFilters={exportInvalidFilters}
+          filtersDescription={exportFiltersDescription}
         />
 
         <PlanningReportHistory />
