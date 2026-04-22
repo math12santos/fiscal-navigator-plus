@@ -47,7 +47,6 @@ export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: Pd
   const { activeScenario, receitaFactor, custoFactor, stressExtraOutflow } = usePlanningScenarioContext();
 
   const generatePdf = useCallback(() => {
-    const versions = versionsQuery.data ?? [];
     const budgetVersion = versions.find((v) => v.id === budgetVersionId) ?? null;
     const budgetLines = (budgetLinesQuery.data ?? []) as BudgetLine[];
 
