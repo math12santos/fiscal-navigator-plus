@@ -126,7 +126,13 @@ export type Database = {
           conta: string | null
           created_at: string | null
           id: string
+          limite_atualizado_em: string | null
+          limite_atualizado_por: string | null
           limite_credito: number | null
+          limite_taxa_juros_mensal: number | null
+          limite_tipo: string | null
+          limite_utilizado: number | null
+          limite_vencimento: string | null
           nome: string
           organization_id: string | null
           pix_key: string | null
@@ -143,7 +149,13 @@ export type Database = {
           conta?: string | null
           created_at?: string | null
           id?: string
+          limite_atualizado_em?: string | null
+          limite_atualizado_por?: string | null
           limite_credito?: number | null
+          limite_taxa_juros_mensal?: number | null
+          limite_tipo?: string | null
+          limite_utilizado?: number | null
+          limite_vencimento?: string | null
           nome: string
           organization_id?: string | null
           pix_key?: string | null
@@ -160,7 +172,13 @@ export type Database = {
           conta?: string | null
           created_at?: string | null
           id?: string
+          limite_atualizado_em?: string | null
+          limite_atualizado_por?: string | null
           limite_credito?: number | null
+          limite_taxa_juros_mensal?: number | null
+          limite_tipo?: string | null
+          limite_utilizado?: number | null
+          limite_vencimento?: string | null
           nome?: string
           organization_id?: string | null
           pix_key?: string | null
