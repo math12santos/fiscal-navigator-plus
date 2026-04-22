@@ -182,6 +182,11 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
       <DialogContent className="sm:max-w-lg">
         <DialogHeader><DialogTitle>Simulador de Desligamento</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          {hrPlanningItemId && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-[11px] text-foreground">
+              Esta rescisão será vinculada a um item de <span className="font-semibold">Planejamento de RH</span> e marcará o item como executado.
+            </div>
+          )}
           <div className="space-y-1">
             <Label>Colaborador</Label>
             <Select value={selectedEmpId} onValueChange={setSelectedEmpId}>
