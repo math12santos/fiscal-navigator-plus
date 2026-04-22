@@ -976,6 +976,20 @@ function buildPageList(current: number, total: number): (number | "…")[] {
 
 // ===== Helpers de renderização por tipo de relatório =====
 
+function getColumnCount(kind: string): number {
+  switch (kind) {
+    case "cashflow": return 5;
+    case "cashflow-quarter": return 3;
+    case "result": return 5;
+    case "result-quarter": return 5;
+    case "contracts": return 6;
+    case "payroll": return 5;
+    case "liabilities": return 5;
+    case "crm": return 5;
+    default: return 5;
+  }
+}
+
 function renderHeader(kind: string) {
   switch (kind) {
     case "cashflow":
