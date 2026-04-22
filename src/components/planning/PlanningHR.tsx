@@ -212,9 +212,18 @@ export default function PlanningHR({ startDate, endDate }: Props) {
                   <TableCell className="text-right text-sm">{fmt(item.salary_estimated ?? 0)}</TableCell>
                   <TableCell className="text-right text-sm font-medium">{fmt(item.total_cost_estimated ?? 0)}</TableCell>
                   <TableCell><Badge variant="outline" className="text-xs">{item.scenario_name}</Badge></TableCell>
-                  <TableCell><Badge variant="secondary" className="text-xs capitalize">{item.status}</Badge></TableCell>
+                  <TableCell>
+                    {item.type === "desligamento" && executedPlanningIds.has(item.id) ? (
+                      <Badge variant="default" className="text-xs bg-success/15 text-success border border-success/30">
+                        rescisão registrada
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs capitalize">{item.status}</Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
+                      {/* Contratação / Reajuste: gera lançamento no Financeiro */}
                       {item.status !== "executado" && item.type !== "desligamento" && (
                         <Button
                           variant="ghost"
@@ -238,6 +247,18 @@ export default function PlanningHR({ startDate, endDate }: Props) {
                           }
                         >
                           <CheckCircle2 className="h-3.5 w-3.5 text-success hover:text-success/80" />
+                        </Button>
+                      )}
+                      {/* Desligamento planejado: abre o simulador de rescisão (fecha o ciclo) */}
+                      {item.type === "desligamento" && item.status !== "executado" && !executedPlanningIds.has(item.id) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="Executar rescisão (abre simulador de desligamento)"
+                          onClick={() => setTermSimItem(item)}
+                        >
+                          <FileSignature className="h-3.5 w-3.5 text-destructive hover:text-destructive/80" />
                         </Button>
                       )}
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove.mutate(item.id)}>
