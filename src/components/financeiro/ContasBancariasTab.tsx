@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useBankAccounts, BankAccount } from "@/hooks/useBankAccounts";
 import { BankAccountFormDialog } from "./BankAccountFormDialog";
+import { OverdraftValidationDialog } from "./OverdraftValidationDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,13 +10,19 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp } from "lucide-react";
+import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp, Info } from "lucide-react";
 import { useHolding } from "@/contexts/HoldingContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  calculateAvailability,
+  estimateMonthlyClosingCharge,
+  getNextClosingDate,
+} from "@/lib/overdraftCalculations";
 
 const tipoContaLabels: Record<string, string> = {
   corrente: "Corrente",
