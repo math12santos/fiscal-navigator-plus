@@ -189,6 +189,10 @@ export default function DPConfig() {
   const fmtSigned = (v: number) =>
     `${v >= 0 ? "+" : ""}${v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 })}`;
 
+  if (isLoading) {
+    return <div className="text-center py-12 text-muted-foreground">Carregando...</div>;
+  }
+
   return (
     <div className="space-y-4">
       <Card>
