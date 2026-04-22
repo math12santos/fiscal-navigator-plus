@@ -283,20 +283,24 @@ export function usePlanningPdfReport({
         ["Saldo mínimo configurado", fmt(config?.saldo_minimo ?? 0)],
         ["Alerta de runway (meses)", String(config?.runway_alerta_meses ?? 3)],
       ],
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, bottom: margin + footerHeight },
+      // Repete o cabeçalho da tabela em cada página e evita cortar linhas
+      showHead: "everyPage",
+      rowPageBreak: "avoid",
+      pageBreak: "auto",
     });
     y = (doc as any).lastAutoTable.finalY + 18;
 
     // ----- Strategic Alerts -----
     if (alerts.length > 0) {
-      if (y > 720) { doc.addPage(); y = margin; }
+      ensureSpace(40); // título + primeira linha
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
       doc.text(`Alertas Estratégicos (${alerts.length})`, margin, y);
       autoTable(doc, {
         startY: y + 6,
         theme: "striped",
-        styles: { fontSize: 8, cellPadding: 5 },
+        styles: { fontSize: 8, cellPadding: 5, overflow: "linebreak" },
         headStyles: { fillColor: [40, 50, 70], textColor: 255 },
         head: [["Tipo", "Categoria", "Título", "Descrição"]],
         body: alerts.map((a) => [
