@@ -315,7 +315,10 @@ export function usePlanningPdfReport({
           2: { cellWidth: 160 },
           3: { cellWidth: "auto" },
         },
-        margin: { left: margin, right: margin },
+        margin: { left: margin, right: margin, bottom: margin + footerHeight },
+        showHead: "everyPage",
+        rowPageBreak: "avoid",
+        pageBreak: "auto",
       });
       y = (doc as any).lastAutoTable.finalY + 18;
     }
@@ -367,26 +370,34 @@ export function usePlanningPdfReport({
       columnStyles: { 0: { halign: "left", cellWidth: 60 } },
       head: [["Mês", "Orçado", "Sob Cenário", "Projetado", "Realizado", "Diferença", "Variação"]],
       body: rows,
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, bottom: margin + footerHeight },
+      // Para horizontes longos, repete o cabeçalho e mantém cada linha íntegra
+      showHead: "everyPage",
+      rowPageBreak: "avoid",
+      pageBreak: "auto",
     });
 
-    // ----- Footer on every page -----
+    // ----- Footer on every page (desenhado depois de todo o conteúdo) -----
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      // Linha divisória sutil acima do rodapé
+      doc.setDrawColor(230);
+      doc.line(margin, pageHeight - footerHeight, pageWidth - margin, pageHeight - footerHeight);
       doc.setFontSize(8);
       doc.setTextColor(140);
       doc.text(
         `Colli FinCore · ${orgName} · ${generatedAt}`,
         margin,
-        doc.internal.pageSize.getHeight() - 18
+        pageHeight - 12
       );
       doc.text(
         `Página ${i}/${pageCount}`,
         pageWidth - margin,
-        doc.internal.pageSize.getHeight() - 18,
+        pageHeight - 12,
         { align: "right" }
       );
+      doc.setTextColor(0);
     }
 
     const fileName = `planejamento_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
