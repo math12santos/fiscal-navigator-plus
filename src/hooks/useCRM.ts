@@ -297,11 +297,62 @@ export function useCRMOpportunities() {
       if (won_at !== undefined) updateData.won_at = won_at;
       if (lost_at !== undefined) updateData.lost_at = lost_at;
       if (lost_reason !== undefined) updateData.lost_reason = lost_reason;
+
+      // Fetch opp to know its value/title before update
+      const { data: oppBefore } = await supabase
+        .from("crm_opportunities" as any)
+        .select("*, crm_clients:client_id(name, entity_id)")
+        .eq("id", id)
+        .single();
+
       const { error } = await supabase.from("crm_opportunities" as any).update(updateData).eq("id", id);
       if (error) throw error;
+
+      // If moved to a Won stage, create a forecasted income entry in cashflow.
+      // De-dup safety: only create if no entry already references this opportunity.
+      if (won_at && oppBefore) {
+        const opp: any = oppBefore;
+        const valor = Number(opp.estimated_value || 0);
+        if (valor > 0) {
+          const dataPrev = opp.estimated_close_date || new Date().toISOString().slice(0, 10);
+          const competencia = dataPrev.slice(0, 7);
+          const clientName = opp.crm_clients?.name || "Cliente CRM";
+
+          // Check existing forecast for this opportunity to avoid duplication
+          const { data: existing } = await supabase
+            .from("cashflow_entries")
+            .select("id")
+            .eq("organization_id", orgId!)
+            .eq("source", "crm_won")
+            .ilike("notes", `%opp:${id}%`)
+            .limit(1);
+
+          if (!existing || existing.length === 0) {
+            await supabase.from("cashflow_entries").insert({
+              organization_id: orgId,
+              user_id: user!.id,
+              descricao: `${opp.title} — ${clientName}`,
+              tipo: "entrada",
+              valor_previsto: valor,
+              data_prevista: dataPrev,
+              data_vencimento: dataPrev,
+              competencia,
+              entity_id: opp.crm_clients?.entity_id || null,
+              status: "previsto",
+              source: "crm_won",
+              categoria: "Receita Comercial",
+              impacto_fluxo_caixa: true,
+              impacto_orcamento: true,
+              notes: `Gerado a partir de oportunidade CRM ganha. opp:${id}`,
+            });
+          }
+        }
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["crm_opportunities", orgId] });
+      qc.invalidateQueries({ queryKey: ["financeiro"] });
+      qc.invalidateQueries({ queryKey: ["cashflow"] });
     },
     onError: (e: any) => toast({ title: "Erro ao mover", description: e.message, variant: "destructive" }),
   });
