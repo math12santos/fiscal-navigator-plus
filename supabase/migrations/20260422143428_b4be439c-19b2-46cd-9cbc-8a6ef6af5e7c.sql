@@ -1,0 +1,2 @@
+ALTER TABLE public.planning_report_exports
+  DROP CONSTRAINT IF EXISTS planning_report_exports_scenario_id_fkey;
