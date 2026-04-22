@@ -299,6 +299,15 @@ function FilterPopover({
           />
         </div>
 
+        {hasActiveFiltersWithoutData && (
+          <div className="flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-2 py-1.5">
+            <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 flex-shrink-0" />
+            <p className="text-[10px] text-warning-foreground leading-tight">
+              Recorte atual sem dados no período. Ajuste os filtros ou o horizonte.
+            </p>
+          </div>
+        )}
+
         <p className="text-[10px] text-muted-foreground pt-1 border-t border-border">
           Filtros refletem em Cockpit, Plan×Real×Projetado e no PDF exportado.
         </p>
@@ -315,11 +324,27 @@ interface ExportPdfButtonProps {
 }
 
 function ExportPdfButton({ startDate, endDate, budgetVersionId, filters }: ExportPdfButtonProps) {
-  const { generatePdf, isReady } = usePlanningPdfReport({ startDate, endDate, budgetVersionId, filters });
+interface ExportPdfButtonProps {
+  startDate: Date;
+  endDate: Date;
+  budgetVersionId: string | null;
+  filters: PlanningFilters;
+  onHasFilteredDataChange?: (v: boolean) => void;
+}
+
+function ExportPdfButton({ startDate, endDate, budgetVersionId, filters, onHasFilteredDataChange }: ExportPdfButtonProps) {
+  const { generatePdf, isReady, hasFilteredData } = usePlanningPdfReport({ startDate, endDate, budgetVersionId, filters });
   const { record } = usePlanningReportExports();
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleClick = async () => {
+  // Repassa o sinal "tem dados após filtro" para o pai poder mostrar a nota
+  // no FilterPopover. Single source of truth para evitar divergir do PDF.
+  useEffect(() => {
+    onHasFilteredDataChange?.(hasFilteredData);
+  }, [hasFilteredData, onHasFilteredDataChange]);
+
+  const runExport = async () => {
     if (!isReady || busy) return;
     try {
       setBusy(true);
@@ -354,18 +379,57 @@ function ExportPdfButton({ startDate, endDate, budgetVersionId, filters }: Expor
     }
   };
 
+  const handleClick = () => {
+    // Filtro ativo + zero dados → exige confirmação para evitar PDF "fantasma"
+    // sem o usuário perceber que o vazio foi causado pelo recorte.
+    if (hasAnyFilter(filters) && !hasFilteredData) {
+      setConfirmOpen(true);
+      return;
+    }
+    void runExport();
+  };
+
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleClick}
-      disabled={!isReady || busy}
-      className="gap-1.5"
-      title="Exportar Cockpit + Plan×Real×Projetado para PDF"
-    >
-      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-      <span className="hidden sm:inline">Exportar PDF</span>
-    </Button>
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleClick}
+        disabled={!isReady || busy}
+        className="gap-1.5"
+        title="Exportar Cockpit + Plan×Real×Projetado para PDF"
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+        <span className="hidden sm:inline">Exportar PDF</span>
+      </Button>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              Recorte sem dados no período
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Os filtros atuais não retornam nenhum lançamento, contrato ou
+              folha no horizonte selecionado. O PDF será gerado em branco e
+              registrado no histórico assim mesmo. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Revisar filtros</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmOpen(false);
+                void runExport();
+              }}
+            >
+              Exportar mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
