@@ -147,25 +147,23 @@ function ProtectedRoutes() {
   return (
     <Suspense fallback={<FullScreenLoader />}>
       <AppLayout>
-        <Suspense fallback={<ContentSkeleton />}>
-          <Routes>
-            <Route path="/" element={<ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard>} />
-            <Route path="/financeiro" element={<ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard>} />
-            <Route path="/fluxo-caixa" element={<Navigate to="/financeiro" replace />} />
-            <Route path="/conciliacao" element={<Navigate to="/financeiro" replace />} />
-            <Route path="/contratos" element={<ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard>} />
-            <Route path="/planejamento" element={<ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard>} />
-            <Route path="/tarefas" element={<ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard>} />
-            <Route path="/integracoes" element={<ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard>} />
-            <Route path="/ia" element={<ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard>} />
-            <Route path="/configuracoes" element={<ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard>} />
-            <Route path="/dp" element={<ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard>} />
-            <Route path="/crm" element={<ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard>} />
-            <Route path="/nova-empresa" element={<CreateOrganization />} />
-            <Route path="/relatorios/kpi/:metric" element={<ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
+        <Routes>
+          <Route path="/" element={<RouteShell skeleton={<DashboardSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/financeiro" element={<RouteShell skeleton={<FinanceiroSkeleton />}><ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/fluxo-caixa" element={<Navigate to="/financeiro" replace />} />
+          <Route path="/conciliacao" element={<Navigate to="/financeiro" replace />} />
+          <Route path="/contratos" element={<RouteShell skeleton={<ContratosSkeleton />}><ModuleMaintenanceGuard moduleKey="contratos"><Contratos /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/planejamento" element={<RouteShell skeleton={<PlanejamentoSkeleton />}><ModuleMaintenanceGuard moduleKey="planejamento"><Planejamento /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/tarefas" element={<RouteShell skeleton={<GenericPageSkeleton title="Tarefas" />}><ModuleMaintenanceGuard moduleKey="tarefas"><Tarefas /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/integracoes" element={<RouteShell skeleton={<GenericPageSkeleton title="Integrações" />}><ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/ia" element={<RouteShell skeleton={<GenericPageSkeleton title="IA Financeira" />}><ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/configuracoes" element={<RouteShell skeleton={<GenericPageSkeleton title="Configurações" />}><ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/dp" element={<RouteShell skeleton={<DpSkeleton />}><ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/crm" element={<RouteShell skeleton={<CrmSkeleton />}><ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/nova-empresa" element={<RouteShell skeleton={<GenericPageSkeleton title="Nova empresa" />}><CreateOrganization /></RouteShell>} />
+          <Route path="/relatorios/kpi/:metric" element={<RouteShell skeleton={<RelatorioKpiSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="*" element={<RouteShell skeleton={<GenericPageSkeleton />}><NotFound /></RouteShell>} />
+        </Routes>
       </AppLayout>
     </Suspense>
   );
