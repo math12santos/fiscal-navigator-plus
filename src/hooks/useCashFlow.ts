@@ -10,6 +10,7 @@ import { useHolding } from "@/contexts/HoldingContext";
 import { useMemo } from "react";
 import { format, isBefore, isAfter } from "date-fns";
 import { isRecurringCashflow, generateProjectionsFromContract } from "@/lib/contractProjections";
+import { projectionKey, buildMaterializedRefs } from "@/lib/projectionRegistry";
 
 export interface CashFlowEntry {
   id: string;
@@ -97,21 +98,20 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
 
   const projectedEntries = useMemo(() => {
     if (!rangeFrom || !rangeTo) return [];
-    const materializedKeys = new Set(
-      (entriesQuery.data ?? [])
-        .filter((e) => e.contract_id && e.source === "contrato")
-        .map((e) => `${e.contract_id}-${e.data_prevista}`)
-    );
 
-    // 1. Recurrent contract projections (only truly recurring services)
+    // Single source of truth: source_ref of every materialized entry.
+    const materializedRefs = buildMaterializedRefs(entriesQuery.data ?? []);
+
+    // 1. Recurrent contract projections (truly recurring services only)
     const recurrentProjections = contracts.flatMap((c) => {
       const projections = generateProjectionsFromContract(c, rangeFrom, rangeTo);
-      return projections.filter(
-        (p) => !materializedKeys.has(`${p.contract_id}-${p.data_prevista}`)
-      );
+      return projections.filter((p) => {
+        const ref = (p as any).source_ref ?? projectionKey.contract(c.id, p.data_prevista);
+        return !materializedRefs.has(ref);
+      });
     });
 
-    // 2. Installment projections (for non-recurring contracts that have manual installments)
+    // 2. Installment projections (non-recurring contracts with manual installments)
     const contractMap = new Map(contracts.map((c) => [c.id, c]));
     const installmentData = installmentsQuery.data ?? [];
     const contractsWithInstallments = new Set(installmentData.map((i) => i.contract_id));
@@ -119,8 +119,9 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     const installmentProjections = installmentData
       .filter((inst) => {
         const d = new Date(inst.data_vencimento);
-        return !isBefore(d, rangeFrom) && !isAfter(d, rangeTo) &&
-          !materializedKeys.has(`${inst.contract_id}-${inst.data_vencimento}`);
+        if (isBefore(d, rangeFrom) || isAfter(d, rangeTo)) return false;
+        const ref = projectionKey.installment(inst.id, inst.contract_id, inst.data_vencimento);
+        return !materializedRefs.has(ref);
       })
       .map((inst) => {
         const contract = contractMap.get(inst.contract_id);
@@ -142,6 +143,7 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
           entity_id: contract?.entity_id ?? null,
           notes: null,
           source: "contrato",
+          source_ref: projectionKey.installment(inst.id, inst.contract_id, inst.data_vencimento),
           created_at: inst.created_at,
           updated_at: inst.created_at,
         } as Omit<CashFlowEntry, "user_id" | "organization_id">;
@@ -154,7 +156,8 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
         const dateStr = c.data_inicio ?? format(new Date(c.created_at), "yyyy-MM-dd");
         const d = new Date(dateStr);
         if (isBefore(d, rangeFrom) || isAfter(d, rangeTo)) return [];
-        if (materializedKeys.has(`${c.id}-${dateStr}`)) return [];
+        const ref = projectionKey.contract(c.id, dateStr);
+        if (materializedRefs.has(ref)) return [];
         const tipo = c.impacto_resultado === "receita" ? "entrada" : "saida";
         return [{
           id: `proj-single-${c.id}`,
@@ -173,6 +176,7 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
           entity_id: c.entity_id,
           notes: null,
           source: "contrato",
+          source_ref: ref,
           created_at: c.created_at,
           updated_at: c.created_at,
         } as Omit<CashFlowEntry, "user_id" | "organization_id">];
