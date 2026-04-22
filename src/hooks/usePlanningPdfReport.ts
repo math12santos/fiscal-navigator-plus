@@ -268,13 +268,13 @@ export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: Pd
 
     const months = Object.keys(monthly).sort();
     const rows = months.map((key) => {
-      const realized = monthly[key];
+      const realized = realizedByMonth[key] ?? { entradas: 0, saidas: 0 };
       const budgeted = budgetedByMonth[key] ?? { receita: 0, gasto: 0 };
+      const projected = projectedByMonth[key] ?? { receita: 0, gasto: 0 };
       const orcado = budgeted.receita - budgeted.gasto;
       const cenario =
         budgeted.receita * receitaFactor - (budgeted.gasto * custoFactor + stressPerMonth);
-      const projetado =
-        monthlyContractRevenue + crmPerMonth - (monthlyContractCost + avgMonthlyPayroll);
+      const projetado = projected.receita - projected.gasto;
       const realizado = realized.entradas - realized.saidas;
       const diferenca = realizado - orcado;
       const variacao = orcado !== 0 ? ((realizado - orcado) / Math.abs(orcado)) * 100 : 0;
