@@ -207,7 +207,7 @@ function BackofficeRoutes() {
   return (
     <Suspense fallback={<FullScreenLoader />}>
       <BackofficeLayout>
-        <Suspense fallback={<ContentSkeleton />}>
+        <Suspense fallback={<GenericPageSkeleton />}>
           <Routes>
             <Route path="/" element={<BackofficeDashboard />} />
             <Route path="/usuarios" element={<BackofficeUsers />} />
