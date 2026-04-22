@@ -6,8 +6,7 @@ import {
   ResponsiveContainer, Legend, ReferenceLine,
 } from "recharts";
 import { useCashFlow } from "@/hooks/useCashFlow";
-import { useBudget, useBudgetLines, BudgetLine } from "@/hooks/useBudget";
-import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
+import { useBudgetLines, BudgetLine } from "@/hooks/useBudget";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 import { useContracts } from "@/hooks/useContracts";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
@@ -35,7 +34,6 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
   // which would double-count against the Projetado series we recompute below.
   const { materializedEntries } = useCashFlow(startDate, endDate);
   const budgetLinesQuery = useBudgetLines(budgetVersionId);
-  const { accounts } = useChartOfAccounts();
   const { payrollProjections } = usePayrollProjections(startDate, endDate);
   const { contracts } = useContracts();
   const { opportunities } = useCRMOpportunities();
@@ -71,11 +69,6 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
     }
     return map;
   }, [materializedEntries]);
-
-  const accountMap = useMemo(
-    () => new Map(accounts.map((a) => [a.id, a])),
-    [accounts]
-  );
 
   // ===== Realizado =====
   // Only count entries that were actually realized (have valor_realizado set
