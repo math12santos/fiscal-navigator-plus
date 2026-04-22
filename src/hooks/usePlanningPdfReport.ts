@@ -14,6 +14,16 @@ import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { usePlanningScenarioContext } from "@/contexts/PlanningScenarioContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { generateProjectionsFromContract } from "@/lib/contractProjections";
+import {
+  PlanningFilters,
+  EMPTY_PLANNING_FILTERS,
+  entryMatchesFilters,
+  contractMatchesFilters,
+  hasAnyFilter,
+} from "@/lib/planningFilters";
+import { useCostCenters } from "@/hooks/useCostCenters";
+import { useBankAccounts } from "@/hooks/useBankAccounts";
+import { useHolding } from "@/contexts/HoldingContext";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", {
@@ -26,19 +36,24 @@ interface PdfReportOptions {
   startDate: Date;
   endDate: Date;
   budgetVersionId: string | null;
+  filters?: PlanningFilters;
 }
 
 /**
  * Builds and downloads a PDF that mirrors the Cockpit and the
  * Plan × Real × Projetado comparative for the chosen horizon.
- * Includes generation date, budget version and active scenario.
+ * Includes generation date, budget version, active scenario and any
+ * operational filters (subsidiary, bank account, cost center) so the
+ * exported document matches exactly what the user sees on screen.
  */
-export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: PdfReportOptions) {
+export function usePlanningPdfReport({
+  startDate, endDate, budgetVersionId, filters = EMPTY_PLANNING_FILTERS,
+}: PdfReportOptions) {
   const { currentOrg } = useOrganization();
-  const { entries, materializedEntries, totals } = useCashFlow(startDate, endDate);
-  const { contracts } = useContracts();
+  const { entries: rawEntries, materializedEntries: rawMaterialized, totals: rawTotals } = useCashFlow(startDate, endDate);
+  const { contracts: rawContracts } = useContracts();
   const { config } = usePlanningConfig();
-  const { avgMonthlyPayroll, payrollProjections } = usePayrollProjections(startDate, endDate);
+  const { avgMonthlyPayroll: rawAvgPayroll, payrollProjections: rawPayroll } = usePayrollProjections(startDate, endDate);
   const { totals: liabTotals } = useLiabilities();
   const { crmWeightedValue, alerts } = useFinancialSummary(startDate, endDate);
   const { versions, isLoadingVersions } = useBudget();
@@ -46,6 +61,9 @@ export function usePlanningPdfReport({ startDate, endDate, budgetVersionId }: Pd
   const { opportunities } = useCRMOpportunities();
   const { stages } = usePipelineStages();
   const { activeScenario, receitaFactor, custoFactor, stressExtraOutflow } = usePlanningScenarioContext();
+  const { costCenters } = useCostCenters();
+  const { allBankAccounts } = useBankAccounts();
+  const { subsidiaryOrgs } = useHolding();
 
   const generatePdf = useCallback(() => {
     const budgetVersion = versions.find((v) => v.id === budgetVersionId) ?? null;
