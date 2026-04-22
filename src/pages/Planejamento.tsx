@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { addMonths, startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
@@ -109,7 +110,43 @@ export default function Planejamento() {
   const { getAllowedTabs } = useUserPermissions();
 
   const allowedTabs = getAllowedTabs("planejamento", ALL_TABS);
-  const [activeTab, setActiveTab] = useState<string>(allowedTabs[0]?.key || "cockpit");
+  const fallbackTab = allowedTabs[0]?.key || "cockpit";
+
+  // Active tab is persisted in the URL (?tab=...) so refresh, back/forward
+  // and shared links preserve navigation context.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  const activeTab =
+    urlTab && allowedTabs.some((t) => t.key === urlTab) ? urlTab : fallbackTab;
+
+  const setActiveTab = useCallback(
+    (tab: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (!tab || tab === fallbackTab) next.delete("tab");
+          else next.set("tab", tab);
+          return next;
+        },
+        { replace: false },
+      );
+    },
+    [setSearchParams, fallbackTab],
+  );
+
+  // If the URL carries an unknown/forbidden tab, normalise it once.
+  useEffect(() => {
+    if (urlTab && !allowedTabs.some((t) => t.key === urlTab)) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("tab");
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [urlTab, allowedTabs, setSearchParams]);
 
   // Navegação programática vinda dos alertas do Cockpit
   useEffect(() => {
@@ -121,7 +158,7 @@ export default function Planejamento() {
     };
     window.addEventListener(PLANNING_NAV_EVENT, handler);
     return () => window.removeEventListener(PLANNING_NAV_EVENT, handler);
-  }, [allowedTabs]);
+  }, [allowedTabs, setActiveTab]);
 
   const { startDate, endDate } = useMemo(() => {
     const now = startOfMonth(new Date());
