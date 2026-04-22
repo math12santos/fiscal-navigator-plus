@@ -670,9 +670,20 @@ export default function RelatorioKpi() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
           <ArrowLeft size={14} className="mr-2" /> Voltar ao Dashboard
         </Button>
-        <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredItems.length === 0}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportCsv}
+          disabled={(isQuarterly ? aggregatedRows.length : filteredItems.length) === 0}
+        >
           <Download size={14} className="mr-2" />
-          {isFiltering ? "Exportar CSV (filtrado)" : "Exportar CSV"}
+          {isQuarterly
+            ? isFiltering
+              ? "Exportar CSV (trimestral, filtrado)"
+              : "Exportar CSV (trimestral)"
+            : isFiltering
+            ? "Exportar CSV (filtrado)"
+            : "Exportar CSV"}
         </Button>
       </div>
 
