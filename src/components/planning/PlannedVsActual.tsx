@@ -179,17 +179,21 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
     return chartData.map((d) => {
       const realizado = d["Realizado (Entrada)"] + d["Realizado (Saída)"];
       const orcado = d["Orçado (Receita)"] + d["Orçado (Gasto)"];
+      const cenario = d["Cenário (Receita)"] + d["Cenário (Gasto)"];
       const projetado = d["Projetado (Receita)"] + d["Projetado (Gasto)"];
       const dp = dpByMonth[d.monthKey] ?? 0;
       const variacao = orcado !== 0 ? ((realizado - orcado) / Math.abs(orcado)) * 100 : 0;
+      const variacaoCenario = orcado !== 0 ? ((cenario - orcado) / Math.abs(orcado)) * 100 : 0;
       return {
         mes: d.mes,
         orcado,
+        cenario,
         realizado,
         projetado,
         dp,
         diferenca: realizado - orcado,
         variacao,
+        variacaoCenario,
       };
     });
   }, [chartData, dpByMonth]);
