@@ -715,6 +715,29 @@ export default function RelatorioKpi() {
                 ? `${filteredItems.length} de ${rows.items.length} item(ns)`
                 : `${rows.items.length} item(ns)`}
             </p>
+            {supportsQuarterly && (
+              <div className="mt-3 flex flex-col items-end gap-1">
+                <ToggleGroup
+                  type="single"
+                  size="sm"
+                  value={granularity}
+                  onValueChange={(v) => {
+                    if (v === "mensal" || v === "trimestral") applyGranularity(v);
+                  }}
+                  aria-label="Granularidade da composição"
+                >
+                  <ToggleGroupItem value="mensal" aria-label="Visão mensal" className="h-7 px-3 text-xs">
+                    Mensal
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="trimestral" aria-label="Visão trimestral" className="h-7 px-3 text-xs">
+                    Trimestral
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <p className="text-[10px] text-muted-foreground max-w-[260px] text-right leading-tight">
+                  A granularidade muda apenas a forma de exibição; o total e a reconciliação não mudam.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
