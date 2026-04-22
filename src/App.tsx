@@ -6,8 +6,16 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
 import { HoldingProvider } from "@/contexts/HoldingContext";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { GenericPageSkeleton } from "@/components/skeletons/GenericPageSkeleton";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
+import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
+import { PlanejamentoSkeleton } from "@/components/skeletons/PlanejamentoSkeleton";
+import { ContratosSkeleton } from "@/components/skeletons/ContratosSkeleton";
+import { DpSkeleton } from "@/components/skeletons/DpSkeleton";
+import { CrmSkeleton } from "@/components/skeletons/CrmSkeleton";
+import { RelatorioKpiSkeleton } from "@/components/skeletons/RelatorioKpiSkeleton";
 
 /** Retry dynamic imports on failure (stale chunk after deploy) */
 function lazyRetry(factory: () => Promise<{ default: React.ComponentType<any> }>) {
@@ -89,18 +97,10 @@ const FullScreenLoader = () => (
   </div>
 );
 
-/** Lightweight content-area skeleton — preserves sidebar/header during route transitions */
-const ContentSkeleton = () => (
-  <div className="space-y-4 animate-pulse" aria-hidden="true">
-    <div className="h-8 w-64 rounded-md bg-muted/60" />
-    <div className="h-4 w-96 rounded-md bg-muted/40" />
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-      <div className="h-28 rounded-xl bg-muted/40" />
-      <div className="h-28 rounded-xl bg-muted/40" />
-      <div className="h-28 rounded-xl bg-muted/40" />
-    </div>
-    <div className="h-64 rounded-xl bg-muted/30 mt-4" />
-  </div>
+/** Wrap each route element in its own Suspense with a module-faithful skeleton.
+ *  Sidebar/header stay mounted (outer Suspense at AppLayout level). */
+const RouteShell = ({ skeleton, children }: { skeleton: ReactNode; children: ReactNode }) => (
+  <Suspense fallback={skeleton}>{children}</Suspense>
 );
 
 /** Hook to check if user needs onboarding */
