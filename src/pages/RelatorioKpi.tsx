@@ -576,8 +576,16 @@ export default function RelatorioKpi() {
           <div className="flex items-start gap-3">
             <div className="rounded-lg bg-primary/10 p-2.5 text-primary">{meta.icon}</div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Período</p>
-              <p className="text-sm font-medium text-foreground capitalize">{periodLabel}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Período</p>
+                <KpiPeriodPresetsPopover
+                  currentFrom={format(rangeFrom, "yyyy-MM-dd")}
+                  currentTo={format(rangeTo, "yyyy-MM-dd")}
+                  onApply={applyRange}
+                  disabled={meta.scopeIsCurrentMonth}
+                />
+              </div>
+              <p className="text-sm font-medium text-foreground capitalize mt-1">{periodLabel}</p>
               {currentOrg && (
                 <p className="text-xs text-muted-foreground mt-0.5">{currentOrg.name}</p>
               )}
