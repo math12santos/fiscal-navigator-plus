@@ -529,6 +529,51 @@ export default function Planejamento() {
     return () => window.removeEventListener(PLANNING_NAV_EVENT, handler);
   }, [allowedTabs, setActiveTab]);
 
+  // ===== Sanitização de filtros =====
+  // Após o carregamento das listas de referência, remove IDs órfãos do URL
+  // (ex: conta excluída, CC desativado, link compartilhado de outra org).
+  // Avisa o usuário uma vez por sanitização — sem o ref, o setFilters re-dispara
+  // o effect e o toast apareceria infinitamente.
+  const { allBankAccounts: refBankAccounts, isLoading: isLoadingBank } = useBankAccounts();
+  const { costCenters: refCostCenters, isLoading: isLoadingCc } = useCostCenters();
+  const { subsidiaryOrgs: refSubsidiaries, isLoading: isLoadingHolding } = useHolding();
+  const sanitizedSignatureRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isLoadingBank || isLoadingCc || isLoadingHolding) return;
+    if (!hasAnyFilter(filters)) return;
+
+    const valid = {
+      orgIds: new Set(refSubsidiaries.map((o) => o.id)),
+      bankIds: new Set(refBankAccounts.map((b) => b.id)),
+      ccIds: new Set(refCostCenters.map((c) => c.id)),
+    };
+    const { sanitized, removed } = sanitizeFilters(filters, valid);
+    if (removed.length === 0) return;
+
+    // Evita re-disparo ao mesmo conjunto de filtros já corrigido.
+    const signature = JSON.stringify({ ...filters, _r: removed });
+    if (sanitizedSignatureRef.current === signature) return;
+    sanitizedSignatureRef.current = signature;
+
+    setFilters(sanitized);
+    const totalRemoved = removed.reduce((s, r) => s + r.count, 0);
+    const dims = removed.map((r) => r.dimension).join(", ");
+    toast.info(
+      `Removemos ${totalRemoved} filtro(s) que não existem mais nesta organização.`,
+      { description: `Dimensão(ões) afetada(s): ${dims}.` },
+    );
+  }, [
+    filters, setFilters,
+    refBankAccounts, refCostCenters, refSubsidiaries,
+    isLoadingBank, isLoadingCc, isLoadingHolding,
+  ]);
+
+  // Sinal vindo do ExportPdfButton para o FilterPopover poder exibir nota
+  // quando filtros ativos resultam em zero dados no horizonte.
+  const [hasFilteredData, setHasFilteredData] = useState(true);
+  const hasActiveFiltersWithoutData = hasAnyFilter(filters) && !hasFilteredData;
+
   const { startDate, endDate } = useMemo(() => {
     const now = startOfMonth(new Date());
     if (horizon === "custom" && customFrom && customTo) {
