@@ -77,10 +77,19 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
     [accounts]
   );
 
-  // Aggregate realized by month
+  // ===== Realizado =====
+  // Only count entries that were actually realized (have valor_realizado set
+  // OR explicit realized statuses). Virtual DP/contract projections that may
+  // be present in the merged stream are filtered out by the source check.
   const realizedByMonth = useMemo(() => {
     const map: Record<string, { entradas: number; saidas: number }> = {};
-    for (const e of entries) {
+    for (const e of materializedEntries) {
+      const isRealized =
+        e.valor_realizado != null ||
+        e.status === "pago" ||
+        e.status === "recebido" ||
+        e.status === "conciliado";
+      if (!isRealized) continue;
       const key = e.data_prevista.slice(0, 7);
       if (!map[key]) map[key] = { entradas: 0, saidas: 0 };
       const val = Number(e.valor_realizado ?? e.valor_previsto);
@@ -88,76 +97,82 @@ export default function PlannedVsActual({ startDate, endDate, budgetVersionId }:
       else map[key].saidas += val;
     }
     return map;
-  }, [entries]);
+  }, [materializedEntries]);
 
-  // Aggregate budgeted by month
+  // ===== Orçado =====
   const budgetedByMonth = useMemo(() => {
     const map: Record<string, { receita: number; gasto: number }> = {};
     for (const line of budgetLines) {
-      const key = (line as BudgetLine).month.slice(0, 7);
+      const key = line.month.slice(0, 7);
       if (!map[key]) map[key] = { receita: 0, gasto: 0 };
-      if ((line as BudgetLine).tipo === "receita") {
-        map[key].receita += Number((line as BudgetLine).valor_orcado);
+      if (line.tipo === "receita") {
+        map[key].receita += Number(line.valor_orcado);
       } else {
-        map[key].gasto += Number((line as BudgetLine).valor_orcado);
+        map[key].gasto += Number(line.valor_orcado);
       }
     }
     return map;
   }, [budgetLines]);
 
-  // Projected (contracts recurring monthly + payroll + CRM weighted)
+  // ===== Projetado (forward-looking, mesma granularidade mensal) =====
+  // Componentes (sem dupla contagem):
+  //   1. Contratos: usa generateProjectionsFromContract — respeita data_inicio/data_fim,
+  //      intervalo de recorrência (mensal/bi/tri/sem/anual) e dia_vencimento.
+  //      Contratos não-recorrentes (mercadoria, serviços pontuais) são tratados via
+  //      installments / lançamento único e NÃO entram aqui para evitar duplicar com Realizado.
+  //   2. DP/Folha: soma payrollProjections por mês (eles já vêm com data_prevista correta).
+  //   3. CRM: aplica pipeline ponderado no mês de estimated_close_date; oportunidades
+  //      sem data são distribuídas igualmente nos meses do horizonte.
   const projectedByMonth = useMemo(() => {
     const map: Record<string, { receita: number; gasto: number }> = {};
+    for (const key of horizonMonths) map[key] = { receita: 0, gasto: 0 };
 
-    // Active recurring contracts → monthly value
-    const monthlyContractRevenue = contracts
-      .filter((c) => c.status === "Ativo" && (c.tipo === "Receita" || c.tipo === "receita"))
-      .reduce((sum, c) => {
-        const v = Number(c.valor);
-        if (c.tipo_recorrencia === "mensal") return sum + v;
-        if (c.tipo_recorrencia === "bimestral") return sum + v / 2;
-        if (c.tipo_recorrencia === "trimestral") return sum + v / 3;
-        if (c.tipo_recorrencia === "semestral") return sum + v / 6;
-        if (c.tipo_recorrencia === "anual") return sum + v / 12;
-        return sum;
-      }, 0);
-
-    const monthlyContractCost = contracts
-      .filter((c) => c.status === "Ativo" && c.tipo !== "Receita" && c.tipo !== "receita")
-      .reduce((sum, c) => {
-        const v = Number(c.valor);
-        if (c.tipo_recorrencia === "mensal") return sum + v;
-        if (c.tipo_recorrencia === "bimestral") return sum + v / 2;
-        if (c.tipo_recorrencia === "trimestral") return sum + v / 3;
-        if (c.tipo_recorrencia === "semestral") return sum + v / 6;
-        if (c.tipo_recorrencia === "anual") return sum + v / 12;
-        return sum;
-      }, 0);
-
-    // CRM weighted pipeline → monthly fraction over horizon
-    const stageMap = new Map(stages.map((s) => [s.id, s]));
-    const totalPipelineWeighted = opportunities
-      .filter((o) => !o.won_at && !o.lost_at)
-      .reduce((sum, o) => {
-        const s = stageMap.get(o.stage_id);
-        const prob = s ? Number(s.probability) / 100 : 0;
-        return sum + Number(o.estimated_value) * prob;
-      }, 0);
-
-    let cursor = startOfMonth(startDate);
-    const monthsCount = Math.max(1, payrollProjections.length || 1);
-    const crmPerMonth = totalPipelineWeighted / monthsCount;
-
-    while (!isAfter(cursor, endDate)) {
-      const key = format(cursor, "yyyy-MM");
-      map[key] = {
-        receita: monthlyContractRevenue + crmPerMonth,
-        gasto: monthlyContractCost + avgMonthlyPayroll,
-      };
-      cursor = addMonths(cursor, 1);
+    // 1. Contracts — per-month, respecting active window
+    for (const c of contracts) {
+      const projs = generateProjectionsFromContract(c, startDate, endDate);
+      for (const p of projs) {
+        const key = p.data_prevista.slice(0, 7);
+        if (!map[key]) continue;
+        const v = Number(p.valor_previsto);
+        if (p.tipo === "entrada") map[key].receita += v;
+        else map[key].gasto += v;
+      }
     }
+
+    // 2. DP / Folha — already month-stamped (data_prevista = first day of month)
+    for (const p of payrollProjections) {
+      const key = String(p.data_prevista).slice(0, 7);
+      if (!map[key]) continue;
+      map[key].gasto += Number(p.valor_previsto);
+    }
+
+    // 3. CRM weighted pipeline — concentrate on estimated_close_date when known
+    const stageMap = new Map(stages.map((s) => [s.id, s]));
+    const openOpps = opportunities.filter((o) => !o.won_at && !o.lost_at);
+    let undatedWeighted = 0;
+    for (const o of openOpps) {
+      const stage = stageMap.get(o.stage_id);
+      const prob = stage ? Number(stage.probability) / 100 : 0;
+      const weighted = Number(o.estimated_value) * prob;
+      if (weighted <= 0) continue;
+      if (o.estimated_close_date) {
+        const key = String(o.estimated_close_date).slice(0, 7);
+        if (map[key]) {
+          map[key].receita += weighted;
+        } else {
+          // Fora do horizonte → ignora (não inflar projeção)
+        }
+      } else {
+        undatedWeighted += weighted;
+      }
+    }
+    if (undatedWeighted > 0) {
+      const perMonth = undatedWeighted / monthsCount;
+      for (const key of horizonMonths) map[key].receita += perMonth;
+    }
+
     return map;
-  }, [contracts, opportunities, stages, avgMonthlyPayroll, payrollProjections.length, startDate, endDate]);
+  }, [contracts, payrollProjections, opportunities, stages, horizonMonths, monthsCount, startDate, endDate]);
 
   // Chart data
   const chartData = useMemo(() => {
