@@ -156,13 +156,19 @@ export default function PlanningReportHistory() {
                       <Badge variant="outline" className="font-normal">
                         Versão: {item.budget_version_name ?? "—"}
                       </Badge>
+                      {item.had_data === false && (
+                        <Badge
+                          variant="outline"
+                          className="font-normal border-warning/40 text-warning gap-1"
+                          title="Esta exportação foi gerada sem dados"
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          {EMPTY_REASON_LABEL[item.empty_reason ?? "other"]}
+                        </Badge>
+                      )}
                     </div>
 
-                    {item.filters_summary && item.filters_summary !== "Nenhum" && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Filtros: {item.filters_summary}
-                      </p>
-                    )}
+                    <FilterLabelsBlock labels={item.filter_labels} fallbackSummary={item.filters_summary} />
 
                     <div className="flex justify-end pt-1">
                       <RedownloadRow
