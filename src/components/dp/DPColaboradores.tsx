@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Edit2, Trash2 } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, UserMinus } from "lucide-react";
+import TerminationSimulatorDialog from "./TerminationSimulatorDialog";
 import { useEmployees, useMutateEmployee, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { usePositions } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
@@ -44,6 +45,7 @@ export default function DPColaboradores() {
   const [statusFilter, setStatusFilter] = useState("__all__");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [terminateEmpId, setTerminateEmpId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "", cpf: "", email: "", phone: "",
     admission_date: "", contract_type: "CLT",
@@ -201,8 +203,19 @@ export default function DPColaboradores() {
                     <TableCell><Badge variant={st.variant}>{st.label}</Badge></TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(e)}><Edit2 size={13} /></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(e.id)}><Trash2 size={13} /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(e)} title="Editar"><Edit2 size={13} /></Button>
+                        {e.status === "ativo" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive"
+                            onClick={() => setTerminateEmpId(e.id)}
+                            title="Demitir"
+                          >
+                            <UserMinus size={13} />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(e.id)} title="Excluir"><Trash2 size={13} /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -335,6 +348,12 @@ export default function DPColaboradores() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TerminationSimulatorDialog
+        open={!!terminateEmpId}
+        onOpenChange={(o) => { if (!o) setTerminateEmpId(null); }}
+        initialEmployeeId={terminateEmpId || undefined}
+      />
     </div>
   );
 }
