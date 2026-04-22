@@ -75,7 +75,20 @@ export default function DPRescisoes() {
                           )}
                         </TableCell>
                         <TableCell className="text-xs">{format(new Date(t.termination_date), "dd/MM/yyyy")}</TableCell>
-                        <TableCell><Badge variant="outline">{ALL_TYPE_LABELS[t.type] || t.type}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="outline">{ALL_TYPE_LABELS[t.type] || t.type}</Badge>
+                            {t.hr_planning_item_id && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[9px] bg-primary/10 text-primary border border-primary/30"
+                                title="Originado de um item de Planejamento de RH"
+                              >
+                                planejado
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="font-mono font-bold">{fmt(t.total_rescisao)}</TableCell>
                         <TableCell className="font-mono text-destructive">
                           {regime === "PJ" || regime === "estagio" ? <span className="text-muted-foreground">—</span> : fmt(t.multa_fgts)}
