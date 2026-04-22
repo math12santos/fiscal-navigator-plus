@@ -24,6 +24,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { useContracts } from "@/hooks/useContracts";
 import { useEmployees } from "@/hooks/useDP";
