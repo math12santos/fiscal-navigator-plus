@@ -98,10 +98,16 @@ export default function DPConfig() {
   const { data: config, isLoading } = useDPConfig();
   const { data: employees = [] } = useEmployees();
   const mutate = useMutateDPConfig();
+  const propagate = usePropagateDPConfigToSubsidiaries();
+  const applySuggestion = useApplyHoldingDPSuggestion();
+  const dismissSuggestion = useDismissHoldingDPSuggestion();
+  const { isHolding, subsidiaryOrgs } = useHolding();
   const { toast } = useToast();
 
   const [base, setBase] = useState<Record<string, number>>(DEFAULTS);
   const [customs, setCustoms] = useState<CustomItem[]>([]);
+  const [propagateDialogOpen, setPropagateDialogOpen] = useState(false);
+  const [selectedSubsidiaries, setSelectedSubsidiaries] = useState<Set<string>>(new Set());
 
   // Sync local state when remote config loads
   useEffect(() => {
@@ -119,6 +125,9 @@ export default function DPConfig() {
     }
   }, [config]);
 
+  // Sugestão pendente vinda da holding (apenas em subsidiárias)
+  const pendingSuggestion = (config as any)?.pending_holding_suggestion ?? null;
+
   const handleSave = () => {
     // Sanitize customs: drop blank labels
     const cleanCustoms = customs
@@ -128,25 +137,62 @@ export default function DPConfig() {
     mutate.mutate(
       { ...base, custom_items: cleanCustoms } as any,
       {
-        onSuccess: () => toast({ title: "Configurações salvas" }),
+        onSuccess: () => {
+          toast({ title: "Configurações salvas" });
+          // Se é holding e tem subsidiárias, abre modal perguntando se quer propagar
+          if (isHolding && subsidiaryOrgs.length > 0) {
+            setSelectedSubsidiaries(new Set(subsidiaryOrgs.map((o) => o.id)));
+            setPropagateDialogOpen(true);
+          }
+        },
         onError: (e: any) => toast({ title: "Erro ao salvar", description: e?.message, variant: "destructive" }),
       },
     );
   };
 
-  const addCustom = (category: Category) => {
-    setCustoms((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), category, label: "", pct: 0 },
-    ]);
+  const handlePropagate = () => {
+    const cleanCustoms = customs
+      .filter((c) => c.label.trim().length > 0)
+      .map((c) => ({ ...c, label: c.label.trim(), pct: Number(c.pct) || 0 }));
+    propagate.mutate(
+      { subsidiaryIds: Array.from(selectedSubsidiaries), base, customs: cleanCustoms },
+      {
+        onSuccess: ({ count }) => {
+          toast({
+            title: "Sugestão enviada",
+            description: `${count} ${count === 1 ? "subsidiária recebeu" : "subsidiárias receberam"} a sugestão para revisão.`,
+          });
+          setPropagateDialogOpen(false);
+        },
+        onError: (e: any) =>
+          toast({ title: "Erro ao propagar", description: e?.message, variant: "destructive" }),
+      },
+    );
   };
 
-  const updateCustom = (id: string, patch: Partial<CustomItem>) => {
-    setCustoms((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  const handleApplySuggestion = () => {
+    applySuggestion.mutate(undefined, {
+      onSuccess: () => toast({ title: "Sugestão aplicada", description: "Os percentuais da holding foram adotados." }),
+      onError: (e: any) =>
+        toast({ title: "Erro ao aplicar", description: e?.message, variant: "destructive" }),
+    });
   };
 
-  const removeCustom = (id: string) => {
-    setCustoms((prev) => prev.filter((c) => c.id !== id));
+  const handleDismissSuggestion = () => {
+    dismissSuggestion.mutate(undefined, {
+      onSuccess: () => toast({ title: "Sugestão descartada" }),
+      onError: (e: any) =>
+        toast({ title: "Erro ao descartar", description: e?.message, variant: "destructive" }),
+    });
+  };
+
+  const toggleSubsidiary = (id: string) => {
+    setSelectedSubsidiaries((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   // ===== Impacto estimado: aplica %s atuais (config) e novos (state) sobre a folha base =====
