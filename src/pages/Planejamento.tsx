@@ -413,6 +413,8 @@ export default function Planejamento() {
           filters={filters}
         />
 
+        <PlanningReportHistory />
+
         <Button
           variant="outline"
           size="sm"
