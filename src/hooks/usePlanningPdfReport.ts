@@ -376,6 +376,18 @@ export function usePlanningPdfReport({
 
     const fileName = `planejamento_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
     doc.save(fileName);
+
+    // Retorna metadados de auditoria para que o chamador possa registrar
+    // a exportação no histórico (mesmos textos exibidos no cabeçalho do PDF).
+    return {
+      fileName,
+      generatedAt: new Date(),
+      filtersSummary: filtersLine,
+      scenarioName: activeScenario?.name ?? null,
+      scenarioId: activeScenario?.id ?? null,
+      budgetVersionId: budgetVersion?.id ?? null,
+      budgetVersionName: budgetVersion?.name ?? null,
+    };
   }, [
     versions,
     budgetVersionId,
