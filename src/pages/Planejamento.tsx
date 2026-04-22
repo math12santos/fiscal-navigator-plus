@@ -9,29 +9,22 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
-import PlanningOverview from "@/components/planning/PlanningOverview";
-import BudgetTab from "@/components/planning/BudgetTab";
-import PlanningScenarios from "@/components/planning/PlanningScenarios";
-import PlannedVsActual from "@/components/planning/PlannedVsActual";
-import PlanningLiquidity from "@/components/planning/PlanningLiquidity";
-import PlanningLiabilities from "@/components/planning/PlanningLiabilities";
-import PlanningCommercial from "@/components/planning/PlanningCommercial";
-import PlanningHR from "@/components/planning/PlanningHR";
+import PlanningCockpit from "@/components/planning/PlanningCockpit";
+import PlanningBudget from "@/components/planning/PlanningBudget";
+import PlanningScenariosRisk from "@/components/planning/PlanningScenariosRisk";
+import PlanningOperational from "@/components/planning/PlanningOperational";
+import PlanningSettingsDialog from "@/components/planning/PlanningSettingsDialog";
 
 type Horizon = "3m" | "6m" | "12m" | "24m" | "custom";
 
 const ALL_TABS = [
-  { key: "visao-geral", label: "Visão Geral" },
-  { key: "orcamento", label: "Orçamento" },
-  { key: "cenarios", label: "Cenários" },
-  { key: "planejado-realizado", label: "Plan. × Real." },
-  { key: "liquidez", label: "Liquidez" },
-  { key: "passivos", label: "Passivos" },
-  { key: "rh", label: "RH" },
-  { key: "comercial", label: "Comercial" },
+  { key: "cockpit", label: "Cockpit" },
+  { key: "orcamento", label: "Orçamento & Realizado" },
+  { key: "cenarios-risco", label: "Cenários & Risco" },
+  { key: "operacional", label: "Operacional" },
 ];
 
 export default function Planejamento() {
@@ -39,6 +32,7 @@ export default function Planejamento() {
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [budgetVersionId, setBudgetVersionId] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const { getAllowedTabs } = useUserPermissions();
 
   const allowedTabs = getAllowedTabs("planejamento", ALL_TABS);
@@ -55,15 +49,23 @@ export default function Planejamento() {
 
   const renderTabContent = (tabKey: string) => {
     switch (tabKey) {
-      case "visao-geral": return <PlanningOverview startDate={startDate} endDate={endDate} />;
-      case "orcamento": return <BudgetTab startDate={startDate} endDate={endDate} selectedVersionId={budgetVersionId} onSelectVersion={setBudgetVersionId} />;
-      case "cenarios": return <PlanningScenarios startDate={startDate} endDate={endDate} />;
-      case "planejado-realizado": return <PlannedVsActual startDate={startDate} endDate={endDate} budgetVersionId={budgetVersionId} />;
-      case "liquidez": return <PlanningLiquidity />;
-      case "passivos": return <PlanningLiabilities />;
-      case "rh": return <PlanningHR startDate={startDate} endDate={endDate} />;
-      case "comercial": return <PlanningCommercial startDate={startDate} endDate={endDate} />;
-      default: return null;
+      case "cockpit":
+        return <PlanningCockpit startDate={startDate} endDate={endDate} />;
+      case "orcamento":
+        return (
+          <PlanningBudget
+            startDate={startDate}
+            endDate={endDate}
+            selectedVersionId={budgetVersionId}
+            onSelectVersion={setBudgetVersionId}
+          />
+        );
+      case "cenarios-risco":
+        return <PlanningScenariosRisk startDate={startDate} endDate={endDate} />;
+      case "operacional":
+        return <PlanningOperational startDate={startDate} endDate={endDate} />;
+      default:
+        return null;
     }
   };
 
@@ -71,11 +73,11 @@ export default function Planejamento() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Planejamento Financeiro"
-        description="Orçamento, projeções, cenários e gestão de passivos — apoio à decisão estratégica"
+        description="Cockpit executivo, orçamento, cenários de risco e operação — apoio à decisão estratégica"
       />
 
-      {/* Horizon Filter */}
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Sticky Horizon Filter + Settings */}
+      <div className="sticky top-0 z-10 -mx-6 px-6 py-3 bg-background/80 backdrop-blur-sm border-b border-border flex flex-wrap items-center gap-3">
         <Select value={horizon} onValueChange={(v) => setHorizon(v as Horizon)}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Horizonte" />
@@ -120,13 +122,26 @@ export default function Planejamento() {
         <span className="text-xs text-muted-foreground ml-auto">
           {format(startDate, "MMM/yyyy", { locale: ptBR })} — {format(endDate, "MMM/yyyy", { locale: ptBR })}
         </span>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowSettings(true)}
+          className="gap-1.5"
+          title="Configurações de planejamento"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Configurações</span>
+        </Button>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue={allowedTabs[0]?.key || "visao-geral"} className="space-y-4">
+      {/* Tabs — 4 main areas */}
+      <Tabs defaultValue={allowedTabs[0]?.key || "cockpit"} className="space-y-4">
         <TabsList className="flex w-full flex-wrap">
           {allowedTabs.map((t) => (
-            <TabsTrigger key={t.key} value={t.key} className="flex-1 min-w-[100px]">{t.label}</TabsTrigger>
+            <TabsTrigger key={t.key} value={t.key} className="flex-1 min-w-[140px]">
+              {t.label}
+            </TabsTrigger>
           ))}
         </TabsList>
 
@@ -136,6 +151,8 @@ export default function Planejamento() {
           </TabsContent>
         ))}
       </Tabs>
+
+      <PlanningSettingsDialog open={showSettings} onOpenChange={setShowSettings} />
     </div>
   );
 }
