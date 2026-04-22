@@ -212,6 +212,12 @@ export default function Planejamento() {
 
         <ScenarioPicker />
 
+        <ExportPdfButton
+          startDate={startDate}
+          endDate={endDate}
+          budgetVersionId={budgetVersionId}
+        />
+
         <Button
           variant="outline"
           size="sm"
