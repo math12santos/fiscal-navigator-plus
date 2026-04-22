@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { KpiPeriodPresetsPopover } from "@/components/relatorio/KpiPeriodPresetsPopover";
 import { ArrowLeft, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info } from "lucide-react";
-import { startOfMonth, endOfMonth, subMonths, format, parseISO } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, format, parseISO, getQuarter } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { useContracts } from "@/hooks/useContracts";
@@ -32,6 +34,7 @@ import { useEmployees } from "@/hooks/useDP";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { validateRange } from "@/lib/kpiRangeValidation";
 
 /**
  * Página única de "drill-down" para KPIs do Dashboard.
