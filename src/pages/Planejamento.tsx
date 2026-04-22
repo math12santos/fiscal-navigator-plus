@@ -183,7 +183,7 @@ export default function Planejamento() {
       </div>
 
       {/* Tabs — 4 main areas */}
-      <Tabs defaultValue={allowedTabs[0]?.key || "cockpit"} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex w-full flex-wrap">
           {allowedTabs.map((t) => (
             <TabsTrigger key={t.key} value={t.key} className="flex-1 min-w-[140px]">
