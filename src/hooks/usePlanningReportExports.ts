@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useAuth } from "@/contexts/AuthContext";
-import type { PlanningFilters } from "@/lib/planningFilters";
+import { EMPTY_PLANNING_FILTERS, withFilterDefaults, type PlanningFilters } from "@/lib/planningFilters";
 
 export interface PlanningReportExport {
   id: string;
@@ -32,7 +32,7 @@ export interface PlanningReportExport {
 export interface RecordPlanningExportInput {
   startDate: Date;
   endDate: Date;
-  filters: PlanningFilters;
+  filters?: PlanningFilters;
   scenarioId: string | null;
   scenarioName: string | null;
   budgetVersionId: string | null;
@@ -67,6 +67,7 @@ export function usePlanningReportExports() {
   const record = useMutation({
     mutationFn: async (input: RecordPlanningExportInput) => {
       if (!currentOrg?.id || !user?.id) throw new Error("Sem organização ativa.");
+      const safeFilters = withFilterDefaults(input.filters ?? EMPTY_PLANNING_FILTERS);
       const payload = {
         organization_id: currentOrg.id,
         user_id: user.id,
@@ -77,7 +78,7 @@ export function usePlanningReportExports() {
         budget_version_name: input.budgetVersionName,
         start_date: isoDate(input.startDate),
         end_date: isoDate(input.endDate),
-        filters: input.filters as any,
+        filters: safeFilters as any,
         filters_summary: input.filtersSummary,
       };
       const { error } = await supabase

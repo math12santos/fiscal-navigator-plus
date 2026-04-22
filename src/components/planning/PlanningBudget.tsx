@@ -1,7 +1,7 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import BudgetTab from "@/components/planning/BudgetTab";
 import PlannedVsActual from "@/components/planning/PlannedVsActual";
-import type { PlanningFilters } from "@/lib/planningFilters";
+import { EMPTY_PLANNING_FILTERS, type PlanningFilters } from "@/lib/planningFilters";
 
 interface Props {
   startDate: Date;
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function PlanningBudget({
-  startDate, endDate, selectedVersionId, onSelectVersion, filters,
+  startDate, endDate, selectedVersionId, onSelectVersion, filters = EMPTY_PLANNING_FILTERS,
 }: Props) {
   return (
     <Tabs defaultValue="linhas" className="space-y-4">
