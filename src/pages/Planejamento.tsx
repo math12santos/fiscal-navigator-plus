@@ -380,10 +380,13 @@ export default function Planejamento() {
 
         <ScenarioPicker />
 
+        <FilterPopover filters={filters} setFilters={setFilters} />
+
         <ExportPdfButton
           startDate={startDate}
           endDate={endDate}
           budgetVersionId={budgetVersionId}
+          filters={filters}
         />
 
         <Button
