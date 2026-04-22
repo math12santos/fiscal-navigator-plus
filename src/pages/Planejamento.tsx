@@ -236,6 +236,7 @@ export default function Planejamento() {
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [budgetVersionId, setBudgetVersionId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [filters, setFilters] = useState<PlanningFilters>(EMPTY_PLANNING_FILTERS);
   const { getAllowedTabs } = useUserPermissions();
 
   const allowedTabs = getAllowedTabs("planejamento", ALL_TABS);
