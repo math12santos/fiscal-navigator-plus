@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronRight } from "lucide-react";
 
 interface KPICardProps {
   title: string;
@@ -10,11 +10,34 @@ interface KPICardProps {
   icon?: ReactNode;
   /** Group share percentage (0-100), shown as "X% do grupo" */
   groupShare?: number | null;
+  /** Quando definido, o card vira clicável e leva ao relatório de composição. */
+  onClick?: () => void;
 }
 
-export function KPICard({ title, value, change, subtitle, icon, groupShare }: KPICardProps) {
+export function KPICard({ title, value, change, subtitle, icon, groupShare, onClick }: KPICardProps) {
+  const clickable = typeof onClick === "function";
   return (
-    <div className="glass-card p-5 animate-slide-up">
+    <div
+      className={cn(
+        "glass-card p-5 animate-slide-up",
+        clickable &&
+          "cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+      )}
+      onClick={onClick}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      aria-label={clickable ? `Ver composição: ${title}` : undefined}
+    >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
