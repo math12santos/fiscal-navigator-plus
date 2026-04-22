@@ -564,6 +564,63 @@ export default function DPConfig() {
           <Save size={14} className="mr-1" /> {mutate.isPending ? "Salvando..." : "Salvar Configurações"}
         </Button>
       </div>
+
+      {/* Modal: propagar percentuais para subsidiárias (apenas em holdings) */}
+      <Dialog open={propagateDialogOpen} onOpenChange={setPropagateDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send size={16} className="text-primary" />
+              Propagar para o grupo?
+            </DialogTitle>
+            <DialogDescription>
+              Os percentuais salvos serão enviados como <strong>sugestão pendente</strong> para as subsidiárias
+              selecionadas. Os valores atuais delas <em>não serão sobrescritos</em> — cada subsidiária poderá
+              revisar e aplicar a sugestão.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 max-h-64 overflow-y-auto rounded-md border border-border p-2">
+            {subsidiaryOrgs.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2 text-center">Nenhuma subsidiária encontrada.</p>
+            ) : (
+              subsidiaryOrgs.map((org) => {
+                const checked = selectedSubsidiaries.has(org.id);
+                return (
+                  <label
+                    key={org.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleSubsidiary(org.id)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <Building2 size={12} className="text-muted-foreground" />
+                    <span className="text-sm">{org.name}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setPropagateDialogOpen(false)}>
+              Agora não
+            </Button>
+            <Button
+              onClick={handlePropagate}
+              disabled={propagate.isPending || selectedSubsidiaries.size === 0}
+            >
+              <Send size={14} className="mr-1" />
+              {propagate.isPending
+                ? "Enviando..."
+                : `Enviar para ${selectedSubsidiaries.size} ${selectedSubsidiaries.size === 1 ? "empresa" : "empresas"}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
