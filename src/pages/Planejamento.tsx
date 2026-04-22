@@ -624,6 +624,48 @@ export default function Planejamento() {
   const [hasFilteredData, setHasFilteredData] = useState(true);
   const hasActiveFiltersWithoutData = hasAnyFilter(filters) && !hasFilteredData;
 
+  // ===== Pré-validação para o botão de exportar =====
+  // Detecta inconsistências instantaneamente (sem esperar o effect de
+  // sanitização) para que o clique em "Exportar PDF" devolva mensagem
+  // amigável precisa, mesmo se o usuário clicar antes da limpeza automática.
+  const refsLoadingForExport = isLoadingBank || isLoadingCc || isLoadingHolding;
+  const exportInvalidFilters = useMemo(() => {
+    if (refsLoadingForExport || !hasAnyFilter(filters)) return [];
+    const valid = {
+      orgIds: new Set(refSubsidiaries.map((o) => o.id)),
+      bankIds: new Set(refBankAccounts.map((b) => b.id)),
+      ccIds: new Set(refCostCenters.map((c) => c.id)),
+    };
+    return sanitizeFilters(filters, valid).removed;
+  }, [filters, refsLoadingForExport, refSubsidiaries, refBankAccounts, refCostCenters]);
+
+  // Resumo legível do recorte aplicado — exibido no diálogo de "sem dados"
+  // para o usuário entender por que o resultado ficou vazio.
+  const exportFiltersDescription = useMemo(() => {
+    const desc: string[] = [];
+    if (filters.subsidiaryOrgId) {
+      const org = refSubsidiaries.find((o) => o.id === filters.subsidiaryOrgId);
+      desc.push(`Unidade: ${org?.name ?? filters.subsidiaryOrgId.slice(0, 8)}`);
+    }
+    if (filters.bankAccountIds.length > 0) {
+      const names = filters.bankAccountIds
+        .map((id) => refBankAccounts.find((b) => b.id === id)?.nome ?? id.slice(0, 8))
+        .slice(0, 3)
+        .join(", ");
+      const extra = filters.bankAccountIds.length > 3 ? ` (+${filters.bankAccountIds.length - 3})` : "";
+      desc.push(`Conta(s) bancária(s): ${names}${extra}`);
+    }
+    if (filters.costCenterIds.length > 0) {
+      const names = filters.costCenterIds
+        .map((id) => refCostCenters.find((c) => c.id === id)?.name ?? id.slice(0, 8))
+        .slice(0, 3)
+        .join(", ");
+      const extra = filters.costCenterIds.length > 3 ? ` (+${filters.costCenterIds.length - 3})` : "";
+      desc.push(`Centro(s) de custo: ${names}${extra}`);
+    }
+    return desc;
+  }, [filters, refSubsidiaries, refBankAccounts, refCostCenters]);
+
   const { startDate, endDate } = useMemo(() => {
     const now = startOfMonth(new Date());
     if (horizon === "custom" && customFrom && customTo) {
