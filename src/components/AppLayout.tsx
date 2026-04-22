@@ -175,6 +175,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       {/* Main */}
       <main className="flex-1 overflow-y-auto">
         <div className="flex items-center justify-end gap-2 px-6 pt-4 lg:px-8">
+          <GlobalFetchingIndicator />
           <ThemeToggle />
           <NotificationCenter />
         </div>
