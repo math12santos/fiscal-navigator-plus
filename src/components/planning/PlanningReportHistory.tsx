@@ -14,11 +14,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { History, FileDown, Trash2, Loader2 } from "lucide-react";
+import { History, FileDown, Trash2, Loader2, AlertTriangle, Building2, Wallet, Layers } from "lucide-react";
 import { toast } from "sonner";
-import { usePlanningReportExports } from "@/hooks/usePlanningReportExports";
+import {
+  usePlanningReportExports,
+  type PlanningEmptyReason,
+  type PlanningExportFilterLabels,
+} from "@/hooks/usePlanningReportExports";
 import { usePlanningPdfReport } from "@/hooks/usePlanningPdfReport";
 import { EMPTY_PLANNING_FILTERS, withFilterDefaults, type PlanningFilters } from "@/lib/planningFilters";
+
+const EMPTY_REASON_LABEL: Record<PlanningEmptyReason, string> = {
+  no_period_data: "Sem lançamentos no período",
+  filters_excluded_all: "Filtros eliminaram todos os dados",
+  no_budget_version: "Sem versão orçamentária ativa",
+  other: "Recorte vazio",
+};
 
 /**
  * Botão "Re-baixar" — instancia o hook de PDF com os parâmetros salvos
