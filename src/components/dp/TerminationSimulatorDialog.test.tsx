@@ -156,12 +156,17 @@ describe("<TerminationSimulatorDialog /> — UI por regime", () => {
     const triggers = screen.getAllByRole("combobox");
     fireEvent.click(triggers[1]);
 
+    // Filtra apenas as opções (não inclui o valor atual no trigger)
+    const options = screen.getAllByRole("option").map((o) => o.textContent ?? "");
+
     // Deve listar opções PJ
-    expect(screen.getByText(/Distrato com aviso prévio contratual/i)).toBeInTheDocument();
-    expect(screen.getByText(/Fim natural do contrato/i)).toBeInTheDocument();
+    expect(options.some((t) => /Distrato com aviso prévio contratual/i.test(t))).toBe(true);
+    expect(options.some((t) => /Fim natural do contrato/i.test(t))).toBe(true);
+    expect(options.some((t) => /Distrato imediato/i.test(t))).toBe(true);
 
     // Não deve listar opções CLT
-    expect(screen.queryByText(/Sem justa causa/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Acordo \(reforma\)/i)).not.toBeInTheDocument();
+    expect(options.some((t) => /Sem justa causa/i.test(t))).toBe(false);
+    expect(options.some((t) => /Acordo \(reforma\)/i.test(t))).toBe(false);
+    expect(options.some((t) => /Pedido de demissão/i.test(t))).toBe(false);
   });
 });
