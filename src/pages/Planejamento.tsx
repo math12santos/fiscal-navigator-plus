@@ -67,6 +67,19 @@ export default function Planejamento() {
   const { getAllowedTabs } = useUserPermissions();
 
   const allowedTabs = getAllowedTabs("planejamento", ALL_TABS);
+  const [activeTab, setActiveTab] = useState<string>(allowedTabs[0]?.key || "cockpit");
+
+  // Navegação programática vinda dos alertas do Cockpit
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent<{ tab: string }>).detail?.tab;
+      if (tab && allowedTabs.some((t) => t.key === tab)) {
+        setActiveTab(tab);
+      }
+    };
+    window.addEventListener(PLANNING_NAV_EVENT, handler);
+    return () => window.removeEventListener(PLANNING_NAV_EVENT, handler);
+  }, [allowedTabs]);
 
   const { startDate, endDate } = useMemo(() => {
     const now = startOfMonth(new Date());
