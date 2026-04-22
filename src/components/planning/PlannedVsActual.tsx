@@ -29,37 +29,47 @@ interface Props {
 }
 
 export default function PlannedVsActual({ startDate, endDate, budgetVersionId }: Props) {
-  const { entries } = useCashFlow(startDate, endDate);
+  // IMPORTANT: use materializedEntries (DB rows) for Realizado.
+  // `entries` from useCashFlow already merges recurrent contract projections + DP virtuals,
+  // which would double-count against the Projetado series we recompute below.
+  const { materializedEntries } = useCashFlow(startDate, endDate);
   const budgetLinesQuery = useBudgetLines(budgetVersionId);
   const { accounts } = useChartOfAccounts();
-  const { avgMonthlyPayroll, payrollProjections } = usePayrollProjections(startDate, endDate);
+  const { payrollProjections } = usePayrollProjections(startDate, endDate);
   const { contracts } = useContracts();
   const { opportunities } = useCRMOpportunities();
   const { stages } = usePipelineStages();
   const { activeScenario, receitaFactor, custoFactor, stressExtraOutflow } = usePlanningScenarioContext();
   const isBaseScenario = !activeScenario || activeScenario.type === "base";
-  // Stress contribution distributed evenly across months for visualization
-  const monthsCount = useMemo(() => {
-    let n = 0;
+
+  // Horizon months — single source of truth for granularity & divisors
+  const horizonMonths = useMemo(() => {
+    const list: string[] = [];
     let c = startOfMonth(startDate);
-    while (!isAfter(c, endDate)) { n++; c = addMonths(c, 1); }
-    return Math.max(1, n);
+    while (!isAfter(c, endDate)) {
+      list.push(format(c, "yyyy-MM"));
+      c = addMonths(c, 1);
+    }
+    return list;
   }, [startDate, endDate]);
+  const monthsCount = Math.max(1, horizonMonths.length);
   const stressPerMonth = stressExtraOutflow / monthsCount;
 
   const budgetLines = (budgetLinesQuery.data ?? []) as BudgetLine[];
 
-  // DP realized costs by month (from cashflow entries with source "dp")
+  // DP realized costs by month — only entries actually paid/realized.
+  // Virtual DP projections (source="dp" + status="previsto") are excluded so
+  // they don't double-count between Realizado and Projetado.
   const dpByMonth = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const e of entries) {
-      if ((e as any).source === "dp" && e.tipo === "saida") {
+    for (const e of materializedEntries) {
+      if (e.source === "dp" && e.tipo === "saida" && e.valor_realizado != null) {
         const key = e.data_prevista.slice(0, 7);
-        map[key] = (map[key] ?? 0) + Number(e.valor_realizado ?? e.valor_previsto);
+        map[key] = (map[key] ?? 0) + Number(e.valor_realizado);
       }
     }
     return map;
-  }, [entries]);
+  }, [materializedEntries]);
 
   const accountMap = useMemo(
     () => new Map(accounts.map((a) => [a.id, a])),
