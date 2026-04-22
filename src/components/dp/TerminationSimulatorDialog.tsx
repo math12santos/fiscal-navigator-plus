@@ -27,9 +27,13 @@ interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   initialEmployeeId?: string;
+  /** ID do item de hr_planning_items que originou esta rescisão (fecha o ciclo planejamento → execução). */
+  hrPlanningItemId?: string;
+  /** Data planejada vinda do item de RH (pré-preenche a data de desligamento). */
+  initialTerminationDate?: string;
 }
 
-export default function TerminationSimulatorDialog({ open, onOpenChange, initialEmployeeId }: Props) {
+export default function TerminationSimulatorDialog({ open, onOpenChange, initialEmployeeId, hrPlanningItemId, initialTerminationDate }: Props) {
   const { data: employees = [] } = useEmployees();
   const { data: dpConfig } = useDPConfig();
   const { create } = useMutateTermination();
@@ -52,10 +56,10 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
     if (open) {
       setSelectedEmpId(initialEmployeeId || "");
       setTermType("sem_justa_causa");
-      setTermDate(format(new Date(), "yyyy-MM-dd"));
+      setTermDate(initialTerminationDate || format(new Date(), "yyyy-MM-dd"));
       setSimResult(null);
     }
-  }, [open, initialEmployeeId]);
+  }, [open, initialEmployeeId, initialTerminationDate]);
 
   const selectedEmp = empMap[selectedEmpId];
   const isPJ = selectedEmp?.contract_type === "PJ";
@@ -151,14 +155,18 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
   const handleSaveTermination = () => {
     if (!simResult || !selectedEmpId) return;
     // contract_type agora é persistido como snapshot imutável do regime na data da rescisão.
+    // hr_planning_item_id fecha o ciclo planejamento → execução (quando aplicável).
     create.mutate({
       employee_id: selectedEmpId,
       termination_date: termDate,
       type: termType,
+      hr_planning_item_id: hrPlanningItemId,
       ...simResult,
     }, {
       onSuccess: () => {
-        toast({ title: "Rescisão registrada" });
+        toast({
+          title: hrPlanningItemId ? "Rescisão registrada e item de planejamento concluído" : "Rescisão registrada",
+        });
         onOpenChange(false);
       },
     });
@@ -174,6 +182,11 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
       <DialogContent className="sm:max-w-lg">
         <DialogHeader><DialogTitle>Simulador de Desligamento</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          {hrPlanningItemId && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-[11px] text-foreground">
+              Esta rescisão será vinculada a um item de <span className="font-semibold">Planejamento de RH</span> e marcará o item como executado.
+            </div>
+          )}
           <div className="space-y-1">
             <Label>Colaborador</Label>
             <Select value={selectedEmpId} onValueChange={setSelectedEmpId}>

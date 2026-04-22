@@ -1934,6 +1934,7 @@ export type Database = {
           decimo_terceiro_proporcional: number | null
           employee_id: string
           ferias_proporcionais: number | null
+          hr_planning_item_id: string | null
           id: string
           multa_fgts: number | null
           notes: string | null
@@ -1954,6 +1955,7 @@ export type Database = {
           decimo_terceiro_proporcional?: number | null
           employee_id: string
           ferias_proporcionais?: number | null
+          hr_planning_item_id?: string | null
           id?: string
           multa_fgts?: number | null
           notes?: string | null
@@ -1974,6 +1976,7 @@ export type Database = {
           decimo_terceiro_proporcional?: number | null
           employee_id?: string
           ferias_proporcionais?: number | null
+          hr_planning_item_id?: string | null
           id?: string
           multa_fgts?: number | null
           notes?: string | null
@@ -1993,6 +1996,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_terminations_hr_planning_item_id_fkey"
+            columns: ["hr_planning_item_id"]
+            isOneToOne: false
+            referencedRelation: "hr_planning_items"
             referencedColumns: ["id"]
           },
           {
