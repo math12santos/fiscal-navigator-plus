@@ -384,6 +384,9 @@ function ExportPdfButton({
             budgetVersionId: meta.budgetVersionId,
             budgetVersionName: meta.budgetVersionName,
             filtersSummary: meta.filtersSummary,
+            filterLabels: meta.filterLabels,
+            hadData: meta.hadData,
+            emptyReason: meta.emptyReason,
           },
           {
             onError: (e: any) => {
