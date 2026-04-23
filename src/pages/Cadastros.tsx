@@ -240,6 +240,9 @@ export default function Cadastros() {
                 className="pl-9"
               />
             </div>
+            <Button variant="outline" onClick={() => setImportKind("cliente")}>
+              <Upload size={16} /> Importar
+            </Button>
             <Button onClick={() => { setEditingCliente(null); setClienteDialogOpen(true); }}>
               <Plus size={16} /> Novo Cliente
             </Button>
