@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { CostCenterFormPayload } from "@/components/CostCenterFormDialog";
 import { useCostCenterPermissions } from "@/hooks/useCostCenterPermissions";
 import { useOrgModules } from "@/hooks/useOrgModules";
@@ -13,30 +14,22 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit2, Power, Wand2, Users, ShoppingBag, Layers, Trash2 } from "lucide-react";
+import { Plus, Search, Edit2, Power, Wand2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import AccountTreeView from "@/components/AccountTreeView";
 import ChartOfAccountsFormDialog from "@/components/ChartOfAccountsFormDialog";
 import CostCenterFormDialog from "@/components/CostCenterFormDialog";
-import EntityFormDialog from "@/components/EntityFormDialog";
-import ProductFormDialog from "@/components/ProductFormDialog";
 import SeedPlanDialog from "@/components/SeedPlanDialog";
 import TransferWizard from "@/components/TransferWizard";
 import { useChartOfAccounts, ChartAccount } from "@/hooks/useChartOfAccounts";
 import { useCostCenters, CostCenter } from "@/hooks/useCostCenters";
-import { useEntities, Entity } from "@/hooks/useEntities";
-import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { useToast } from "@/hooks/use-toast";
 import GroupingConfigTab from "@/components/financeiro/GroupingConfigTab";
-import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const ALL_TABS = [
   { key: "accounts", label: "Plano de Contas" },
   { key: "cost-centers", label: "Centros de Custo" },
-  { key: "entities", label: "Fornecedores / Clientes" },
-  { key: "products", label: "Produtos / Serviços" },
   { key: "grouping", label: "Aglutinação" },
 ];
 
@@ -49,25 +42,24 @@ const ACCOUNT_TYPES = [
   { value: "transferencia", label: "Transferência" },
 ];
 
-const ENTITY_TYPES = [
-  { value: "__all__", label: "Todos" },
-  { value: "fornecedor", label: "Fornecedor" },
-  { value: "cliente", label: "Cliente" },
-  { value: "ambos", label: "Ambos" },
-];
-
-const PRODUCT_TYPES = [
-  { value: "__all__", label: "Todos" },
-  { value: "produto", label: "Produto" },
-  { value: "servico", label: "Serviço" },
-];
-
 export default function Configuracoes() {
   const { getAllowedTabs } = useUserPermissions();
   const allowedTabs = getAllowedTabs("configuracoes", ALL_TABS);
 
   const { currentOrg } = useOrganization();
   const orgId = currentOrg?.id;
+
+  // Backwards-compat redirect: /configuracoes?tab=entities|products → /cadastros
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "entities") {
+      navigate("/cadastros?tab=fornecedores", { replace: true });
+    } else if (tab === "products") {
+      navigate("/cadastros?tab=produtos", { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   // Fetch org members for responsible selector
   const { data: orgMembers = [] } = useQuery({
@@ -111,25 +103,10 @@ export default function Configuracoes() {
   // CC permissions for editing
   const { permissions: editingCCPermissions } = useCostCenterPermissions(editingCenter?.id);
 
-  // Entidades (Fornecedores/Clientes)
-  const { entities, isLoading: loadingEntities, create: createEntity, update: updateEntity, toggleActive: toggleEntityActive } = useEntities();
-  const [entitySearch, setEntitySearch] = useState("");
-  const [entityTypeFilter, setEntityTypeFilter] = useState("__all__");
-  const [entityDialogOpen, setEntityDialogOpen] = useState(false);
-  const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
-
-  // Produtos/Serviços
-  const { products, isLoading: loadingProducts, create: createProduct, update: updateProduct, toggleActive: toggleProductActive } = useProducts();
-  const [productSearch, setProductSearch] = useState("");
-  const [productTypeFilter, setProductTypeFilter] = useState("__all__");
-  const [productDialogOpen, setProductDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-
   const [seedDialogOpen, setSeedDialogOpen] = useState(false);
   const [transferWizardOpen, setTransferWizardOpen] = useState(false);
   const { log } = useAuditLog();
   const { toast } = useToast();
-
 
   const handleSeedFresh = async () => {
     await deleteAllAccounts();
@@ -161,24 +138,10 @@ export default function Configuracoes() {
     return matchSearch && matchUnit;
   });
 
-  const filteredEntities = entities.filter((e) => {
-    const matchSearch = !entitySearch || e.name.toLowerCase().includes(entitySearch.toLowerCase()) || (e.document_number || "").includes(entitySearch);
-    const matchType = entityTypeFilter === "__all__" || e.type === entityTypeFilter;
-    return matchSearch && matchType;
-  });
-
-  const filteredProducts = products.filter((p) => {
-    const matchSearch = !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.code.toLowerCase().includes(productSearch.toLowerCase());
-    const matchType = productTypeFilter === "__all__" || p.type === productTypeFilter;
-    return matchSearch && matchType;
-  });
-
-  const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center gap-3">
-        <PageHeader title="Configurações" description="Plano de Contas, Centros de Custo, Cadastros e Produtos" showHoldingToggle={false} />
+        <PageHeader title="Configurações" description="Plano de Contas, Centros de Custo e Aglutinação" showHoldingToggle={false} />
         <Button variant="outline" className="ml-auto" onClick={() => setSeedDialogOpen(true)}>
           <Wand2 size={16} /> Gerar Plano Padrão
         </Button>
@@ -260,97 +223,6 @@ export default function Configuracoes() {
             )}
           </div>
           <CostCenterFormDialog open={centerDialogOpen} onOpenChange={setCenterDialogOpen} costCenter={editingCenter} costCenters={costCenters} orgMembers={orgMembers} orgModules={filteredOrgModules} existingPermissions={editingCCPermissions} onSubmit={(data: CostCenterFormPayload) => { if (editingCenter && data.id) { updateCenter.mutate(data as any, { onSuccess: () => setCenterDialogOpen(false) }); } else { const { id, ...rest } = data; createCenter.mutate(rest as any, { onSuccess: () => setCenterDialogOpen(false) }); } }} isLoading={createCenter.isPending || updateCenter.isPending} />
-        </TabsContent>
-
-        {/* ===== FORNECEDORES / CLIENTES ===== */}
-        <TabsContent value="entities" className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-              <Input placeholder="Buscar por nome ou documento..." value={entitySearch} onChange={(e) => setEntitySearch(e.target.value)} className="pl-9" />
-            </div>
-            <Select value={entityTypeFilter} onValueChange={setEntityTypeFilter}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-              <SelectContent>{ENTITY_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-            </Select>
-            <Button onClick={() => { setEditingEntity(null); setEntityDialogOpen(true); }}><Plus size={16} /> Novo Cadastro</Button>
-          </div>
-          <div className="glass-card overflow-hidden">
-            {loadingEntities ? <div className="text-center py-8 text-muted-foreground">Carregando...</div> : filteredEntities.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">Nenhum fornecedor ou cliente cadastrado.</div>
-            ) : (
-              <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Nome</TableHead><TableHead>Tipo</TableHead><TableHead>Documento</TableHead><TableHead>Email</TableHead><TableHead>Telefone</TableHead><TableHead>Status</TableHead><TableHead className="w-24">Ações</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  {filteredEntities.map((e) => (
-                    <TableRow key={e.id} className={!e.active ? "opacity-50" : ""}>
-                      <TableCell className="font-medium">{e.name}</TableCell>
-                      <TableCell><Badge variant="outline" className="capitalize">{e.type}</Badge></TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">{e.document_number ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{e.email ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{e.phone ?? "—"}</TableCell>
-                      <TableCell><Badge variant={e.active ? "default" : "secondary"}>{e.active ? "Ativo" : "Inativo"}</Badge></TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingEntity(e); setEntityDialogOpen(true); }}><Edit2 size={13} /></Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleEntityActive.mutate({ id: e.id, active: !e.active })}><Power size={13} className={e.active ? "text-success" : "text-destructive"} /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-          <EntityFormDialog open={entityDialogOpen} onOpenChange={setEntityDialogOpen} entity={editingEntity} onSubmit={(data) => { if (editingEntity) { updateEntity.mutate(data, { onSuccess: () => setEntityDialogOpen(false) }); } else { createEntity.mutate(data, { onSuccess: () => setEntityDialogOpen(false) }); } }} isLoading={createEntity.isPending || updateEntity.isPending} />
-        </TabsContent>
-
-        {/* ===== PRODUTOS / SERVIÇOS ===== */}
-        <TabsContent value="products" className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-              <Input placeholder="Buscar por nome ou código..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)} className="pl-9" />
-            </div>
-            <Select value={productTypeFilter} onValueChange={setProductTypeFilter}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-              <SelectContent>{PRODUCT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-            </Select>
-            <Button onClick={() => { setEditingProduct(null); setProductDialogOpen(true); }}><Plus size={16} /> Novo Produto</Button>
-          </div>
-          <div className="glass-card overflow-hidden">
-            {loadingProducts ? <div className="text-center py-8 text-muted-foreground">Carregando...</div> : filteredProducts.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">Nenhum produto ou serviço cadastrado.</div>
-            ) : (
-              <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Código</TableHead><TableHead>Nome</TableHead><TableHead>Tipo</TableHead><TableHead>Unidade</TableHead><TableHead>Valor Unit.</TableHead><TableHead>Categoria</TableHead><TableHead>Status</TableHead><TableHead className="w-24">Ações</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  {filteredProducts.map((p) => (
-                    <TableRow key={p.id} className={!p.active ? "opacity-50" : ""}>
-                      <TableCell className="font-mono text-xs">{p.code}</TableCell>
-                      <TableCell className="font-medium">{p.name}</TableCell>
-                      <TableCell><Badge variant="outline" className="capitalize">{p.type === "servico" ? "Serviço" : "Produto"}</Badge></TableCell>
-                      <TableCell className="text-muted-foreground">{p.unit}</TableCell>
-                      <TableCell>{fmt.format(p.unit_price)}</TableCell>
-                      <TableCell className="text-muted-foreground">{p.category ?? "—"}</TableCell>
-                      <TableCell><Badge variant={p.active ? "default" : "secondary"}>{p.active ? "Ativo" : "Inativo"}</Badge></TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingProduct(p); setProductDialogOpen(true); }}><Edit2 size={13} /></Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleProductActive.mutate({ id: p.id, active: !p.active })}><Power size={13} className={p.active ? "text-success" : "text-destructive"} /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-          <ProductFormDialog open={productDialogOpen} onOpenChange={setProductDialogOpen} product={editingProduct} products={products} accounts={accounts} onSubmit={(data) => { if (editingProduct) { updateProduct.mutate(data, { onSuccess: () => setProductDialogOpen(false) }); } else { createProduct.mutate(data, { onSuccess: () => setProductDialogOpen(false) }); } }} isLoading={createProduct.isPending || updateProduct.isPending} />
         </TabsContent>
 
         {/* ===== AGLUTINAÇÃO ===== */}
