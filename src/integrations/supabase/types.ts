@@ -2407,6 +2407,51 @@ export type Database = {
           },
         ]
       }
+      escalation_policies: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          levels: Json
+          organization_id: string
+          template_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          levels?: Json
+          organization_id: string
+          template_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          levels?: Json
+          organization_id?: string
+          template_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalation_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalation_policies_template_code_fkey"
+            columns: ["template_code"]
+            isOneToOne: false
+            referencedRelation: "report_templates"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       expense_cost_center_splits: {
         Row: {
           cashflow_entry_id: string
@@ -3107,6 +3152,50 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      org_chat_bindings: {
+        Row: {
+          active: boolean
+          channel: string
+          chat_id: string
+          created_at: string
+          created_by: string
+          id: string
+          label: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          channel: string
+          chat_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          label: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          channel?: string
+          chat_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          label?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_chat_bindings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_holdings: {
         Row: {
@@ -4045,6 +4134,329 @@ export type Database = {
           full_name?: string | null
           id?: string
           must_change_password?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      report_deliveries: {
+        Row: {
+          channel: string
+          chat_binding_id: string | null
+          chat_id_masked: string | null
+          created_at: string
+          delivery_attempt: number
+          error: string | null
+          escalated_from: string | null
+          escalation_level: number
+          external_message_id: string | null
+          feedback_at: string | null
+          feedback_comment: string | null
+          feedback_score: string | null
+          id: string
+          link_opened_at: string | null
+          organization_id: string
+          recipient_role: string | null
+          recipient_user_id: string | null
+          run_id: string
+          sent_at: string | null
+          signed_link_token: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          chat_binding_id?: string | null
+          chat_id_masked?: string | null
+          created_at?: string
+          delivery_attempt?: number
+          error?: string | null
+          escalated_from?: string | null
+          escalation_level?: number
+          external_message_id?: string | null
+          feedback_at?: string | null
+          feedback_comment?: string | null
+          feedback_score?: string | null
+          id?: string
+          link_opened_at?: string | null
+          organization_id: string
+          recipient_role?: string | null
+          recipient_user_id?: string | null
+          run_id: string
+          sent_at?: string | null
+          signed_link_token?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          chat_binding_id?: string | null
+          chat_id_masked?: string | null
+          created_at?: string
+          delivery_attempt?: number
+          error?: string | null
+          escalated_from?: string | null
+          escalation_level?: number
+          external_message_id?: string | null
+          feedback_at?: string | null
+          feedback_comment?: string | null
+          feedback_score?: string | null
+          id?: string
+          link_opened_at?: string | null
+          organization_id?: string
+          recipient_role?: string | null
+          recipient_user_id?: string | null
+          run_id?: string
+          sent_at?: string | null
+          signed_link_token?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_deliveries_chat_binding_id_fkey"
+            columns: ["chat_binding_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_bindings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_deliveries_escalated_from_fkey"
+            columns: ["escalated_from"]
+            isOneToOne: false
+            referencedRelation: "report_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_deliveries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_deliveries_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "report_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_recipients: {
+        Row: {
+          active: boolean
+          chat_binding_id: string | null
+          created_at: string
+          escalation_level: number
+          id: string
+          mask_values_override: boolean | null
+          role: string | null
+          schedule_id: string
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          chat_binding_id?: string | null
+          created_at?: string
+          escalation_level?: number
+          id?: string
+          mask_values_override?: boolean | null
+          role?: string | null
+          schedule_id: string
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          chat_binding_id?: string | null
+          created_at?: string
+          escalation_level?: number
+          id?: string
+          mask_values_override?: boolean | null
+          role?: string | null
+          schedule_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_recipients_chat_binding_id_fkey"
+            columns: ["chat_binding_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_bindings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_recipients_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "report_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_runs: {
+        Row: {
+          created_by: string | null
+          error: string | null
+          expires_at: string | null
+          generated_at: string
+          id: string
+          organization_id: string
+          payload: Json | null
+          pdf_path: string | null
+          schedule_id: string | null
+          signed_token: string | null
+          status: string
+          template_code: string
+          trigger_source: string
+        }
+        Insert: {
+          created_by?: string | null
+          error?: string | null
+          expires_at?: string | null
+          generated_at?: string
+          id?: string
+          organization_id: string
+          payload?: Json | null
+          pdf_path?: string | null
+          schedule_id?: string | null
+          signed_token?: string | null
+          status?: string
+          template_code: string
+          trigger_source?: string
+        }
+        Update: {
+          created_by?: string | null
+          error?: string | null
+          expires_at?: string | null
+          generated_at?: string
+          id?: string
+          organization_id?: string
+          payload?: Json | null
+          pdf_path?: string | null
+          schedule_id?: string | null
+          signed_token?: string | null
+          status?: string
+          template_code?: string
+          trigger_source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_runs_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "report_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_schedules: {
+        Row: {
+          created_at: string
+          created_by: string
+          cron: string | null
+          enabled: boolean
+          id: string
+          last_run_at: string | null
+          mask_values: boolean
+          next_run_at: string | null
+          notes: string | null
+          organization_id: string
+          severity_threshold: Json | null
+          template_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          cron?: string | null
+          enabled?: boolean
+          id?: string
+          last_run_at?: string | null
+          mask_values?: boolean
+          next_run_at?: string | null
+          notes?: string | null
+          organization_id: string
+          severity_threshold?: Json | null
+          template_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          cron?: string | null
+          enabled?: boolean
+          id?: string
+          last_run_at?: string | null
+          mask_values?: boolean
+          next_run_at?: string | null
+          notes?: string | null
+          organization_id?: string
+          severity_threshold?: Json | null
+          template_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_schedules_template_code_fkey"
+            columns: ["template_code"]
+            isOneToOne: false
+            referencedRelation: "report_templates"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      report_templates: {
+        Row: {
+          active: boolean
+          category: string
+          code: string
+          created_at: string
+          default_payload_schema: Json | null
+          default_schedule_cron: string | null
+          description: string | null
+          id: string
+          name: string
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string
+          code: string
+          created_at?: string
+          default_payload_schema?: Json | null
+          default_schedule_cron?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          trigger_type?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          code?: string
+          created_at?: string
+          default_payload_schema?: Json | null
+          default_schedule_cron?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          trigger_type?: string
           updated_at?: string
         }
         Relationships: []
