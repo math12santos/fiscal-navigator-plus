@@ -1722,20 +1722,39 @@ function renderRow(kind: string, r: any, i: number) {
           <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
         </TableRow>
       );
-    case "dp-beneficio":
+    case "dp-beneficio": {
+      const tipoLabel =
+        r.tipo === "percentual" ? "Percentual" :
+        r.tipo === "por_dia" ? "Por dia útil" :
+        "Valor fixo";
+      const tipoVariant: "secondary" | "outline" | "default" =
+        r.tipo === "por_dia" ? "default" :
+        r.tipo === "percentual" ? "secondary" :
+        "outline";
       return (
         <TableRow key={i}>
           <TableCell className="font-medium">{r.nome}</TableCell>
-          <TableCell className="text-muted-foreground">
-            {r.beneficio}
-            {r.tipo === "percentual" && <span className="text-[10px] ml-1 opacity-60">(%)</span>}
+          <TableCell className="text-muted-foreground">{r.beneficio}</TableCell>
+          <TableCell>
+            <Badge variant={tipoVariant} className="text-xs">{tipoLabel}</Badge>
           </TableCell>
           <TableCell className="text-right font-mono text-muted-foreground">
-            {r.tipo === "percentual" ? `${r.base}%` : fmt(r.base)}
+            {r.tipo === "percentual"
+              ? `${r.base}%`
+              : r.tipo === "por_dia"
+              ? `${fmt(r.base)}/dia`
+              : fmt(r.base)}
+          </TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">
+            {r.tipo === "por_dia" && r.valor_dia != null ? fmt(r.valor_dia) : "—"}
+          </TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">
+            {r.tipo === "por_dia" && r.dias_uteis != null ? r.dias_uteis : "—"}
           </TableCell>
           <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
         </TableRow>
       );
+    }
     default:
       return null;
   }
