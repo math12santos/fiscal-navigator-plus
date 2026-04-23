@@ -7,10 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search, Edit2, Power, Truck, UserCircle, Package, Wrench } from "lucide-react";
+import { Plus, Search, Edit2, Power, Truck, UserCircle, Package, Wrench, Upload } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import EntityFormDialog from "@/components/EntityFormDialog";
 import ProductFormDialog from "@/components/ProductFormDialog";
+import CadastroImportDialog, { type CadastroKind } from "@/components/cadastros/CadastroImportDialog";
 import { useEntities, Entity } from "@/hooks/useEntities";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
