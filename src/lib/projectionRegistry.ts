@@ -44,6 +44,10 @@ export const projectionKey = {
   payroll(employeeId: string, subCategory: string, monthKey: string): string {
     return `dp:${employeeId}:${subCategory}:${monthKey.slice(0, 7)}`;
   },
+  /** Eventos variáveis de folha (proventos/descontos pontuais). */
+  payrollEvent(eventId: string): string {
+    return `dp_event:${eventId}`;
+  },
   crmWon(opportunityId: string): string {
     return `crm:${opportunityId}`;
   },
