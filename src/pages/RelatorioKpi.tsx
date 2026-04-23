@@ -833,6 +833,8 @@ export default function RelatorioKpi() {
             const valBase = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
             const v = benefit.type === "percentual"
               ? Number(emp.salary_base || 0) * (valBase / 100)
+              : benefit.type === "por_dia"
+              ? valBase * DIAS_UTEIS_EFETIVOS
               : valBase;
             return s + v;
           }, 0);
