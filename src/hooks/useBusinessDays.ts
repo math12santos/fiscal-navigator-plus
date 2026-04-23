@@ -44,6 +44,56 @@ export function monthKey(date: Date | string): string {
 }
 
 /**
+ * Valida uma quantidade de dias úteis efetivos contra o teto seg–sex do mês.
+ * - error: bloqueia salvamento (negativo, não-inteiro, acima do máximo seg–sex).
+ * - warning: permite salvar mas sinaliza divergência relevante (banco de
+ *   horas/afastamentos): redução >=3 dias ou >50% sem justificativa.
+ */
+export type BusinessDaysValidation = {
+  error?: string;
+  warning?: string;
+  maxBusinessDays: number;
+};
+
+export function validateBusinessDays(
+  month: Date | string,
+  rawDays: number | string,
+  reason?: string | null,
+): BusinessDaysValidation {
+  const d = typeof month === "string" ? new Date(month) : month;
+  const maxBusinessDays = getBusinessDays(d);
+  const days = typeof rawDays === "string" ? Number(rawDays) : rawDays;
+
+  if (rawDays === "" || rawDays === null || rawDays === undefined || Number.isNaN(days)) {
+    return { error: "Informe um número inteiro.", maxBusinessDays };
+  }
+  if (!Number.isInteger(days)) {
+    return { error: "A quantidade deve ser um número inteiro.", maxBusinessDays };
+  }
+  if (days < 0) {
+    return { error: "Dias úteis não podem ser negativos.", maxBusinessDays };
+  }
+  if (days > maxBusinessDays) {
+    return {
+      error: `Máximo do mês: ${maxBusinessDays} dias úteis (seg–sex). Para incluir sábados/domingos, registre como evento variável.`,
+      maxBusinessDays,
+    };
+  }
+
+  const reasonTrimmed = (reason ?? "").trim();
+  const delta = maxBusinessDays - days;
+  if (delta > 0 && !reasonTrimmed) {
+    if (delta >= 3 || delta / maxBusinessDays > 0.5) {
+      return {
+        warning: `Redução de ${delta} dia(s) frente ao mês cheio sem motivo registrado. Informe o motivo (banco de horas, afastamento, férias parciais).`,
+        maxBusinessDays,
+      };
+    }
+  }
+  return { maxBusinessDays };
+}
+
+/**
  * Resolve dias úteis aplicáveis (versão sync — para uso dentro de loops em
  * componentes que já têm os overrides carregados).
  */
