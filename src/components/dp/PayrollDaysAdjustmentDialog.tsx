@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { RotateCcw, Save } from "lucide-react";
+import { RotateCcw, Save, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEmployees } from "@/hooks/useDP";
@@ -26,6 +26,7 @@ import {
   useMutatePayrollDayOverride,
   useBusinessDayOverrides,
   resolveBusinessDays,
+  validateBusinessDays,
 } from "@/hooks/useBusinessDays";
 import { useToast } from "@/hooks/use-toast";
 
