@@ -970,12 +970,20 @@ export default function RelatorioKpi() {
     [filteredItems],
   );
 
-  const totalPages = Math.max(1, Math.ceil(aggregatedRows.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
 
-  // Reseta página ao mudar busca, métrica, tamanho de página ou granularidade
+  // Reseta página ao mudar busca, métrica, tamanho de página, granularidade
+  // ou ordenação. Isso garante que o usuário sempre veja o "topo" do recorte.
   useEffect(() => {
     setPage(1);
-  }, [search, metric, pageSize, isQuarterlyApplied]);
+  }, [search, metric, pageSize, isQuarterlyApplied, sortKey, sortDir]);
+
+  // Reseta a ordenação ao trocar de métrica ou alternar granularidade,
+  // pois as colunas/chaves disponíveis mudam.
+  useEffect(() => {
+    setSortKey(null);
+    setSortDir("asc");
+  }, [metric, isQuarterlyApplied]);
 
   // Garante que a página atual existe após mudanças no dataset
   useEffect(() => {
@@ -984,12 +992,24 @@ export default function RelatorioKpi() {
 
   const pagedItems = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return aggregatedRows.slice(start, start + pageSize);
-  }, [aggregatedRows, page, pageSize]);
+    return sortedRows.slice(start, start + pageSize);
+  }, [sortedRows, page, pageSize]);
 
   const isFiltering = search.trim().length > 0;
-  const showingFrom = aggregatedRows.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const showingTo = Math.min(page * pageSize, aggregatedRows.length);
+  const showingFrom = sortedRows.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const showingTo = Math.min(page * pageSize, sortedRows.length);
+
+  /** Manipula clique no cabeçalho: alterna asc/desc e reinicia em asc ao trocar a coluna. */
+  const handleSort = useCallback((key: string) => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        return prev;
+      }
+      setSortDir("asc");
+      return key;
+    });
+  }, []);
 
   const exportCsv = () => {
     // Quando trimestral, exportamos as linhas agregadas (1 por trimestre);
