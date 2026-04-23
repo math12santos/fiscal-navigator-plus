@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEmployees, usePayrollRuns, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { useEmployeeBenefits, useDPBenefits } from "@/hooks/useDPBenefits";
@@ -11,11 +12,14 @@ import { dpFmt, generateDPExcelReport, generateDPPdfReport } from "@/lib/dpExpor
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import DPDocumentAlerts from "./DPDocumentAlerts";
+import { KPICard } from "@/components/KPICard";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "hsl(var(--accent))", "#8884d8", "#82ca9d", "#ffc658"];
 const DIAS_UTEIS_MES = 22;
 
 export default function DPDashboard() {
+  const navigate = useNavigate();
   const { data: employees = [] } = useEmployees();
   const { data: payrollRuns = [] } = usePayrollRuns();
   const { data: dpConfig } = useDPConfig();
@@ -71,20 +75,38 @@ export default function DPDashboard() {
   const saudeStats = findBenefit(["saúde", "saude", "plano de saúde", "health"]);
   const otherBenefits = benefitStats.filter((b) => b !== vaStats && b !== saudeStats);
 
+  // Total geral de benefícios (todos os benefícios + VT) — usado no fallback do card "Total Benefícios"
+  const totalBeneficiosGeral = useMemo(
+    () => vtStats.custoTotal + benefitStats.reduce((s, b) => s + b.custoTotal, 0),
+    [vtStats.custoTotal, benefitStats],
+  );
+
   const costCenterMap = useMemo(() => {
     const map: Record<string, string> = {};
     costCenters.forEach((cc: any) => { map[cc.id] = cc.name; });
     return map;
   }, [costCenters]);
 
+  // Visão de custo por CC: "salario" (apenas salário base) ou "total" (salário + encargos)
+  const [ccView, setCcView] = useState<"salario" | "total">("salario");
+
   const custoPorCC = useMemo(() => {
-    const map: Record<string, number> = {};
+    const map: Record<string, { salario: number; total: number }> = {};
     activeEmployees.forEach((e: any) => {
       const ccName = e.cost_center_id ? costCenterMap[e.cost_center_id] || "Sem CC" : "Sem CC";
-      map[ccName] = (map[ccName] || 0) + Number(e.salary_base || 0);
+      const sal = Number(e.salary_base || 0);
+      const enc = calcEncargosPatronais(sal, dpConfig, e.contract_type);
+      if (!map[ccName]) map[ccName] = { salario: 0, total: 0 };
+      map[ccName].salario += sal;
+      map[ccName].total += sal + enc.total;
     });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [activeEmployees, costCenterMap]);
+    return Object.entries(map).map(([name, v]) => ({
+      name,
+      value: ccView === "total" ? v.total : v.salario,
+      salario: v.salario,
+      total: v.total,
+    }));
+  }, [activeEmployees, costCenterMap, dpConfig, ccView]);
 
   const folhaLiquida = activeEmployees.map((e: any) => ({
     name: e.name.split(" ").slice(0, 2).join(" "),
@@ -106,11 +128,12 @@ export default function DPDashboard() {
         { label: "Encargos", value: fmt(encargosTotal) },
         { label: "Custo Médio", value: fmt(custoMedioPorColab) },
       ],
-      columns: ["Centro de Custo", "Custo Mensal (R$)", "% do Total"],
+      columns: ["Centro de Custo", "Salário Base (R$)", "Custo c/ Encargos (R$)", "% do Total"],
       rows: custoPorCC.map((cc) => [
         cc.name,
-        fmt(cc.value),
-        totalFolhaBruta > 0 ? `${((cc.value / totalFolhaBruta) * 100).toFixed(1)}%` : "0%",
+        fmt(cc.salario),
+        fmt(cc.total),
+        totalFolhaBruta > 0 ? `${((cc.salario / totalFolhaBruta) * 100).toFixed(1)}%` : "0%",
       ]),
     });
   };
@@ -133,11 +156,12 @@ export default function DPDashboard() {
         {
           name: "Por Centro de Custo",
           rows: [
-            ["Centro de Custo", "Custo Mensal", "% do Total"],
+            ["Centro de Custo", "Salário Base", "Custo c/ Encargos", "% do Total"],
             ...custoPorCC.map((cc) => [
               cc.name,
-              cc.value,
-              totalFolhaBruta > 0 ? Number(((cc.value / totalFolhaBruta) * 100).toFixed(2)) : 0,
+              cc.salario,
+              cc.total,
+              totalFolhaBruta > 0 ? Number(((cc.salario / totalFolhaBruta) * 100).toFixed(2)) : 0,
             ]),
           ],
         },
@@ -156,6 +180,8 @@ export default function DPDashboard() {
     });
   };
 
+  const go = (m: string) => navigate(`/relatorios/kpi/${m}`);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -167,21 +193,72 @@ export default function DPDashboard() {
 
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard icon={Users} label="Headcount Ativo" value={String(activeEmployees.length)} />
-        <KPICard icon={DollarSign} label="Folha Bruta Total" value={fmt(totalFolhaBruta)} />
-        <KPICard icon={TrendingUp} label="Encargos Totais" value={fmt(encargosTotal)} />
-        <KPICard icon={Percent} label="Custo Médio/Colab." value={fmt(custoMedioPorColab)} />
+        <KPICard
+          icon={<Users size={18} />}
+          title="Headcount Ativo"
+          value={String(activeEmployees.length)}
+          onClick={() => go("dp-headcount")}
+        />
+        <KPICard
+          icon={<DollarSign size={18} />}
+          title="Folha Bruta Total"
+          value={fmt(totalFolhaBruta)}
+          onClick={() => go("dp-folha-bruta")}
+        />
+        <KPICard
+          icon={<TrendingUp size={18} />}
+          title="Encargos Totais"
+          value={fmt(encargosTotal)}
+          onClick={() => go("dp-encargos")}
+        />
+        <KPICard
+          icon={<Percent size={18} />}
+          title="Custo Médio/Colab."
+          value={fmt(custoMedioPorColab)}
+          subtitle="salário + encargos"
+          onClick={() => go("dp-custo-medio")}
+        />
       </div>
 
       {/* Benefícios KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard icon={Bus} label="Vale Transporte" value={fmt(vtStats.custoTotal)} subtitle={`${vtStats.count} colaborador(es)`} />
-        <KPICard icon={UtensilsCrossed} label={vaStats?.name || "Vale Alimentação"} value={fmt(vaStats?.custoTotal || 0)} subtitle={`${vaStats?.count || 0} colaborador(es)`} />
-        <KPICard icon={HeartPulse} label={saudeStats?.name || "Plano de Saúde"} value={fmt(saudeStats?.custoTotal || 0)} subtitle={`${saudeStats?.count || 0} colaborador(es)`} />
+        <KPICard
+          icon={<Bus size={18} />}
+          title="Vale Transporte"
+          value={fmt(vtStats.custoTotal)}
+          subtitle={`${vtStats.count} colaborador(es)`}
+          onClick={() => go("dp-vt")}
+        />
+        <KPICard
+          icon={<UtensilsCrossed size={18} />}
+          title={vaStats?.name || "Vale Alimentação"}
+          value={fmt(vaStats?.custoTotal || 0)}
+          subtitle={`${vaStats?.count || 0} colaborador(es)`}
+          onClick={() => go("dp-va")}
+        />
+        <KPICard
+          icon={<HeartPulse size={18} />}
+          title={saudeStats?.name || "Plano de Saúde"}
+          value={fmt(saudeStats?.custoTotal || 0)}
+          subtitle={`${saudeStats?.count || 0} colaborador(es)`}
+          onClick={() => go("dp-saude")}
+        />
         {otherBenefits.length > 0 ? (
-          <KPICard icon={DollarSign} label="Outros Benefícios" value={fmt(otherBenefits.reduce((s, b) => s + b.custoTotal, 0))} subtitle={`${otherBenefits.length} tipo(s)`} />
+          <KPICard
+            icon={<DollarSign size={18} />}
+            title="Outros Benefícios"
+            value={fmt(otherBenefits.reduce((s, b) => s + b.custoTotal, 0))}
+            subtitle={`${otherBenefits.length} tipo(s)`}
+            onClick={() => go("dp-outros-beneficios")}
+          />
         ) : (
-          <KPICard icon={DollarSign} label="Total Benefícios" value={fmt(vtStats.custoTotal + (vaStats?.custoTotal || 0) + (saudeStats?.custoTotal || 0))} subtitle="Custo mensal" />
+          <KPICard
+            icon={<DollarSign size={18} />}
+            title="Total Benefícios"
+            value={fmt(totalBeneficiosGeral)}
+            subtitle="VT + todos os benefícios"
+            onClick={() => go("dp-outros-beneficios")}
+          />
         )}
       </div>
 
@@ -210,7 +287,25 @@ export default function DPDashboard() {
 
         {/* Custo por centro de custo */}
         <Card>
-          <CardHeader><CardTitle className="text-sm">Custo por Centro de Custo</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm">Custo por Centro de Custo</CardTitle>
+            <ToggleGroup
+              type="single"
+              size="sm"
+              value={ccView}
+              onValueChange={(v) => {
+                if (v === "salario" || v === "total") setCcView(v);
+              }}
+              aria-label="Visão de custo por centro de custo"
+            >
+              <ToggleGroupItem value="salario" className="h-6 px-2 text-[11px]">
+                Salário base
+              </ToggleGroupItem>
+              <ToggleGroupItem value="total" className="h-6 px-2 text-[11px]">
+                Com encargos
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </CardHeader>
           <CardContent className="h-64">
             {custoPorCC.length === 0 ? (
               <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Sem dados</div>
@@ -230,22 +325,5 @@ export default function DPDashboard() {
         </Card>
       </div>
     </div>
-  );
-}
-
-function KPICard({ icon: Icon, label, value, subtitle }: { icon: any; label: string; value: string; subtitle?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <Icon size={16} className="text-primary" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-lg font-bold text-foreground truncate">{value}</p>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-        </div>
-      </CardContent>
-    </Card>
   );
 }

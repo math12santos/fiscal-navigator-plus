@@ -32,11 +32,15 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { useContracts } from "@/hooks/useContracts";
-import { useEmployees } from "@/hooks/useDP";
+import { useEmployees, useDPConfig, usePositions, calcEncargosPatronais } from "@/hooks/useDP";
+import { useDPBenefits, useEmployeeBenefits } from "@/hooks/useDPBenefits";
+import { useCostCenters } from "@/hooks/useCostCenters";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { validateRange } from "@/lib/kpiRangeValidation";
+
+const DIAS_UTEIS_MES = 22;
 
 /**
  * Página única de "drill-down" para KPIs do Dashboard.
@@ -61,7 +65,15 @@ type KpiMetric =
   | "custo-folha"
   | "passivos"
   | "runway"
-  | "crm-pipeline";
+  | "crm-pipeline"
+  | "dp-headcount"
+  | "dp-folha-bruta"
+  | "dp-encargos"
+  | "dp-custo-medio"
+  | "dp-vt"
+  | "dp-va"
+  | "dp-saude"
+  | "dp-outros-beneficios";
 
 interface KpiMeta {
   title: string;
@@ -119,6 +131,54 @@ const METRIC_META: Record<KpiMetric, KpiMeta> = {
     title: "Pipeline CRM Ponderado",
     description: "Oportunidades em aberto com valor estimado × probabilidade do estágio.",
     icon: <Handshake size={18} />,
+  },
+  "dp-headcount": {
+    title: "Headcount Ativo",
+    description: "Colaboradores com status ativo — base de todos os cálculos do módulo DP.",
+    icon: <Users size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-folha-bruta": {
+    title: "Folha Bruta Total",
+    description: "Soma do salário base de todos os colaboradores ativos no mês corrente.",
+    icon: <Wallet size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-encargos": {
+    title: "Encargos Patronais",
+    description: "INSS Patronal, RAT, FGTS e Terceiros sobre o salário base (PJ excluído).",
+    icon: <Shield size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-custo-medio": {
+    title: "Custo Médio por Colaborador",
+    description: "(Folha bruta + encargos) ÷ headcount ativo. Não inclui benefícios.",
+    icon: <PiggyBank size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-vt": {
+    title: "Vale Transporte",
+    description: "Custo líquido empresa: (vt_diario × 22) − 6% do salário base, mínimo 0.",
+    icon: <TrendingDown size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-va": {
+    title: "Vale Alimentação / Refeição",
+    description: "Colaboradores recebendo benefícios de alimentação ou refeição ativos.",
+    icon: <PiggyBank size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-saude": {
+    title: "Plano de Saúde",
+    description: "Colaboradores recebendo benefícios de saúde ativos.",
+    icon: <Shield size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-outros-beneficios": {
+    title: "Outros Benefícios",
+    description: "Demais benefícios ativos (excluídos VT, VA/VR e Saúde, já detalhados separadamente).",
+    icon: <PiggyBank size={18} />,
+    scopeIsCurrentMonth: true,
   },
 };
 
@@ -241,6 +301,12 @@ export default function RelatorioKpi() {
   const { liabilities } = useLiabilities();
   const { opportunities } = useCRMOpportunities();
   const { stages } = usePipelineStages();
+  // Fontes adicionais para drill-down do módulo DP
+  const { data: dpConfig } = useDPConfig();
+  const { data: positions = [] } = usePositions();
+  const { data: allBenefits = [] } = useDPBenefits();
+  const { data: allEmployeeBenefits = [] } = useEmployeeBenefits();
+  const { costCenters = [] } = useCostCenters();
 
   // ===== Filtros derivados por KPI =====
   const curMonthStart = useMemo(() => format(startOfMonth(now), "yyyy-MM-dd"), [now]);
@@ -400,10 +466,148 @@ export default function RelatorioKpi() {
         };
       }
 
+      // ===== Métricas do módulo DP (snapshot do mês corrente) =====
+      case "dp-headcount": {
+        const positionMap = new Map<string, string>(
+          (positions as any[]).map((p) => [p.id, p.name ?? p.title ?? "—"]),
+        );
+        const ccMap = new Map<string, string>(
+          (costCenters as any[]).map((c) => [c.id, c.name]),
+        );
+        const items = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => ({
+            nome: e.name,
+            cargo: e.position_id ? positionMap.get(e.position_id) ?? "—" : "—",
+            regime: e.contract_type || "—",
+            admissao: e.admission_date || "—",
+            cc: e.cost_center_id ? ccMap.get(e.cost_center_id) ?? "Sem CC" : "Sem CC",
+            salario: Number(e.salary_base || 0),
+          }));
+        // "valor" = 1 por colaborador (para o Total = headcount)
+        const itemsWithCount = items.map((i) => ({ ...i, valor: 1 }));
+        return { items: itemsWithCount, total: items.length, kind: "dp-headcount" as const };
+      }
+
+      case "dp-folha-bruta": {
+        const positionMap = new Map<string, string>(
+          (positions as any[]).map((p) => [p.id, p.name ?? p.title ?? "—"]),
+        );
+        const items = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => ({
+            nome: e.name,
+            cargo: e.position_id ? positionMap.get(e.position_id) ?? "—" : "—",
+            regime: e.contract_type || "—",
+            valor: Number(e.salary_base || 0),
+          }));
+        return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-folha" as const };
+      }
+
+      case "dp-encargos": {
+        const items = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => {
+            const sal = Number(e.salary_base || 0);
+            const enc = calcEncargosPatronais(sal, dpConfig, e.contract_type);
+            return {
+              nome: e.name,
+              regime: e.contract_type || "—",
+              salario: sal,
+              inss: enc.inssPatronal,
+              rat: enc.rat,
+              fgts: enc.fgts,
+              terceiros: enc.terceiros,
+              valor: enc.total,
+            };
+          });
+        return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-encargos" as const };
+      }
+
+      case "dp-custo-medio": {
+        const ativos = (employees as any[]).filter((e) => e.status === "ativo");
+        const folha = ativos.reduce((s, e) => s + Number(e.salary_base || 0), 0);
+        const enc = ativos.reduce((s, e) => {
+          const c = calcEncargosPatronais(Number(e.salary_base || 0), dpConfig, e.contract_type);
+          return s + c.total;
+        }, 0);
+        const headcount = ativos.length;
+        const medio = headcount > 0 ? (folha + enc) / headcount : 0;
+        // Tabela informativa de composição — 1 linha por componente
+        const items = [
+          { componente: "Folha bruta total", detalhe: `${headcount} colaborador(es) ativo(s)`, valor: folha },
+          { componente: "Encargos patronais", detalhe: "INSS + RAT + FGTS + Terceiros (PJ excluído)", valor: enc },
+          { componente: "Custo total estimado", detalhe: "Folha + encargos", valor: folha + enc },
+          { componente: "Custo médio por colaborador", detalhe: `(folha + encargos) ÷ ${headcount || 0}`, valor: medio },
+        ];
+        return { items, total: medio, kind: "dp-composicao" as const };
+      }
+
+      case "dp-vt": {
+        const items = (employees as any[])
+          .filter((e) => e.status === "ativo" && e.vt_ativo)
+          .map((e) => {
+            const sal = Number(e.salary_base || 0);
+            const vtMensal = Number(e.vt_diario || 0) * DIAS_UTEIS_MES;
+            const desconto = sal * 0.06;
+            const liquido = Math.max(vtMensal - desconto, 0);
+            return {
+              nome: e.name,
+              vt_diario: Number(e.vt_diario || 0),
+              vt_mensal: vtMensal,
+              desconto_6pct: desconto,
+              valor: liquido,
+            };
+          });
+        return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-vt" as const };
+      }
+
+      case "dp-va":
+      case "dp-saude":
+      case "dp-outros-beneficios": {
+        const isVA = (b: any) =>
+          ["alimentação", "alimentacao", "refeição", "refeicao", "vale alimentação", "vale refeição", "va", "vr"]
+            .some((k) => String(b.name || "").toLowerCase().includes(k));
+        const isSaude = (b: any) =>
+          ["saúde", "saude", "plano de saúde", "health"]
+            .some((k) => String(b.name || "").toLowerCase().includes(k));
+        const filterFn =
+          (metric as KpiMetric) === "dp-va" ? isVA :
+          (metric as KpiMetric) === "dp-saude" ? isSaude :
+          (b: any) => !isVA(b) && !isSaude(b);
+        const ativos = new Map((employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => [e.id, e]));
+        const items = (allEmployeeBenefits as any[])
+          .filter((eb) => eb.active)
+          .map((eb) => {
+            const benefit = (allBenefits as any[]).find((b) => b.id === eb.benefit_id);
+            if (!benefit || !benefit.active || !filterFn(benefit)) return null;
+            const emp = ativos.get(eb.employee_id);
+            if (!emp) return null;
+            const valBase = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
+            const valor = benefit.type === "percentual"
+              ? Number(emp.salary_base || 0) * (valBase / 100)
+              : valBase;
+            return {
+              nome: (emp as any).name,
+              beneficio: benefit.name,
+              tipo: benefit.type,
+              base: valBase,
+              valor,
+            };
+          })
+          .filter((x): x is { nome: string; beneficio: string; tipo: string; base: number; valor: number } => x !== null);
+        return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-beneficio" as const };
+      }
+
       default:
         return { items: [], total: 0, kind: "empty" as const };
     }
-  }, [metric, meta, summary.entries, contracts, employees, liabilities, opportunities, stages, curMonthStart, curMonthEnd]);
+  }, [
+    metric, meta, summary.entries, contracts, employees, liabilities, opportunities, stages,
+    curMonthStart, curMonthEnd, dpConfig, positions, allBenefits, allEmployeeBenefits, costCenters,
+  ]);
 
   // ===== Validação cruzada com o KPI canônico do Dashboard =====
   // Para cada métrica, comparamos a soma dos itens detalhados (rows.total) com
@@ -515,6 +719,108 @@ export default function RelatorioKpi() {
         } satisfies Recon;
       }
 
+      // ===== DP — Reconciliação por recálculo a partir das mesmas fontes =====
+      case "dp-headcount": {
+        const headcount = (employees as any[]).filter((e) => e.status === "ativo").length;
+        return {
+          dashboardLabel: "Headcount no Dashboard DP",
+          dashboardValue: headcount,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "dp-folha-bruta": {
+        const folha = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .reduce((s, e) => s + Number(e.salary_base || 0), 0);
+        return {
+          dashboardLabel: "Folha Bruta no Dashboard DP",
+          dashboardValue: folha,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "dp-encargos": {
+        const encTotal = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .reduce((s, e) => s + calcEncargosPatronais(Number(e.salary_base || 0), dpConfig, e.contract_type).total, 0);
+        return {
+          dashboardLabel: "Encargos Totais no Dashboard DP",
+          dashboardValue: encTotal,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "dp-custo-medio": {
+        const ativos = (employees as any[]).filter((e) => e.status === "ativo");
+        const folha = ativos.reduce((s, e) => s + Number(e.salary_base || 0), 0);
+        const enc = ativos.reduce((s, e) => s + calcEncargosPatronais(Number(e.salary_base || 0), dpConfig, e.contract_type).total, 0);
+        const medio = ativos.length > 0 ? (folha + enc) / ativos.length : 0;
+        return {
+          dashboardLabel: "Custo Médio no Dashboard DP",
+          dashboardValue: medio,
+          drilldownValue,
+          mode: "exact" as const,
+          note: "Composição: folha bruta + encargos patronais ÷ headcount ativo. Não inclui benefícios.",
+        } satisfies Recon;
+      }
+
+      case "dp-vt": {
+        const total = (employees as any[])
+          .filter((e) => e.status === "ativo" && e.vt_ativo)
+          .reduce((s, e) => {
+            const vtMensal = Number(e.vt_diario || 0) * DIAS_UTEIS_MES;
+            const desconto = Number(e.salary_base || 0) * 0.06;
+            return s + Math.max(vtMensal - desconto, 0);
+          }, 0);
+        return {
+          dashboardLabel: "Vale Transporte no Dashboard DP",
+          dashboardValue: total,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "dp-va":
+      case "dp-saude":
+      case "dp-outros-beneficios": {
+        const isVA = (b: any) =>
+          ["alimentação", "alimentacao", "refeição", "refeicao", "vale alimentação", "vale refeição", "va", "vr"]
+            .some((k) => String(b.name || "").toLowerCase().includes(k));
+        const isSaude = (b: any) =>
+          ["saúde", "saude", "plano de saúde", "health"]
+            .some((k) => String(b.name || "").toLowerCase().includes(k));
+        const filterFn =
+          (metric as KpiMetric) === "dp-va" ? isVA :
+          (metric as KpiMetric) === "dp-saude" ? isSaude :
+          (b: any) => !isVA(b) && !isSaude(b);
+        const ativos = new Map((employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => [e.id, e]));
+        const total = (allEmployeeBenefits as any[])
+          .filter((eb) => eb.active)
+          .reduce((s, eb) => {
+            const benefit = (allBenefits as any[]).find((b) => b.id === eb.benefit_id);
+            if (!benefit || !benefit.active || !filterFn(benefit)) return s;
+            const emp = ativos.get(eb.employee_id) as any;
+            if (!emp) return s;
+            const valBase = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
+            const v = benefit.type === "percentual"
+              ? Number(emp.salary_base || 0) * (valBase / 100)
+              : valBase;
+            return s + v;
+          }, 0);
+        return {
+          dashboardLabel: "Benefício no Dashboard DP",
+          dashboardValue: total,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
       default:
         return null;
     }
@@ -531,6 +837,10 @@ export default function RelatorioKpi() {
     summary.monthlyBurn,
     curMonthStart,
     curMonthEnd,
+    employees,
+    dpConfig,
+    allBenefits,
+    allEmployeeBenefits,
   ]);
 
   // Status: "match" (bate até 1 centavo), "mismatch" (diverge), "info" (modo informativo).
@@ -986,6 +1296,12 @@ function getColumnCount(kind: string): number {
     case "payroll": return 5;
     case "liabilities": return 5;
     case "crm": return 5;
+    case "dp-headcount": return 6;
+    case "dp-folha": return 4;
+    case "dp-encargos": return 7;
+    case "dp-composicao": return 3;
+    case "dp-vt": return 5;
+    case "dp-beneficio": return 4;
     default: return 5;
   }
 }
@@ -1069,6 +1385,65 @@ function renderHeader(kind: string) {
           <TableHead className="text-right">Prob.</TableHead>
           <TableHead className="text-right">Valor</TableHead>
           <TableHead className="text-right">Ponderado</TableHead>
+        </TableRow>
+      );
+    case "dp-headcount":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead>Cargo</TableHead>
+          <TableHead>Regime</TableHead>
+          <TableHead>Admissão</TableHead>
+          <TableHead>Centro de Custo</TableHead>
+          <TableHead className="text-right">Salário base</TableHead>
+        </TableRow>
+      );
+    case "dp-folha":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead>Cargo</TableHead>
+          <TableHead>Regime</TableHead>
+          <TableHead className="text-right">Salário base</TableHead>
+        </TableRow>
+      );
+    case "dp-encargos":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead>Regime</TableHead>
+          <TableHead className="text-right">Salário</TableHead>
+          <TableHead className="text-right">INSS Pat.</TableHead>
+          <TableHead className="text-right">RAT</TableHead>
+          <TableHead className="text-right">FGTS</TableHead>
+          <TableHead className="text-right">Total</TableHead>
+        </TableRow>
+      );
+    case "dp-composicao":
+      return (
+        <TableRow>
+          <TableHead>Componente</TableHead>
+          <TableHead>Detalhe</TableHead>
+          <TableHead className="text-right">Valor</TableHead>
+        </TableRow>
+      );
+    case "dp-vt":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead className="text-right">VT diário</TableHead>
+          <TableHead className="text-right">VT mensal (×22)</TableHead>
+          <TableHead className="text-right">Desconto 6%</TableHead>
+          <TableHead className="text-right">Custo empresa</TableHead>
+        </TableRow>
+      );
+    case "dp-beneficio":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead>Benefício</TableHead>
+          <TableHead className="text-right">Base</TableHead>
+          <TableHead className="text-right">Custo mensal</TableHead>
         </TableRow>
       );
     default:
@@ -1173,6 +1548,78 @@ function renderRow(kind: string, r: any, i: number) {
           <TableCell className="text-right text-muted-foreground">{r.probabilidade.toFixed(0)}%</TableCell>
           <TableCell className="text-right font-mono">{fmt(r.valor)}</TableCell>
           <TableCell className="text-right font-mono">{fmt(r.ponderado)}</TableCell>
+        </TableRow>
+      );
+    case "dp-headcount":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell className="text-muted-foreground">{r.cargo}</TableCell>
+          <TableCell>
+            <Badge variant="outline" className="text-xs uppercase">{r.regime}</Badge>
+          </TableCell>
+          <TableCell className="text-muted-foreground whitespace-nowrap">
+            {r.admissao !== "—" ? fmtDate(r.admissao) : "—"}
+          </TableCell>
+          <TableCell className="text-muted-foreground">{r.cc}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.salario)}</TableCell>
+        </TableRow>
+      );
+    case "dp-folha":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell className="text-muted-foreground">{r.cargo}</TableCell>
+          <TableCell>
+            <Badge variant="outline" className="text-xs uppercase">{r.regime}</Badge>
+          </TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
+    case "dp-encargos":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell>
+            <Badge variant="outline" className="text-xs uppercase">{r.regime}</Badge>
+          </TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">{fmt(r.salario)}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.inss)}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.rat)}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.fgts)}</TableCell>
+          <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
+    case "dp-composicao":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.componente}</TableCell>
+          <TableCell className="text-muted-foreground">{r.detalhe}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
+    case "dp-vt":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.vt_diario)}</TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">{fmt(r.vt_mensal)}</TableCell>
+          <TableCell className="text-right font-mono text-destructive">{fmt(r.desconto_6pct)}</TableCell>
+          <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
+    case "dp-beneficio":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell className="text-muted-foreground">
+            {r.beneficio}
+            {r.tipo === "percentual" && <span className="text-[10px] ml-1 opacity-60">(%)</span>}
+          </TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">
+            {r.tipo === "percentual" ? `${r.base}%` : fmt(r.base)}
+          </TableCell>
+          <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
         </TableRow>
       );
     default:
