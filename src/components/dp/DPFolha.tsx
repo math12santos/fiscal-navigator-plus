@@ -17,8 +17,9 @@ import { generateDPExcelReport, generateDPPdfReport, generatePaystubPdf, dpFmt }
 import { usePayrollEvents, summarizeEvents, type PayrollEvent } from "@/hooks/usePayrollEvents";
 import PayrollEventsDialog from "./PayrollEventsDialog";
 import PayrollDaysAdjustmentDialog from "./PayrollDaysAdjustmentDialog";
+import PayrollBankHoursSimulator from "./PayrollBankHoursSimulator";
 import DPPayrollComparison from "./DPPayrollComparison";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Clock } from "lucide-react";
 import {
   useBusinessDayOverrides,
   usePayrollDayOverrides,
@@ -37,6 +38,7 @@ export default function DPFolha() {
   const [selectedRunId, setSelectedRunId] = useState<string>("");
   const [eventsOpen, setEventsOpen] = useState(false);
   const [daysAdjOpen, setDaysAdjOpen] = useState(false);
+  const [bankHoursOpen, setBankHoursOpen] = useState(false);
 
   const activeEmployees = employees.filter((e: any) => e.status === "ativo");
   const selectedRun = runs.find((r: any) => r.id === selectedRunId);
@@ -302,6 +304,9 @@ export default function DPFolha() {
             <Button variant="outline" onClick={() => setDaysAdjOpen(true)}>
               <CalendarClock size={14} className="mr-1" /> Ajustar dias úteis
             </Button>
+            <Button variant="outline" onClick={() => setBankHoursOpen(true)}>
+              <Clock size={14} className="mr-1" /> Simular banco de horas
+            </Button>
             <Button onClick={handleLock} variant="destructive"><Lock size={14} className="mr-1" /> Fechar Folha</Button>
           </>
         )}
@@ -395,6 +400,12 @@ export default function DPFolha() {
           <PayrollDaysAdjustmentDialog
             open={daysAdjOpen}
             onOpenChange={setDaysAdjOpen}
+            payrollRunId={selectedRunId}
+            referenceMonth={selectedRun.reference_month}
+          />
+          <PayrollBankHoursSimulator
+            open={bankHoursOpen}
+            onOpenChange={setBankHoursOpen}
             payrollRunId={selectedRunId}
             referenceMonth={selectedRun.reference_month}
           />
