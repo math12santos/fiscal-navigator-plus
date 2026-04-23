@@ -1270,7 +1270,7 @@ export default function RelatorioKpi() {
               <p className="text-xs text-muted-foreground">
                 Mostrando <span className="font-medium text-foreground">{showingFrom}</span>–
                 <span className="font-medium text-foreground">{showingTo}</span> de{" "}
-                <span className="font-medium text-foreground">{aggregatedRows.length}</span>
+                <span className="font-medium text-foreground">{sortedRows.length}</span>
                 {isQuarterly && <span className="ml-1">trimestre(s)</span>}
               </p>
               {totalPages > 1 && (
