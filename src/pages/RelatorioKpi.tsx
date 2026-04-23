@@ -858,6 +858,11 @@ export default function RelatorioKpi() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(25);
+  // Ordenação clicável das colunas do drill-down. `null` = ordem natural
+  // (a mesma usada na geração das `rows.items`, normalmente cronológica para
+  // fluxo e por nome para listas de cadastro).
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
