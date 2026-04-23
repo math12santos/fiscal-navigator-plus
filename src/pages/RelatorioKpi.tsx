@@ -35,6 +35,7 @@ import { useContracts } from "@/hooks/useContracts";
 import { useEmployees, useDPConfig, usePositions, calcEncargosPatronais } from "@/hooks/useDP";
 import { useDPBenefits, useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import { useCostCenters } from "@/hooks/useCostCenters";
+import { useBusinessDaysForMonth } from "@/hooks/useBusinessDays";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { useOrganization } from "@/contexts/OrganizationContext";
