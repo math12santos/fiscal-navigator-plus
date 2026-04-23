@@ -592,18 +592,34 @@ export default function RelatorioKpi() {
             const emp = ativos.get(eb.employee_id);
             if (!emp) return null;
             const valBase = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
+            // Cálculo por tipo:
+            // - percentual: % sobre salário base
+            // - por_dia: valor/dia × dias úteis efetivos do mês corrente
+            //   (mesma fonte do card no DPDashboard — garante reconciliação)
+            // - fixo: valor mensal direto
             const valor = benefit.type === "percentual"
               ? Number(emp.salary_base || 0) * (valBase / 100)
+              : benefit.type === "por_dia"
+              ? valBase * DIAS_UTEIS_EFETIVOS
               : valBase;
             return {
               nome: (emp as any).name,
               beneficio: benefit.name,
               tipo: benefit.type,
               base: valBase,
+              // Campos extras p/ benefícios "por dia útil" — exibidos apenas
+              // quando tipo === "por_dia"; demais tipos os ignoram na render.
+              valor_dia: benefit.type === "por_dia" ? valBase : null,
+              dias_uteis: benefit.type === "por_dia" ? DIAS_UTEIS_EFETIVOS : null,
+              custo_mensal: benefit.type === "por_dia" ? valBase * DIAS_UTEIS_EFETIVOS : null,
               valor,
             };
           })
-          .filter((x): x is { nome: string; beneficio: string; tipo: string; base: number; valor: number } => x !== null);
+          .filter((x): x is {
+            nome: string; beneficio: string; tipo: string; base: number;
+            valor_dia: number | null; dias_uteis: number | null; custo_mensal: number | null;
+            valor: number;
+          } => x !== null);
         return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-beneficio" as const };
       }
 
@@ -613,6 +629,7 @@ export default function RelatorioKpi() {
   }, [
     metric, meta, summary.entries, contracts, employees, liabilities, opportunities, stages,
     curMonthStart, curMonthEnd, dpConfig, positions, allBenefits, allEmployeeBenefits, costCenters,
+    DIAS_UTEIS_EFETIVOS,
   ]);
 
   // ===== Validação cruzada com o KPI canônico do Dashboard =====
