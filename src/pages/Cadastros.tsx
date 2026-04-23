@@ -325,6 +325,9 @@ export default function Cadastros() {
                 {produtoCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={() => setImportKind("produto")}>
+              <Upload size={16} /> Importar
+            </Button>
             <Button onClick={() => { setEditingProduto(null); setProdutoDialogOpen(true); }}>
               <Plus size={16} /> Novo Produto
             </Button>
