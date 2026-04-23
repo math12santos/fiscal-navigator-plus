@@ -1480,7 +1480,10 @@ const COLUMN_DEFS: Record<string, ColumnDef[]> = {
   "dp-beneficio": [
     { key: "nome", label: "Colaborador", sortable: true },
     { key: "beneficio", label: "Benefício", sortable: true },
+    { key: "tipo", label: "Tipo", sortable: true },
     { key: "base", label: "Base", align: "right", sortable: true },
+    { key: "valor_dia", label: "Valor/dia", align: "right", sortable: true },
+    { key: "dias_uteis", label: "Dias úteis", align: "right", sortable: true },
     { key: "valor", label: "Custo mensal", align: "right", sortable: true },
   ],
 };
