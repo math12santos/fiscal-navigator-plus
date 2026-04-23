@@ -242,7 +242,11 @@ export default function DPDashboard() {
           icon={<UtensilsCrossed size={18} />}
           title={vaStats?.name || "Vale Alimentação"}
           value={fmt(vaStats?.custoTotal || 0)}
-          subtitle={`${vaStats?.count || 0} colaborador(es)`}
+          subtitle={
+            vaStats?.hasPorDia
+              ? `${vaStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`
+              : `${vaStats?.count || 0} colaborador(es)`
+          }
           onClick={() => go("dp-va")}
         />
         <KPICard
