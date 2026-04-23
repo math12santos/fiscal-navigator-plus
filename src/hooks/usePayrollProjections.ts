@@ -51,13 +51,34 @@ const SUB_CATEGORY_LABELS: Record<string, string> = {
  * Generate payroll projections as virtual CashFlowEntry items — one per employee per sub-category.
  */
 export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
+  const { currentOrg } = useOrganization();
   const employeesQuery = useEmployees();
   const dpConfigQuery = useDPConfig();
   const employeeBenefitsQuery = useEmployeeBenefits();
 
+  // Fetch variable payroll events covering the planning range so they appear as
+  // virtual cashflow entries — keeps projections aligned with reality.
+  const eventsQuery = useQuery({
+    queryKey: ["payroll_events_range", currentOrg?.id, rangeFrom?.toISOString().slice(0, 10), rangeTo?.toISOString().slice(0, 10)],
+    queryFn: async () => {
+      if (!currentOrg?.id || !rangeFrom || !rangeTo) return [];
+      const monthFrom = format(startOfMonth(rangeFrom), "yyyy-MM");
+      const monthTo = format(startOfMonth(rangeTo), "yyyy-MM");
+      const { data, error } = await (supabase.from as any)("payroll_events")
+        .select("id, employee_id, signal, value, description, reference_month, event_type")
+        .eq("organization_id", currentOrg.id)
+        .gte("reference_month", monthFrom)
+        .lte("reference_month", monthTo);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!currentOrg?.id && !!rangeFrom && !!rangeTo,
+  });
+
   const employees = (employeesQuery.data ?? []) as unknown as EmployeeRow[];
   const config = dpConfigQuery.data;
   const employeeBenefits = (employeeBenefitsQuery.data ?? []) as unknown as BenefitRow[];
+  const events = (eventsQuery.data ?? []) as any[];
 
   const projections = useMemo(() => {
     if (!rangeFrom || !rangeTo || employees.length === 0) return [];
