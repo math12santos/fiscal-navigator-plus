@@ -52,6 +52,8 @@ export default function DPColaboradores() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [terminateEmpId, setTerminateEmpId] = useState<string | null>(null);
+  const [dossierEmp, setDossierEmp] = useState<any | null>(null);
+  const [massOpen, setMassOpen] = useState(false);
   const [form, setForm] = useState({
     name: "", cpf: "", email: "", phone: "",
     admission_date: "", contract_type: "CLT",
