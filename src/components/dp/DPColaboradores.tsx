@@ -433,7 +433,6 @@ export default function DPColaboradores() {
       <MassAdjustmentDialog
         open={massOpen}
         onOpenChange={setMassOpen}
-        employees={filtered}
       />
 
       <EmployeeImportDialog
