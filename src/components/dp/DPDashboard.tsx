@@ -50,7 +50,7 @@ export default function DPDashboard() {
       return sum + Math.max(vtMensal - desconto, 0);
     }, 0);
     return { count: vtAtivos.length, custoTotal };
-  }, [activeEmployees]);
+  }, [activeEmployees, DIAS_UTEIS_MES]);
 
   // Benefits totals by name (VA, Plano de Saúde, etc.)
   const benefitStats = useMemo(() => {
