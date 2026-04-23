@@ -90,10 +90,11 @@ export default function PayrollDaysAdjustmentDialog({
     const draft = drafts[empId];
     if (!draft) return;
     const days = Number(draft.days);
-    if (!Number.isInteger(days) || days < 0 || days > 31) {
+    const validation = validateBusinessDays(referenceMonth, draft.days, draft.reason);
+    if (validation.error) {
       toast({
         title: "Quantidade inválida",
-        description: "Informe um número inteiro entre 0 e 31.",
+        description: validation.error,
         variant: "destructive",
       });
       return;
@@ -116,7 +117,7 @@ export default function PayrollDaysAdjustmentDialog({
       },
       {
         onSuccess: () => {
-          toast({ title: "Ajuste registrado" });
+          toast({ title: "Ajuste registrado", description: validation.warning });
           setDrafts((prev) => {
             const next = { ...prev };
             delete next[empId];
