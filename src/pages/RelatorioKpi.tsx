@@ -32,11 +32,15 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFinancialSummary } from "@/hooks/useFinancialSummary";
 import { useContracts } from "@/hooks/useContracts";
-import { useEmployees } from "@/hooks/useDP";
+import { useEmployees, useDPConfig, usePositions, calcEncargosPatronais } from "@/hooks/useDP";
+import { useDPBenefits, useEmployeeBenefits } from "@/hooks/useDPBenefits";
+import { useCostCenters } from "@/hooks/useCostCenters";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { validateRange } from "@/lib/kpiRangeValidation";
+
+const DIAS_UTEIS_MES = 22;
 
 /**
  * Página única de "drill-down" para KPIs do Dashboard.
