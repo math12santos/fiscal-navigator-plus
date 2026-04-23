@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { KpiPeriodPresetsPopover } from "@/components/relatorio/KpiPeriodPresetsPopover";
 import { KpiRangePicker } from "@/components/relatorio/KpiRangePicker";
-import { ArrowLeft, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowUp, ArrowDown, ArrowUpDown, Download, FileText, Users, Shield, Wallet, TrendingUp, TrendingDown, PiggyBank, AlertTriangle, Handshake, Search, X, CheckCircle2, AlertCircle, Info, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { startOfMonth, endOfMonth, subMonths, format, parseISO, getQuarter } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -858,6 +858,11 @@ export default function RelatorioKpi() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(25);
+  // Ordenação clicável das colunas do drill-down. `null` = ordem natural
+  // (a mesma usada na geração das `rows.items`, normalmente cronológica para
+  // fluxo e por nome para listas de cadastro).
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -925,6 +930,35 @@ export default function RelatorioKpi() {
     return Array.from(buckets.values()).sort((a, b) => a.period.localeCompare(b.period));
   }, [filteredItems, isQuarterlyApplied, rows.kind]);
 
+  /**
+   * Ordenação clicável: aplicada após o filtro e a agregação trimestral.
+   * Valores numéricos comparam por subtração; demais por `localeCompare` com
+   * locale pt-BR e `numeric: true` (lida bem com códigos tipo "01", "10").
+   * Datas no formato `yyyy-MM-dd` ordenam corretamente como string.
+   */
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return aggregatedRows;
+    const dir = sortDir === "asc" ? 1 : -1;
+    const arr = [...(aggregatedRows as any[])];
+    arr.sort((a, b) => {
+      const va = a?.[sortKey];
+      const vb = b?.[sortKey];
+      // null/undefined sempre por último, independente da direção
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+      // Tenta numérico se ambos forem strings numéricas
+      const na = Number(va);
+      const nb = Number(vb);
+      if (!Number.isNaN(na) && !Number.isNaN(nb) && typeof va !== "string") {
+        return (na - nb) * dir;
+      }
+      return String(va).localeCompare(String(vb), "pt-BR", { numeric: true, sensitivity: "base" }) * dir;
+    });
+    return arr;
+  }, [aggregatedRows, sortKey, sortDir]);
+
   const displayKind = isQuarterlyApplied
     ? rows.kind === "result"
       ? "result-quarter"
@@ -936,12 +970,20 @@ export default function RelatorioKpi() {
     [filteredItems],
   );
 
-  const totalPages = Math.max(1, Math.ceil(aggregatedRows.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
 
-  // Reseta página ao mudar busca, métrica, tamanho de página ou granularidade
+  // Reseta página ao mudar busca, métrica, tamanho de página, granularidade
+  // ou ordenação. Isso garante que o usuário sempre veja o "topo" do recorte.
   useEffect(() => {
     setPage(1);
-  }, [search, metric, pageSize, isQuarterlyApplied]);
+  }, [search, metric, pageSize, isQuarterlyApplied, sortKey, sortDir]);
+
+  // Reseta a ordenação ao trocar de métrica ou alternar granularidade,
+  // pois as colunas/chaves disponíveis mudam.
+  useEffect(() => {
+    setSortKey(null);
+    setSortDir("asc");
+  }, [metric, isQuarterlyApplied]);
 
   // Garante que a página atual existe após mudanças no dataset
   useEffect(() => {
@@ -950,17 +992,29 @@ export default function RelatorioKpi() {
 
   const pagedItems = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return aggregatedRows.slice(start, start + pageSize);
-  }, [aggregatedRows, page, pageSize]);
+    return sortedRows.slice(start, start + pageSize);
+  }, [sortedRows, page, pageSize]);
 
   const isFiltering = search.trim().length > 0;
-  const showingFrom = aggregatedRows.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const showingTo = Math.min(page * pageSize, aggregatedRows.length);
+  const showingFrom = sortedRows.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const showingTo = Math.min(page * pageSize, sortedRows.length);
+
+  /** Manipula clique no cabeçalho: alterna asc/desc e reinicia em asc ao trocar a coluna. */
+  const handleSort = useCallback((key: string) => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        return prev;
+      }
+      setSortDir("asc");
+      return key;
+    });
+  }, []);
 
   const exportCsv = () => {
-    // Quando trimestral, exportamos as linhas agregadas (1 por trimestre);
-    // caso contrário, exportamos os itens individuais filtrados.
-    const source = isQuarterly ? aggregatedRows : filteredItems;
+    // Exporta exatamente o que está visível: respeita filtro, agregação
+    // trimestral E ordenação aplicada pelo usuário ("WYSIWYG audit").
+    const source = isQuarterly ? sortedRows : (sortKey ? sortedRows : filteredItems);
     if (source.length === 0) return;
     const headers = Object.keys(source[0] as Record<string, unknown>);
     const csvRows = [
@@ -1195,7 +1249,14 @@ export default function RelatorioKpi() {
           <>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>{renderHeader(displayKind)}</TableHeader>
+                <TableHeader>
+                  <SortableHeaderRow
+                    columns={getColumns(displayKind)}
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={handleSort}
+                  />
+                </TableHeader>
                 <TableBody>
                   {isGranularityPending && supportsQuarterly
                     ? Array.from({ length: Math.min(pageSize, 8) }).map((_, i) => (
@@ -1216,7 +1277,7 @@ export default function RelatorioKpi() {
               <p className="text-xs text-muted-foreground">
                 Mostrando <span className="font-medium text-foreground">{showingFrom}</span>–
                 <span className="font-medium text-foreground">{showingTo}</span> de{" "}
-                <span className="font-medium text-foreground">{aggregatedRows.length}</span>
+                <span className="font-medium text-foreground">{sortedRows.length}</span>
                 {isQuarterly && <span className="ml-1">trimestre(s)</span>}
               </p>
               {totalPages > 1 && (
@@ -1286,169 +1347,193 @@ function buildPageList(current: number, total: number): (number | "…")[] {
 
 // ===== Helpers de renderização por tipo de relatório =====
 
-function getColumnCount(kind: string): number {
-  switch (kind) {
-    case "cashflow": return 5;
-    case "cashflow-quarter": return 3;
-    case "result": return 5;
-    case "result-quarter": return 5;
-    case "contracts": return 6;
-    case "payroll": return 5;
-    case "liabilities": return 5;
-    case "crm": return 5;
-    case "dp-headcount": return 6;
-    case "dp-folha": return 4;
-    case "dp-encargos": return 7;
-    case "dp-composicao": return 3;
-    case "dp-vt": return 5;
-    case "dp-beneficio": return 4;
-    default: return 5;
-  }
+/**
+ * Definição declarativa das colunas por tipo de relatório.
+ * `key` deve corresponder ao campo presente em cada item de `rows.items`
+ * (ou no bucket trimestral em modo `*-quarter`). Quando `sortable` é falso,
+ * o cabeçalho permanece estático (ex.: trimestre já vem ordenado por período).
+ */
+type ColumnDef = {
+  key: string;
+  label: string;
+  align?: "left" | "right";
+  sortable?: boolean;
+};
+
+const COLUMN_DEFS: Record<string, ColumnDef[]> = {
+  cashflow: [
+    { key: "data", label: "Data", sortable: true },
+    { key: "descricao", label: "Descrição", sortable: true },
+    { key: "categoria", label: "Categoria", sortable: true },
+    { key: "origem", label: "Origem", sortable: true },
+    { key: "valor", label: "Valor", align: "right", sortable: true },
+  ],
+  "cashflow-quarter": [
+    { key: "label", label: "Trimestre", sortable: true },
+    { key: "count", label: "Itens", align: "right", sortable: true },
+    { key: "valor", label: "Valor total", align: "right", sortable: true },
+  ],
+  result: [
+    { key: "data", label: "Data", sortable: true },
+    { key: "descricao", label: "Descrição", sortable: true },
+    { key: "tipo", label: "Tipo", sortable: true },
+    { key: "categoria", label: "Categoria", sortable: true },
+    { key: "valor", label: "Impacto", align: "right", sortable: true },
+  ],
+  "result-quarter": [
+    { key: "label", label: "Trimestre", sortable: true },
+    { key: "count", label: "Itens", align: "right", sortable: true },
+    { key: "entradas", label: "Entradas", align: "right", sortable: true },
+    { key: "saidas", label: "Saídas", align: "right", sortable: true },
+    { key: "valor", label: "Líquido", align: "right", sortable: true },
+  ],
+  contracts: [
+    { key: "nome", label: "Contrato", sortable: true },
+    { key: "tipo", label: "Tipo", sortable: true },
+    { key: "recorrencia", label: "Recorrência", sortable: true },
+    { key: "data_fim", label: "Fim", sortable: true },
+    { key: "valor", label: "Valor", align: "right", sortable: true },
+    { key: "mensal", label: "Mensalizado", align: "right", sortable: true },
+  ],
+  payroll: [
+    { key: "nome", label: "Colaborador", sortable: true },
+    { key: "cargo", label: "Cargo", sortable: true },
+    { key: "regime", label: "Regime", sortable: true },
+    { key: "admissao", label: "Admissão", sortable: true },
+    { key: "salario", label: "Salário base", align: "right", sortable: true },
+  ],
+  liabilities: [
+    { key: "descricao", label: "Descrição", sortable: true },
+    { key: "tipo", label: "Tipo", sortable: true },
+    { key: "status", label: "Status", sortable: true },
+    { key: "probabilidade", label: "Probabilidade", sortable: true },
+    { key: "valor", label: "Valor atualizado", align: "right", sortable: true },
+  ],
+  crm: [
+    { key: "titulo", label: "Oportunidade", sortable: true },
+    { key: "estagio", label: "Estágio", sortable: true },
+    { key: "probabilidade", label: "Prob.", align: "right", sortable: true },
+    { key: "valor", label: "Valor", align: "right", sortable: true },
+    { key: "ponderado", label: "Ponderado", align: "right", sortable: true },
+  ],
+  "dp-headcount": [
+    { key: "nome", label: "Colaborador", sortable: true },
+    { key: "cargo", label: "Cargo", sortable: true },
+    { key: "regime", label: "Regime", sortable: true },
+    { key: "admissao", label: "Admissão", sortable: true },
+    { key: "cc", label: "Centro de Custo", sortable: true },
+    { key: "salario", label: "Salário base", align: "right", sortable: true },
+  ],
+  "dp-folha": [
+    { key: "nome", label: "Colaborador", sortable: true },
+    { key: "cargo", label: "Cargo", sortable: true },
+    { key: "regime", label: "Regime", sortable: true },
+    { key: "valor", label: "Salário base", align: "right", sortable: true },
+  ],
+  "dp-encargos": [
+    { key: "nome", label: "Colaborador", sortable: true },
+    { key: "regime", label: "Regime", sortable: true },
+    { key: "salario", label: "Salário", align: "right", sortable: true },
+    { key: "inss", label: "INSS Pat.", align: "right", sortable: true },
+    { key: "rat", label: "RAT", align: "right", sortable: true },
+    { key: "fgts", label: "FGTS", align: "right", sortable: true },
+    { key: "valor", label: "Total", align: "right", sortable: true },
+  ],
+  "dp-composicao": [
+    { key: "componente", label: "Componente", sortable: true },
+    { key: "detalhe", label: "Detalhe", sortable: true },
+    { key: "valor", label: "Valor", align: "right", sortable: true },
+  ],
+  "dp-vt": [
+    { key: "nome", label: "Colaborador", sortable: true },
+    { key: "vt_diario", label: "VT diário", align: "right", sortable: true },
+    { key: "vt_mensal", label: "VT mensal (×22)", align: "right", sortable: true },
+    { key: "desconto_6pct", label: "Desconto 6%", align: "right", sortable: true },
+    { key: "valor", label: "Custo empresa", align: "right", sortable: true },
+  ],
+  "dp-beneficio": [
+    { key: "nome", label: "Colaborador", sortable: true },
+    { key: "beneficio", label: "Benefício", sortable: true },
+    { key: "base", label: "Base", align: "right", sortable: true },
+    { key: "valor", label: "Custo mensal", align: "right", sortable: true },
+  ],
+};
+
+function getColumns(kind: string): ColumnDef[] {
+  return COLUMN_DEFS[kind] ?? [];
 }
 
-function renderHeader(kind: string) {
-  switch (kind) {
-    case "cashflow":
-      return (
-        <TableRow>
-          <TableHead>Data</TableHead>
-          <TableHead>Descrição</TableHead>
-          <TableHead>Categoria</TableHead>
-          <TableHead>Origem</TableHead>
-          <TableHead className="text-right">Valor</TableHead>
-        </TableRow>
-      );
-    case "cashflow-quarter":
-      return (
-        <TableRow>
-          <TableHead>Trimestre</TableHead>
-          <TableHead className="text-right">Itens</TableHead>
-          <TableHead className="text-right">Valor total</TableHead>
-        </TableRow>
-      );
-    case "result":
-      return (
-        <TableRow>
-          <TableHead>Data</TableHead>
-          <TableHead>Descrição</TableHead>
-          <TableHead>Tipo</TableHead>
-          <TableHead>Categoria</TableHead>
-          <TableHead className="text-right">Impacto</TableHead>
-        </TableRow>
-      );
-    case "result-quarter":
-      return (
-        <TableRow>
-          <TableHead>Trimestre</TableHead>
-          <TableHead className="text-right">Itens</TableHead>
-          <TableHead className="text-right">Entradas</TableHead>
-          <TableHead className="text-right">Saídas</TableHead>
-          <TableHead className="text-right">Líquido</TableHead>
-        </TableRow>
-      );
-    case "contracts":
-      return (
-        <TableRow>
-          <TableHead>Contrato</TableHead>
-          <TableHead>Tipo</TableHead>
-          <TableHead>Recorrência</TableHead>
-          <TableHead>Fim</TableHead>
-          <TableHead className="text-right">Valor</TableHead>
-          <TableHead className="text-right">Mensalizado</TableHead>
-        </TableRow>
-      );
-    case "payroll":
-      return (
-        <TableRow>
-          <TableHead>Colaborador</TableHead>
-          <TableHead>Cargo</TableHead>
-          <TableHead>Regime</TableHead>
-          <TableHead>Admissão</TableHead>
-          <TableHead className="text-right">Salário base</TableHead>
-        </TableRow>
-      );
-    case "liabilities":
-      return (
-        <TableRow>
-          <TableHead>Descrição</TableHead>
-          <TableHead>Tipo</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Probabilidade</TableHead>
-          <TableHead className="text-right">Valor atualizado</TableHead>
-        </TableRow>
-      );
-    case "crm":
-      return (
-        <TableRow>
-          <TableHead>Oportunidade</TableHead>
-          <TableHead>Estágio</TableHead>
-          <TableHead className="text-right">Prob.</TableHead>
-          <TableHead className="text-right">Valor</TableHead>
-          <TableHead className="text-right">Ponderado</TableHead>
-        </TableRow>
-      );
-    case "dp-headcount":
-      return (
-        <TableRow>
-          <TableHead>Colaborador</TableHead>
-          <TableHead>Cargo</TableHead>
-          <TableHead>Regime</TableHead>
-          <TableHead>Admissão</TableHead>
-          <TableHead>Centro de Custo</TableHead>
-          <TableHead className="text-right">Salário base</TableHead>
-        </TableRow>
-      );
-    case "dp-folha":
-      return (
-        <TableRow>
-          <TableHead>Colaborador</TableHead>
-          <TableHead>Cargo</TableHead>
-          <TableHead>Regime</TableHead>
-          <TableHead className="text-right">Salário base</TableHead>
-        </TableRow>
-      );
-    case "dp-encargos":
-      return (
-        <TableRow>
-          <TableHead>Colaborador</TableHead>
-          <TableHead>Regime</TableHead>
-          <TableHead className="text-right">Salário</TableHead>
-          <TableHead className="text-right">INSS Pat.</TableHead>
-          <TableHead className="text-right">RAT</TableHead>
-          <TableHead className="text-right">FGTS</TableHead>
-          <TableHead className="text-right">Total</TableHead>
-        </TableRow>
-      );
-    case "dp-composicao":
-      return (
-        <TableRow>
-          <TableHead>Componente</TableHead>
-          <TableHead>Detalhe</TableHead>
-          <TableHead className="text-right">Valor</TableHead>
-        </TableRow>
-      );
-    case "dp-vt":
-      return (
-        <TableRow>
-          <TableHead>Colaborador</TableHead>
-          <TableHead className="text-right">VT diário</TableHead>
-          <TableHead className="text-right">VT mensal (×22)</TableHead>
-          <TableHead className="text-right">Desconto 6%</TableHead>
-          <TableHead className="text-right">Custo empresa</TableHead>
-        </TableRow>
-      );
-    case "dp-beneficio":
-      return (
-        <TableRow>
-          <TableHead>Colaborador</TableHead>
-          <TableHead>Benefício</TableHead>
-          <TableHead className="text-right">Base</TableHead>
-          <TableHead className="text-right">Custo mensal</TableHead>
-        </TableRow>
-      );
-    default:
-      return null;
-  }
+function getColumnCount(kind: string): number {
+  return getColumns(kind).length || 5;
+}
+
+/**
+ * Cabeçalho de tabela com colunas clicáveis para ordenação.
+ * Mantém alinhamento (esquerda/direita) e mostra um indicador visual:
+ * - inativo: ícone neutro (ArrowUpDown), opacidade reduzida
+ * - ativo:   ícone direcional (ArrowUp/ArrowDown), cor de destaque
+ *
+ * Acessibilidade: usa <button> nativo dentro do <th>, com `aria-sort` e
+ * `aria-label` descritivo (lido por leitores de tela).
+ */
+function SortableHeaderRow({
+  columns,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  columns: ColumnDef[];
+  sortKey: string | null;
+  sortDir: "asc" | "desc";
+  onSort: (key: string) => void;
+}) {
+  return (
+    <TableRow>
+      {columns.map((col) => {
+        const isActive = sortKey === col.key;
+        const align = col.align === "right" ? "text-right" : "";
+        const ariaSort: "ascending" | "descending" | "none" = isActive
+          ? sortDir === "asc"
+            ? "ascending"
+            : "descending"
+          : "none";
+
+        if (!col.sortable) {
+          return (
+            <TableHead key={col.key} className={align}>
+              {col.label}
+            </TableHead>
+          );
+        }
+
+        return (
+          <TableHead key={col.key} className={align} aria-sort={ariaSort}>
+            <button
+              type="button"
+              onClick={() => onSort(col.key)}
+              className={`inline-flex items-center gap-1 font-medium hover:text-foreground transition-colors ${
+                col.align === "right" ? "ml-auto" : ""
+              } ${isActive ? "text-foreground" : "text-muted-foreground"}`}
+              aria-label={`Ordenar por ${col.label}${
+                isActive ? ` (atual: ${sortDir === "asc" ? "crescente" : "decrescente"})` : ""
+              }`}
+            >
+              <span>{col.label}</span>
+              {isActive ? (
+                sortDir === "asc" ? (
+                  <ArrowUp size={12} className="text-primary" />
+                ) : (
+                  <ArrowDown size={12} className="text-primary" />
+                )
+              ) : (
+                <ArrowUpDown size={12} className="opacity-40" />
+              )}
+            </button>
+          </TableHead>
+        );
+      })}
+    </TableRow>
+  );
 }
 
 function renderRow(kind: string, r: any, i: number) {
