@@ -160,6 +160,7 @@ function ProtectedRoutes() {
           <Route path="/integracoes" element={<RouteShell skeleton={<GenericPageSkeleton title="Integrações" />}><ModuleMaintenanceGuard moduleKey="integracoes"><Integracoes /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/ia" element={<RouteShell skeleton={<GenericPageSkeleton title="IA Financeira" />}><ModuleMaintenanceGuard moduleKey="ia-financeira"><IAFinanceira /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/configuracoes" element={<RouteShell skeleton={<GenericPageSkeleton title="Configurações" />}><ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/cadastros" element={<RouteShell skeleton={<GenericPageSkeleton title="Cadastros" />}><ModuleMaintenanceGuard moduleKey="cadastro"><Cadastros /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/dp" element={<RouteShell skeleton={<DpSkeleton />}><ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/crm" element={<RouteShell skeleton={<CrmSkeleton />}><ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/nova-empresa" element={<RouteShell skeleton={<GenericPageSkeleton title="Nova empresa" />}><CreateOrganization /></RouteShell>} />

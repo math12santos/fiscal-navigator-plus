@@ -16,6 +16,7 @@ import {
   Users,
   Handshake,
   Rocket,
+  BookUser,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,7 @@ const navItems: Array<{
   { path: "/planejamento", label: "Planejamento", icon: Target, module: "planejamento", prefetch: "planejamento" },
   { path: "/dp", label: "Depto. Pessoal", icon: Users, module: "dp", prefetch: "dp" },
   { path: "/crm", label: "CRM", icon: Handshake, module: "crm", prefetch: "crm" },
+  { path: "/cadastros", label: "Cadastros", icon: BookUser, module: "cadastro", prefetch: "cadastros" },
   { path: "/tarefas", label: "Tarefas", icon: CheckSquare, module: "tarefas", prefetch: "tarefas" },
   { path: "/integracoes", label: "Integrações", icon: Plug, module: "integracoes", prefetch: "integracoes" },
   { path: "/ia", label: "IA Financeira", icon: Brain, module: "ia", prefetch: "ia" },
