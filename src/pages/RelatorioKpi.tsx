@@ -1012,9 +1012,9 @@ export default function RelatorioKpi() {
   }, []);
 
   const exportCsv = () => {
-    // Quando trimestral, exportamos as linhas agregadas (1 por trimestre);
-    // caso contrário, exportamos os itens individuais filtrados.
-    const source = isQuarterly ? aggregatedRows : filteredItems;
+    // Exporta exatamente o que está visível: respeita filtro, agregação
+    // trimestral E ordenação aplicada pelo usuário ("WYSIWYG audit").
+    const source = isQuarterly ? sortedRows : (sortKey ? sortedRows : filteredItems);
     if (source.length === 0) return;
     const headers = Object.keys(source[0] as Record<string, unknown>);
     const csvRows = [
