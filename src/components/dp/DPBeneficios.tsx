@@ -82,6 +82,21 @@ export default function DPBeneficios() {
   const handleExportMatrix = () => {
     const activeEmps = employees.filter((e: any) => e.status === "ativo");
     const activeBenefits = benefits.filter((b: any) => b.active);
+    // Para benefícios "por_dia", usa o cálculo automático seg-sex do mês
+    // corrente. O custo real considerando overrides individuais aparece nos
+    // relatórios de folha; aqui é uma estimativa estável.
+    const today = new Date();
+    const businessDaysAuto = (() => {
+      const y = today.getFullYear();
+      const m = today.getMonth();
+      const last = new Date(y, m + 1, 0).getDate();
+      let count = 0;
+      for (let d = 1; d <= last; d++) {
+        const wd = new Date(y, m, d).getDay();
+        if (wd >= 1 && wd <= 5) count++;
+      }
+      return count;
+    })();
 
     const matrixHeader = ["Colaborador", "Salário Base", ...activeBenefits.map((b: any) => b.name), "Custo Total Mensal"];
     const matrixRows = activeEmps.map((emp: any) => {
@@ -91,7 +106,12 @@ export default function DPBeneficios() {
         const link = empBenefits.find((eb: any) => eb.employee_id === emp.id && eb.benefit_id === b.id && eb.active);
         if (!link) return "";
         const valor = link.custom_value != null ? Number(link.custom_value) : Number(b.default_value);
-        const custo = b.type === "percentual" ? sal * (valor / 100) : valor;
+        const custo =
+          b.type === "percentual"
+            ? sal * (valor / 100)
+            : b.type === "por_dia"
+            ? valor * businessDaysAuto
+            : valor;
         totalEmp += custo;
         return custo;
       });
