@@ -206,6 +206,9 @@ export default function DPColaboradores() {
           </SelectContent>
         </Select>
         <DPExportButton onExcel={handleExportExcel} disabled={filtered.length === 0} />
+        <Button variant="outline" onClick={() => setMassOpen(true)}>
+          <TrendingUp size={14} className="mr-1" /> Reajuste em massa
+        </Button>
         <Button onClick={openNew}><Plus size={14} className="mr-1" /> Novo Colaborador</Button>
       </div>
 
