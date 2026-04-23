@@ -423,6 +423,23 @@ export default function DPColaboradores() {
         onOpenChange={(o) => { if (!o) setTerminateEmpId(null); }}
         initialEmployeeId={terminateEmpId || undefined}
       />
+
+      <EmployeeDossierDrawer
+        open={!!dossierEmp}
+        onOpenChange={(o) => { if (!o) setDossierEmp(null); }}
+        employee={dossierEmp}
+      />
+
+      <MassAdjustmentDialog
+        open={massOpen}
+        onOpenChange={setMassOpen}
+        employees={filtered}
+      />
+
+      <EmployeeImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+      />
     </div>
   );
 }
