@@ -65,7 +65,15 @@ type KpiMetric =
   | "custo-folha"
   | "passivos"
   | "runway"
-  | "crm-pipeline";
+  | "crm-pipeline"
+  | "dp-headcount"
+  | "dp-folha-bruta"
+  | "dp-encargos"
+  | "dp-custo-medio"
+  | "dp-vt"
+  | "dp-va"
+  | "dp-saude"
+  | "dp-outros-beneficios";
 
 interface KpiMeta {
   title: string;
@@ -123,6 +131,54 @@ const METRIC_META: Record<KpiMetric, KpiMeta> = {
     title: "Pipeline CRM Ponderado",
     description: "Oportunidades em aberto com valor estimado × probabilidade do estágio.",
     icon: <Handshake size={18} />,
+  },
+  "dp-headcount": {
+    title: "Headcount Ativo",
+    description: "Colaboradores com status ativo — base de todos os cálculos do módulo DP.",
+    icon: <Users size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-folha-bruta": {
+    title: "Folha Bruta Total",
+    description: "Soma do salário base de todos os colaboradores ativos no mês corrente.",
+    icon: <Wallet size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-encargos": {
+    title: "Encargos Patronais",
+    description: "INSS Patronal, RAT, FGTS e Terceiros sobre o salário base (PJ excluído).",
+    icon: <Shield size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-custo-medio": {
+    title: "Custo Médio por Colaborador",
+    description: "(Folha bruta + encargos) ÷ headcount ativo. Não inclui benefícios.",
+    icon: <PiggyBank size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-vt": {
+    title: "Vale Transporte",
+    description: "Custo líquido empresa: (vt_diario × 22) − 6% do salário base, mínimo 0.",
+    icon: <TrendingDown size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-va": {
+    title: "Vale Alimentação / Refeição",
+    description: "Colaboradores recebendo benefícios de alimentação ou refeição ativos.",
+    icon: <PiggyBank size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-saude": {
+    title: "Plano de Saúde",
+    description: "Colaboradores recebendo benefícios de saúde ativos.",
+    icon: <Shield size={18} />,
+    scopeIsCurrentMonth: true,
+  },
+  "dp-outros-beneficios": {
+    title: "Outros Benefícios",
+    description: "Demais benefícios ativos (excluídos VT, VA/VR e Saúde, já detalhados separadamente).",
+    icon: <PiggyBank size={18} />,
+    scopeIsCurrentMonth: true,
   },
 };
 
