@@ -1249,7 +1249,14 @@ export default function RelatorioKpi() {
           <>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>{renderHeader(displayKind)}</TableHeader>
+                <TableHeader>
+                  <SortableHeaderRow
+                    columns={getColumns(displayKind)}
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={handleSort}
+                  />
+                </TableHeader>
                 <TableBody>
                   {isGranularityPending && supportsQuarterly
                     ? Array.from({ length: Math.min(pageSize, 8) }).map((_, i) => (
