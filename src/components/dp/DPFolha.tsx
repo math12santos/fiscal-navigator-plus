@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calculator, Lock, FileText, Download } from "lucide-react";
+import { Plus, Calculator, Lock, FileText, Download, Sparkles } from "lucide-react";
 import { useEmployees, usePayrollRuns, usePayrollItems, useMutatePayroll, useDPConfig, calcINSSEmpregado, calcIRRF, calcEncargosPatronais, usePositions } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { getBusinessDays } from "@/hooks/usePayrollProjections";
@@ -14,6 +14,9 @@ import { ptBR } from "date-fns/locale";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { DPExportButton } from "./DPExportButton";
 import { generateDPExcelReport, generateDPPdfReport, generatePaystubPdf, dpFmt } from "@/lib/dpExports";
+import { usePayrollEvents, summarizeEvents, type PayrollEvent } from "@/hooks/usePayrollEvents";
+import PayrollEventsDialog from "./PayrollEventsDialog";
+import DPPayrollComparison from "./DPPayrollComparison";
 
 export default function DPFolha() {
   const { data: employees = [] } = useEmployees();
