@@ -930,6 +930,35 @@ export default function RelatorioKpi() {
     return Array.from(buckets.values()).sort((a, b) => a.period.localeCompare(b.period));
   }, [filteredItems, isQuarterlyApplied, rows.kind]);
 
+  /**
+   * Ordenação clicável: aplicada após o filtro e a agregação trimestral.
+   * Valores numéricos comparam por subtração; demais por `localeCompare` com
+   * locale pt-BR e `numeric: true` (lida bem com códigos tipo "01", "10").
+   * Datas no formato `yyyy-MM-dd` ordenam corretamente como string.
+   */
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return aggregatedRows;
+    const dir = sortDir === "asc" ? 1 : -1;
+    const arr = [...(aggregatedRows as any[])];
+    arr.sort((a, b) => {
+      const va = a?.[sortKey];
+      const vb = b?.[sortKey];
+      // null/undefined sempre por último, independente da direção
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+      // Tenta numérico se ambos forem strings numéricas
+      const na = Number(va);
+      const nb = Number(vb);
+      if (!Number.isNaN(na) && !Number.isNaN(nb) && typeof va !== "string") {
+        return (na - nb) * dir;
+      }
+      return String(va).localeCompare(String(vb), "pt-BR", { numeric: true, sensitivity: "base" }) * dir;
+    });
+    return arr;
+  }, [aggregatedRows, sortKey, sortDir]);
+
   const displayKind = isQuarterlyApplied
     ? rows.kind === "result"
       ? "result-quarter"
