@@ -14,18 +14,19 @@ interface Props {
   entity: Entity | null;
   onSubmit: (data: any) => void;
   isLoading: boolean;
+  defaultType?: "fornecedor" | "cliente" | "ambos";
 }
 
 const STATES = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
-export default function EntityFormDialog({ open, onOpenChange, entity, onSubmit, isLoading }: Props) {
+export default function EntityFormDialog({ open, onOpenChange, entity, onSubmit, isLoading, defaultType }: Props) {
   const [form, setForm] = useState<any>({});
 
   useEffect(() => {
     if (open) {
-      setForm(entity ? { ...entity } : { type: "fornecedor", document_type: "CNPJ", active: true, credit_limit: 0 });
+      setForm(entity ? { ...entity } : { type: defaultType ?? "fornecedor", document_type: "CNPJ", active: true, credit_limit: 0 });
     }
-  }, [open, entity]);
+  }, [open, entity, defaultType]);
 
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
 

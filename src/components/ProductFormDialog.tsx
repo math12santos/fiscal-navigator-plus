@@ -18,13 +18,14 @@ interface Props {
   accounts: ChartAccount[];
   onSubmit: (data: any) => void;
   isLoading: boolean;
+  defaultType?: "produto" | "servico" | "imobilizado";
 }
 
 const PRODUCT_UNITS = ["un","kg","g","l","ml","m","m²","m³","pç","cx","pct","par","kit"];
 const SERVICE_UNITS = ["hr","dia","mês","projeto","visita","km","m²","un"];
 const IMOBILIZADO_UNITS = ["un","pç","kit","m²","m³"];
 
-export default function ProductFormDialog({ open, onOpenChange, product, products, accounts, onSubmit, isLoading }: Props) {
+export default function ProductFormDialog({ open, onOpenChange, product, products, accounts, onSubmit, isLoading, defaultType }: Props) {
   const [form, setForm] = useState<any>({});
   const [newGroup, setNewGroup] = useState("");
   const [showNewGroup, setShowNewGroup] = useState(false);
@@ -45,13 +46,14 @@ export default function ProductFormDialog({ open, onOpenChange, product, product
       if (product) {
         setForm({ ...product });
       } else {
-        const type = "produto";
-        setForm({ type, unit: "un", unit_price: 0, active: true, code: generateNextCode(type) });
+        const type = defaultType ?? "produto";
+        const defaultUnit = type === "servico" ? "hr" : "un";
+        setForm({ type, unit: defaultUnit, unit_price: 0, active: true, code: generateNextCode(type) });
       }
       setShowNewGroup(false);
       setNewGroup("");
     }
-  }, [open, product]);
+  }, [open, product, defaultType]);
 
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
 
