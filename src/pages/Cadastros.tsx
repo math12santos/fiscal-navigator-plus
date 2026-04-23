@@ -412,6 +412,9 @@ export default function Cadastros() {
                 {servicoCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={() => setImportKind("servico")}>
+              <Upload size={16} /> Importar
+            </Button>
             <Button onClick={() => { setEditingServico(null); setServicoDialogOpen(true); }}>
               <Plus size={16} /> Novo Serviço
             </Button>
