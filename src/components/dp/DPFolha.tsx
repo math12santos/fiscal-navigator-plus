@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Calculator, Lock, FileText, Download, Sparkles } from "lucide-react";
 import { useEmployees, usePayrollRuns, usePayrollItems, useMutatePayroll, useDPConfig, calcINSSEmpregado, calcIRRF, calcEncargosPatronais, usePositions } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
-import { getBusinessDays } from "@/hooks/usePayrollProjections";
+
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
