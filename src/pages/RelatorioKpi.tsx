@@ -572,8 +572,8 @@ export default function RelatorioKpi() {
           ["saúde", "saude", "plano de saúde", "health"]
             .some((k) => String(b.name || "").toLowerCase().includes(k));
         const filterFn =
-          m === "dp-va" ? isVA :
-          m === "dp-saude" ? isSaude :
+          (metric as KpiMetric) === "dp-va" ? isVA :
+          (metric as KpiMetric) === "dp-saude" ? isSaude :
           (b: any) => !isVA(b) && !isSaude(b);
         const ativos = new Map((employees as any[])
           .filter((e) => e.status === "ativo")
