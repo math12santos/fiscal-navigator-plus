@@ -10,6 +10,7 @@ import { DPExportButton } from "./DPExportButton";
 import { dpFmt, generateDPExcelReport, generateDPPdfReport } from "@/lib/dpExports";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import DPDocumentAlerts from "./DPDocumentAlerts";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "hsl(var(--accent))", "#8884d8", "#82ca9d", "#ffc658"];
 const DIAS_UTEIS_MES = 22;
@@ -183,6 +184,8 @@ export default function DPDashboard() {
           <KPICard icon={DollarSign} label="Total Benefícios" value={fmt(vtStats.custoTotal + (vaStats?.custoTotal || 0) + (saudeStats?.custoTotal || 0))} subtitle="Custo mensal" />
         )}
       </div>
+
+      <DPDocumentAlerts />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Salários por colaborador */}

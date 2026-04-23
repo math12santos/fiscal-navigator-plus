@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calculator, Lock, FileText, Download } from "lucide-react";
+import { Plus, Calculator, Lock, FileText, Download, Sparkles } from "lucide-react";
 import { useEmployees, usePayrollRuns, usePayrollItems, useMutatePayroll, useDPConfig, calcINSSEmpregado, calcIRRF, calcEncargosPatronais, usePositions } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { getBusinessDays } from "@/hooks/usePayrollProjections";
@@ -14,6 +14,9 @@ import { ptBR } from "date-fns/locale";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { DPExportButton } from "./DPExportButton";
 import { generateDPExcelReport, generateDPPdfReport, generatePaystubPdf, dpFmt } from "@/lib/dpExports";
+import { usePayrollEvents, summarizeEvents, type PayrollEvent } from "@/hooks/usePayrollEvents";
+import PayrollEventsDialog from "./PayrollEventsDialog";
+import DPPayrollComparison from "./DPPayrollComparison";
 
 export default function DPFolha() {
   const { data: employees = [] } = useEmployees();
@@ -25,10 +28,26 @@ export default function DPFolha() {
   const { data: positions = [] } = usePositions();
   const { costCenters = [] } = useCostCenters();
   const [selectedRunId, setSelectedRunId] = useState<string>("");
+  const [eventsOpen, setEventsOpen] = useState(false);
 
   const activeEmployees = employees.filter((e: any) => e.status === "ativo");
   const selectedRun = runs.find((r: any) => r.id === selectedRunId);
   const { data: items = [] } = usePayrollItems(selectedRunId || undefined);
+  const { data: events = [] } = usePayrollEvents({ runId: selectedRunId || undefined });
+
+  // Eventos agregados por colaborador para esta folha
+  const eventsByEmp = useMemo(() => {
+    const m: Record<string, { proventos: number; descontos: number; liquido: number; count: number }> = {};
+    events.forEach((ev: PayrollEvent) => {
+      if (!m[ev.employee_id]) m[ev.employee_id] = { proventos: 0, descontos: 0, liquido: 0, count: 0 };
+      const v = Number(ev.value || 0);
+      if (ev.signal === "provento") m[ev.employee_id].proventos += v;
+      else m[ev.employee_id].descontos += v;
+      m[ev.employee_id].liquido = m[ev.employee_id].proventos - m[ev.employee_id].descontos;
+      m[ev.employee_id].count += 1;
+    });
+    return m;
+  }, [events]);
 
   const handleCreateRun = () => {
     const refMonth = format(startOfMonth(new Date()), "yyyy-MM-dd");
@@ -264,6 +283,9 @@ export default function DPFolha() {
         {selectedRun && !selectedRun.locked && (
           <>
             <Button onClick={handleCalcPayroll}><Calculator size={14} className="mr-1" /> Calcular</Button>
+            <Button variant="outline" onClick={() => setEventsOpen(true)}>
+              <Sparkles size={14} className="mr-1" /> Eventos variáveis
+            </Button>
             <Button onClick={handleLock} variant="destructive"><Lock size={14} className="mr-1" /> Fechar Folha</Button>
           </>
         )}
@@ -291,6 +313,7 @@ export default function DPFolha() {
                 <TableHead>INSS</TableHead>
                 <TableHead>IRRF</TableHead>
                 <TableHead>VT</TableHead>
+                <TableHead>Eventos</TableHead>
                 <TableHead>Líquido</TableHead>
                 <TableHead>FGTS</TableHead>
                 <TableHead>Encargos</TableHead>
@@ -299,35 +322,63 @@ export default function DPFolha() {
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Clique em "Calcular" para gerar a folha</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Clique em "Calcular" para gerar a folha</TableCell></TableRow>
               ) : (
-                items.map((item: any) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium text-foreground">{empMap[item.employee_id]?.name || "—"}</TableCell>
-                    <TableCell className="font-mono">{fmt(item.salario_base)}</TableCell>
-                    <TableCell className="text-destructive font-mono">{fmt(item.inss_empregado)}</TableCell>
-                    <TableCell className="text-destructive font-mono">{fmt(item.irrf)}</TableCell>
-                    <TableCell className="text-destructive font-mono">{fmt(item.vt_desconto)}</TableCell>
-                    <TableCell className="font-mono font-bold">{fmt(item.total_liquido)}</TableCell>
-                    <TableCell className="font-mono text-muted-foreground">{fmt(item.fgts)}</TableCell>
-                    <TableCell className="font-mono text-muted-foreground">{fmt(item.total_encargos)}</TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handlePaystub(item)}
-                        title="Baixar holerite (PDF)"
-                      >
-                        <Download size={14} />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                items.map((item: any) => {
+                  const ev = eventsByEmp[item.employee_id];
+                  const liquidoFinal = Number(item.total_liquido || 0) + (ev?.liquido || 0);
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium text-foreground">{empMap[item.employee_id]?.name || "—"}</TableCell>
+                      <TableCell className="font-mono">{fmt(item.salario_base)}</TableCell>
+                      <TableCell className="text-destructive font-mono">{fmt(item.inss_empregado)}</TableCell>
+                      <TableCell className="text-destructive font-mono">{fmt(item.irrf)}</TableCell>
+                      <TableCell className="text-destructive font-mono">{fmt(item.vt_desconto)}</TableCell>
+                      <TableCell className="font-mono">
+                        {ev ? (
+                          <span
+                            className={ev.liquido >= 0 ? "text-foreground" : "text-destructive"}
+                            title={`+${fmt(ev.proventos)} / −${fmt(ev.descontos)} (${ev.count} lançamento(s))`}
+                          >
+                            {ev.liquido >= 0 ? "+" : "−"}{fmt(Math.abs(ev.liquido))}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono font-bold">{fmt(liquidoFinal)}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground">{fmt(item.fgts)}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground">{fmt(item.total_encargos)}</TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handlePaystub(item)}
+                          title="Baixar holerite (PDF)"
+                        >
+                          <Download size={14} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
         </div>
       )}
+
+      {selectedRunId && selectedRun && (
+        <PayrollEventsDialog
+          open={eventsOpen}
+          onOpenChange={setEventsOpen}
+          payrollRunId={selectedRunId}
+          referenceMonth={selectedRun.reference_month}
+        />
+      )}
+
+      {/* Histórico/comparativo das últimas folhas */}
+      <DPPayrollComparison />
 
       {!selectedRunId && (
         <div className="text-center py-12 text-muted-foreground">

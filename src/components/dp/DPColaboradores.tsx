@@ -8,10 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Edit2, Trash2, UserMinus, TrendingUp } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, UserMinus, TrendingUp, FileUp } from "lucide-react";
 import TerminationSimulatorDialog from "./TerminationSimulatorDialog";
 import { EmployeeDossierDrawer } from "./EmployeeDossierDrawer";
 import MassAdjustmentDialog from "./MassAdjustmentDialog";
+import EmployeeImportDialog from "./EmployeeImportDialog";
 import { useEmployees, useMutateEmployee, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { usePositions } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
@@ -54,6 +55,7 @@ export default function DPColaboradores() {
   const [terminateEmpId, setTerminateEmpId] = useState<string | null>(null);
   const [dossierEmp, setDossierEmp] = useState<any | null>(null);
   const [massOpen, setMassOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({
     name: "", cpf: "", email: "", phone: "",
     admission_date: "", contract_type: "CLT",
@@ -206,6 +208,9 @@ export default function DPColaboradores() {
           </SelectContent>
         </Select>
         <DPExportButton onExcel={handleExportExcel} disabled={filtered.length === 0} />
+        <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <FileUp size={14} className="mr-1" /> Importar CSV
+        </Button>
         <Button variant="outline" onClick={() => setMassOpen(true)}>
           <TrendingUp size={14} className="mr-1" /> Reajuste em massa
         </Button>
@@ -417,6 +422,22 @@ export default function DPColaboradores() {
         open={!!terminateEmpId}
         onOpenChange={(o) => { if (!o) setTerminateEmpId(null); }}
         initialEmployeeId={terminateEmpId || undefined}
+      />
+
+      <EmployeeDossierDrawer
+        open={!!dossierEmp}
+        onOpenChange={(o) => { if (!o) setDossierEmp(null); }}
+        employee={dossierEmp}
+      />
+
+      <MassAdjustmentDialog
+        open={massOpen}
+        onOpenChange={setMassOpen}
+      />
+
+      <EmployeeImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
       />
     </div>
   );
