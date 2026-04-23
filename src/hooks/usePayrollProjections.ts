@@ -257,8 +257,45 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
       cursor = addMonths(cursor, 1);
     }
 
+    // Variable payroll events — projected as outflow. Provento = saída adicional
+    // (pagamento extra ao empregado); desconto = saída negativa (reduz custo).
+    // Same source: "dp" namespace, dedup via `dp_event:<eventId>`.
+    const empById = new Map(employees.map((e) => [e.id, e]));
+    for (const ev of events) {
+      const emp = empById.get(ev.employee_id);
+      if (!emp) continue;
+      const monthKey = (ev.reference_month || "").slice(0, 7);
+      if (!monthKey) continue;
+      const monthDate = `${monthKey}-01`;
+      const sign = ev.signal === "desconto" ? -1 : 1;
+      const value = Math.round(Number(ev.value || 0) * sign * 100) / 100;
+      if (value === 0) continue;
+      entries.push({
+        id: `proj-dp-event-${ev.id}`,
+        contract_id: null,
+        contract_installment_id: null,
+        tipo: "saida",
+        categoria: "Pessoal",
+        descricao: `${ev.signal === "desconto" ? "Desconto" : "Provento"} — ${emp.name}: ${ev.description || ev.event_type}`,
+        valor_previsto: value,
+        valor_realizado: null,
+        data_prevista: monthDate,
+        data_realizada: null,
+        status: "previsto",
+        account_id: null,
+        cost_center_id: emp.cost_center_id ?? null,
+        entity_id: null,
+        notes: `Evento variável (${ev.event_type})`,
+        source: "dp",
+        source_ref: projectionKey.payrollEvent(ev.id),
+        dp_sub_category: "eventos",
+        created_at: now,
+        updated_at: now,
+      } as any);
+    }
+
     return entries;
-  }, [employees, config, employeeBenefits, rangeFrom, rangeTo]);
+  }, [employees, config, employeeBenefits, events, rangeFrom, rangeTo]);
 
   const monthlyPayrollTotal = useMemo(() => {
     return projections.reduce((sum, p) => sum + Number(p.valor_previsto), 0);
