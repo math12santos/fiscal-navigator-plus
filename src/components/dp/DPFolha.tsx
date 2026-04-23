@@ -299,6 +299,9 @@ export default function DPFolha() {
             <Button variant="outline" onClick={() => setEventsOpen(true)}>
               <Sparkles size={14} className="mr-1" /> Eventos variáveis
             </Button>
+            <Button variant="outline" onClick={() => setDaysAdjOpen(true)}>
+              <CalendarClock size={14} className="mr-1" /> Ajustar dias úteis
+            </Button>
             <Button onClick={handleLock} variant="destructive"><Lock size={14} className="mr-1" /> Fechar Folha</Button>
           </>
         )}
