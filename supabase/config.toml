@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.detect-import-mapping]
 verify_jwt = false
+
+[functions.telegram-feedback]
+verify_jwt = false
+
+[functions.report-link]
+verify_jwt = false

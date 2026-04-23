@@ -17,6 +17,7 @@ import {
   Handshake,
   Rocket,
   BookUser,
+  Send,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ const navItems: Array<{
   { path: "/tarefas", label: "Tarefas", icon: CheckSquare, module: "tarefas", prefetch: "tarefas" },
   { path: "/integracoes", label: "Integrações", icon: Plug, module: "integracoes", prefetch: "integracoes" },
   { path: "/ia", label: "IA Financeira", icon: Brain, module: "ia", prefetch: "ia" },
+  { path: "/relatorios/distribuicao", label: "Distrib. Relatórios", icon: Send, module: "relatorios-out", prefetch: "relatoriosDistribuicao" },
   { path: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes", prefetch: "configuracoes" },
 ];
 

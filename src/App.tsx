@@ -50,6 +50,7 @@ export const pageFactories = {
   crm: () => import("@/pages/CRM"),
   financeiro: () => import("@/pages/Financeiro"),
   relatorioKpi: () => import("@/pages/RelatorioKpi"),
+  relatoriosDistribuicao: () => import("@/pages/RelatoriosDistribuicao"),
   onboardingGuiado: () => import("@/pages/OnboardingGuiado"),
 } as const;
 
@@ -66,6 +67,7 @@ const DepartamentoPessoal = lazyRetry(pageFactories.dp);
 const CRM = lazyRetry(pageFactories.crm);
 const Financeiro = lazyRetry(pageFactories.financeiro);
 const RelatorioKpi = lazyRetry(pageFactories.relatorioKpi);
+const RelatoriosDistribuicao = lazyRetry(pageFactories.relatoriosDistribuicao);
 const OnboardingGuiado = lazyRetry(pageFactories.onboardingGuiado);
 const CreateOrganization = lazyRetry(() => import("@/pages/CreateOrganization"));
 const Onboarding = lazyRetry(() => import("@/pages/Onboarding"));
@@ -165,6 +167,7 @@ function ProtectedRoutes() {
           <Route path="/crm" element={<RouteShell skeleton={<CrmSkeleton />}><ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/nova-empresa" element={<RouteShell skeleton={<GenericPageSkeleton title="Nova empresa" />}><CreateOrganization /></RouteShell>} />
           <Route path="/relatorios/kpi/:metric" element={<RouteShell skeleton={<RelatorioKpiSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/relatorios/distribuicao" element={<RouteShell skeleton={<GenericPageSkeleton title="Distribuição de Relatórios" />}><ModuleMaintenanceGuard moduleKey="relatorios-out"><RelatoriosDistribuicao /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="*" element={<RouteShell skeleton={<GenericPageSkeleton />}><NotFound /></RouteShell>} />
         </Routes>
       </AppLayout>
