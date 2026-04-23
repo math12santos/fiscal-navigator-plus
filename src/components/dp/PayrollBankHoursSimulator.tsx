@@ -67,7 +67,7 @@ export default function PayrollBankHoursSimulator({
   const { data: employees = [] } = useEmployees();
   const { data: monthlyOverrides = [] } = useBusinessDayOverrides();
   const { data: empOverrides = [] } = usePayrollDayOverrides(payrollRunId);
-  const { data: benefits = [] } = useBenefits();
+  const { data: benefits = [] } = useDPBenefits();
   const { data: empBenefitsRaw = [] } = useEmployeeBenefits();
   const { upsert } = useMutatePayrollDayOverride();
 
