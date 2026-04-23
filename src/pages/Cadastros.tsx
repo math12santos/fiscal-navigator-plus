@@ -162,6 +162,9 @@ export default function Cadastros() {
                 className="pl-9"
               />
             </div>
+            <Button variant="outline" onClick={() => setImportKind("fornecedor")}>
+              <Upload size={16} /> Importar
+            </Button>
             <Button onClick={() => { setEditingFornec(null); setFornecDialogOpen(true); }}>
               <Plus size={16} /> Novo Fornecedor
             </Button>
