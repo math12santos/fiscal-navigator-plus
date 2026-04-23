@@ -7,10 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search, Edit2, Power, Truck, UserCircle, Package, Wrench } from "lucide-react";
+import { Plus, Search, Edit2, Power, Truck, UserCircle, Package, Wrench, Upload } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import EntityFormDialog from "@/components/EntityFormDialog";
 import ProductFormDialog from "@/components/ProductFormDialog";
+import CadastroImportDialog, { type CadastroKind } from "@/components/cadastros/CadastroImportDialog";
 import { useEntities, Entity } from "@/hooks/useEntities";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
@@ -56,6 +57,9 @@ export default function Cadastros() {
   const [servicoCatFilter, setServicoCatFilter] = useState("__all__");
   const [servicoDialogOpen, setServicoDialogOpen] = useState(false);
   const [editingServico, setEditingServico] = useState<Product | null>(null);
+
+  // Importação
+  const [importKind, setImportKind] = useState<CadastroKind | null>(null);
 
   const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -158,6 +162,9 @@ export default function Cadastros() {
                 className="pl-9"
               />
             </div>
+            <Button variant="outline" onClick={() => setImportKind("fornecedor")}>
+              <Upload size={16} /> Importar
+            </Button>
             <Button onClick={() => { setEditingFornec(null); setFornecDialogOpen(true); }}>
               <Plus size={16} /> Novo Fornecedor
             </Button>
@@ -233,6 +240,9 @@ export default function Cadastros() {
                 className="pl-9"
               />
             </div>
+            <Button variant="outline" onClick={() => setImportKind("cliente")}>
+              <Upload size={16} /> Importar
+            </Button>
             <Button onClick={() => { setEditingCliente(null); setClienteDialogOpen(true); }}>
               <Plus size={16} /> Novo Cliente
             </Button>
@@ -315,6 +325,9 @@ export default function Cadastros() {
                 {produtoCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={() => setImportKind("produto")}>
+              <Upload size={16} /> Importar
+            </Button>
             <Button onClick={() => { setEditingProduto(null); setProdutoDialogOpen(true); }}>
               <Plus size={16} /> Novo Produto
             </Button>
@@ -399,6 +412,9 @@ export default function Cadastros() {
                 {servicoCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={() => setImportKind("servico")}>
+              <Upload size={16} /> Importar
+            </Button>
             <Button onClick={() => { setEditingServico(null); setServicoDialogOpen(true); }}>
               <Plus size={16} /> Novo Serviço
             </Button>
@@ -464,6 +480,14 @@ export default function Cadastros() {
           />
         </TabsContent>
       </Tabs>
+
+      {importKind && (
+        <CadastroImportDialog
+          open={!!importKind}
+          onOpenChange={(v) => { if (!v) setImportKind(null); }}
+          kind={importKind}
+        />
+      )}
     </div>
   );
 }
