@@ -8,8 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Edit2, Trash2, UserMinus } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, UserMinus, TrendingUp } from "lucide-react";
 import TerminationSimulatorDialog from "./TerminationSimulatorDialog";
+import { EmployeeDossierDrawer } from "./EmployeeDossierDrawer";
+import MassAdjustmentDialog from "./MassAdjustmentDialog";
 import { useEmployees, useMutateEmployee, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { usePositions } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
@@ -50,6 +52,8 @@ export default function DPColaboradores() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [terminateEmpId, setTerminateEmpId] = useState<string | null>(null);
+  const [dossierEmp, setDossierEmp] = useState<any | null>(null);
+  const [massOpen, setMassOpen] = useState(false);
   const [form, setForm] = useState({
     name: "", cpf: "", email: "", phone: "",
     admission_date: "", contract_type: "CLT",
@@ -202,6 +206,9 @@ export default function DPColaboradores() {
           </SelectContent>
         </Select>
         <DPExportButton onExcel={handleExportExcel} disabled={filtered.length === 0} />
+        <Button variant="outline" onClick={() => setMassOpen(true)}>
+          <TrendingUp size={14} className="mr-1" /> Reajuste em massa
+        </Button>
         <Button onClick={openNew}><Plus size={14} className="mr-1" /> Novo Colaborador</Button>
       </div>
 
@@ -241,7 +248,14 @@ export default function DPColaboradores() {
                 const custoDiario = custoTotal / 30;
                 return (
                   <TableRow key={e.id}>
-                    <TableCell className="font-medium text-foreground">{e.name}</TableCell>
+                    <TableCell>
+                      <button
+                        className="font-medium text-foreground hover:text-primary hover:underline text-left"
+                        onClick={() => setDossierEmp(e)}
+                      >
+                        {e.name}
+                      </button>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{posMap[e.position_id] || "—"}</TableCell>
                     <TableCell><Badge variant="outline">{e.contract_type}</Badge></TableCell>
                     <TableCell className="font-mono text-foreground">{fmt(salario)}</TableCell>

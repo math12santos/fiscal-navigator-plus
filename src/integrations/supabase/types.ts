@@ -1932,6 +1932,69 @@ export type Database = {
           },
         ]
       }
+      employee_documents: {
+        Row: {
+          created_at: string
+          doc_type: string
+          employee_id: string
+          expires_at: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          notes: string | null
+          organization_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          doc_type: string
+          employee_id: string
+          expires_at?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          organization_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          doc_type?: string
+          employee_id?: string
+          expires_at?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          organization_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_documents_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_terminations: {
         Row: {
           aviso_previo: number | null
@@ -3180,6 +3243,78 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "payment_methods_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_events: {
+        Row: {
+          created_at: string
+          description: string
+          employee_id: string
+          event_type: string
+          id: string
+          notes: string | null
+          organization_id: string
+          payroll_run_id: string | null
+          quantity: number | null
+          reference: string | null
+          reference_month: string | null
+          signal: string
+          unit_value: number | null
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          employee_id: string
+          event_type: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          payroll_run_id?: string | null
+          quantity?: number | null
+          reference?: string | null
+          reference_month?: string | null
+          signal: string
+          unit_value?: number | null
+          updated_at?: string
+          user_id: string
+          value?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          employee_id?: string
+          event_type?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          payroll_run_id?: string | null
+          quantity?: number | null
+          reference?: string | null
+          reference_month?: string | null
+          signal?: string
+          unit_value?: number | null
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_events_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
