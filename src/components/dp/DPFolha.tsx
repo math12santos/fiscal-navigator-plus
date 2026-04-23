@@ -403,6 +403,12 @@ export default function DPFolha() {
             payrollRunId={selectedRunId}
             referenceMonth={selectedRun.reference_month}
           />
+          <PayrollBankHoursSimulator
+            open={bankHoursOpen}
+            onOpenChange={setBankHoursOpen}
+            payrollRunId={selectedRunId}
+            referenceMonth={selectedRun.reference_month}
+          />
         </>
       )}
 
