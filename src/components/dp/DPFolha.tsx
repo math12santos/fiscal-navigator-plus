@@ -28,10 +28,26 @@ export default function DPFolha() {
   const { data: positions = [] } = usePositions();
   const { costCenters = [] } = useCostCenters();
   const [selectedRunId, setSelectedRunId] = useState<string>("");
+  const [eventsOpen, setEventsOpen] = useState(false);
 
   const activeEmployees = employees.filter((e: any) => e.status === "ativo");
   const selectedRun = runs.find((r: any) => r.id === selectedRunId);
   const { data: items = [] } = usePayrollItems(selectedRunId || undefined);
+  const { data: events = [] } = usePayrollEvents({ runId: selectedRunId || undefined });
+
+  // Eventos agregados por colaborador para esta folha
+  const eventsByEmp = useMemo(() => {
+    const m: Record<string, { proventos: number; descontos: number; liquido: number; count: number }> = {};
+    events.forEach((ev: PayrollEvent) => {
+      if (!m[ev.employee_id]) m[ev.employee_id] = { proventos: 0, descontos: 0, liquido: 0, count: 0 };
+      const v = Number(ev.value || 0);
+      if (ev.signal === "provento") m[ev.employee_id].proventos += v;
+      else m[ev.employee_id].descontos += v;
+      m[ev.employee_id].liquido = m[ev.employee_id].proventos - m[ev.employee_id].descontos;
+      m[ev.employee_id].count += 1;
+    });
+    return m;
+  }, [events]);
 
   const handleCreateRun = () => {
     const refMonth = format(startOfMonth(new Date()), "yyyy-MM-dd");
