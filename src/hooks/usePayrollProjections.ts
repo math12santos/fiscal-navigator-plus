@@ -1,4 +1,7 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { format, addMonths, startOfMonth, endOfMonth, isAfter, isBefore, eachDayOfInterval, getDay } from "date-fns";
 import { useEmployees, useDPConfig, calcINSSEmpregado, calcIRRF } from "@/hooks/useDP";
 import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
@@ -48,13 +51,34 @@ const SUB_CATEGORY_LABELS: Record<string, string> = {
  * Generate payroll projections as virtual CashFlowEntry items — one per employee per sub-category.
  */
 export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
+  const { currentOrg } = useOrganization();
   const employeesQuery = useEmployees();
   const dpConfigQuery = useDPConfig();
   const employeeBenefitsQuery = useEmployeeBenefits();
 
+  // Fetch variable payroll events covering the planning range so they appear as
+  // virtual cashflow entries — keeps projections aligned with reality.
+  const eventsQuery = useQuery({
+    queryKey: ["payroll_events_range", currentOrg?.id, rangeFrom?.toISOString().slice(0, 10), rangeTo?.toISOString().slice(0, 10)],
+    queryFn: async () => {
+      if (!currentOrg?.id || !rangeFrom || !rangeTo) return [];
+      const monthFrom = format(startOfMonth(rangeFrom), "yyyy-MM");
+      const monthTo = format(startOfMonth(rangeTo), "yyyy-MM");
+      const { data, error } = await (supabase.from as any)("payroll_events")
+        .select("id, employee_id, signal, value, description, reference_month, event_type")
+        .eq("organization_id", currentOrg.id)
+        .gte("reference_month", monthFrom)
+        .lte("reference_month", monthTo);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!currentOrg?.id && !!rangeFrom && !!rangeTo,
+  });
+
   const employees = (employeesQuery.data ?? []) as unknown as EmployeeRow[];
   const config = dpConfigQuery.data;
   const employeeBenefits = (employeeBenefitsQuery.data ?? []) as unknown as BenefitRow[];
+  const events = (eventsQuery.data ?? []) as any[];
 
   const projections = useMemo(() => {
     if (!rangeFrom || !rangeTo || employees.length === 0) return [];
@@ -233,8 +257,45 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
       cursor = addMonths(cursor, 1);
     }
 
+    // Variable payroll events — projected as outflow. Provento = saída adicional
+    // (pagamento extra ao empregado); desconto = saída negativa (reduz custo).
+    // Same source: "dp" namespace, dedup via `dp_event:<eventId>`.
+    const empById = new Map(employees.map((e) => [e.id, e]));
+    for (const ev of events) {
+      const emp = empById.get(ev.employee_id);
+      if (!emp) continue;
+      const monthKey = (ev.reference_month || "").slice(0, 7);
+      if (!monthKey) continue;
+      const monthDate = `${monthKey}-01`;
+      const sign = ev.signal === "desconto" ? -1 : 1;
+      const value = Math.round(Number(ev.value || 0) * sign * 100) / 100;
+      if (value === 0) continue;
+      entries.push({
+        id: `proj-dp-event-${ev.id}`,
+        contract_id: null,
+        contract_installment_id: null,
+        tipo: "saida",
+        categoria: "Pessoal",
+        descricao: `${ev.signal === "desconto" ? "Desconto" : "Provento"} — ${emp.name}: ${ev.description || ev.event_type}`,
+        valor_previsto: value,
+        valor_realizado: null,
+        data_prevista: monthDate,
+        data_realizada: null,
+        status: "previsto",
+        account_id: null,
+        cost_center_id: emp.cost_center_id ?? null,
+        entity_id: null,
+        notes: `Evento variável (${ev.event_type})`,
+        source: "dp",
+        source_ref: projectionKey.payrollEvent(ev.id),
+        dp_sub_category: "eventos",
+        created_at: now,
+        updated_at: now,
+      } as any);
+    }
+
     return entries;
-  }, [employees, config, employeeBenefits, rangeFrom, rangeTo]);
+  }, [employees, config, employeeBenefits, events, rangeFrom, rangeTo]);
 
   const monthlyPayrollTotal = useMemo(() => {
     return projections.reduce((sum, p) => sum + Number(p.valor_previsto), 0);
