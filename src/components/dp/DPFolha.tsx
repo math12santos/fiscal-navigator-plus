@@ -38,6 +38,7 @@ export default function DPFolha() {
   const [selectedRunId, setSelectedRunId] = useState<string>("");
   const [eventsOpen, setEventsOpen] = useState(false);
   const [daysAdjOpen, setDaysAdjOpen] = useState(false);
+  const [bankHoursOpen, setBankHoursOpen] = useState(false);
 
   const activeEmployees = employees.filter((e: any) => e.status === "ativo");
   const selectedRun = runs.find((r: any) => r.id === selectedRunId);
