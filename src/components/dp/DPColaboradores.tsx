@@ -248,7 +248,14 @@ export default function DPColaboradores() {
                 const custoDiario = custoTotal / 30;
                 return (
                   <TableRow key={e.id}>
-                    <TableCell className="font-medium text-foreground">{e.name}</TableCell>
+                    <TableCell>
+                      <button
+                        className="font-medium text-foreground hover:text-primary hover:underline text-left"
+                        onClick={() => setDossierEmp(e)}
+                      >
+                        {e.name}
+                      </button>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{posMap[e.position_id] || "—"}</TableCell>
                     <TableCell><Badge variant="outline">{e.contract_type}</Badge></TableCell>
                     <TableCell className="font-mono text-foreground">{fmt(salario)}</TableCell>
