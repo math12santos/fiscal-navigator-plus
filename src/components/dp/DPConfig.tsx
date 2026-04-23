@@ -38,6 +38,7 @@ import {
   Send,
 } from "lucide-react";
 import DPBusinessDaysCalendar from "./DPBusinessDaysCalendar";
+import DPBusinessDaysOverridesReport from "./DPBusinessDaysOverridesReport";
 
 type Category = "encargo" | "provisao" | "desconto";
 
@@ -300,6 +301,9 @@ export default function DPConfig() {
 
       {/* Calendário de dias úteis (afeta VT, VA por dia e demais cálculos proporcionais) */}
       <DPBusinessDaysCalendar />
+
+      {/* Auditoria CFO-first: histórico completo de overrides mensais e individuais */}
+      <DPBusinessDaysOverridesReport />
 
       {/* Banner de sugestão pendente vinda da Holding (apenas em subsidiárias) */}
       {pendingSuggestion && (
