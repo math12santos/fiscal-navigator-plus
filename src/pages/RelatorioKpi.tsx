@@ -866,6 +866,7 @@ export default function RelatorioKpi() {
     dpConfig,
     allBenefits,
     allEmployeeBenefits,
+    DIAS_UTEIS_EFETIVOS,
   ]);
 
   // Status: "match" (bate até 1 centavo), "mismatch" (diverge), "info" (modo informativo).
