@@ -14,9 +14,9 @@ import { ptBR } from "date-fns/locale";
 import DPDocumentAlerts from "./DPDocumentAlerts";
 import { KPICard } from "@/components/KPICard";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useBusinessDaysForMonth } from "@/hooks/useBusinessDays";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "hsl(var(--accent))", "#8884d8", "#82ca9d", "#ffc658"];
-const DIAS_UTEIS_MES = 22;
 
 export default function DPDashboard() {
   const navigate = useNavigate();
@@ -27,6 +27,9 @@ export default function DPDashboard() {
   const { data: allBenefits = [] } = useDPBenefits();
   const { data: allEmployeeBenefits = [] } = useEmployeeBenefits();
   const { currentOrg } = useOrganization();
+  // Dias úteis efetivos do mês corrente (override organizacional > automático)
+  const businessDaysInfo = useBusinessDaysForMonth(new Date());
+  const DIAS_UTEIS_MES = businessDaysInfo.days;
 
   const activeEmployees = employees.filter((e: any) => e.status === "ativo");
   const totalFolhaBruta = activeEmployees.reduce((sum: number, e: any) => sum + Number(e.salary_base || 0), 0);
@@ -51,23 +54,25 @@ export default function DPDashboard() {
 
   // Benefits totals by name (VA, Plano de Saúde, etc.)
   const benefitStats = useMemo(() => {
-    const benefitMap: Record<string, { name: string; count: number; custoTotal: number }> = {};
+    const benefitMap: Record<string, { name: string; count: number; custoTotal: number; type: string }> = {};
     allEmployeeBenefits.forEach((eb: any) => {
       const benefit = allBenefits.find((b: any) => b.id === eb.benefit_id);
       if (!benefit || !benefit.active) return;
       const emp = activeEmployees.find((e: any) => e.id === eb.employee_id);
       if (!emp || !eb.active) return;
-      if (!benefitMap[benefit.id]) benefitMap[benefit.id] = { name: benefit.name, count: 0, custoTotal: 0 };
+      if (!benefitMap[benefit.id]) benefitMap[benefit.id] = { name: benefit.name, count: 0, custoTotal: 0, type: benefit.type };
       benefitMap[benefit.id].count++;
       const valor = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
       if (benefit.type === "percentual") {
         benefitMap[benefit.id].custoTotal += Number(emp.salary_base || 0) * (valor / 100);
+      } else if (benefit.type === "por_dia") {
+        benefitMap[benefit.id].custoTotal += valor * DIAS_UTEIS_MES;
       } else {
         benefitMap[benefit.id].custoTotal += valor;
       }
     });
     return Object.values(benefitMap);
-  }, [allEmployeeBenefits, allBenefits, activeEmployees]);
+  }, [allEmployeeBenefits, allBenefits, activeEmployees, DIAS_UTEIS_MES]);
 
   // Find specific well-known benefits for dedicated cards
   const findBenefit = (keywords: string[]) => benefitStats.find((b) => keywords.some((k) => b.name.toLowerCase().includes(k)));
