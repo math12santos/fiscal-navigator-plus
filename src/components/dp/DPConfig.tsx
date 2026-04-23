@@ -298,6 +298,9 @@ export default function DPConfig() {
         </CardContent>
       </Card>
 
+      {/* Calendário de dias úteis (afeta VT, VA por dia e demais cálculos proporcionais) */}
+      <DPBusinessDaysCalendar />
+
       {/* Banner de sugestão pendente vinda da Holding (apenas em subsidiárias) */}
       {pendingSuggestion && (
         <Card className="border-warning/40 bg-warning/5">

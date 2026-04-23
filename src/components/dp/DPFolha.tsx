@@ -16,7 +16,14 @@ import { DPExportButton } from "./DPExportButton";
 import { generateDPExcelReport, generateDPPdfReport, generatePaystubPdf, dpFmt } from "@/lib/dpExports";
 import { usePayrollEvents, summarizeEvents, type PayrollEvent } from "@/hooks/usePayrollEvents";
 import PayrollEventsDialog from "./PayrollEventsDialog";
+import PayrollDaysAdjustmentDialog from "./PayrollDaysAdjustmentDialog";
 import DPPayrollComparison from "./DPPayrollComparison";
+import { CalendarClock } from "lucide-react";
+import {
+  useBusinessDayOverrides,
+  usePayrollDayOverrides,
+  resolveBusinessDays,
+} from "@/hooks/useBusinessDays";
 
 export default function DPFolha() {
   const { data: employees = [] } = useEmployees();
@@ -29,11 +36,14 @@ export default function DPFolha() {
   const { costCenters = [] } = useCostCenters();
   const [selectedRunId, setSelectedRunId] = useState<string>("");
   const [eventsOpen, setEventsOpen] = useState(false);
+  const [daysAdjOpen, setDaysAdjOpen] = useState(false);
 
   const activeEmployees = employees.filter((e: any) => e.status === "ativo");
   const selectedRun = runs.find((r: any) => r.id === selectedRunId);
   const { data: items = [] } = usePayrollItems(selectedRunId || undefined);
   const { data: events = [] } = usePayrollEvents({ runId: selectedRunId || undefined });
+  const { data: monthlyOverrides = [] } = useBusinessDayOverrides();
+  const { data: empDayOverrides = [] } = usePayrollDayOverrides(selectedRunId || undefined);
 
   // Eventos agregados por colaborador para esta folha
   const eventsByEmp = useMemo(() => {
