@@ -385,12 +385,20 @@ export default function DPFolha() {
       )}
 
       {selectedRunId && selectedRun && (
-        <PayrollEventsDialog
-          open={eventsOpen}
-          onOpenChange={setEventsOpen}
-          payrollRunId={selectedRunId}
-          referenceMonth={selectedRun.reference_month}
-        />
+        <>
+          <PayrollEventsDialog
+            open={eventsOpen}
+            onOpenChange={setEventsOpen}
+            payrollRunId={selectedRunId}
+            referenceMonth={selectedRun.reference_month}
+          />
+          <PayrollDaysAdjustmentDialog
+            open={daysAdjOpen}
+            onOpenChange={setDaysAdjOpen}
+            payrollRunId={selectedRunId}
+            referenceMonth={selectedRun.reference_month}
+          />
+        </>
       )}
 
       {/* Histórico/comparativo das últimas folhas */}
