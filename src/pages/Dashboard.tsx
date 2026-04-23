@@ -20,6 +20,7 @@ import { useMemo, useCallback } from "react";
 import { startOfMonth, subMonths, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
+import DPCockpitSection from "@/components/dp/DPCockpitSection";
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
