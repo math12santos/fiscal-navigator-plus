@@ -301,6 +301,12 @@ export default function RelatorioKpi() {
   const { liabilities } = useLiabilities();
   const { opportunities } = useCRMOpportunities();
   const { stages } = usePipelineStages();
+  // Fontes adicionais para drill-down do módulo DP
+  const { data: dpConfig } = useDPConfig();
+  const { data: positions = [] } = usePositions();
+  const { data: allBenefits = [] } = useDPBenefits();
+  const { data: allEmployeeBenefits = [] } = useEmployeeBenefits();
+  const { costCenters = [] } = useCostCenters();
 
   // ===== Filtros derivados por KPI =====
   const curMonthStart = useMemo(() => format(startOfMonth(now), "yyyy-MM-dd"), [now]);
