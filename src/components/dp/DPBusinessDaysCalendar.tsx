@@ -14,13 +14,14 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { CalendarDays, RotateCcw, Save, Info } from "lucide-react";
+import { CalendarDays, RotateCcw, Save, Info, AlertTriangle } from "lucide-react";
 import { addMonths, format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   useBusinessDayOverrides,
   useMutateBusinessDayOverride,
   monthKey,
+  validateBusinessDays,
 } from "@/hooks/useBusinessDays";
 import { getBusinessDays } from "@/hooks/usePayrollProjections";
 import { useToast } from "@/hooks/use-toast";
