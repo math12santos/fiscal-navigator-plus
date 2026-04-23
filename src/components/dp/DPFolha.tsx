@@ -71,16 +71,19 @@ export default function DPFolha() {
   };
 
   const handleCalcPayroll = async () => {
-    if (!selectedRunId) return;
+    if (!selectedRunId || !selectedRun) return;
     const { upsertItem } = useMutatePayrollInner();
     let totalBruto = 0, totalDescontos = 0, totalLiquido = 0, totalEncargos = 0;
+    const refMonth = selectedRun.reference_month;
 
     for (const emp of activeEmployees) {
       const salario = Number(emp.salary_base || 0);
       const inssEmp = calcINSSEmpregado(salario);
       const baseIRRF = salario - inssEmp;
       const irrf = calcIRRF(baseIRRF);
-      const businessDays = getBusinessDays(new Date());
+      const empOverride = empDayOverrides.find((o) => o.employee_id === emp.id) ?? null;
+      const resolved = resolveBusinessDays(refMonth, monthlyOverrides, empOverride);
+      const businessDays = resolved.days;
       const vtBruto = Number(emp.vt_diario || 0) * businessDays;
       const vtDesconto = emp.vt_ativo ? Math.min(salario * ((dpConfig?.vt_desconto_pct ?? 6) / 100), vtBruto) : 0;
       const enc = calcEncargosPatronais(salario, dpConfig, emp.contract_type);
