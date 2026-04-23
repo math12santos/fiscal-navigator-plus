@@ -58,6 +58,9 @@ export default function Cadastros() {
   const [servicoDialogOpen, setServicoDialogOpen] = useState(false);
   const [editingServico, setEditingServico] = useState<Product | null>(null);
 
+  // Importação
+  const [importKind, setImportKind] = useState<CadastroKind | null>(null);
+
   const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
   const fornecedores = useMemo(
