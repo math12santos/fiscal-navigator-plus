@@ -15,6 +15,7 @@ import MassAdjustmentDialog from "./MassAdjustmentDialog";
 import EmployeeImportDialog from "./EmployeeImportDialog";
 import { useEmployees, useMutateEmployee, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { usePositions } from "@/hooks/useDP";
+import { useBusinessDaysForMonth } from "@/hooks/useBusinessDays";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useDPBenefits, useEmployeeBenefits, useMutateEmployeeBenefit } from "@/hooks/useDPBenefits";
 import { useToast } from "@/hooks/use-toast";
@@ -47,7 +48,8 @@ export default function DPColaboradores() {
   const { assign: assignBenefits } = useMutateEmployeeBenefit();
   const { toast } = useToast();
   const { currentOrg } = useOrganization();
-
+  const businessDaysInfo = useBusinessDaysForMonth(new Date());
+  const DIAS_UTEIS_MES = businessDaysInfo.days;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("__all__");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -245,7 +247,6 @@ export default function DPColaboradores() {
                 const salario = Number(e.salary_base || 0);
                 const encargos = calcEncargosPatronais(salario, dpConfig, e.contract_type);
                 const vtDiario = Number(e.vt_diario || 0);
-                const DIAS_UTEIS_MES = 22;
                 const vtMensal = e.vt_ativo ? vtDiario * DIAS_UTEIS_MES : 0;
                 const vtDesconto = e.vt_ativo ? salario * 0.06 : 0;
                 const custoVTLiquido = Math.max(vtMensal - vtDesconto, 0);

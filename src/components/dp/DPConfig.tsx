@@ -37,6 +37,7 @@ import {
   XCircle,
   Send,
 } from "lucide-react";
+import DPBusinessDaysCalendar from "./DPBusinessDaysCalendar";
 
 type Category = "encargo" | "provisao" | "desconto";
 
@@ -296,6 +297,9 @@ export default function DPConfig() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Calendário de dias úteis (afeta VT, VA por dia e demais cálculos proporcionais) */}
+      <DPBusinessDaysCalendar />
 
       {/* Banner de sugestão pendente vinda da Holding (apenas em subsidiárias) */}
       {pendingSuggestion && (

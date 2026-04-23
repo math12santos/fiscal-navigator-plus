@@ -1764,6 +1764,47 @@ export type Database = {
           },
         ]
       }
+      dp_business_days: {
+        Row: {
+          business_days: number
+          created_at: string
+          id: string
+          notes: string | null
+          organization_id: string
+          reference_month: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_days: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          reference_month: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_days?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          reference_month?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dp_business_days_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dp_config: {
         Row: {
           created_at: string
@@ -3246,6 +3287,64 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_business_days_overrides: {
+        Row: {
+          business_days_used: number
+          created_at: string
+          employee_id: string
+          id: string
+          organization_id: string
+          payroll_run_id: string
+          reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_days_used: number
+          created_at?: string
+          employee_id: string
+          id?: string
+          organization_id: string
+          payroll_run_id: string
+          reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_days_used?: number
+          created_at?: string
+          employee_id?: string
+          id?: string
+          organization_id?: string
+          payroll_run_id?: string
+          reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_business_days_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_business_days_overrides_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_business_days_overrides_payroll_run_id_fkey"
+            columns: ["payroll_run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
             referencedColumns: ["id"]
           },
         ]

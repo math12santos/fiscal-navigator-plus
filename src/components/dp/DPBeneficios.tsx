@@ -16,8 +16,9 @@ import { DPExportButton } from "./DPExportButton";
 import { generateDPExcelReport } from "@/lib/dpExports";
 
 const BENEFIT_TYPES = [
-  { value: "fixo", label: "Valor Fixo (R$)" },
+  { value: "fixo", label: "Valor Fixo (R$/mês)" },
   { value: "percentual", label: "Percentual do Salário (%)" },
+  { value: "por_dia", label: "Valor por Dia Útil (R$/dia)" },
 ];
 
 export default function DPBeneficios() {
@@ -67,14 +68,35 @@ export default function DPBeneficios() {
     remove.mutate(id, { onSuccess: () => toast({ title: "Benefício removido" }) });
   };
 
-  const fmtValue = (b: any) =>
-    b.type === "percentual"
-      ? `${Number(b.default_value).toFixed(1)}%`
-      : Number(b.default_value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const fmtValue = (b: any) => {
+    if (b.type === "percentual") return `${Number(b.default_value).toFixed(1)}%`;
+    if (b.type === "por_dia") {
+      return `${Number(b.default_value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/dia`;
+    }
+    return Number(b.default_value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  };
+
+  const typeLabel = (t: string) =>
+    t === "percentual" ? "Percentual" : t === "por_dia" ? "Por dia útil" : "Valor Fixo";
 
   const handleExportMatrix = () => {
     const activeEmps = employees.filter((e: any) => e.status === "ativo");
     const activeBenefits = benefits.filter((b: any) => b.active);
+    // Para benefícios "por_dia", usa o cálculo automático seg-sex do mês
+    // corrente. O custo real considerando overrides individuais aparece nos
+    // relatórios de folha; aqui é uma estimativa estável.
+    const today = new Date();
+    const businessDaysAuto = (() => {
+      const y = today.getFullYear();
+      const m = today.getMonth();
+      const last = new Date(y, m + 1, 0).getDate();
+      let count = 0;
+      for (let d = 1; d <= last; d++) {
+        const wd = new Date(y, m, d).getDay();
+        if (wd >= 1 && wd <= 5) count++;
+      }
+      return count;
+    })();
 
     const matrixHeader = ["Colaborador", "Salário Base", ...activeBenefits.map((b: any) => b.name), "Custo Total Mensal"];
     const matrixRows = activeEmps.map((emp: any) => {
@@ -84,7 +106,12 @@ export default function DPBeneficios() {
         const link = empBenefits.find((eb: any) => eb.employee_id === emp.id && eb.benefit_id === b.id && eb.active);
         if (!link) return "";
         const valor = link.custom_value != null ? Number(link.custom_value) : Number(b.default_value);
-        const custo = b.type === "percentual" ? sal * (valor / 100) : valor;
+        const custo =
+          b.type === "percentual"
+            ? sal * (valor / 100)
+            : b.type === "por_dia"
+            ? valor * businessDaysAuto
+            : valor;
         totalEmp += custo;
         return custo;
       });
@@ -148,7 +175,7 @@ export default function DPBeneficios() {
               {filtered.map((b: any) => (
                 <TableRow key={b.id}>
                   <TableCell className="font-medium text-foreground">{b.name}</TableCell>
-                  <TableCell><Badge variant="outline">{b.type === "percentual" ? "Percentual" : "Valor Fixo"}</Badge></TableCell>
+                  <TableCell><Badge variant="outline">{typeLabel(b.type)}</Badge></TableCell>
                   <TableCell className="font-mono text-foreground">{fmtValue(b)}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{b.description || "—"}</TableCell>
                   <TableCell><Badge variant={b.active ? "default" : "secondary"}>{b.active ? "Ativo" : "Inativo"}</Badge></TableCell>
@@ -180,8 +207,19 @@ export default function DPBeneficios() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>{form.type === "percentual" ? "Percentual Padrão (%)" : "Valor Padrão (R$)"}</Label>
+              <Label>
+                {form.type === "percentual"
+                  ? "Percentual Padrão (%)"
+                  : form.type === "por_dia"
+                  ? "Valor por Dia Útil (R$/dia)"
+                  : "Valor Padrão Mensal (R$)"}
+              </Label>
               <Input type="number" value={form.default_value} onChange={(e) => setForm({ ...form, default_value: e.target.value })} />
+              {form.type === "por_dia" && (
+                <p className="text-[10px] text-muted-foreground">
+                  O custo mensal será calculado automaticamente: valor por dia × dias úteis efetivos do mês.
+                </p>
+              )}
             </div>
             <div className="space-y-1"><Label>Descrição</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
           </div>
