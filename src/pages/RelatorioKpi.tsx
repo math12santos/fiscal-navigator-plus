@@ -719,6 +719,108 @@ export default function RelatorioKpi() {
         } satisfies Recon;
       }
 
+      // ===== DP — Reconciliação por recálculo a partir das mesmas fontes =====
+      case "dp-headcount": {
+        const headcount = (employees as any[]).filter((e) => e.status === "ativo").length;
+        return {
+          dashboardLabel: "Headcount no Dashboard DP",
+          dashboardValue: headcount,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "dp-folha-bruta": {
+        const folha = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .reduce((s, e) => s + Number(e.salary_base || 0), 0);
+        return {
+          dashboardLabel: "Folha Bruta no Dashboard DP",
+          dashboardValue: folha,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "dp-encargos": {
+        const encTotal = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .reduce((s, e) => s + calcEncargosPatronais(Number(e.salary_base || 0), dpConfig, e.contract_type).total, 0);
+        return {
+          dashboardLabel: "Encargos Totais no Dashboard DP",
+          dashboardValue: encTotal,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "dp-custo-medio": {
+        const ativos = (employees as any[]).filter((e) => e.status === "ativo");
+        const folha = ativos.reduce((s, e) => s + Number(e.salary_base || 0), 0);
+        const enc = ativos.reduce((s, e) => s + calcEncargosPatronais(Number(e.salary_base || 0), dpConfig, e.contract_type).total, 0);
+        const medio = ativos.length > 0 ? (folha + enc) / ativos.length : 0;
+        return {
+          dashboardLabel: "Custo Médio no Dashboard DP",
+          dashboardValue: medio,
+          drilldownValue,
+          mode: "exact" as const,
+          note: "Composição: folha bruta + encargos patronais ÷ headcount ativo. Não inclui benefícios.",
+        } satisfies Recon;
+      }
+
+      case "dp-vt": {
+        const total = (employees as any[])
+          .filter((e) => e.status === "ativo" && e.vt_ativo)
+          .reduce((s, e) => {
+            const vtMensal = Number(e.vt_diario || 0) * DIAS_UTEIS_MES;
+            const desconto = Number(e.salary_base || 0) * 0.06;
+            return s + Math.max(vtMensal - desconto, 0);
+          }, 0);
+        return {
+          dashboardLabel: "Vale Transporte no Dashboard DP",
+          dashboardValue: total,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
+      case "dp-va":
+      case "dp-saude":
+      case "dp-outros-beneficios": {
+        const isVA = (b: any) =>
+          ["alimentação", "alimentacao", "refeição", "refeicao", "vale alimentação", "vale refeição", "va", "vr"]
+            .some((k) => String(b.name || "").toLowerCase().includes(k));
+        const isSaude = (b: any) =>
+          ["saúde", "saude", "plano de saúde", "health"]
+            .some((k) => String(b.name || "").toLowerCase().includes(k));
+        const filterFn =
+          (metric as KpiMetric) === "dp-va" ? isVA :
+          (metric as KpiMetric) === "dp-saude" ? isSaude :
+          (b: any) => !isVA(b) && !isSaude(b);
+        const ativos = new Map((employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => [e.id, e]));
+        const total = (allEmployeeBenefits as any[])
+          .filter((eb) => eb.active)
+          .reduce((s, eb) => {
+            const benefit = (allBenefits as any[]).find((b) => b.id === eb.benefit_id);
+            if (!benefit || !benefit.active || !filterFn(benefit)) return s;
+            const emp = ativos.get(eb.employee_id) as any;
+            if (!emp) return s;
+            const valBase = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
+            const v = benefit.type === "percentual"
+              ? Number(emp.salary_base || 0) * (valBase / 100)
+              : valBase;
+            return s + v;
+          }, 0);
+        return {
+          dashboardLabel: "Benefício no Dashboard DP",
+          dashboardValue: total,
+          drilldownValue,
+          mode: "exact" as const,
+        } satisfies Recon;
+      }
+
       default:
         return null;
     }
@@ -735,6 +837,10 @@ export default function RelatorioKpi() {
     summary.monthlyBurn,
     curMonthStart,
     curMonthEnd,
+    employees,
+    dpConfig,
+    allBenefits,
+    allEmployeeBenefits,
   ]);
 
   // Status: "match" (bate até 1 centavo), "mismatch" (diverge), "info" (modo informativo).
