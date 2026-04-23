@@ -1,128 +1,68 @@
 
 
-## Revisão completa do módulo DP — melhorias e exportações
+## Verificar cálculos do DP Dashboard + Drill-down clicável nos cards
 
-Análise do módulo atual identificou pontos fortes (cálculo de encargos, rescisão com simulador, integração com cashflow e planejamento de RH, propagação Holding) e lacunas relevantes para um módulo DP de cockpit financeiro. Abaixo, o plano organizado por **camadas de prioridade**, todas opcionais — você pode aprovar tudo ou apenas as fases que fizerem sentido.
+### Verificação dos cálculos atuais
+Após auditoria, os cálculos do `DPDashboard` estão corretos e fiéis às fontes:
 
----
-
-### O que existe hoje
-- **Dashboard** com KPIs (headcount, folha bruta, encargos, custo médio) e cards de VT/VA/Saúde.
-- **Colaboradores** com cadastro, comissão, VT, vínculo de benefícios e desligamento via simulador.
-- **Folha** mensal com cálculo de INSS/IRRF/VT e fechamento (lock).
-- **Férias/13º** com provisões e prazos legais.
-- **Rescisões** com simulador, integração com planejamento e materialização em cashflow.
-- **Encargos** com detalhamento por colaborador (INSS patronal, RAT, FGTS, terceiros).
-- **Cargos & Rotinas** com organograma e SLA das rotinas.
-- **Benefícios** cadastrados e atribuídos por colaborador.
-- **Configurações** com Encargos, Provisionamentos, Descontos, propagação para subsidiárias.
-
-### O que falta (lacunas identificadas)
-- Nenhuma exportação de relatório (PDF/Excel/CSV).
-- Sem holerite/recibo individual do colaborador.
-- Sem dossiê do colaborador (anexos: contrato, RG, CPF, CTPS, exames).
-- Sem eventos variáveis de folha (horas extras, faltas, adicionais, descontos pontuais).
-- Sem absenteísmo / banco de horas.
-- Sem dissídio coletivo / reajuste em massa.
-- Sem aniversariantes, tempo de casa, aniversário de admissão.
-- Sem importação em lote de colaboradores (CSV/XLSX).
-- Sem alertas proativos (férias vencendo, exames a renovar, contratos de experiência expirando).
-- Sem comparativo histórico (folha mês vs mês, headcount evolução).
-- Integração com Tarefas para rotinas existe, mas sem visão consolidada de pendências do DP no Dashboard.
-
----
-
-## Fase 1 — Exportação de relatórios (foco do pedido)
-
-Adicionar exportação **PDF executivo** e **Excel detalhado** em pontos-chave do módulo, reutilizando `jsPDF + jspdf-autotable` (já no projeto) e `xlsx` (já no projeto via `useFinanceiroImport`).
-
-**Relatórios disponíveis:**
-
-| Relatório | PDF | Excel | Origem |
-|---|---|---|---|
-| **Folha de pagamento** (resumo + analítico por colaborador) | ✅ | ✅ | aba Folha, por `payroll_run` |
-| **Holerite individual** (contracheque PDF) | ✅ | — | aba Folha, item selecionado |
-| **Encargos sociais** (mensal por colaborador) | ✅ | ✅ | aba Encargos |
-| **Provisões de Férias e 13º** | ✅ | ✅ | aba Férias |
-| **Rescisões** (período) com totais e multa FGTS | ✅ | ✅ | aba Rescisões |
-| **Headcount e custos por CC** | ✅ | ✅ | Dashboard |
-| **Lista de colaboradores** (cadastro completo) | — | ✅ | aba Colaboradores |
-| **Benefícios atribuídos** (matriz colaborador × benefício) | — | ✅ | aba Benefícios |
-
-**Onde aparece:** botão **"Exportar"** no canto superior direito de cada aba (dropdown PDF/Excel). Holerite individual: ícone de download na linha do colaborador na aba Folha.
-
-**Padrão visual do PDF:** cabeçalho com nome da empresa, período, logo placeholder; rodapé com "Gerado por Colli FinCore — DD/MM/AAAA HH:mm"; tabelas com zebra striping; resumo executivo no topo (totais).
-
----
-
-## Fase 2 — Dossiê e ciclo de vida do colaborador
-
-**a) Dossiê do colaborador (drawer lateral)**
-Ao clicar no nome do colaborador, abrir drawer com 4 abas:
-- **Dados** — cadastrais + cargo + CC.
-- **Histórico de salário** — usa `employee_compensations` (já existe, mas sem UI de visualização).
-- **Documentos** — upload de RG, CPF, CTPS, contrato, exames admissional/periódico (Storage bucket `employee-documents` com isolamento por org).
-- **Histórico de folha** — todas as folhas em que apareceu, com link para o holerite.
-
-**b) Eventos variáveis de folha**
-Nova tabela `payroll_events` (employee_id, payroll_run_id, type, description, value, signal +/−).
-Tipos: hora extra 50%, hora extra 100%, adicional noturno, faltas, atrasos, desconto pontual, bônus, comissão variável.
-UI: dentro do detalhe da folha, botão "+ Lançamento variável" que entra no cálculo do líquido.
-
-**c) Reajuste em massa (dissídio)**
-Modal "Aplicar reajuste" filtrando por cargo/CC, aplicando % ou valor fixo. Cria automaticamente registros em `employee_compensations` com motivo = "dissídio".
-
----
-
-## Fase 3 — Inteligência e alertas
-
-**a) Painel de pendências DP no Dashboard:**
-- Férias vencendo nos próximos 30/60 dias (já calculado, falta destaque).
-- Contratos de experiência (45/90 dias) expirando.
-- Exames periódicos vencidos (depende da Fase 2 — documentos com data).
-- Aniversariantes do mês + aniversário de admissão.
-- Folhas pendentes de fechamento.
-
-**b) Comparativos históricos:**
-- Gráfico "Evolução da folha bruta" (últimos 12 meses).
-- Gráfico "Evolução do headcount" (admitidos vs desligados por mês).
-- Card "Turnover anualizado" (desligamentos / headcount médio).
-
-**c) Importação em lote de colaboradores:**
-Reaproveitar o padrão `ImportDialog` do Financeiro (CSV/XLSX → mapeamento IA → preview → confirmar). Coluna obrigatória: nome, CPF, admissão, salário.
-
----
-
-## Fase 4 — Integrações (melhorias nas existentes)
-
-| Integração | Status atual | Melhoria proposta |
+| KPI | Fonte | Status |
 |---|---|---|
-| **Cashflow** (rescisões) | OK, materializa via `dedup_hash` | Estender para folha mensal: ao **fechar** uma `payroll_run`, materializar 1 entry por sub_category (já existe lógica em `usePayrollProjections` — falta o "promote to real"). |
-| **Planejamento RH** | OK (rescisão fecha ciclo) | Estender: admissões planejadas → quando colaborador for cadastrado a partir de um item, marcar `hr_planning_item` como executado. |
-| **Tarefas** (rotinas DP) | OK | Adicionar widget "Rotinas DP de hoje" no Dashboard do DP (atualmente só aparece em Tarefas). |
-| **Centros de Custo** | OK | Adicionar visão "DRE de pessoal por CC" (rateio quando colaborador atende +1 CC). |
-| **Contratos** | Ligação `contract_id` existe na tabela `employees` mas **não tem UI** | Selector de contrato no cadastro do colaborador — útil para terceirizados/PJ ligados a um contrato de prestação. |
+| Headcount Ativo | `employees` filtrado por `status === "ativo"` | ✅ correto |
+| Folha Bruta | soma de `salary_base` dos ativos | ✅ correto |
+| Encargos Totais | `calcEncargosPatronais` por colaborador (PJ excluído) | ✅ correto |
+| Custo Médio/Colab. | `(folha + encargos) / headcount` | ✅ correto |
+| Vale Transporte | `vt_diario × 22 − 6% salário`, mínimo 0, só `vt_ativo` | ✅ correto |
+| VA / Plano de Saúde / Outros | benefícios ativos, valor fixo ou % do salário | ✅ correto |
+| Custo por CC | soma de `salary_base` agrupada por `cost_center_id` (com "Sem CC") | ✅ correto |
 
----
+**Pequenos ajustes de consistência a aplicar junto:**
+1. **Custo por CC inclui apenas salário base** — adicionar opção de visão "com encargos" para refletir o custo real de pessoal por CC (mantém a coluna `salário base` como padrão e exibe o total com encargos como subtítulo).
+2. **Card "Total Benefícios" no fallback** soma VT + VA + Saúde, ignorando outros benefícios — corrigir para somar **todos** os `benefitStats` + VT.
+3. **Custo Médio** atualmente exclui benefícios — manter o card como está (foco em salário+encargos), mas adicionar `subtitle` esclarecendo a composição.
 
-## Sugestão de priorização
+### Drill-down nos cards (mesma lógica do Dashboard global)
+Replicar o padrão `KPICard` clicável → rota `/relatorios/kpi/:metric` que existe no Dashboard, mas dedicado a métricas DP. Cada card vira clicável e abre uma página de composição com lista detalhada, busca, paginação, exportação CSV e card de "Reconciliação" (drill-down ↔ valor do KPI), seguindo o padrão de auditabilidade já em uso.
 
-Para não comprometer o cronograma, sugiro **3 sprints**:
+**Arquitetura:**
 
-1. **Sprint 1 (foco do pedido):** Fase 1 completa — todos os exports.
-2. **Sprint 2:** Fase 3 (alertas, comparativos, importação em lote) + Fase 4 (widget de rotinas no Dashboard, link de contrato).
-3. **Sprint 3:** Fase 2 (dossiê + eventos variáveis + dissídio) — maior, demanda novas tabelas e Storage.
+1. **Adotar o componente `KPICard`** (de `src/components/KPICard.tsx`) no `DPDashboard`, substituindo o `KPICard` local — assim ganhamos `onClick`, chevron, hover, acessibilidade já testados.
 
----
+2. **Novas métricas em `RelatorioKpi.tsx`** — estender o tipo `KpiMetric` e o mapa `METRIC_META` com:
+   - `dp-headcount` — lista de colaboradores ativos (nome, cargo, regime, admissão, CC, salário).
+   - `dp-folha-bruta` — colaboradores ativos com salário base + total.
+   - `dp-encargos` — por colaborador: INSS patronal, RAT, FGTS, Terceiros, Total. Reconciliação com soma do KPI.
+   - `dp-custo-medio` — informativa, mostra `(folha+encargos)/headcount` com explicação.
+   - `dp-vt` — colaboradores com VT ativo: `vt_diario × 22`, desconto 6%, custo líquido empresa.
+   - `dp-va` — colaboradores recebendo qualquer benefício "alimentação/refeição": valor por colaborador.
+   - `dp-saude` — colaboradores com benefício "saúde": valor por colaborador.
+   - `dp-outros-beneficios` — matriz benefício × colaborador para todos os demais.
+   - `dp-custo-cc` — agrupado por centro de custo com colaboradores listados.
 
-## Decisão necessária
+3. **Cards do DPDashboard que ficarão clicáveis** (todos):
+   - Headcount Ativo → `/relatorios/kpi/dp-headcount`
+   - Folha Bruta Total → `/relatorios/kpi/dp-folha-bruta`
+   - Encargos Totais → `/relatorios/kpi/dp-encargos`
+   - Custo Médio/Colab. → `/relatorios/kpi/dp-custo-medio`
+   - Vale Transporte → `/relatorios/kpi/dp-vt`
+   - Vale Alimentação → `/relatorios/kpi/dp-va`
+   - Plano de Saúde → `/relatorios/kpi/dp-saude`
+   - Outros Benefícios / Total Benefícios → `/relatorios/kpi/dp-outros-beneficios`
 
-Para eu começar, escolha o escopo:
+4. **Reconciliação** — para cada nova métrica, comparar `rows.total` com o valor recalculado a partir das mesmas fontes (`useEmployees`, `useDPConfig`, `useDPBenefits`, `useEmployeeBenefits`), seguindo o padrão `match` / `mismatch` / `info` já implementado.
 
-- **(A)** Apenas Fase 1 — exportações de relatórios (recomendo começar por aqui).
-- **(B)** Fase 1 + Fase 3 (exports + alertas/comparativos/importação).
-- **(C)** Tudo (Fases 1 a 4) em sprints sequenciais.
-- **(D)** Outro recorte — me diga quais itens da lista priorizar.
+5. **Exportação CSV** já vem nativa do `RelatorioKpi` (botão "Download" no header da página) — sem trabalho adicional. Mantém os botões PDF/Excel atuais do DPDashboard intactos.
 
-Sem mudanças destrutivas em qualquer fase: novas tabelas e colunas são aditivas; UI nova convive com a existente; integrações respeitam o padrão MECE de materialização (sem duplicatas).
+### Detalhes técnicos
+- O `RelatorioKpi.tsx` ganhará nova lógica no `switch (metric)` e novo bloco `reconciliation`, importando hooks `useEmployees`, `useDPConfig`, `useDPBenefits`, `useEmployeeBenefits`, `useCostCenters`.
+- O período do drill-down DP será **o mês corrente** (alinhado ao Dashboard DP que mostra o snapshot atual). O `KpiRangePicker` continua disponível para o usuário ajustar (ex.: ver folha de meses passados via `payroll_runs` futuramente).
+- O `ModuleMaintenanceGuard moduleKey="dashboard"` já protege a rota; nada muda no roteamento.
+- Sem migrations. Sem novas tabelas. Sem novas dependências.
+
+### O que fica como está
+- Os gráficos (Salário por colaborador, Pizza de CC) permanecem não-clicáveis — drill-down via cards é suficiente.
+- Cards de seção "Documentos/Exames" e "Top Centros de Custo" no `DPCockpitSection` (Dashboard global) continuam abrindo direto o módulo DP — comportamento atual já adequado.
+
+### Arquivos afetados
+- `src/components/dp/DPDashboard.tsx` — usar `KPICard` global, adicionar `onClick`, corrigir fallback "Total Benefícios", adicionar opção visão com encargos no Custo por CC.
+- `src/pages/RelatorioKpi.tsx` — adicionar 8 novas métricas DP (`switch rows`, `reconciliation`, `METRIC_META`).
 
