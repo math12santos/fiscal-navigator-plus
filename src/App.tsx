@@ -45,6 +45,7 @@ export const pageFactories = {
   integracoes: () => import("@/pages/Integracoes"),
   ia: () => import("@/pages/IAFinanceira"),
   configuracoes: () => import("@/pages/Configuracoes"),
+  cadastros: () => import("@/pages/Cadastros"),
   dp: () => import("@/pages/DepartamentoPessoal"),
   crm: () => import("@/pages/CRM"),
   financeiro: () => import("@/pages/Financeiro"),
