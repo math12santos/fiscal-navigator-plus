@@ -231,7 +231,7 @@ export default function DPDashboard() {
           icon={<Bus size={18} />}
           title="Vale Transporte"
           value={fmt(vtStats.custoTotal)}
-          subtitle={`${vtStats.count} colaborador(es)`}
+          subtitle={`${vtStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`}
           onClick={() => go("dp-vt")}
         />
         <KPICard
