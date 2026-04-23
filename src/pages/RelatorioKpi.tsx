@@ -1550,6 +1550,78 @@ function renderRow(kind: string, r: any, i: number) {
           <TableCell className="text-right font-mono">{fmt(r.ponderado)}</TableCell>
         </TableRow>
       );
+    case "dp-headcount":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell className="text-muted-foreground">{r.cargo}</TableCell>
+          <TableCell>
+            <Badge variant="outline" className="text-xs uppercase">{r.regime}</Badge>
+          </TableCell>
+          <TableCell className="text-muted-foreground whitespace-nowrap">
+            {r.admissao !== "—" ? fmtDate(r.admissao) : "—"}
+          </TableCell>
+          <TableCell className="text-muted-foreground">{r.cc}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.salario)}</TableCell>
+        </TableRow>
+      );
+    case "dp-folha":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell className="text-muted-foreground">{r.cargo}</TableCell>
+          <TableCell>
+            <Badge variant="outline" className="text-xs uppercase">{r.regime}</Badge>
+          </TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
+    case "dp-encargos":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell>
+            <Badge variant="outline" className="text-xs uppercase">{r.regime}</Badge>
+          </TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">{fmt(r.salario)}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.inss)}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.rat)}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.fgts)}</TableCell>
+          <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
+    case "dp-composicao":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.componente}</TableCell>
+          <TableCell className="text-muted-foreground">{r.detalhe}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
+    case "dp-vt":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell className="text-right font-mono">{fmt(r.vt_diario)}</TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">{fmt(r.vt_mensal)}</TableCell>
+          <TableCell className="text-right font-mono text-destructive">{fmt(r.desconto_6pct)}</TableCell>
+          <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
+    case "dp-beneficio":
+      return (
+        <TableRow key={i}>
+          <TableCell className="font-medium">{r.nome}</TableCell>
+          <TableCell className="text-muted-foreground">
+            {r.beneficio}
+            {r.tipo === "percentual" && <span className="text-[10px] ml-1 opacity-60">(%)</span>}
+          </TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">
+            {r.tipo === "percentual" ? `${r.base}%` : fmt(r.base)}
+          </TableCell>
+          <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
+        </TableRow>
+      );
     default:
       return null;
   }
