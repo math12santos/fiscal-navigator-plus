@@ -53,20 +53,24 @@ export default function DPDashboard() {
   }, [activeEmployees, DIAS_UTEIS_MES]);
 
   // Benefits totals by name (VA, Plano de Saúde, etc.)
+  // `hasPorDia` indica se algum benefício do grupo é "por dia útil" — quando
+  // verdadeiro, o cálculo é valor/dia × dias úteis efetivos do mês corrente
+  // (mesma fonte da projeção e do drill-down `dp-va` no RelatorioKpi).
   const benefitStats = useMemo(() => {
-    const benefitMap: Record<string, { name: string; count: number; custoTotal: number; type: string }> = {};
+    const benefitMap: Record<string, { name: string; count: number; custoTotal: number; type: string; hasPorDia: boolean }> = {};
     allEmployeeBenefits.forEach((eb: any) => {
       const benefit = allBenefits.find((b: any) => b.id === eb.benefit_id);
       if (!benefit || !benefit.active) return;
       const emp = activeEmployees.find((e: any) => e.id === eb.employee_id);
       if (!emp || !eb.active) return;
-      if (!benefitMap[benefit.id]) benefitMap[benefit.id] = { name: benefit.name, count: 0, custoTotal: 0, type: benefit.type };
+      if (!benefitMap[benefit.id]) benefitMap[benefit.id] = { name: benefit.name, count: 0, custoTotal: 0, type: benefit.type, hasPorDia: false };
       benefitMap[benefit.id].count++;
       const valor = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
       if (benefit.type === "percentual") {
         benefitMap[benefit.id].custoTotal += Number(emp.salary_base || 0) * (valor / 100);
       } else if (benefit.type === "por_dia") {
         benefitMap[benefit.id].custoTotal += valor * DIAS_UTEIS_MES;
+        benefitMap[benefit.id].hasPorDia = true;
       } else {
         benefitMap[benefit.id].custoTotal += valor;
       }
