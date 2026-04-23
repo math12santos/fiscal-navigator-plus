@@ -1296,6 +1296,12 @@ function getColumnCount(kind: string): number {
     case "payroll": return 5;
     case "liabilities": return 5;
     case "crm": return 5;
+    case "dp-headcount": return 6;
+    case "dp-folha": return 4;
+    case "dp-encargos": return 7;
+    case "dp-composicao": return 3;
+    case "dp-vt": return 5;
+    case "dp-beneficio": return 4;
     default: return 5;
   }
 }
