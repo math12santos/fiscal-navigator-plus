@@ -72,5 +72,15 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   },
   { key: "integracoes", label: "Integrações" },
   { key: "ia", label: "IA Financeira" },
+  {
+    key: "cadastro",
+    label: "Cadastros",
+    tabs: [
+      { key: "fornecedores", label: "Fornecedores" },
+      { key: "clientes", label: "Clientes" },
+      { key: "produtos", label: "Produtos" },
+      { key: "servicos", label: "Serviços" },
+    ],
+  },
   { key: "configuracoes", label: "Configurações" },
 ];
