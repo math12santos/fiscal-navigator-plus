@@ -421,6 +421,9 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* SEÇÃO 2.5 — COCKPIT DP */}
+      <DPCockpitSection />
+
       {/* SEÇÃO 3 — ANÁLISE FINANCEIRA (2 colunas: 70/30) */}
       <section className="grid grid-cols-1 lg:grid-cols-10 gap-4">
         {/* Receita vs Despesas — Coluna principal (70%) */}
