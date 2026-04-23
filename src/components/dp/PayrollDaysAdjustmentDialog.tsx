@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { RotateCcw, Save } from "lucide-react";
+import { RotateCcw, Save, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEmployees } from "@/hooks/useDP";
@@ -26,6 +26,7 @@ import {
   useMutatePayrollDayOverride,
   useBusinessDayOverrides,
   resolveBusinessDays,
+  validateBusinessDays,
 } from "@/hooks/useBusinessDays";
 import { useToast } from "@/hooks/use-toast";
 
@@ -89,10 +90,11 @@ export default function PayrollDaysAdjustmentDialog({
     const draft = drafts[empId];
     if (!draft) return;
     const days = Number(draft.days);
-    if (!Number.isInteger(days) || days < 0 || days > 31) {
+    const validation = validateBusinessDays(referenceMonth, draft.days, draft.reason);
+    if (validation.error) {
       toast({
         title: "Quantidade inválida",
-        description: "Informe um número inteiro entre 0 e 31.",
+        description: validation.error,
         variant: "destructive",
       });
       return;
@@ -115,7 +117,7 @@ export default function PayrollDaysAdjustmentDialog({
       },
       {
         onSuccess: () => {
-          toast({ title: "Ajuste registrado" });
+          toast({ title: "Ajuste registrado", description: validation.warning });
           setDrafts((prev) => {
             const next = { ...prev };
             delete next[empId];
@@ -200,9 +202,12 @@ export default function PayrollDaysAdjustmentDialog({
                   const dirty =
                     !Number.isNaN(numericDays) &&
                     (numericDays !== defaults.days || (v.reason ?? "") !== defaults.reason);
+                  const validation = validateBusinessDays(referenceMonth, v.days, v.reason);
+                  const hasError = !!validation.error;
+                  const hasWarning = !hasError && !!validation.warning;
                   return (
                     <TableRow key={emp.id}>
-                      <TableCell>
+                      <TableCell className="align-top">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-foreground">{emp.name}</span>
                           {hasOverride && (
@@ -213,20 +218,39 @@ export default function PayrollDaysAdjustmentDialog({
                         </div>
                         <p className="text-[10px] text-muted-foreground">{emp.contract_type}</p>
                       </TableCell>
-                      <TableCell className="text-center font-mono text-muted-foreground">
+                      <TableCell className="text-center font-mono text-muted-foreground align-top">
                         {standard.days}
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center align-top">
                         <Input
                           type="number"
                           min={0}
-                          max={31}
+                          max={validation.maxBusinessDays}
                           value={v.days}
                           onChange={(e) => setDraft(emp.id, { days: e.target.value })}
-                          className="h-8 w-20 mx-auto text-center font-mono"
+                          aria-invalid={hasError}
+                          className={`h-8 w-20 mx-auto text-center font-mono ${
+                            hasError
+                              ? "border-destructive focus-visible:ring-destructive"
+                              : hasWarning
+                              ? "border-warning focus-visible:ring-warning"
+                              : ""
+                          }`}
                         />
+                        {(hasError || hasWarning) && (
+                          <p
+                            className={`mt-1 text-[10px] leading-tight flex items-start gap-1 justify-center ${
+                              hasError ? "text-destructive" : "text-warning"
+                            }`}
+                          >
+                            <AlertTriangle size={10} className="mt-px shrink-0" />
+                            <span className="text-left">
+                              {hasError ? validation.error : validation.warning}
+                            </span>
+                          </p>
+                        )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
                         <Input
                           placeholder="Ex.: 5 dias de banco de horas"
                           value={v.reason}
@@ -234,7 +258,7 @@ export default function PayrollDaysAdjustmentDialog({
                           className="h-8 text-xs"
                         />
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right align-top">
                         <div className="flex justify-end gap-1">
                           <Button
                             size="sm"
@@ -250,7 +274,7 @@ export default function PayrollDaysAdjustmentDialog({
                             size="sm"
                             className="h-7 px-2 text-xs"
                             onClick={() => handleSave(emp.id, defaults, hasOverride)}
-                            disabled={!dirty || upsert.isPending}
+                            disabled={!dirty || hasError || upsert.isPending}
                           >
                             <Save size={12} className="mr-1" /> Salvar
                           </Button>

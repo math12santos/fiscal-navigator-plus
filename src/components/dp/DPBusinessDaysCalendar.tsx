@@ -14,13 +14,14 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { CalendarDays, RotateCcw, Save, Info } from "lucide-react";
+import { CalendarDays, RotateCcw, Save, Info, AlertTriangle } from "lucide-react";
 import { addMonths, format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   useBusinessDayOverrides,
   useMutateBusinessDayOverride,
   monthKey,
+  validateBusinessDays,
 } from "@/hooks/useBusinessDays";
 import { getBusinessDays } from "@/hooks/usePayrollProjections";
 import { useToast } from "@/hooks/use-toast";
@@ -83,10 +84,11 @@ export default function DPBusinessDaysCalendar() {
     const draft = drafts[r.monthKey];
     if (!draft) return;
     const days = Number(draft.days);
-    if (!Number.isInteger(days) || days < 0 || days > 31) {
+    const validation = validateBusinessDays(r.monthKey, draft.days, draft.notes);
+    if (validation.error) {
       toast({
         title: "Quantidade inválida",
-        description: "Informe um número inteiro entre 0 e 31.",
+        description: validation.error,
         variant: "destructive",
       });
       return;
@@ -95,7 +97,10 @@ export default function DPBusinessDaysCalendar() {
       { reference_month: r.monthKey, business_days: days, notes: draft.notes?.trim() || null },
       {
         onSuccess: () => {
-          toast({ title: `Calendário atualizado — ${r.label}` });
+          toast({
+            title: `Calendário atualizado — ${r.label}`,
+            description: validation.warning,
+          });
           setDrafts((prev) => {
             const next = { ...prev };
             delete next[r.monthKey];
@@ -168,6 +173,9 @@ export default function DPBusinessDaysCalendar() {
                 {baseRows.map((r) => {
                   const v = getValue(r);
                   const dirty = isDirty(r);
+                  const validation = validateBusinessDays(r.monthKey, v.days, v.notes);
+                  const hasError = !!validation.error;
+                  const hasWarning = !hasError && !!validation.warning;
                   return (
                     <TableRow key={r.monthKey}>
                       <TableCell className="capitalize">
@@ -183,15 +191,34 @@ export default function DPBusinessDaysCalendar() {
                       <TableCell className="text-center font-mono text-muted-foreground">
                         {r.auto}
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center align-top">
                         <Input
                           type="number"
                           min={0}
-                          max={31}
+                          max={validation.maxBusinessDays}
                           value={v.days}
                           onChange={(e) => setDraft(r.monthKey, { days: e.target.value })}
-                          className="h-8 w-20 mx-auto text-center font-mono"
+                          aria-invalid={hasError}
+                          className={`h-8 w-20 mx-auto text-center font-mono ${
+                            hasError
+                              ? "border-destructive focus-visible:ring-destructive"
+                              : hasWarning
+                              ? "border-warning focus-visible:ring-warning"
+                              : ""
+                          }`}
                         />
+                        {(hasError || hasWarning) && (
+                          <p
+                            className={`mt-1 text-[10px] leading-tight flex items-start gap-1 justify-center ${
+                              hasError ? "text-destructive" : "text-warning"
+                            }`}
+                          >
+                            <AlertTriangle size={10} className="mt-px shrink-0" />
+                            <span className="text-left">
+                              {hasError ? validation.error : validation.warning}
+                            </span>
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Input
@@ -201,7 +228,7 @@ export default function DPBusinessDaysCalendar() {
                           className="h-8 text-xs"
                         />
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right align-top">
                         <div className="flex justify-end gap-1">
                           <Button
                             size="sm"
@@ -218,7 +245,7 @@ export default function DPBusinessDaysCalendar() {
                             size="sm"
                             className="h-7 px-2 text-xs"
                             onClick={() => handleSave(r)}
-                            disabled={!dirty || upsert.isPending}
+                            disabled={!dirty || hasError || upsert.isPending}
                           >
                             <Save size={12} className="mr-1" /> Salvar
                           </Button>
