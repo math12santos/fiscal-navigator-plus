@@ -8,8 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Edit2, Trash2, UserMinus } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, UserMinus, TrendingUp } from "lucide-react";
 import TerminationSimulatorDialog from "./TerminationSimulatorDialog";
+import { EmployeeDossierDrawer } from "./EmployeeDossierDrawer";
+import MassAdjustmentDialog from "./MassAdjustmentDialog";
 import { useEmployees, useMutateEmployee, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { usePositions } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
