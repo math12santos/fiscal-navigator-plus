@@ -313,6 +313,7 @@ export default function DPFolha() {
                 <TableHead>INSS</TableHead>
                 <TableHead>IRRF</TableHead>
                 <TableHead>VT</TableHead>
+                <TableHead>Eventos</TableHead>
                 <TableHead>Líquido</TableHead>
                 <TableHead>FGTS</TableHead>
                 <TableHead>Encargos</TableHead>
@@ -321,35 +322,63 @@ export default function DPFolha() {
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Clique em "Calcular" para gerar a folha</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Clique em "Calcular" para gerar a folha</TableCell></TableRow>
               ) : (
-                items.map((item: any) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium text-foreground">{empMap[item.employee_id]?.name || "—"}</TableCell>
-                    <TableCell className="font-mono">{fmt(item.salario_base)}</TableCell>
-                    <TableCell className="text-destructive font-mono">{fmt(item.inss_empregado)}</TableCell>
-                    <TableCell className="text-destructive font-mono">{fmt(item.irrf)}</TableCell>
-                    <TableCell className="text-destructive font-mono">{fmt(item.vt_desconto)}</TableCell>
-                    <TableCell className="font-mono font-bold">{fmt(item.total_liquido)}</TableCell>
-                    <TableCell className="font-mono text-muted-foreground">{fmt(item.fgts)}</TableCell>
-                    <TableCell className="font-mono text-muted-foreground">{fmt(item.total_encargos)}</TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handlePaystub(item)}
-                        title="Baixar holerite (PDF)"
-                      >
-                        <Download size={14} />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                items.map((item: any) => {
+                  const ev = eventsByEmp[item.employee_id];
+                  const liquidoFinal = Number(item.total_liquido || 0) + (ev?.liquido || 0);
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium text-foreground">{empMap[item.employee_id]?.name || "—"}</TableCell>
+                      <TableCell className="font-mono">{fmt(item.salario_base)}</TableCell>
+                      <TableCell className="text-destructive font-mono">{fmt(item.inss_empregado)}</TableCell>
+                      <TableCell className="text-destructive font-mono">{fmt(item.irrf)}</TableCell>
+                      <TableCell className="text-destructive font-mono">{fmt(item.vt_desconto)}</TableCell>
+                      <TableCell className="font-mono">
+                        {ev ? (
+                          <span
+                            className={ev.liquido >= 0 ? "text-foreground" : "text-destructive"}
+                            title={`+${fmt(ev.proventos)} / −${fmt(ev.descontos)} (${ev.count} lançamento(s))`}
+                          >
+                            {ev.liquido >= 0 ? "+" : "−"}{fmt(Math.abs(ev.liquido))}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono font-bold">{fmt(liquidoFinal)}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground">{fmt(item.fgts)}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground">{fmt(item.total_encargos)}</TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handlePaystub(item)}
+                          title="Baixar holerite (PDF)"
+                        >
+                          <Download size={14} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
         </div>
       )}
+
+      {selectedRunId && selectedRun && (
+        <PayrollEventsDialog
+          open={eventsOpen}
+          onOpenChange={setEventsOpen}
+          payrollRunId={selectedRunId}
+          referenceMonth={selectedRun.reference_month}
+        />
+      )}
+
+      {/* Histórico/comparativo das últimas folhas */}
+      <DPPayrollComparison />
 
       {!selectedRunId && (
         <div className="text-center py-12 text-muted-foreground">
