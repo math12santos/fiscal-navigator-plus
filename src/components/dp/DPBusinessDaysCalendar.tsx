@@ -84,10 +84,11 @@ export default function DPBusinessDaysCalendar() {
     const draft = drafts[r.monthKey];
     if (!draft) return;
     const days = Number(draft.days);
-    if (!Number.isInteger(days) || days < 0 || days > 31) {
+    const validation = validateBusinessDays(r.monthKey, draft.days, draft.notes);
+    if (validation.error) {
       toast({
         title: "Quantidade inválida",
-        description: "Informe um número inteiro entre 0 e 31.",
+        description: validation.error,
         variant: "destructive",
       });
       return;
@@ -96,7 +97,10 @@ export default function DPBusinessDaysCalendar() {
       { reference_month: r.monthKey, business_days: days, notes: draft.notes?.trim() || null },
       {
         onSuccess: () => {
-          toast({ title: `Calendário atualizado — ${r.label}` });
+          toast({
+            title: `Calendário atualizado — ${r.label}`,
+            description: validation.warning,
+          });
           setDrafts((prev) => {
             const next = { ...prev };
             delete next[r.monthKey];
