@@ -38,7 +38,7 @@ import { AlertTriangle, Calculator, RotateCcw, Save, Sparkles } from "lucide-rea
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEmployees } from "@/hooks/useDP";
-import { useBenefits, useEmployeeBenefits } from "@/hooks/useDPBenefits";
+import { useDPBenefits, useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import {
   resolveBusinessDays,
   useBusinessDayOverrides,
