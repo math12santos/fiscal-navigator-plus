@@ -480,6 +480,14 @@ export default function Cadastros() {
           />
         </TabsContent>
       </Tabs>
+
+      {importKind && (
+        <CadastroImportDialog
+          open={!!importKind}
+          onOpenChange={(v) => { if (!v) setImportKind(null); }}
+          kind={importKind}
+        />
+      )}
     </div>
   );
 }
