@@ -17,8 +17,9 @@ import { generateDPExcelReport, generateDPPdfReport, generatePaystubPdf, dpFmt }
 import { usePayrollEvents, summarizeEvents, type PayrollEvent } from "@/hooks/usePayrollEvents";
 import PayrollEventsDialog from "./PayrollEventsDialog";
 import PayrollDaysAdjustmentDialog from "./PayrollDaysAdjustmentDialog";
+import PayrollBankHoursSimulator from "./PayrollBankHoursSimulator";
 import DPPayrollComparison from "./DPPayrollComparison";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Clock } from "lucide-react";
 import {
   useBusinessDayOverrides,
   usePayrollDayOverrides,
