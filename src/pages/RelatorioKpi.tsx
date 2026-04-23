@@ -165,7 +165,7 @@ const METRIC_META: Record<KpiMetric, KpiMeta> = {
   },
   "dp-va": {
     title: "Vale Alimentação / Refeição",
-    description: "Colaboradores recebendo benefícios de alimentação ou refeição ativos.",
+    description: "Colaboradores recebendo benefícios de alimentação ou refeição ativos. Benefícios por dia útil são calculados como valor/dia × dias úteis efetivos do mês corrente.",
     icon: <PiggyBank size={18} />,
     scopeIsCurrentMonth: true,
   },
@@ -312,6 +312,11 @@ export default function RelatorioKpi() {
   // ===== Filtros derivados por KPI =====
   const curMonthStart = useMemo(() => format(startOfMonth(now), "yyyy-MM-dd"), [now]);
   const curMonthEnd = useMemo(() => format(endOfMonth(now), "yyyy-MM-dd"), [now]);
+  // Dias úteis efetivos do mês corrente (override organizacional > automático).
+  // Usado para benefícios "por_dia" (VA/VR e similares) — espelha exatamente
+  // o cálculo do card no DPDashboard, garantindo reconciliação.
+  const businessDaysInfo = useBusinessDaysForMonth(now);
+  const DIAS_UTEIS_EFETIVOS = businessDaysInfo.days;
 
   const rows = useMemo(() => {
     if (!meta) return { items: [] as any[], total: 0, kind: "empty" as const };
