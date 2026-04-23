@@ -35,6 +35,7 @@ import { useContracts } from "@/hooks/useContracts";
 import { useEmployees, useDPConfig, usePositions, calcEncargosPatronais } from "@/hooks/useDP";
 import { useDPBenefits, useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import { useCostCenters } from "@/hooks/useCostCenters";
+import { useBusinessDaysForMonth } from "@/hooks/useBusinessDays";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -164,7 +165,7 @@ const METRIC_META: Record<KpiMetric, KpiMeta> = {
   },
   "dp-va": {
     title: "Vale Alimentação / Refeição",
-    description: "Colaboradores recebendo benefícios de alimentação ou refeição ativos.",
+    description: "Colaboradores recebendo benefícios de alimentação ou refeição ativos. Benefícios por dia útil são calculados como valor/dia × dias úteis efetivos do mês corrente.",
     icon: <PiggyBank size={18} />,
     scopeIsCurrentMonth: true,
   },
@@ -311,6 +312,11 @@ export default function RelatorioKpi() {
   // ===== Filtros derivados por KPI =====
   const curMonthStart = useMemo(() => format(startOfMonth(now), "yyyy-MM-dd"), [now]);
   const curMonthEnd = useMemo(() => format(endOfMonth(now), "yyyy-MM-dd"), [now]);
+  // Dias úteis efetivos do mês corrente (override organizacional > automático).
+  // Usado para benefícios "por_dia" (VA/VR e similares) — espelha exatamente
+  // o cálculo do card no DPDashboard, garantindo reconciliação.
+  const businessDaysInfo = useBusinessDaysForMonth(now);
+  const DIAS_UTEIS_EFETIVOS = businessDaysInfo.days;
 
   const rows = useMemo(() => {
     if (!meta) return { items: [] as any[], total: 0, kind: "empty" as const };
@@ -586,18 +592,34 @@ export default function RelatorioKpi() {
             const emp = ativos.get(eb.employee_id);
             if (!emp) return null;
             const valBase = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
+            // Cálculo por tipo:
+            // - percentual: % sobre salário base
+            // - por_dia: valor/dia × dias úteis efetivos do mês corrente
+            //   (mesma fonte do card no DPDashboard — garante reconciliação)
+            // - fixo: valor mensal direto
             const valor = benefit.type === "percentual"
               ? Number(emp.salary_base || 0) * (valBase / 100)
+              : benefit.type === "por_dia"
+              ? valBase * DIAS_UTEIS_EFETIVOS
               : valBase;
             return {
               nome: (emp as any).name,
               beneficio: benefit.name,
               tipo: benefit.type,
               base: valBase,
+              // Campos extras p/ benefícios "por dia útil" — exibidos apenas
+              // quando tipo === "por_dia"; demais tipos os ignoram na render.
+              valor_dia: benefit.type === "por_dia" ? valBase : null,
+              dias_uteis: benefit.type === "por_dia" ? DIAS_UTEIS_EFETIVOS : null,
+              custo_mensal: benefit.type === "por_dia" ? valBase * DIAS_UTEIS_EFETIVOS : null,
               valor,
             };
           })
-          .filter((x): x is { nome: string; beneficio: string; tipo: string; base: number; valor: number } => x !== null);
+          .filter((x): x is {
+            nome: string; beneficio: string; tipo: string; base: number;
+            valor_dia: number | null; dias_uteis: number | null; custo_mensal: number | null;
+            valor: number;
+          } => x !== null);
         return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-beneficio" as const };
       }
 
@@ -607,6 +629,7 @@ export default function RelatorioKpi() {
   }, [
     metric, meta, summary.entries, contracts, employees, liabilities, opportunities, stages,
     curMonthStart, curMonthEnd, dpConfig, positions, allBenefits, allEmployeeBenefits, costCenters,
+    DIAS_UTEIS_EFETIVOS,
   ]);
 
   // ===== Validação cruzada com o KPI canônico do Dashboard =====
@@ -810,6 +833,8 @@ export default function RelatorioKpi() {
             const valBase = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
             const v = benefit.type === "percentual"
               ? Number(emp.salary_base || 0) * (valBase / 100)
+              : benefit.type === "por_dia"
+              ? valBase * DIAS_UTEIS_EFETIVOS
               : valBase;
             return s + v;
           }, 0);
@@ -841,6 +866,7 @@ export default function RelatorioKpi() {
     dpConfig,
     allBenefits,
     allEmployeeBenefits,
+    DIAS_UTEIS_EFETIVOS,
   ]);
 
   // Status: "match" (bate até 1 centavo), "mismatch" (diverge), "info" (modo informativo).
@@ -1454,7 +1480,10 @@ const COLUMN_DEFS: Record<string, ColumnDef[]> = {
   "dp-beneficio": [
     { key: "nome", label: "Colaborador", sortable: true },
     { key: "beneficio", label: "Benefício", sortable: true },
+    { key: "tipo", label: "Tipo", sortable: true },
     { key: "base", label: "Base", align: "right", sortable: true },
+    { key: "valor_dia", label: "Valor/dia", align: "right", sortable: true },
+    { key: "dias_uteis", label: "Dias úteis", align: "right", sortable: true },
     { key: "valor", label: "Custo mensal", align: "right", sortable: true },
   ],
 };
@@ -1693,20 +1722,39 @@ function renderRow(kind: string, r: any, i: number) {
           <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
         </TableRow>
       );
-    case "dp-beneficio":
+    case "dp-beneficio": {
+      const tipoLabel =
+        r.tipo === "percentual" ? "Percentual" :
+        r.tipo === "por_dia" ? "Por dia útil" :
+        "Valor fixo";
+      const tipoVariant: "secondary" | "outline" | "default" =
+        r.tipo === "por_dia" ? "default" :
+        r.tipo === "percentual" ? "secondary" :
+        "outline";
       return (
         <TableRow key={i}>
           <TableCell className="font-medium">{r.nome}</TableCell>
-          <TableCell className="text-muted-foreground">
-            {r.beneficio}
-            {r.tipo === "percentual" && <span className="text-[10px] ml-1 opacity-60">(%)</span>}
+          <TableCell className="text-muted-foreground">{r.beneficio}</TableCell>
+          <TableCell>
+            <Badge variant={tipoVariant} className="text-xs">{tipoLabel}</Badge>
           </TableCell>
           <TableCell className="text-right font-mono text-muted-foreground">
-            {r.tipo === "percentual" ? `${r.base}%` : fmt(r.base)}
+            {r.tipo === "percentual"
+              ? `${r.base}%`
+              : r.tipo === "por_dia"
+              ? `${fmt(r.base)}/dia`
+              : fmt(r.base)}
+          </TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">
+            {r.tipo === "por_dia" && r.valor_dia != null ? fmt(r.valor_dia) : "—"}
+          </TableCell>
+          <TableCell className="text-right font-mono text-muted-foreground">
+            {r.tipo === "por_dia" && r.dias_uteis != null ? r.dias_uteis : "—"}
           </TableCell>
           <TableCell className="text-right font-mono font-semibold">{fmt(r.valor)}</TableCell>
         </TableRow>
       );
+    }
     default:
       return null;
   }
