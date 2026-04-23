@@ -60,6 +60,7 @@ const Tarefas = lazyRetry(pageFactories.tarefas);
 const Integracoes = lazyRetry(pageFactories.integracoes);
 const IAFinanceira = lazyRetry(pageFactories.ia);
 const Configuracoes = lazyRetry(pageFactories.configuracoes);
+const Cadastros = lazyRetry(pageFactories.cadastros);
 const DepartamentoPessoal = lazyRetry(pageFactories.dp);
 const CRM = lazyRetry(pageFactories.crm);
 const Financeiro = lazyRetry(pageFactories.financeiro);
