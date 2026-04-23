@@ -466,10 +466,148 @@ export default function RelatorioKpi() {
         };
       }
 
+      // ===== Métricas do módulo DP (snapshot do mês corrente) =====
+      case "dp-headcount": {
+        const positionMap = new Map<string, string>(
+          (positions as any[]).map((p) => [p.id, p.name ?? p.title ?? "—"]),
+        );
+        const ccMap = new Map<string, string>(
+          (costCenters as any[]).map((c) => [c.id, c.name]),
+        );
+        const items = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => ({
+            nome: e.name,
+            cargo: e.position_id ? positionMap.get(e.position_id) ?? "—" : "—",
+            regime: e.contract_type || "—",
+            admissao: e.admission_date || "—",
+            cc: e.cost_center_id ? ccMap.get(e.cost_center_id) ?? "Sem CC" : "Sem CC",
+            salario: Number(e.salary_base || 0),
+          }));
+        // "valor" = 1 por colaborador (para o Total = headcount)
+        const itemsWithCount = items.map((i) => ({ ...i, valor: 1 }));
+        return { items: itemsWithCount, total: items.length, kind: "dp-headcount" as const };
+      }
+
+      case "dp-folha-bruta": {
+        const positionMap = new Map<string, string>(
+          (positions as any[]).map((p) => [p.id, p.name ?? p.title ?? "—"]),
+        );
+        const items = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => ({
+            nome: e.name,
+            cargo: e.position_id ? positionMap.get(e.position_id) ?? "—" : "—",
+            regime: e.contract_type || "—",
+            valor: Number(e.salary_base || 0),
+          }));
+        return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-folha" as const };
+      }
+
+      case "dp-encargos": {
+        const items = (employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => {
+            const sal = Number(e.salary_base || 0);
+            const enc = calcEncargosPatronais(sal, dpConfig, e.contract_type);
+            return {
+              nome: e.name,
+              regime: e.contract_type || "—",
+              salario: sal,
+              inss: enc.inssPatronal,
+              rat: enc.rat,
+              fgts: enc.fgts,
+              terceiros: enc.terceiros,
+              valor: enc.total,
+            };
+          });
+        return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-encargos" as const };
+      }
+
+      case "dp-custo-medio": {
+        const ativos = (employees as any[]).filter((e) => e.status === "ativo");
+        const folha = ativos.reduce((s, e) => s + Number(e.salary_base || 0), 0);
+        const enc = ativos.reduce((s, e) => {
+          const c = calcEncargosPatronais(Number(e.salary_base || 0), dpConfig, e.contract_type);
+          return s + c.total;
+        }, 0);
+        const headcount = ativos.length;
+        const medio = headcount > 0 ? (folha + enc) / headcount : 0;
+        // Tabela informativa de composição — 1 linha por componente
+        const items = [
+          { componente: "Folha bruta total", detalhe: `${headcount} colaborador(es) ativo(s)`, valor: folha },
+          { componente: "Encargos patronais", detalhe: "INSS + RAT + FGTS + Terceiros (PJ excluído)", valor: enc },
+          { componente: "Custo total estimado", detalhe: "Folha + encargos", valor: folha + enc },
+          { componente: "Custo médio por colaborador", detalhe: `(folha + encargos) ÷ ${headcount || 0}`, valor: medio },
+        ];
+        return { items, total: medio, kind: "dp-composicao" as const };
+      }
+
+      case "dp-vt": {
+        const items = (employees as any[])
+          .filter((e) => e.status === "ativo" && e.vt_ativo)
+          .map((e) => {
+            const sal = Number(e.salary_base || 0);
+            const vtMensal = Number(e.vt_diario || 0) * DIAS_UTEIS_MES;
+            const desconto = sal * 0.06;
+            const liquido = Math.max(vtMensal - desconto, 0);
+            return {
+              nome: e.name,
+              vt_diario: Number(e.vt_diario || 0),
+              vt_mensal: vtMensal,
+              desconto_6pct: desconto,
+              valor: liquido,
+            };
+          });
+        return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-vt" as const };
+      }
+
+      case "dp-va":
+      case "dp-saude":
+      case "dp-outros-beneficios": {
+        const isVA = (b: any) =>
+          ["alimentação", "alimentacao", "refeição", "refeicao", "vale alimentação", "vale refeição", "va", "vr"]
+            .some((k) => String(b.name || "").toLowerCase().includes(k));
+        const isSaude = (b: any) =>
+          ["saúde", "saude", "plano de saúde", "health"]
+            .some((k) => String(b.name || "").toLowerCase().includes(k));
+        const filterFn =
+          m === "dp-va" ? isVA :
+          m === "dp-saude" ? isSaude :
+          (b: any) => !isVA(b) && !isSaude(b);
+        const ativos = new Map((employees as any[])
+          .filter((e) => e.status === "ativo")
+          .map((e) => [e.id, e]));
+        const items = (allEmployeeBenefits as any[])
+          .filter((eb) => eb.active)
+          .map((eb) => {
+            const benefit = (allBenefits as any[]).find((b) => b.id === eb.benefit_id);
+            if (!benefit || !benefit.active || !filterFn(benefit)) return null;
+            const emp = ativos.get(eb.employee_id);
+            if (!emp) return null;
+            const valBase = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
+            const valor = benefit.type === "percentual"
+              ? Number(emp.salary_base || 0) * (valBase / 100)
+              : valBase;
+            return {
+              nome: (emp as any).name,
+              beneficio: benefit.name,
+              tipo: benefit.type,
+              base: valBase,
+              valor,
+            };
+          })
+          .filter((x): x is { nome: string; beneficio: string; tipo: string; base: number; valor: number } => x !== null);
+        return { items, total: items.reduce((s, i) => s + i.valor, 0), kind: "dp-beneficio" as const };
+      }
+
       default:
         return { items: [], total: 0, kind: "empty" as const };
     }
-  }, [metric, meta, summary.entries, contracts, employees, liabilities, opportunities, stages, curMonthStart, curMonthEnd]);
+  }, [
+    metric, meta, summary.entries, contracts, employees, liabilities, opportunities, stages,
+    curMonthStart, curMonthEnd, dpConfig, positions, allBenefits, allEmployeeBenefits, costCenters,
+  ]);
 
   // ===== Validação cruzada com o KPI canônico do Dashboard =====
   // Para cada métrica, comparamos a soma dos itens detalhados (rows.total) com
