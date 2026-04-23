@@ -1387,6 +1387,65 @@ function renderHeader(kind: string) {
           <TableHead className="text-right">Ponderado</TableHead>
         </TableRow>
       );
+    case "dp-headcount":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead>Cargo</TableHead>
+          <TableHead>Regime</TableHead>
+          <TableHead>Admissão</TableHead>
+          <TableHead>Centro de Custo</TableHead>
+          <TableHead className="text-right">Salário base</TableHead>
+        </TableRow>
+      );
+    case "dp-folha":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead>Cargo</TableHead>
+          <TableHead>Regime</TableHead>
+          <TableHead className="text-right">Salário base</TableHead>
+        </TableRow>
+      );
+    case "dp-encargos":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead>Regime</TableHead>
+          <TableHead className="text-right">Salário</TableHead>
+          <TableHead className="text-right">INSS Pat.</TableHead>
+          <TableHead className="text-right">RAT</TableHead>
+          <TableHead className="text-right">FGTS</TableHead>
+          <TableHead className="text-right">Total</TableHead>
+        </TableRow>
+      );
+    case "dp-composicao":
+      return (
+        <TableRow>
+          <TableHead>Componente</TableHead>
+          <TableHead>Detalhe</TableHead>
+          <TableHead className="text-right">Valor</TableHead>
+        </TableRow>
+      );
+    case "dp-vt":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead className="text-right">VT diário</TableHead>
+          <TableHead className="text-right">VT mensal (×22)</TableHead>
+          <TableHead className="text-right">Desconto 6%</TableHead>
+          <TableHead className="text-right">Custo empresa</TableHead>
+        </TableRow>
+      );
+    case "dp-beneficio":
+      return (
+        <TableRow>
+          <TableHead>Colaborador</TableHead>
+          <TableHead>Benefício</TableHead>
+          <TableHead className="text-right">Base</TableHead>
+          <TableHead className="text-right">Custo mensal</TableHead>
+        </TableRow>
+      );
     default:
       return null;
   }
