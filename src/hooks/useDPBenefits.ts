@@ -2,21 +2,25 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
 
 export function useDPBenefits() {
   const { currentOrg } = useOrganization();
+  const { holdingMode, activeOrgIds } = useHolding();
+  const orgIds = holdingMode && activeOrgIds.length > 0 ? activeOrgIds : currentOrg?.id ? [currentOrg.id] : [];
+
   return useQuery({
-    queryKey: ["dp_benefits", currentOrg?.id],
+    queryKey: ["dp_benefits", orgIds],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("dp_benefits")
         .select("*")
-        .eq("organization_id", currentOrg!.id)
+        .in("organization_id", orgIds)
         .order("name");
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!currentOrg?.id,
+    enabled: orgIds.length > 0,
   });
 }
 
@@ -58,19 +62,22 @@ export function useMutateDPBenefit() {
 
 export function useEmployeeBenefits(employeeId?: string) {
   const { currentOrg } = useOrganization();
+  const { holdingMode, activeOrgIds } = useHolding();
+  const orgIds = holdingMode && activeOrgIds.length > 0 ? activeOrgIds : currentOrg?.id ? [currentOrg.id] : [];
+
   return useQuery({
-    queryKey: ["employee_benefits", currentOrg?.id, employeeId],
+    queryKey: ["employee_benefits", orgIds, employeeId],
     queryFn: async () => {
       let q = supabase
         .from("employee_benefits")
-        .select("*, dp_benefits(name, type, default_value)")
-        .eq("organization_id", currentOrg!.id);
+        .select("*, dp_benefits(name, type, default_value, category)")
+        .in("organization_id", orgIds);
       if (employeeId) q = q.eq("employee_id", employeeId);
       const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!currentOrg?.id,
+    enabled: orgIds.length > 0,
   });
 }
 
