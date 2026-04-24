@@ -221,14 +221,17 @@ export function useMutateRoutine() {
 // ========== PAYROLL ==========
 export function usePayrollRuns() {
   const { currentOrg } = useOrganization();
+  const { holdingMode, activeOrgIds } = useHolding();
   return useQuery({
-    queryKey: ["payroll_runs", currentOrg?.id],
+    queryKey: ["payroll_runs", holdingMode ? activeOrgIds : currentOrg?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payroll_runs")
-        .select("*")
-        .eq("organization_id", currentOrg!.id)
-        .order("reference_month", { ascending: false });
+      let q = supabase.from("payroll_runs").select("*").order("reference_month", { ascending: false });
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else {
+        q = q.eq("organization_id", currentOrg!.id);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
