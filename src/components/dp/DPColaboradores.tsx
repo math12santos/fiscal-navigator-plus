@@ -126,21 +126,60 @@ export default function DPColaboradores() {
     };
 
     const saveBenefits = async (employeeId: string) => {
-      // Sincronização completa: remove vínculos não mais selecionados antes de inserir,
-      // para evitar conflito com a regra de unicidade por categoria.
+      // Sincronização completa em 2 etapas:
+      // 1) Remove vínculos desmarcados explicitamente.
+      // 2) Remove vínculos pré-existentes que conflitem por CATEGORIA com algum
+      //    benefício recém-adicionado (exceto categoria "outros"), evitando
+      //    a violação do trigger trg_unique_employee_benefit_category.
       const current = allEmployeeBenefits.filter((eb: any) => eb.employee_id === employeeId);
-      const toRemove = current.filter((eb: any) => !selectedBenefitIds.includes(eb.benefit_id));
+
+      const explicitRemove = current.filter((eb: any) => !selectedBenefitIds.includes(eb.benefit_id));
+
       const toAdd = selectedBenefitIds.filter(
         (bid) => !current.some((eb: any) => eb.benefit_id === bid),
       );
+
+      // Categorias dos benefícios novos (ignorando "outros")
+      const incomingCategories = new Set(
+        toAdd
+          .map((bid) => allBenefits.find((b: any) => b.id === bid))
+          .filter((b: any) => b && (b.category || "outros") !== "outros")
+          .map((b: any) => b.category),
+      );
+
+      // Conflitos implícitos: vínculos atuais que ficam, mas pertencem a categoria
+      // de um novo (e não foram explicitamente desmarcados nem estão em explicitRemove).
+      const implicitRemove = current.filter((eb: any) => {
+        if (explicitRemove.some((r: any) => r.id === eb.id)) return false;
+        if (toAdd.includes(eb.benefit_id)) return false;
+        const benefit = allBenefits.find((b: any) => b.id === eb.benefit_id);
+        const cat = benefit?.category || "outros";
+        return incomingCategories.has(cat);
+      });
+
+      const allRemove = [...explicitRemove, ...implicitRemove];
+      const removedNames = implicitRemove
+        .map((eb: any) => allBenefits.find((b: any) => b.id === eb.benefit_id)?.name)
+        .filter(Boolean);
+
       try {
-        if (toRemove.length > 0) {
-          await supabase.from("employee_benefits").delete().in("id", toRemove.map((eb: any) => eb.id));
+        if (allRemove.length > 0) {
+          const { error: delErr } = await supabase
+            .from("employee_benefits")
+            .delete()
+            .in("id", allRemove.map((eb: any) => eb.id));
+          if (delErr) throw delErr;
         }
         if (toAdd.length > 0) {
           await assignBenefits.mutateAsync(
             toAdd.map((bid) => ({ employee_id: employeeId, benefit_id: bid })),
           );
+        }
+        if (removedNames.length > 0) {
+          toast({
+            title: "Benefícios sincronizados",
+            description: `Substituído(s) automaticamente por categoria: ${removedNames.join(", ")}.`,
+          });
         }
       } catch (err: any) {
         toast({
