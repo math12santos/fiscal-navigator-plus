@@ -1070,9 +1070,15 @@ export default function RelatorioKpi() {
     URL.revokeObjectURL(url);
   };
 
-  // "Voltar" inteligente: KPIs de DP retornam ao dashboard do DP; demais ao Dashboard Geral.
-  const backTarget = metric?.startsWith("dp-") ? "/dp" : "/";
-  const backLabel = metric?.startsWith("dp-") ? "Voltar ao DP" : "Voltar ao Dashboard";
+  // "Voltar" inteligente: KPIs de DP retornam ao dashboard do DP; demais à home efetiva
+  // do usuário (Dashboard Geral para quem tem acesso, ou home setorial para os demais).
+  const isDpMetric = metric?.startsWith("dp-");
+  const backTarget = isDpMetric ? "/dp" : effectiveHome;
+  const backLabel = isDpMetric
+    ? "Voltar ao DP"
+    : effectiveHome === "/"
+      ? "Voltar ao Dashboard"
+      : "Voltar";
 
   if (!meta) {
     return (
