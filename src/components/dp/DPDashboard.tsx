@@ -88,11 +88,12 @@ export default function DPDashboard() {
     };
   };
 
-  const vaStats = sumByCategory(["vale_alimentacao", "vale_refeicao"]);
+  const vrStats = sumByCategory(["vale_refeicao"]);
+  const vaStats = sumByCategory(["vale_alimentacao"]);
   const saudeStats = sumByCategory(["plano_saude"]);
-  const otherBenefits = benefitStats.filter(
-    (b) => !["vale_alimentacao", "vale_refeicao", "plano_saude", "vale_transporte"].includes(b.category),
-  );
+  const variavelStats = sumByCategory(["bonus", "comissao"]);
+  const KNOWN_CATS = ["vale_refeicao", "vale_alimentacao", "vale_transporte", "plano_saude", "bonus", "comissao"];
+  const otherBenefits = benefitStats.filter((b) => !KNOWN_CATS.includes(b.category));
 
   // Total geral de benefícios (todos os benefícios + VT) — usado no fallback do card "Total Benefícios"
   const totalBeneficiosGeral = useMemo(
