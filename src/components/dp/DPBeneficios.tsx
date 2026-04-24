@@ -21,6 +21,19 @@ const BENEFIT_TYPES = [
   { value: "por_dia", label: "Valor por Dia Útil (R$/dia)" },
 ];
 
+const BENEFIT_CATEGORIES = [
+  { value: "vale_refeicao", label: "Vale Refeição" },
+  { value: "vale_alimentacao", label: "Vale Alimentação" },
+  { value: "vale_transporte", label: "Vale Transporte" },
+  { value: "plano_saude", label: "Plano de Saúde" },
+  { value: "bonus", label: "Bônus" },
+  { value: "comissao", label: "Comissão" },
+  { value: "outros", label: "Outros" },
+];
+
+const categoryLabel = (c: string) =>
+  BENEFIT_CATEGORIES.find((x) => x.value === c)?.label || "Outros";
+
 export default function DPBeneficios() {
   const { data: benefits = [], isLoading } = useDPBenefits();
   const { create, update, remove } = useMutateDPBenefit();
