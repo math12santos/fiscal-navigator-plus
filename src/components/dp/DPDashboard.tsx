@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEmployees, usePayrollRuns, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { useEmployeeBenefits, useDPBenefits } from "@/hooks/useDPBenefits";
-import { Users, DollarSign, TrendingUp, Percent, Bus, UtensilsCrossed, HeartPulse } from "lucide-react";
+import { Users, DollarSign, TrendingUp, Percent, Bus, UtensilsCrossed, HeartPulse, Apple, Gift } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useOrganization } from "@/contexts/OrganizationContext";
