@@ -420,28 +420,56 @@ export default function DPColaboradores() {
                 <div className="grid grid-cols-2 gap-2">
                   {allBenefits.filter((b: any) => b.active).map((b: any) => {
                     const cat = b.category || "outros";
+                    const isSelected = selectedBenefitIds.includes(b.id);
+                    // Detecta conflito: outro benefício já selecionado, mesma categoria (não "outros"), e não é este
+                    const conflictWith = !isSelected && cat !== "outros"
+                      ? allBenefits.find((x: any) =>
+                          x.id !== b.id &&
+                          selectedBenefitIds.includes(x.id) &&
+                          (x.category || "outros") === cat
+                        )
+                      : null;
                     return (
-                      <label key={b.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <label
+                        key={b.id}
+                        className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
+                          conflictWith ? "bg-amber-500/10 border border-amber-500/30" : "border border-transparent"
+                        }`}
+                        title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
+                      >
                         <Checkbox
-                          checked={selectedBenefitIds.includes(b.id)}
+                          checked={isSelected}
                           onCheckedChange={(checked) => {
                             setSelectedBenefitIds((prev) => {
                               if (!checked) return prev.filter((id) => id !== b.id);
                               // Substituir outros benefícios da mesma categoria (exceto "outros")
-                              const next = cat === "outros"
-                                ? prev
-                                : prev.filter((id) => {
-                                    const other = allBenefits.find((x: any) => x.id === id);
-                                    return (other?.category || "outros") !== cat;
-                                  });
+                              if (cat === "outros") return [...prev, b.id];
+                              const replaced = prev
+                                .map((id) => allBenefits.find((x: any) => x.id === id))
+                                .filter((x: any) => x && x.id !== b.id && (x.category || "outros") === cat);
+                              const next = prev.filter((id) => {
+                                const other = allBenefits.find((x: any) => x.id === id);
+                                return (other?.category || "outros") !== cat;
+                              });
+                              if (replaced.length > 0) {
+                                toast({
+                                  title: "Benefício substituído",
+                                  description: `"${b.name}" substituiu "${replaced.map((r: any) => r.name).join(", ")}" na categoria ${cat}.`,
+                                });
+                              }
                               return [...next, b.id];
                             });
                           }}
                         />
-                        <span>{b.name}</span>
+                        <span className={conflictWith ? "font-medium" : ""}>{b.name}</span>
                         <span className="text-muted-foreground text-xs">
                           ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
                         </span>
+                        {conflictWith && (
+                          <span className="ml-auto text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                            substitui {conflictWith.name}
+                          </span>
+                        )}
                       </label>
                     );
                   })}
