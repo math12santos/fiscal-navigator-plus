@@ -39,6 +39,7 @@ import { useBusinessDaysForMonth } from "@/hooks/useBusinessDays";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useEffectiveHomeRoute } from "@/hooks/useEffectiveHomeRoute";
 import { validateRange } from "@/lib/kpiRangeValidation";
 
 const DIAS_UTEIS_MES = 22;
