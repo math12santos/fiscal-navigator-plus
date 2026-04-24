@@ -39,6 +39,7 @@ import { useBusinessDaysForMonth } from "@/hooks/useBusinessDays";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { useCRMOpportunities, usePipelineStages } from "@/hooks/useCRM";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useEffectiveHomeRoute } from "@/hooks/useEffectiveHomeRoute";
 import { validateRange } from "@/lib/kpiRangeValidation";
 
 const DIAS_UTEIS_MES = 22;
@@ -199,6 +200,7 @@ export default function RelatorioKpi() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { currentOrg } = useOrganization();
+  const { home: effectiveHome } = useEffectiveHomeRoute();
 
   /**
    * Aplica um novo intervalo (from/to) à URL — fonte de verdade do período.
@@ -1068,9 +1070,15 @@ export default function RelatorioKpi() {
     URL.revokeObjectURL(url);
   };
 
-  // "Voltar" inteligente: KPIs de DP retornam ao dashboard do DP; demais ao Dashboard Geral.
-  const backTarget = metric?.startsWith("dp-") ? "/dp" : "/";
-  const backLabel = metric?.startsWith("dp-") ? "Voltar ao DP" : "Voltar ao Dashboard";
+  // "Voltar" inteligente: KPIs de DP retornam ao dashboard do DP; demais à home efetiva
+  // do usuário (Dashboard Geral para quem tem acesso, ou home setorial para os demais).
+  const isDpMetric = metric?.startsWith("dp-");
+  const backTarget = isDpMetric ? "/dp" : effectiveHome;
+  const backLabel = isDpMetric
+    ? "Voltar ao DP"
+    : effectiveHome === "/"
+      ? "Voltar ao Dashboard"
+      : "Voltar";
 
   if (!meta) {
     return (
