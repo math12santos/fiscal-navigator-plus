@@ -433,7 +433,7 @@ export default function DPColaboradores() {
                       <label
                         key={b.id}
                         className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
-                          conflictWith ? "bg-amber-500/10 border border-amber-500/30" : "border border-transparent"
+                          conflictWith ? "bg-warning/10 border border-warning/40" : "border border-transparent"
                         }`}
                         title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
                       >
