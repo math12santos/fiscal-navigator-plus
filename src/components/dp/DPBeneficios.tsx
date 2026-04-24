@@ -177,6 +177,7 @@ export default function DPBeneficios() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
+                <TableHead>Categoria</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Valor Padrão</TableHead>
                 <TableHead>Descrição</TableHead>
@@ -188,6 +189,7 @@ export default function DPBeneficios() {
               {filtered.map((b: any) => (
                 <TableRow key={b.id}>
                   <TableCell className="font-medium text-foreground">{b.name}</TableCell>
+                  <TableCell><Badge variant="secondary">{categoryLabel(b.category || "outros")}</Badge></TableCell>
                   <TableCell><Badge variant="outline">{typeLabel(b.type)}</Badge></TableCell>
                   <TableCell className="font-mono text-foreground">{fmtValue(b)}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{b.description || "—"}</TableCell>
