@@ -75,9 +75,11 @@ export function SectorMaturityTab() {
 
   const stats = useMemo(() => {
     const base = sector === "all" ? rows : rows.filter((r) => r.sector === sector);
-    const counts: Record<string, number> = { critico: 0, desenvolvimento: 0, maduro: 0, excelente: 0 };
+    const counts = { critico: 0, desenvolvimento: 0, maduro: 0, excelente: 0 };
     for (const r of base) {
-      if (r.maturity_label) counts[r.maturity_label] = (counts[r.maturity_label] || 0) + 1;
+      if (r.maturity_label && r.maturity_label in counts) {
+        counts[r.maturity_label as keyof typeof counts] += 1;
+      }
     }
     return { total: base.length, ...counts };
   }, [rows, sector]);
