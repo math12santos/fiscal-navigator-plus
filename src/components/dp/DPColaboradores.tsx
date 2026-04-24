@@ -125,19 +125,43 @@ export default function DPColaboradores() {
       vt_diario: Number(vt_diario) || 0,
     };
 
-    const saveBenefits = (employeeId: string) => {
-      if (selectedBenefitIds.length > 0) {
-        assignBenefits.mutate(selectedBenefitIds.map((bid) => ({ employee_id: employeeId, benefit_id: bid })));
+    const saveBenefits = async (employeeId: string) => {
+      // Sincronização completa: remove vínculos não mais selecionados antes de inserir,
+      // para evitar conflito com a regra de unicidade por categoria.
+      const current = allEmployeeBenefits.filter((eb: any) => eb.employee_id === employeeId);
+      const toRemove = current.filter((eb: any) => !selectedBenefitIds.includes(eb.benefit_id));
+      const toAdd = selectedBenefitIds.filter(
+        (bid) => !current.some((eb: any) => eb.benefit_id === bid),
+      );
+      try {
+        if (toRemove.length > 0) {
+          await supabase.from("employee_benefits").delete().in("id", toRemove.map((eb: any) => eb.id));
+        }
+        if (toAdd.length > 0) {
+          await assignBenefits.mutateAsync(
+            toAdd.map((bid) => ({ employee_id: employeeId, benefit_id: bid })),
+          );
+        }
+      } catch (err: any) {
+        toast({
+          title: "Erro ao salvar benefícios",
+          description: err?.message || "Verifique se há benefícios duplicados na mesma categoria.",
+          variant: "destructive",
+        });
       }
     };
 
     if (editing) {
       update.mutate({ id: editing.id, ...payload }, {
-        onSuccess: () => { toast({ title: "Colaborador atualizado" }); saveBenefits(editing.id); setDialogOpen(false); },
+        onSuccess: async () => { toast({ title: "Colaborador atualizado" }); await saveBenefits(editing.id); setDialogOpen(false); },
       });
     } else {
       create.mutate(payload, {
-        onSuccess: (data: any) => { toast({ title: "Colaborador cadastrado" }); setDialogOpen(false); },
+        onSuccess: async (data: any) => {
+          toast({ title: "Colaborador cadastrado" });
+          if (data?.id) await saveBenefits(data.id);
+          setDialogOpen(false);
+        },
       });
     }
   };
