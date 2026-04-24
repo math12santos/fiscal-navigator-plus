@@ -45,7 +45,7 @@ export default function DPBeneficios() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", type: "fixo", default_value: "", description: "" });
+  const [form, setForm] = useState({ name: "", type: "fixo", category: "outros", default_value: "", description: "" });
 
   const filtered = useMemo(() => {
     return benefits.filter((b: any) => !search || b.name.toLowerCase().includes(search.toLowerCase()));
