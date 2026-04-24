@@ -200,6 +200,7 @@ export default function RelatorioKpi() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { currentOrg } = useOrganization();
+  const { home: effectiveHome } = useEffectiveHomeRoute();
 
   /**
    * Aplica um novo intervalo (from/to) à URL — fonte de verdade do período.
