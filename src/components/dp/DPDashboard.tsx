@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEmployees, usePayrollRuns, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { useEmployeeBenefits, useDPBenefits } from "@/hooks/useDPBenefits";
-import { Users, DollarSign, TrendingUp, Percent, Bus, UtensilsCrossed, HeartPulse } from "lucide-react";
+import { Users, DollarSign, TrendingUp, Percent, Bus, UtensilsCrossed, HeartPulse, Apple, Gift } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -88,11 +88,12 @@ export default function DPDashboard() {
     };
   };
 
-  const vaStats = sumByCategory(["vale_alimentacao", "vale_refeicao"]);
+  const vrStats = sumByCategory(["vale_refeicao"]);
+  const vaStats = sumByCategory(["vale_alimentacao"]);
   const saudeStats = sumByCategory(["plano_saude"]);
-  const otherBenefits = benefitStats.filter(
-    (b) => !["vale_alimentacao", "vale_refeicao", "plano_saude", "vale_transporte"].includes(b.category),
-  );
+  const variavelStats = sumByCategory(["bonus", "comissao"]);
+  const KNOWN_CATS = ["vale_refeicao", "vale_alimentacao", "vale_transporte", "plano_saude", "bonus", "comissao"];
+  const otherBenefits = benefitStats.filter((b) => !KNOWN_CATS.includes(b.category));
 
   // Total geral de benefícios (todos os benefícios + VT) — usado no fallback do card "Total Benefícios"
   const totalBeneficiosGeral = useMemo(
@@ -239,8 +240,8 @@ export default function DPDashboard() {
         />
       </div>
 
-      {/* Benefícios KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Benefícios KPIs — totais somados por CATEGORIA do benefício (não por nome) */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <KPICard
           icon={<Bus size={18} />}
           title="Vale Transporte"
@@ -250,7 +251,18 @@ export default function DPDashboard() {
         />
         <KPICard
           icon={<UtensilsCrossed size={18} />}
-          title="Vale Refeição/Alimentação"
+          title="Vale Refeição"
+          value={fmt(vrStats.custoTotal)}
+          subtitle={
+            vrStats.hasPorDia
+              ? `${vrStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`
+              : `${vrStats.count} colaborador(es)`
+          }
+          onClick={() => go("dp-vr")}
+        />
+        <KPICard
+          icon={<Apple size={18} />}
+          title="Vale Alimentação"
           value={fmt(vaStats.custoTotal)}
           subtitle={
             vaStats.hasPorDia
@@ -265,6 +277,13 @@ export default function DPDashboard() {
           value={fmt(saudeStats.custoTotal)}
           subtitle={`${saudeStats.count} colaborador(es)`}
           onClick={() => go("dp-saude")}
+        />
+        <KPICard
+          icon={<Gift size={18} />}
+          title="Bônus & Comissão"
+          value={fmt(variavelStats.custoTotal)}
+          subtitle={`${variavelStats.count} vínculo(s)`}
+          onClick={() => go("dp-variavel")}
         />
         {otherBenefits.length > 0 ? (
           <KPICard
