@@ -14,7 +14,7 @@ export interface ChecklistItem {
   category: MaturityCategory;
   weight: number;          // pontos máximos do item
   earned: number;          // pontos obtidos (0..weight)
-  done: boolean;           // shortcut para UI (earned >= weight)
+  done?: boolean;          // shortcut para UI (earned >= weight) — preenchido pelo avaliador
   hint?: string;           // descrição/dica de ação
   ctaTab?: string;         // aba do módulo para onde levar o usuário
   detail?: string;         // métrica resumida ("3 de 5", "vencido há 12 dias", ...)
