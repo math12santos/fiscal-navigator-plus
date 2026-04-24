@@ -52,18 +52,17 @@ export default function DPDashboard() {
     return { count: vtAtivos.length, custoTotal };
   }, [activeEmployees, DIAS_UTEIS_MES]);
 
-  // Benefits totals by name (VA, Plano de Saúde, etc.)
-  // `hasPorDia` indica se algum benefício do grupo é "por dia útil" — quando
-  // verdadeiro, o cálculo é valor/dia × dias úteis efetivos do mês corrente
-  // (mesma fonte da projeção e do drill-down `dp-va` no RelatorioKpi).
+  // Benefits totals — agrupados por CATEGORIA (não por benefit individual),
+  // garantindo que múltiplos cadastros de mesma categoria (ex.: VR R$30 e VR R$50)
+  // sejam somados no card correspondente.
   const benefitStats = useMemo(() => {
-    const benefitMap: Record<string, { name: string; count: number; custoTotal: number; type: string; hasPorDia: boolean }> = {};
+    const benefitMap: Record<string, { name: string; count: number; custoTotal: number; type: string; hasPorDia: boolean; category: string }> = {};
     allEmployeeBenefits.forEach((eb: any) => {
       const benefit = allBenefits.find((b: any) => b.id === eb.benefit_id);
       if (!benefit || !benefit.active) return;
       const emp = activeEmployees.find((e: any) => e.id === eb.employee_id);
       if (!emp || !eb.active) return;
-      if (!benefitMap[benefit.id]) benefitMap[benefit.id] = { name: benefit.name, count: 0, custoTotal: 0, type: benefit.type, hasPorDia: false };
+      if (!benefitMap[benefit.id]) benefitMap[benefit.id] = { name: benefit.name, count: 0, custoTotal: 0, type: benefit.type, hasPorDia: false, category: benefit.category || "outros" };
       benefitMap[benefit.id].count++;
       const valor = eb.custom_value != null ? Number(eb.custom_value) : Number(benefit.default_value);
       if (benefit.type === "percentual") {
@@ -78,11 +77,22 @@ export default function DPDashboard() {
     return Object.values(benefitMap);
   }, [allEmployeeBenefits, allBenefits, activeEmployees, DIAS_UTEIS_MES]);
 
-  // Find specific well-known benefits for dedicated cards
-  const findBenefit = (keywords: string[]) => benefitStats.find((b) => keywords.some((k) => b.name.toLowerCase().includes(k)));
-  const vaStats = findBenefit(["alimentação", "alimentacao", "refeição", "refeicao", "vale alimentação", "vale refeição", "va", "vr"]);
-  const saudeStats = findBenefit(["saúde", "saude", "plano de saúde", "health"]);
-  const otherBenefits = benefitStats.filter((b) => b !== vaStats && b !== saudeStats);
+  // Soma por categoria (fonte de verdade dos cards específicos)
+  const sumByCategory = (cats: string[]) => {
+    const items = benefitStats.filter((b) => cats.includes(b.category));
+    return {
+      custoTotal: items.reduce((s, b) => s + b.custoTotal, 0),
+      count: items.reduce((s, b) => s + b.count, 0),
+      hasPorDia: items.some((b) => b.hasPorDia),
+      name: items[0]?.name,
+    };
+  };
+
+  const vaStats = sumByCategory(["vale_alimentacao", "vale_refeicao"]);
+  const saudeStats = sumByCategory(["plano_saude"]);
+  const otherBenefits = benefitStats.filter(
+    (b) => !["vale_alimentacao", "vale_refeicao", "plano_saude", "vale_transporte"].includes(b.category),
+  );
 
   // Total geral de benefícios (todos os benefícios + VT) — usado no fallback do card "Total Benefícios"
   const totalBeneficiosGeral = useMemo(
@@ -240,20 +250,20 @@ export default function DPDashboard() {
         />
         <KPICard
           icon={<UtensilsCrossed size={18} />}
-          title={vaStats?.name || "Vale Alimentação"}
-          value={fmt(vaStats?.custoTotal || 0)}
+          title="Vale Refeição/Alimentação"
+          value={fmt(vaStats.custoTotal)}
           subtitle={
-            vaStats?.hasPorDia
+            vaStats.hasPorDia
               ? `${vaStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`
-              : `${vaStats?.count || 0} colaborador(es)`
+              : `${vaStats.count} colaborador(es)`
           }
           onClick={() => go("dp-va")}
         />
         <KPICard
           icon={<HeartPulse size={18} />}
-          title={saudeStats?.name || "Plano de Saúde"}
-          value={fmt(saudeStats?.custoTotal || 0)}
-          subtitle={`${saudeStats?.count || 0} colaborador(es)`}
+          title="Plano de Saúde"
+          value={fmt(saudeStats.custoTotal)}
+          subtitle={`${saudeStats.count} colaborador(es)`}
           onClick={() => go("dp-saude")}
         />
         {otherBenefits.length > 0 ? (

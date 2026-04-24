@@ -18,6 +18,7 @@ import { usePositions } from "@/hooks/useDP";
 import { useBusinessDaysForMonth } from "@/hooks/useBusinessDays";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useDPBenefits, useEmployeeBenefits, useMutateEmployeeBenefit } from "@/hooks/useDPBenefits";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -124,19 +125,43 @@ export default function DPColaboradores() {
       vt_diario: Number(vt_diario) || 0,
     };
 
-    const saveBenefits = (employeeId: string) => {
-      if (selectedBenefitIds.length > 0) {
-        assignBenefits.mutate(selectedBenefitIds.map((bid) => ({ employee_id: employeeId, benefit_id: bid })));
+    const saveBenefits = async (employeeId: string) => {
+      // Sincronização completa: remove vínculos não mais selecionados antes de inserir,
+      // para evitar conflito com a regra de unicidade por categoria.
+      const current = allEmployeeBenefits.filter((eb: any) => eb.employee_id === employeeId);
+      const toRemove = current.filter((eb: any) => !selectedBenefitIds.includes(eb.benefit_id));
+      const toAdd = selectedBenefitIds.filter(
+        (bid) => !current.some((eb: any) => eb.benefit_id === bid),
+      );
+      try {
+        if (toRemove.length > 0) {
+          await supabase.from("employee_benefits").delete().in("id", toRemove.map((eb: any) => eb.id));
+        }
+        if (toAdd.length > 0) {
+          await assignBenefits.mutateAsync(
+            toAdd.map((bid) => ({ employee_id: employeeId, benefit_id: bid })),
+          );
+        }
+      } catch (err: any) {
+        toast({
+          title: "Erro ao salvar benefícios",
+          description: err?.message || "Verifique se há benefícios duplicados na mesma categoria.",
+          variant: "destructive",
+        });
       }
     };
 
     if (editing) {
       update.mutate({ id: editing.id, ...payload }, {
-        onSuccess: () => { toast({ title: "Colaborador atualizado" }); saveBenefits(editing.id); setDialogOpen(false); },
+        onSuccess: async () => { toast({ title: "Colaborador atualizado" }); await saveBenefits(editing.id); setDialogOpen(false); },
       });
     } else {
       create.mutate(payload, {
-        onSuccess: (data: any) => { toast({ title: "Colaborador cadastrado" }); setDialogOpen(false); },
+        onSuccess: async (data: any) => {
+          toast({ title: "Colaborador cadastrado" });
+          if (data?.id) await saveBenefits(data.id);
+          setDialogOpen(false);
+        },
       });
     }
   };
@@ -389,23 +414,37 @@ export default function DPColaboradores() {
             {allBenefits.length > 0 && (
               <div className="space-y-2 pt-2 border-t">
                 <Label className="text-sm font-semibold">Benefícios</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Cada colaborador só pode receber 1 benefício por categoria (exceto "Outros"). Selecionar outro da mesma categoria substitui o anterior.
+                </p>
                 <div className="grid grid-cols-2 gap-2">
-                  {allBenefits.filter((b: any) => b.active).map((b: any) => (
-                    <label key={b.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Checkbox
-                        checked={selectedBenefitIds.includes(b.id)}
-                        onCheckedChange={(checked) => {
-                          setSelectedBenefitIds((prev) =>
-                            checked ? [...prev, b.id] : prev.filter((id) => id !== b.id)
-                          );
-                        }}
-                      />
-                      <span>{b.name}</span>
-                      <span className="text-muted-foreground text-xs">
-                        ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
-                      </span>
-                    </label>
-                  ))}
+                  {allBenefits.filter((b: any) => b.active).map((b: any) => {
+                    const cat = b.category || "outros";
+                    return (
+                      <label key={b.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={selectedBenefitIds.includes(b.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedBenefitIds((prev) => {
+                              if (!checked) return prev.filter((id) => id !== b.id);
+                              // Substituir outros benefícios da mesma categoria (exceto "outros")
+                              const next = cat === "outros"
+                                ? prev
+                                : prev.filter((id) => {
+                                    const other = allBenefits.find((x: any) => x.id === id);
+                                    return (other?.category || "outros") !== cat;
+                                  });
+                              return [...next, b.id];
+                            });
+                          }}
+                        />
+                        <span>{b.name}</span>
+                        <span className="text-muted-foreground text-xs">
+                          ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             )}

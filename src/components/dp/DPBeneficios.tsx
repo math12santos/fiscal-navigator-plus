@@ -21,6 +21,19 @@ const BENEFIT_TYPES = [
   { value: "por_dia", label: "Valor por Dia Útil (R$/dia)" },
 ];
 
+const BENEFIT_CATEGORIES = [
+  { value: "vale_refeicao", label: "Vale Refeição" },
+  { value: "vale_alimentacao", label: "Vale Alimentação" },
+  { value: "vale_transporte", label: "Vale Transporte" },
+  { value: "plano_saude", label: "Plano de Saúde" },
+  { value: "bonus", label: "Bônus" },
+  { value: "comissao", label: "Comissão" },
+  { value: "outros", label: "Outros" },
+];
+
+const categoryLabel = (c: string) =>
+  BENEFIT_CATEGORIES.find((x) => x.value === c)?.label || "Outros";
+
 export default function DPBeneficios() {
   const { data: benefits = [], isLoading } = useDPBenefits();
   const { create, update, remove } = useMutateDPBenefit();
@@ -32,7 +45,7 @@ export default function DPBeneficios() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", type: "fixo", default_value: "", description: "" });
+  const [form, setForm] = useState({ name: "", type: "fixo", category: "outros", default_value: "", description: "" });
 
   const filtered = useMemo(() => {
     return benefits.filter((b: any) => !search || b.name.toLowerCase().includes(search.toLowerCase()));
@@ -40,13 +53,13 @@ export default function DPBeneficios() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", type: "fixo", default_value: "", description: "" });
+    setForm({ name: "", type: "fixo", category: "outros", default_value: "", description: "" });
     setDialogOpen(true);
   };
 
   const openEdit = (b: any) => {
     setEditing(b);
-    setForm({ name: b.name, type: b.type, default_value: String(b.default_value), description: b.description || "" });
+    setForm({ name: b.name, type: b.type, category: b.category || "outros", default_value: String(b.default_value), description: b.description || "" });
     setDialogOpen(true);
   };
 
@@ -164,6 +177,7 @@ export default function DPBeneficios() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
+                <TableHead>Categoria</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Valor Padrão</TableHead>
                 <TableHead>Descrição</TableHead>
@@ -175,6 +189,7 @@ export default function DPBeneficios() {
               {filtered.map((b: any) => (
                 <TableRow key={b.id}>
                   <TableCell className="font-medium text-foreground">{b.name}</TableCell>
+                  <TableCell><Badge variant="secondary">{categoryLabel(b.category || "outros")}</Badge></TableCell>
                   <TableCell><Badge variant="outline">{typeLabel(b.type)}</Badge></TableCell>
                   <TableCell className="font-mono text-foreground">{fmtValue(b)}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{b.description || "—"}</TableCell>
@@ -200,7 +215,17 @@ export default function DPBeneficios() {
           <div className="space-y-3">
             <div className="space-y-1"><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Vale Refeição" /></div>
             <div className="space-y-1">
-              <Label>Tipo</Label>
+              <Label>Categoria</Label>
+              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{BENEFIT_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">
+                Cada colaborador só pode receber 1 benefício por categoria (exceto "Outros").
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label>Tipo de cálculo</Label>
               <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{BENEFIT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
