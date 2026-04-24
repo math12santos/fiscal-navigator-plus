@@ -389,23 +389,37 @@ export default function DPColaboradores() {
             {allBenefits.length > 0 && (
               <div className="space-y-2 pt-2 border-t">
                 <Label className="text-sm font-semibold">Benefícios</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Cada colaborador só pode receber 1 benefício por categoria (exceto "Outros"). Selecionar outro da mesma categoria substitui o anterior.
+                </p>
                 <div className="grid grid-cols-2 gap-2">
-                  {allBenefits.filter((b: any) => b.active).map((b: any) => (
-                    <label key={b.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Checkbox
-                        checked={selectedBenefitIds.includes(b.id)}
-                        onCheckedChange={(checked) => {
-                          setSelectedBenefitIds((prev) =>
-                            checked ? [...prev, b.id] : prev.filter((id) => id !== b.id)
-                          );
-                        }}
-                      />
-                      <span>{b.name}</span>
-                      <span className="text-muted-foreground text-xs">
-                        ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
-                      </span>
-                    </label>
-                  ))}
+                  {allBenefits.filter((b: any) => b.active).map((b: any) => {
+                    const cat = b.category || "outros";
+                    return (
+                      <label key={b.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={selectedBenefitIds.includes(b.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedBenefitIds((prev) => {
+                              if (!checked) return prev.filter((id) => id !== b.id);
+                              // Substituir outros benefícios da mesma categoria (exceto "outros")
+                              const next = cat === "outros"
+                                ? prev
+                                : prev.filter((id) => {
+                                    const other = allBenefits.find((x: any) => x.id === id);
+                                    return (other?.category || "outros") !== cat;
+                                  });
+                              return [...next, b.id];
+                            });
+                          }}
+                        />
+                        <span>{b.name}</span>
+                        <span className="text-muted-foreground text-xs">
+                          ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             )}
