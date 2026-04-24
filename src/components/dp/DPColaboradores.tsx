@@ -466,7 +466,7 @@ export default function DPColaboradores() {
                           ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
                         </span>
                         {conflictWith && (
-                          <span className="ml-auto text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                          <span className="ml-auto text-[10px] text-warning font-medium">
                             substitui {conflictWith.name}
                           </span>
                         )}
