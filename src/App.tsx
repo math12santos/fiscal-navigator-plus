@@ -155,7 +155,7 @@ function ProtectedRoutes() {
     <Suspense fallback={<FullScreenLoader />}>
       <AppLayout>
         <Routes>
-          <Route path="/" element={<RouteShell skeleton={<DashboardSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/" element={<RouteShell skeleton={<DashboardSkeleton />}><DashboardOrEffectiveHome fallbackSkeleton={<DashboardSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><Dashboard /></ModuleMaintenanceGuard></DashboardOrEffectiveHome></RouteShell>} />
           <Route path="/financeiro" element={<RouteShell skeleton={<FinanceiroSkeleton />}><ModuleMaintenanceGuard moduleKey="financeiro"><Financeiro /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/fluxo-caixa" element={<Navigate to="/financeiro" replace />} />
           <Route path="/conciliacao" element={<Navigate to="/financeiro" replace />} />
