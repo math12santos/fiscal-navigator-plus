@@ -215,7 +215,17 @@ export default function DPBeneficios() {
           <div className="space-y-3">
             <div className="space-y-1"><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Vale Refeição" /></div>
             <div className="space-y-1">
-              <Label>Tipo</Label>
+              <Label>Categoria</Label>
+              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{BENEFIT_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">
+                Cada colaborador só pode receber 1 benefício por categoria (exceto "Outros").
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label>Tipo de cálculo</Label>
               <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{BENEFIT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
