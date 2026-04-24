@@ -18,6 +18,7 @@ import { usePositions } from "@/hooks/useDP";
 import { useBusinessDaysForMonth } from "@/hooks/useBusinessDays";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useDPBenefits, useEmployeeBenefits, useMutateEmployeeBenefit } from "@/hooks/useDPBenefits";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useOrganization } from "@/contexts/OrganizationContext";
