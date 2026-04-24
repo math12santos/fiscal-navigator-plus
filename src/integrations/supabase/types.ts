@@ -1720,6 +1720,7 @@ export type Database = {
       dp_benefits: {
         Row: {
           active: boolean
+          category: string
           created_at: string
           default_value: number
           description: string | null
@@ -1732,6 +1733,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          category?: string
           created_at?: string
           default_value?: number
           description?: string | null
@@ -1744,6 +1746,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          category?: string
           created_at?: string
           default_value?: number
           description?: string | null
