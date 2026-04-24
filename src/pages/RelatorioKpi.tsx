@@ -1068,12 +1068,16 @@ export default function RelatorioKpi() {
     URL.revokeObjectURL(url);
   };
 
+  // "Voltar" inteligente: KPIs de DP retornam ao dashboard do DP; demais ao Dashboard Geral.
+  const backTarget = metric?.startsWith("dp-") ? "/dp" : "/";
+  const backLabel = metric?.startsWith("dp-") ? "Voltar ao DP" : "Voltar ao Dashboard";
+
   if (!meta) {
     return (
       <div className="space-y-6">
         <PageHeader title="Relatório não encontrado" description="O KPI solicitado não está disponível." />
-        <Button variant="outline" onClick={() => navigate("/")}>
-          <ArrowLeft size={14} className="mr-2" /> Voltar ao Dashboard
+        <Button variant="outline" onClick={() => navigate(backTarget)}>
+          <ArrowLeft size={14} className="mr-2" /> {backLabel}
         </Button>
       </div>
     );
@@ -1086,8 +1090,8 @@ export default function RelatorioKpi() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-          <ArrowLeft size={14} className="mr-2" /> Voltar ao Dashboard
+        <Button variant="ghost" size="sm" onClick={() => navigate(backTarget)}>
+          <ArrowLeft size={14} className="mr-2" /> {backLabel}
         </Button>
         <Button
           variant="outline"
