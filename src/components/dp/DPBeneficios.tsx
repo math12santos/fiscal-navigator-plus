@@ -53,13 +53,13 @@ export default function DPBeneficios() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", type: "fixo", default_value: "", description: "" });
+    setForm({ name: "", type: "fixo", category: "outros", default_value: "", description: "" });
     setDialogOpen(true);
   };
 
   const openEdit = (b: any) => {
     setEditing(b);
-    setForm({ name: b.name, type: b.type, default_value: String(b.default_value), description: b.description || "" });
+    setForm({ name: b.name, type: b.type, category: b.category || "outros", default_value: String(b.default_value), description: b.description || "" });
     setDialogOpen(true);
   };
 
