@@ -250,20 +250,20 @@ export default function DPDashboard() {
         />
         <KPICard
           icon={<UtensilsCrossed size={18} />}
-          title={vaStats?.name || "Vale Alimentação"}
-          value={fmt(vaStats?.custoTotal || 0)}
+          title="Vale Refeição/Alimentação"
+          value={fmt(vaStats.custoTotal)}
           subtitle={
-            vaStats?.hasPorDia
+            vaStats.hasPorDia
               ? `${vaStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`
-              : `${vaStats?.count || 0} colaborador(es)`
+              : `${vaStats.count} colaborador(es)`
           }
           onClick={() => go("dp-va")}
         />
         <KPICard
           icon={<HeartPulse size={18} />}
-          title={saudeStats?.name || "Plano de Saúde"}
-          value={fmt(saudeStats?.custoTotal || 0)}
-          subtitle={`${saudeStats?.count || 0} colaborador(es)`}
+          title="Plano de Saúde"
+          value={fmt(saudeStats.custoTotal)}
+          subtitle={`${saudeStats.count} colaborador(es)`}
           onClick={() => go("dp-saude")}
         />
         {otherBenefits.length > 0 ? (
