@@ -6,9 +6,10 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Rocket, ChevronDown, ChevronUp, Settings } from "lucide-react";
+import { Loader2, Rocket, ChevronDown, ChevronUp, Settings, Gauge } from "lucide-react";
 import { format } from "date-fns";
 import { OnboardingConfigTab } from "@/components/onboarding-guiado/OnboardingConfigTab";
+import { SectorMaturityTab } from "@/components/sector-onboarding/SectorMaturityTab";
 
 interface OrgOnboarding {
   id: string;
@@ -173,9 +174,11 @@ export default function BackofficeOnboarding() {
       <Tabs defaultValue="acompanhamento">
         <TabsList>
           <TabsTrigger value="acompanhamento"><Rocket size={14} className="mr-1" /> Acompanhamento</TabsTrigger>
+          <TabsTrigger value="maturidade"><Gauge size={14} className="mr-1" /> Maturidade Setorial</TabsTrigger>
           <TabsTrigger value="configuracao"><Settings size={14} className="mr-1" /> Configuração</TabsTrigger>
         </TabsList>
         <TabsContent value="acompanhamento"><TrackingTab /></TabsContent>
+        <TabsContent value="maturidade"><SectorMaturityTab /></TabsContent>
         <TabsContent value="configuracao"><OnboardingConfigTab /></TabsContent>
       </Tabs>
     </div>

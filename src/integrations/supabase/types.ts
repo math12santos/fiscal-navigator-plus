@@ -4804,6 +4804,65 @@ export type Database = {
           },
         ]
       }
+      sector_onboarding: {
+        Row: {
+          checklist: Json
+          completeness_score: number
+          created_at: string
+          freshness_score: number
+          id: string
+          last_calculated_at: string
+          maturity_label: string | null
+          notes: string | null
+          organization_id: string
+          routines_score: number
+          score: number
+          sector: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checklist?: Json
+          completeness_score?: number
+          created_at?: string
+          freshness_score?: number
+          id?: string
+          last_calculated_at?: string
+          maturity_label?: string | null
+          notes?: string | null
+          organization_id: string
+          routines_score?: number
+          score?: number
+          sector: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checklist?: Json
+          completeness_score?: number
+          created_at?: string
+          freshness_score?: number
+          id?: string
+          last_calculated_at?: string
+          maturity_label?: string | null
+          notes?: string | null
+          organization_id?: string
+          routines_score?: number
+          score?: number
+          sector?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sector_onboarding_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_agreements: {
         Row: {
           created_at: string | null

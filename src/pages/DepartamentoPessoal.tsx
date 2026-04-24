@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { SectorOnboardingBar } from "@/components/sector-onboarding/SectorOnboardingBar";
 import DPDashboard from "@/components/dp/DPDashboard";
 import DPColaboradores from "@/components/dp/DPColaboradores";
 import DPFolha from "@/components/dp/DPFolha";
@@ -55,6 +56,8 @@ export default function DepartamentoPessoal() {
         title="Departamento Pessoal"
         description="Gestão de colaboradores, folha de pagamento, encargos e planejamento de RH"
       />
+
+      <SectorOnboardingBar sector="dp" onTabChange={setTab} />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex-wrap">
