@@ -224,6 +224,7 @@ export function useSectorOnboarding(
       qc.invalidateQueries({ queryKey: ["dp-documents-maturity"] });
       qc.invalidateQueries({ queryKey: ["dp-compensations-maturity"] });
       qc.invalidateQueries({ queryKey: ["dp-vacations-maturity"] });
+      qc.invalidateQueries({ queryKey: ["dp-position-routines-maturity"] });
       qc.invalidateQueries({ queryKey: ["dp-routines-maturity"] });
     },
     persist: (r: SectorMaturityResult) => persist.mutateAsync(r),
