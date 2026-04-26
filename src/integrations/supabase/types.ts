@@ -1815,6 +1815,7 @@ export type Database = {
           fgts_pct: number | null
           id: string
           inss_patronal_pct: number | null
+          meta_rotinas_pct: number
           organization_id: string | null
           pending_holding_suggestion: Json | null
           provisao_13_pct: number | null
@@ -1831,6 +1832,7 @@ export type Database = {
           fgts_pct?: number | null
           id?: string
           inss_patronal_pct?: number | null
+          meta_rotinas_pct?: number
           organization_id?: string | null
           pending_holding_suggestion?: Json | null
           provisao_13_pct?: number | null
@@ -1847,6 +1849,7 @@ export type Database = {
           fgts_pct?: number | null
           id?: string
           inss_patronal_pct?: number | null
+          meta_rotinas_pct?: number
           organization_id?: string | null
           pending_holding_suggestion?: Json | null
           provisao_13_pct?: number | null
@@ -4856,6 +4859,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sector_onboarding_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sector_onboarding_history: {
+        Row: {
+          checklist: Json
+          completeness_score: number
+          created_at: string
+          freshness_score: number
+          id: string
+          maturity_label: string | null
+          organization_id: string
+          period_month: string
+          routines_score: number
+          score: number
+          sector: string
+          snapshot_at: string
+        }
+        Insert: {
+          checklist?: Json
+          completeness_score?: number
+          created_at?: string
+          freshness_score?: number
+          id?: string
+          maturity_label?: string | null
+          organization_id: string
+          period_month: string
+          routines_score?: number
+          score?: number
+          sector: string
+          snapshot_at?: string
+        }
+        Update: {
+          checklist?: Json
+          completeness_score?: number
+          created_at?: string
+          freshness_score?: number
+          id?: string
+          maturity_label?: string | null
+          organization_id?: string
+          period_month?: string
+          routines_score?: number
+          score?: number
+          sector?: string
+          snapshot_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sector_onboarding_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
