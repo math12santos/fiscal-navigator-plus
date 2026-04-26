@@ -2215,6 +2215,7 @@ export type Database = {
           cost_center_id: string | null
           cpf: string | null
           created_at: string
+          department_id: string | null
           dismissal_date: string | null
           email: string | null
           id: string
@@ -2240,6 +2241,7 @@ export type Database = {
           cost_center_id?: string | null
           cpf?: string | null
           created_at?: string
+          department_id?: string | null
           dismissal_date?: string | null
           email?: string | null
           id?: string
@@ -2265,6 +2267,7 @@ export type Database = {
           cost_center_id?: string | null
           cpf?: string | null
           created_at?: string
+          department_id?: string | null
           dismissal_date?: string | null
           email?: string | null
           id?: string
@@ -2294,6 +2297,13 @@ export type Database = {
             columns: ["cost_center_id"]
             isOneToOne: false
             referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "hr_departments"
             referencedColumns: ["id"]
           },
           {
@@ -2742,6 +2752,678 @@ export type Database = {
           },
           {
             foreignKeyName: "grouping_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_9box_evaluations: {
+        Row: {
+          bsc_score_snapshot: number | null
+          created_at: string
+          data_avaliacao: string
+          employee_id: string
+          evaluator_user_id: string
+          id: string
+          indicacao_sucessao: boolean
+          justificativa: string | null
+          liberado_para_colaborador: boolean
+          nivel_desempenho: string | null
+          nivel_potencial: string | null
+          nota_desempenho: number
+          nota_potencial: number
+          organization_id: string
+          pontos_atencao: string | null
+          pontos_fortes: string | null
+          quadrante: number | null
+          recomendacao: Database["public"]["Enums"]["nine_box_recomendacao"]
+          risco_perda: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bsc_score_snapshot?: number | null
+          created_at?: string
+          data_avaliacao?: string
+          employee_id: string
+          evaluator_user_id: string
+          id?: string
+          indicacao_sucessao?: boolean
+          justificativa?: string | null
+          liberado_para_colaborador?: boolean
+          nivel_desempenho?: string | null
+          nivel_potencial?: string | null
+          nota_desempenho: number
+          nota_potencial: number
+          organization_id: string
+          pontos_atencao?: string | null
+          pontos_fortes?: string | null
+          quadrante?: number | null
+          recomendacao?: Database["public"]["Enums"]["nine_box_recomendacao"]
+          risco_perda?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bsc_score_snapshot?: number | null
+          created_at?: string
+          data_avaliacao?: string
+          employee_id?: string
+          evaluator_user_id?: string
+          id?: string
+          indicacao_sucessao?: boolean
+          justificativa?: string | null
+          liberado_para_colaborador?: boolean
+          nivel_desempenho?: string | null
+          nivel_potencial?: string | null
+          nota_desempenho?: number
+          nota_potencial?: number
+          organization_id?: string
+          pontos_atencao?: string | null
+          pontos_fortes?: string | null
+          quadrante?: number | null
+          recomendacao?: Database["public"]["Enums"]["nine_box_recomendacao"]
+          risco_perda?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_9box_evaluations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_9box_evaluations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_bsc_history: {
+        Row: {
+          bsc_id: string
+          id: string
+          indicator_id: string
+          organization_id: string
+          percentual: number
+          periodo_mes: string
+          realizado: number
+          snapshot_at: string
+        }
+        Insert: {
+          bsc_id: string
+          id?: string
+          indicator_id: string
+          organization_id: string
+          percentual?: number
+          periodo_mes: string
+          realizado?: number
+          snapshot_at?: string
+        }
+        Update: {
+          bsc_id?: string
+          id?: string
+          indicator_id?: string
+          organization_id?: string
+          percentual?: number
+          periodo_mes?: string
+          realizado?: number
+          snapshot_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_bsc_history_bsc_id_fkey"
+            columns: ["bsc_id"]
+            isOneToOne: false
+            referencedRelation: "hr_bsc_scorecards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_bsc_history_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "hr_bsc_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_bsc_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_bsc_indicators: {
+        Row: {
+          bsc_id: string
+          created_at: string
+          descricao: string | null
+          fonte_dado: string | null
+          frequencia: Database["public"]["Enums"]["bsc_frequencia"]
+          id: string
+          meta: number
+          nome: string
+          nota_ponderada: number
+          organization_id: string
+          percentual_atingimento: number
+          perspectiva: Database["public"]["Enums"]["bsc_perspectiva"]
+          peso: number
+          quanto_menor_melhor: boolean
+          realizado: number
+          responsavel_user_id: string | null
+          status: Database["public"]["Enums"]["bsc_indicator_status"]
+          unidade: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bsc_id: string
+          created_at?: string
+          descricao?: string | null
+          fonte_dado?: string | null
+          frequencia?: Database["public"]["Enums"]["bsc_frequencia"]
+          id?: string
+          meta: number
+          nome: string
+          nota_ponderada?: number
+          organization_id: string
+          percentual_atingimento?: number
+          perspectiva: Database["public"]["Enums"]["bsc_perspectiva"]
+          peso?: number
+          quanto_menor_melhor?: boolean
+          realizado?: number
+          responsavel_user_id?: string | null
+          status?: Database["public"]["Enums"]["bsc_indicator_status"]
+          unidade?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bsc_id?: string
+          created_at?: string
+          descricao?: string | null
+          fonte_dado?: string | null
+          frequencia?: Database["public"]["Enums"]["bsc_frequencia"]
+          id?: string
+          meta?: number
+          nome?: string
+          nota_ponderada?: number
+          organization_id?: string
+          percentual_atingimento?: number
+          perspectiva?: Database["public"]["Enums"]["bsc_perspectiva"]
+          peso?: number
+          quanto_menor_melhor?: boolean
+          realizado?: number
+          responsavel_user_id?: string | null
+          status?: Database["public"]["Enums"]["bsc_indicator_status"]
+          unidade?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_bsc_indicators_bsc_id_fkey"
+            columns: ["bsc_id"]
+            isOneToOne: false
+            referencedRelation: "hr_bsc_scorecards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_bsc_indicators_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_bsc_scorecards: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          employee_id: string | null
+          id: string
+          liberado_para_colaborador: boolean
+          manager_user_id: string | null
+          nome: string
+          observacoes: string | null
+          organization_id: string
+          periodo_fim: string
+          periodo_inicio: string
+          resultado_geral: number
+          status: Database["public"]["Enums"]["bsc_status"]
+          tipo: Database["public"]["Enums"]["bsc_tipo"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          employee_id?: string | null
+          id?: string
+          liberado_para_colaborador?: boolean
+          manager_user_id?: string | null
+          nome: string
+          observacoes?: string | null
+          organization_id: string
+          periodo_fim: string
+          periodo_inicio: string
+          resultado_geral?: number
+          status?: Database["public"]["Enums"]["bsc_status"]
+          tipo: Database["public"]["Enums"]["bsc_tipo"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          employee_id?: string | null
+          id?: string
+          liberado_para_colaborador?: boolean
+          manager_user_id?: string | null
+          nome?: string
+          observacoes?: string | null
+          organization_id?: string
+          periodo_fim?: string
+          periodo_inicio?: string
+          resultado_geral?: number
+          status?: Database["public"]["Enums"]["bsc_status"]
+          tipo?: Database["public"]["Enums"]["bsc_tipo"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_bsc_scorecards_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "hr_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_bsc_scorecards_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_bsc_scorecards_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_departments: {
+        Row: {
+          active: boolean
+          cost_center_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          manager_user_id: string | null
+          name: string
+          organization_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          cost_center_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          manager_user_id?: string | null
+          name: string
+          organization_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          cost_center_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          manager_user_id?: string | null
+          name?: string
+          organization_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_departments_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_departments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_one_on_one_actions: {
+        Row: {
+          created_at: string
+          id: string
+          observacoes: string | null
+          one_on_one_id: string
+          organization_id: string
+          prazo: string | null
+          responsavel_user_id: string | null
+          status: Database["public"]["Enums"]["pdi_action_status"]
+          tarefa: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          one_on_one_id: string
+          organization_id: string
+          prazo?: string | null
+          responsavel_user_id?: string | null
+          status?: Database["public"]["Enums"]["pdi_action_status"]
+          tarefa: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          one_on_one_id?: string
+          organization_id?: string
+          prazo?: string | null
+          responsavel_user_id?: string | null
+          status?: Database["public"]["Enums"]["pdi_action_status"]
+          tarefa?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_one_on_one_actions_one_on_one_id_fkey"
+            columns: ["one_on_one_id"]
+            isOneToOne: false
+            referencedRelation: "hr_one_on_ones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_one_on_one_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_one_on_ones: {
+        Row: {
+          created_at: string
+          data_reuniao: string
+          decisoes: string | null
+          dificuldades: string | null
+          employee_id: string
+          entregas_recentes: string | null
+          feedback_colaborador: string | null
+          feedback_gestor: string | null
+          humor: Database["public"]["Enums"]["one_on_one_humor"] | null
+          id: string
+          liberado_para_colaborador: boolean
+          manager_user_id: string | null
+          organization_id: string
+          pauta: string | null
+          pontos_discutidos: string | null
+          previous_id: string | null
+          proxima_reuniao_sugerida: string | null
+          proximos_passos: string | null
+          status: Database["public"]["Enums"]["one_on_one_status"]
+          tipo: Database["public"]["Enums"]["one_on_one_tipo"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_reuniao: string
+          decisoes?: string | null
+          dificuldades?: string | null
+          employee_id: string
+          entregas_recentes?: string | null
+          feedback_colaborador?: string | null
+          feedback_gestor?: string | null
+          humor?: Database["public"]["Enums"]["one_on_one_humor"] | null
+          id?: string
+          liberado_para_colaborador?: boolean
+          manager_user_id?: string | null
+          organization_id: string
+          pauta?: string | null
+          pontos_discutidos?: string | null
+          previous_id?: string | null
+          proxima_reuniao_sugerida?: string | null
+          proximos_passos?: string | null
+          status?: Database["public"]["Enums"]["one_on_one_status"]
+          tipo?: Database["public"]["Enums"]["one_on_one_tipo"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_reuniao?: string
+          decisoes?: string | null
+          dificuldades?: string | null
+          employee_id?: string
+          entregas_recentes?: string | null
+          feedback_colaborador?: string | null
+          feedback_gestor?: string | null
+          humor?: Database["public"]["Enums"]["one_on_one_humor"] | null
+          id?: string
+          liberado_para_colaborador?: boolean
+          manager_user_id?: string | null
+          organization_id?: string
+          pauta?: string | null
+          pontos_discutidos?: string | null
+          previous_id?: string | null
+          proxima_reuniao_sugerida?: string | null
+          proximos_passos?: string | null
+          status?: Database["public"]["Enums"]["one_on_one_status"]
+          tipo?: Database["public"]["Enums"]["one_on_one_tipo"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_one_on_ones_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_one_on_ones_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_one_on_ones_previous_id_fkey"
+            columns: ["previous_id"]
+            isOneToOne: false
+            referencedRelation: "hr_one_on_ones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_pdi_actions: {
+        Row: {
+          acao: string
+          comentarios: string | null
+          concluida_em: string | null
+          created_at: string
+          evidencia: string | null
+          id: string
+          organization_id: string
+          pdi_id: string
+          prazo: string | null
+          responsavel_user_id: string | null
+          status: Database["public"]["Enums"]["pdi_action_status"]
+          tipo: Database["public"]["Enums"]["pdi_action_tipo"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acao: string
+          comentarios?: string | null
+          concluida_em?: string | null
+          created_at?: string
+          evidencia?: string | null
+          id?: string
+          organization_id: string
+          pdi_id: string
+          prazo?: string | null
+          responsavel_user_id?: string | null
+          status?: Database["public"]["Enums"]["pdi_action_status"]
+          tipo?: Database["public"]["Enums"]["pdi_action_tipo"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acao?: string
+          comentarios?: string | null
+          concluida_em?: string | null
+          created_at?: string
+          evidencia?: string | null
+          id?: string
+          organization_id?: string
+          pdi_id?: string
+          prazo?: string | null
+          responsavel_user_id?: string | null
+          status?: Database["public"]["Enums"]["pdi_action_status"]
+          tipo?: Database["public"]["Enums"]["pdi_action_tipo"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_pdi_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_pdi_actions_pdi_id_fkey"
+            columns: ["pdi_id"]
+            isOneToOne: false
+            referencedRelation: "hr_pdis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_pdis: {
+        Row: {
+          competencia: string | null
+          created_at: string
+          created_by: string
+          data_conclusao_prevista: string | null
+          data_conclusao_real: string | null
+          data_inicio: string
+          employee_id: string
+          id: string
+          justificativa: string | null
+          liberado_para_colaborador: boolean
+          manager_user_id: string | null
+          objetivo: string
+          obs_colaborador: string | null
+          obs_gestor: string | null
+          obs_rh: string | null
+          organization_id: string
+          percentual_evolucao: number
+          source_9box_id: string | null
+          source_one_on_one_id: string | null
+          status: Database["public"]["Enums"]["pdi_status"]
+          ultima_atualizacao_em: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          competencia?: string | null
+          created_at?: string
+          created_by: string
+          data_conclusao_prevista?: string | null
+          data_conclusao_real?: string | null
+          data_inicio?: string
+          employee_id: string
+          id?: string
+          justificativa?: string | null
+          liberado_para_colaborador?: boolean
+          manager_user_id?: string | null
+          objetivo: string
+          obs_colaborador?: string | null
+          obs_gestor?: string | null
+          obs_rh?: string | null
+          organization_id: string
+          percentual_evolucao?: number
+          source_9box_id?: string | null
+          source_one_on_one_id?: string | null
+          status?: Database["public"]["Enums"]["pdi_status"]
+          ultima_atualizacao_em?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          competencia?: string | null
+          created_at?: string
+          created_by?: string
+          data_conclusao_prevista?: string | null
+          data_conclusao_real?: string | null
+          data_inicio?: string
+          employee_id?: string
+          id?: string
+          justificativa?: string | null
+          liberado_para_colaborador?: boolean
+          manager_user_id?: string | null
+          objetivo?: string
+          obs_colaborador?: string | null
+          obs_gestor?: string | null
+          obs_rh?: string | null
+          organization_id?: string
+          percentual_evolucao?: number
+          source_9box_id?: string | null
+          source_one_on_one_id?: string | null
+          status?: Database["public"]["Enums"]["pdi_status"]
+          ultima_atualizacao_em?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_pdis_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_pdis_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -3955,6 +4637,7 @@ export type Database = {
           contract_types: string[] | null
           cost_center_id: string | null
           created_at: string
+          department_id: string | null
           evidence_requirements: string | null
           id: string
           level_hierarchy: number
@@ -3974,6 +4657,7 @@ export type Database = {
           contract_types?: string[] | null
           cost_center_id?: string | null
           created_at?: string
+          department_id?: string | null
           evidence_requirements?: string | null
           id?: string
           level_hierarchy?: number
@@ -3993,6 +4677,7 @@ export type Database = {
           contract_types?: string[] | null
           cost_center_id?: string | null
           created_at?: string
+          department_id?: string | null
           evidence_requirements?: string | null
           id?: string
           level_hierarchy?: number
@@ -4012,6 +4697,13 @@ export type Database = {
             columns: ["cost_center_id"]
             isOneToOne: false
             referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "positions_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "hr_departments"
             referencedColumns: ["id"]
           },
           {
@@ -5165,6 +5857,41 @@ export type Database = {
     }
     Enums: {
       app_role: "master" | "admin" | "user"
+      bsc_frequencia: "mensal" | "trimestral" | "semestral" | "anual"
+      bsc_indicator_status: "abaixo" | "parcial" | "atingido" | "superado"
+      bsc_perspectiva: "financeira" | "clientes" | "processos" | "aprendizado"
+      bsc_status: "em_elaboracao" | "ativo" | "encerrado"
+      bsc_tipo: "individual" | "departamento" | "empresa"
+      nine_box_recomendacao:
+        | "manter"
+        | "desenvolver"
+        | "promover"
+        | "realocar"
+        | "acompanhar"
+        | "desligamento_em_analise"
+      one_on_one_humor: "muito_bom" | "bom" | "neutro" | "ruim" | "critico"
+      one_on_one_status:
+        | "agendada"
+        | "realizada"
+        | "remarcada"
+        | "cancelada"
+        | "pendente"
+      one_on_one_tipo: "mensal" | "quinzenal" | "trimestral" | "extraordinaria"
+      pdi_action_status: "pendente" | "em_andamento" | "concluida" | "cancelada"
+      pdi_action_tipo:
+        | "treinamento"
+        | "mentoria"
+        | "pratica"
+        | "leitura"
+        | "curso"
+        | "reuniao"
+        | "outro"
+      pdi_status:
+        | "nao_iniciado"
+        | "em_andamento"
+        | "em_atraso"
+        | "concluido"
+        | "cancelado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5293,6 +6020,45 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["master", "admin", "user"],
+      bsc_frequencia: ["mensal", "trimestral", "semestral", "anual"],
+      bsc_indicator_status: ["abaixo", "parcial", "atingido", "superado"],
+      bsc_perspectiva: ["financeira", "clientes", "processos", "aprendizado"],
+      bsc_status: ["em_elaboracao", "ativo", "encerrado"],
+      bsc_tipo: ["individual", "departamento", "empresa"],
+      nine_box_recomendacao: [
+        "manter",
+        "desenvolver",
+        "promover",
+        "realocar",
+        "acompanhar",
+        "desligamento_em_analise",
+      ],
+      one_on_one_humor: ["muito_bom", "bom", "neutro", "ruim", "critico"],
+      one_on_one_status: [
+        "agendada",
+        "realizada",
+        "remarcada",
+        "cancelada",
+        "pendente",
+      ],
+      one_on_one_tipo: ["mensal", "quinzenal", "trimestral", "extraordinaria"],
+      pdi_action_status: ["pendente", "em_andamento", "concluida", "cancelada"],
+      pdi_action_tipo: [
+        "treinamento",
+        "mentoria",
+        "pratica",
+        "leitura",
+        "curso",
+        "reuniao",
+        "outro",
+      ],
+      pdi_status: [
+        "nao_iniciado",
+        "em_andamento",
+        "em_atraso",
+        "concluido",
+        "cancelado",
+      ],
     },
   },
 } as const
