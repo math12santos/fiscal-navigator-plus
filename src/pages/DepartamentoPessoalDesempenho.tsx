@@ -27,6 +27,7 @@ import { useOneOnOnes, useMutateOneOnOne, type HrOneOnOne } from "@/hooks/useOne
 import { useNineBoxEvaluations, useLatest9BoxByEmployee, useMutateNineBox } from "@/hooks/useNineBox";
 import { useBSCScorecards, useMutateBSC } from "@/hooks/useBSC";
 import { QUADRANT_META, QUADRANT_TONE_CLASS, quadrantFrom } from "@/lib/performance/quadrante";
+import { PDICharts, OneOnOneCharts, BSCCharts } from "@/components/desempenho/DesempenhoCharts";
 
 const PDI_STATUS_META: Record<string, { label: string; class: string }> = {
   nao_iniciado: { label: "Não iniciado", class: "bg-muted text-foreground border-border" },
@@ -269,14 +270,16 @@ function PDITab({ pdis, employees, employeeMap }: any) {
   const { create, update, remove } = useMutatePDI();
 
   return (
-    <Card>
-      <CardContent className="pt-4 space-y-4">
-        <div className="flex justify-between">
-          <p className="text-sm text-muted-foreground">{pdis.length} PDI(s)</p>
-          <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }}>
-            <Plus size={14} className="mr-1" /> Novo PDI
-          </Button>
-        </div>
+    <div className="space-y-4">
+      <PDICharts pdis={pdis} employeeMap={employeeMap} />
+      <Card>
+        <CardContent className="pt-4 space-y-4">
+          <div className="flex justify-between">
+            <p className="text-sm text-muted-foreground">{pdis.length} PDI(s)</p>
+            <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }}>
+              <Plus size={14} className="mr-1" /> Novo PDI
+            </Button>
+          </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -330,8 +333,9 @@ function PDITab({ pdis, employees, employeeMap }: any) {
           }
           setOpen(false);
         }} />
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -409,7 +413,9 @@ function OneOnOneTab({ list, employees, employeeMap }: any) {
   const { create, update, remove } = useMutateOneOnOne();
 
   return (
-    <Card>
+    <div className="space-y-4">
+      <OneOnOneCharts list={list} employeeMap={employeeMap} />
+      <Card>
       <CardContent className="pt-4 space-y-4">
         <div className="flex justify-between">
           <p className="text-sm text-muted-foreground">{list.length} reunião(ões)</p>
@@ -464,7 +470,8 @@ function OneOnOneTab({ list, employees, employeeMap }: any) {
           setOpen(false);
         }} />
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
@@ -728,7 +735,9 @@ function BSCTab({ list, employees, departments, employeeMap }: any) {
   const { create, remove } = useMutateBSC();
 
   return (
-    <Card>
+    <div className="space-y-4">
+      <BSCCharts list={list} employeeMap={employeeMap} departments={departments} />
+      <Card>
       <CardContent className="pt-4 space-y-4">
         <div className="flex justify-between">
           <p className="text-sm text-muted-foreground">{list.length} scorecard(s)</p>
@@ -781,6 +790,7 @@ function BSCTab({ list, employees, departments, employeeMap }: any) {
         }} />
       </CardContent>
     </Card>
+    </div>
   );
 }
 
