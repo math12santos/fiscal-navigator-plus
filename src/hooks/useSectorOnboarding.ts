@@ -100,6 +100,19 @@ export function useSectorOnboarding(
     enabled: !!orgId && sector === "dp",
   });
 
+  const positionRoutinesQ = useQuery({
+    queryKey: ["dp-position-routines-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("position_routines")
+        .select("id, position_id, active")
+        .eq("organization_id", orgId!);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId && sector === "dp",
+  });
+
   // Rotinas DP do mês corrente
   const today = useMemo(() => new Date(), []);
   const competencia = format(today, "yyyy-MM");
