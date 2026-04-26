@@ -313,6 +313,41 @@ export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
   }
 
   // ============== C. ROTINAS (25 pts) ==============
+
+  // C.1 Rotinas por cargo cadastradas (10 pts) — pré-requisito estrutural
+  // Cada cargo ativo deve ter ao menos uma rotina cadastrada.
+  const positionsWithRoutines = new Set(
+    (input.positionRoutines ?? [])
+      .filter((r: any) => r.active !== false)
+      .map((r: any) => r.position_id)
+  );
+  const totalPositions = input.positions.length;
+  const positionsCovered = input.positions.filter((p: any) => positionsWithRoutines.has(p.id)).length;
+  const hasAnyRoutine = positionsWithRoutines.size > 0;
+  {
+    let earned = 0;
+    let detail = "nenhuma rotina cadastrada";
+    if (totalPositions === 0) {
+      // sem cargos, não dá para avaliar — pontuação zero porque é pré-requisito
+      earned = 0;
+      detail = "cadastre cargos primeiro";
+    } else {
+      earned = 10 * pct(positionsCovered, totalPositions);
+      detail = `${positionsCovered}/${totalPositions} cargos com rotinas`;
+    }
+    push({
+      key: "dp-routines-catalog",
+      label: "Rotinas cadastradas por cargo",
+      category: "rotinas",
+      weight: 10,
+      earned,
+      hint: "Sem rotinas por cargo, não há como medir o cumprimento operacional do setor.",
+      ctaTab: "cargos",
+      detail,
+    });
+  }
+
+  // C.2 Cumprimento das rotinas no mês (15 pts)
   {
     const total = input.routinesGenerated;
     const completed = input.routinesCompleted;
@@ -320,22 +355,27 @@ export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
 
     let earned = 0;
     let detail = "sem rotinas no mês";
-    if (total > 0) {
+    if (!hasAnyRoutine) {
+      // sem catálogo de rotinas, não há o que cumprir — pontuação zero
+      earned = 0;
+      detail = "cadastre rotinas por cargo primeiro";
+    } else if (total > 0) {
       const completionRate = completed / total;
-      const overduePenalty = Math.min(0.5, overdue / total * 0.5);
-      earned = 25 * Math.max(0, completionRate - overduePenalty);
+      const overduePenalty = Math.min(0.5, (overdue / total) * 0.5);
+      earned = 15 * Math.max(0, completionRate - overduePenalty);
       detail = `${completed}/${total} concluídas${overdue > 0 ? ` • ${overdue} atrasadas` : ""}`;
     } else {
-      // sem rotinas geradas: dá pontuação cheia (não penaliza setor que não usa rotinas)
-      earned = 25;
+      // catálogo existe mas o mês ainda não gerou tarefas — neutro (metade)
+      earned = 7.5;
+      detail = "rotinas cadastradas, sem geração no mês";
     }
     push({
       key: "dp-routines",
       label: "Cumprimento de rotinas no mês",
       category: "rotinas",
-      weight: 25,
+      weight: 15,
       earned,
-      hint: "Rotinas geradas a partir dos cargos e atribuídas aos colaboradores.",
+      hint: "Tarefas geradas a partir das rotinas dos cargos e atribuídas aos colaboradores.",
       ctaTab: "cargos",
       detail,
     });
