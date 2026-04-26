@@ -470,7 +470,8 @@ function OneOnOneTab({ list, employees, employeeMap }: any) {
           setOpen(false);
         }} />
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
