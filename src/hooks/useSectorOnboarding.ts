@@ -100,6 +100,19 @@ export function useSectorOnboarding(
     enabled: !!orgId && sector === "dp",
   });
 
+  const positionRoutinesQ = useQuery({
+    queryKey: ["dp-position-routines-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("position_routines")
+        .select("id, position_id, active")
+        .eq("organization_id", orgId!);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId && sector === "dp",
+  });
+
   // Rotinas DP do mês corrente
   const today = useMemo(() => new Date(), []);
   const competencia = format(today, "yyyy-MM");
@@ -144,6 +157,7 @@ export function useSectorOnboarding(
       payrollRuns: payrollRuns ?? [],
       compensations: compensationsQ.data ?? [],
       vacations: vacationsQ.data ?? [],
+      positionRoutines: positionRoutinesQ.data ?? [],
       routinesGenerated: generated,
       routinesCompleted: completed,
       routinesOverdue: overdue,
@@ -152,14 +166,15 @@ export function useSectorOnboarding(
   }, [
     orgId, sector, dpConfig, businessDaysQ.data, positionsQ.data,
     employees, benefits, employeeBenefits, documentsQ.data,
-    payrollRuns, compensationsQ.data, vacationsQ.data, routinesQ.data, today,
+    payrollRuns, compensationsQ.data, vacationsQ.data,
+    positionRoutinesQ.data, routinesQ.data, today,
   ]);
 
   const isLoading =
     loadEmp || loadPay || loadCfg || loadBen || loadEB ||
     positionsQ.isLoading || businessDaysQ.isLoading ||
     documentsQ.isLoading || compensationsQ.isLoading ||
-    vacationsQ.isLoading || routinesQ.isLoading;
+    vacationsQ.isLoading || positionRoutinesQ.isLoading || routinesQ.isLoading;
 
   // ============== Cache na tabela sector_onboarding ==============
   const persist = useMutation({
@@ -209,6 +224,7 @@ export function useSectorOnboarding(
       qc.invalidateQueries({ queryKey: ["dp-documents-maturity"] });
       qc.invalidateQueries({ queryKey: ["dp-compensations-maturity"] });
       qc.invalidateQueries({ queryKey: ["dp-vacations-maturity"] });
+      qc.invalidateQueries({ queryKey: ["dp-position-routines-maturity"] });
       qc.invalidateQueries({ queryKey: ["dp-routines-maturity"] });
     },
     persist: (r: SectorMaturityResult) => persist.mutateAsync(r),
