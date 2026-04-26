@@ -8,15 +8,22 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Loader2, Gauge } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Loader2, Gauge, FileDown, Sparkles, ListChecks, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import {
   MATURITY_LABEL_META,
   SECTOR_META,
   MaturityLabel,
+  SectorKey,
   SectorMaturityResult,
 } from "@/lib/sectorMaturity/types";
+import { downloadMaturityPdf } from "@/lib/sectorMaturity/exportMaturityPdf";
 import { SectorOnboardingChecklist } from "@/components/sector-onboarding/SectorOnboardingChecklist";
+import { ImprovementTrack } from "@/components/sector-onboarding/ImprovementTrack";
+import { MaturityTrendChart } from "@/components/sector-onboarding/MaturityTrendChart";
 
 interface Row {
   id: string;
@@ -178,36 +185,75 @@ export function SectorMaturityTab() {
       </Card>
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-          {selected && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <Gauge size={18} className="text-primary" />
-                  {selected.org_name} — {SECTOR_META[selected.sector as keyof typeof SECTOR_META]?.label ?? selected.sector}
-                </SheetTitle>
-                <SheetDescription>
-                  Score {Math.round(Number(selected.score))}/100 — atualizado em{" "}
-                  {format(new Date(selected.last_calculated_at), "dd/MM/yyyy HH:mm")}
-                </SheetDescription>
-              </SheetHeader>
-              <div className="mt-4">
-                <SectorOnboardingChecklist
-                  readOnly
-                  result={{
-                    score: Number(selected.score),
-                    completeness: Number(selected.completeness_score),
-                    freshness: Number(selected.freshness_score),
-                    routines: Number(selected.routines_score),
-                    label: (selected.maturity_label ?? "critico") as any,
-                    checklist: Array.isArray(selected.checklist) ? selected.checklist : [],
-                  } as SectorMaturityResult}
-                />
-              </div>
-            </>
-          )}
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          {selected && <SelectedDetail row={selected} />}
         </SheetContent>
       </Sheet>
     </div>
+  );
+}
+
+function SelectedDetail({ row }: { row: Row }) {
+  const result: SectorMaturityResult = {
+    score: Number(row.score),
+    completeness: Number(row.completeness_score),
+    freshness: Number(row.freshness_score),
+    routines: Number(row.routines_score),
+    label: (row.maturity_label ?? "critico") as MaturityLabel,
+    checklist: Array.isArray(row.checklist) ? row.checklist : [],
+  };
+
+  const handleExport = () => {
+    try {
+      downloadMaturityPdf({
+        orgName: row.org_name || "Organização",
+        sector: row.sector as SectorKey,
+        result,
+      });
+      toast.success("PDF gerado com sucesso");
+    } catch (e: any) {
+      toast.error("Erro ao gerar PDF", { description: e?.message });
+    }
+  };
+
+  return (
+    <>
+      <SheetHeader>
+        <SheetTitle className="flex items-center gap-2">
+          <Gauge size={18} className="text-primary" />
+          {row.org_name} — {SECTOR_META[row.sector as keyof typeof SECTOR_META]?.label ?? row.sector}
+        </SheetTitle>
+        <SheetDescription>
+          Score {Math.round(Number(row.score))}/100 — atualizado em{" "}
+          {format(new Date(row.last_calculated_at), "dd/MM/yyyy HH:mm")}
+        </SheetDescription>
+      </SheetHeader>
+
+      <Tabs defaultValue="checklist" className="mt-4">
+        <TabsList className="w-full grid grid-cols-3">
+          <TabsTrigger value="trilha"><Sparkles size={12} className="mr-1" /> Trilha</TabsTrigger>
+          <TabsTrigger value="checklist"><ListChecks size={12} className="mr-1" /> Checklist</TabsTrigger>
+          <TabsTrigger value="tendencia"><TrendingUp size={12} className="mr-1" /> Tendência</TabsTrigger>
+        </TabsList>
+        <TabsContent value="trilha" className="mt-4">
+          <ImprovementTrack result={result} readOnly />
+        </TabsContent>
+        <TabsContent value="checklist" className="mt-4">
+          <SectorOnboardingChecklist readOnly result={result} />
+        </TabsContent>
+        <TabsContent value="tendencia" className="mt-4">
+          <MaturityTrendChart
+            sector={row.sector as SectorKey}
+            organizationId={row.organization_id}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <div className="mt-4 flex justify-end">
+        <Button size="sm" variant="outline" onClick={handleExport}>
+          <FileDown size={14} className="mr-1.5" /> Exportar PDF
+        </Button>
+      </div>
+    </>
   );
 }
