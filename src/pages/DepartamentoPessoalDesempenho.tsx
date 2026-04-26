@@ -333,8 +333,9 @@ function PDITab({ pdis, employees, employeeMap }: any) {
           }
           setOpen(false);
         }} />
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
