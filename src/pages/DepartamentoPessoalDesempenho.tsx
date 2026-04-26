@@ -790,6 +790,7 @@ function BSCTab({ list, employees, departments, employeeMap }: any) {
         }} />
       </CardContent>
     </Card>
+    </div>
   );
 }
 
