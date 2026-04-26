@@ -735,7 +735,9 @@ function BSCTab({ list, employees, departments, employeeMap }: any) {
   const { create, remove } = useMutateBSC();
 
   return (
-    <Card>
+    <div className="space-y-4">
+      <BSCCharts list={list} employeeMap={employeeMap} departments={departments} />
+      <Card>
       <CardContent className="pt-4 space-y-4">
         <div className="flex justify-between">
           <p className="text-sm text-muted-foreground">{list.length} scorecard(s)</p>
