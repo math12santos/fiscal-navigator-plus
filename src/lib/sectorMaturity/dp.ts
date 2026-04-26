@@ -21,6 +21,8 @@ interface EvaluateDPInput {
   payrollRuns: any[];            // payroll_runs
   compensations: any[];          // employee_compensations (reajustes)
   vacations: any[];              // employee_vacations
+  // Rotinas cadastradas por cargo (estrutural)
+  positionRoutines: any[];       // position_routines ativos
   // Rotinas (mês corrente)
   routinesGenerated: number;
   routinesCompleted: number;
