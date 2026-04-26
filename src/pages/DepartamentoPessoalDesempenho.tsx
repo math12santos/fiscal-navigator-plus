@@ -27,6 +27,7 @@ import { useOneOnOnes, useMutateOneOnOne, type HrOneOnOne } from "@/hooks/useOne
 import { useNineBoxEvaluations, useLatest9BoxByEmployee, useMutateNineBox } from "@/hooks/useNineBox";
 import { useBSCScorecards, useMutateBSC } from "@/hooks/useBSC";
 import { QUADRANT_META, QUADRANT_TONE_CLASS, quadrantFrom } from "@/lib/performance/quadrante";
+import { PDICharts, OneOnOneCharts, BSCCharts } from "@/components/desempenho/DesempenhoCharts";
 
 const PDI_STATUS_META: Record<string, { label: string; class: string }> = {
   nao_iniciado: { label: "Não iniciado", class: "bg-muted text-foreground border-border" },
