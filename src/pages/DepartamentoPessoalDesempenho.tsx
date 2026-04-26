@@ -270,14 +270,16 @@ function PDITab({ pdis, employees, employeeMap }: any) {
   const { create, update, remove } = useMutatePDI();
 
   return (
-    <Card>
-      <CardContent className="pt-4 space-y-4">
-        <div className="flex justify-between">
-          <p className="text-sm text-muted-foreground">{pdis.length} PDI(s)</p>
-          <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }}>
-            <Plus size={14} className="mr-1" /> Novo PDI
-          </Button>
-        </div>
+    <div className="space-y-4">
+      <PDICharts pdis={pdis} employeeMap={employeeMap} />
+      <Card>
+        <CardContent className="pt-4 space-y-4">
+          <div className="flex justify-between">
+            <p className="text-sm text-muted-foreground">{pdis.length} PDI(s)</p>
+            <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }}>
+              <Plus size={14} className="mr-1" /> Novo PDI
+            </Button>
+          </div>
         <Table>
           <TableHeader>
             <TableRow>
