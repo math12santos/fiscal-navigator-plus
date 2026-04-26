@@ -1,20 +1,32 @@
-// Barra colapsável de maturidade do setor, mostrada no topo do módulo.
+// Barra colapsável de maturidade do setor, com Trilha sugerida, Checklist,
+// Tendência mensal e exportação em PDF.
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp, RefreshCw, Gauge, ListChecks } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  ChevronDown, ChevronUp, RefreshCw, Gauge, ListChecks, FileDown, Sparkles, TrendingUp,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 import { useSectorOnboarding } from "@/hooks/useSectorOnboarding";
+import { useMaturityMonthlyBackfill } from "@/hooks/useMaturityHistory";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import {
   MATURITY_LABEL_META,
   SECTOR_META,
   SectorKey,
   ChecklistItem,
 } from "@/lib/sectorMaturity/types";
+import { downloadMaturityPdf } from "@/lib/sectorMaturity/exportMaturityPdf";
+import { ImprovementStep } from "@/lib/sectorMaturity/improvementTrack";
 import { SectorOnboardingChecklist } from "./SectorOnboardingChecklist";
+import { ImprovementTrack } from "./ImprovementTrack";
+import { MaturityTrendChart } from "./MaturityTrendChart";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -25,7 +37,24 @@ interface Props {
 export function SectorOnboardingBar({ sector, onTabChange }: Props) {
   const [open, setOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<"trilha" | "checklist" | "tendencia">("trilha");
   const { result, isLoading, refresh } = useSectorOnboarding(sector);
+  const { currentOrg } = useOrganization();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Snapshot mensal defensivo
+  useMaturityMonthlyBackfill(sector, result);
+
+  // Deep-link: ?openMaturity=1 abre o drawer já na trilha (vindo de notificação)
+  useEffect(() => {
+    if (searchParams.get("openMaturity") === "1") {
+      setDrawer(true);
+      setDrawerTab("trilha");
+      const next = new URLSearchParams(searchParams);
+      next.delete("openMaturity");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   if (isLoading || !result) {
     return (
@@ -42,10 +71,26 @@ export function SectorOnboardingBar({ sector, onTabChange }: Props) {
 
   const meta = MATURITY_LABEL_META[result.label];
 
-  const handleAction = (item: ChecklistItem) => {
-    if (item.ctaTab && onTabChange) {
-      onTabChange(item.ctaTab);
+  const navigateToTab = (tab?: string) => {
+    if (tab && onTabChange) {
+      onTabChange(tab);
       setDrawer(false);
+    }
+  };
+
+  const handleChecklistAction = (item: ChecklistItem) => navigateToTab(item.ctaTab);
+  const handleStepAction = (step: ImprovementStep) => navigateToTab(step.ctaTab);
+
+  const handleExport = () => {
+    try {
+      downloadMaturityPdf({
+        orgName: currentOrg?.name || "Organização",
+        sector,
+        result,
+      });
+      toast.success("PDF gerado com sucesso");
+    } catch (e: any) {
+      toast.error("Erro ao gerar PDF", { description: e?.message });
     }
   };
 
@@ -69,9 +114,23 @@ export function SectorOnboardingBar({ sector, onTabChange }: Props) {
               </Badge>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="ghost" onClick={() => setDrawer(true)}>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setDrawerTab("trilha"); setDrawer(true); }}
+              >
+                <Sparkles size={14} className="mr-1" /> Trilha
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setDrawerTab("checklist"); setDrawer(true); }}
+              >
                 <ListChecks size={14} className="mr-1" /> Checklist
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleExport} title="Exportar PDF">
+                <FileDown size={14} />
               </Button>
               <Button size="sm" variant="ghost" onClick={refresh} title="Recalcular">
                 <RefreshCw size={14} />
@@ -100,18 +159,39 @@ export function SectorOnboardingBar({ sector, onTabChange }: Props) {
       </Card>
 
       <Sheet open={drawer} onOpenChange={setDrawer}>
-        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <Gauge size={18} className="text-primary" />
               Maturidade do {SECTOR_META[sector].label}
             </SheetTitle>
             <SheetDescription>
-              {result.score}/100 — {meta.label}. Clique em um item para ir até a aba correspondente.
+              {result.score}/100 — {meta.label}.
             </SheetDescription>
           </SheetHeader>
-          <div className="mt-4">
-            <SectorOnboardingChecklist result={result} onItemAction={handleAction} />
+
+          <Tabs value={drawerTab} onValueChange={(v) => setDrawerTab(v as any)} className="mt-4">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="trilha"><Sparkles size={12} className="mr-1" /> Trilha</TabsTrigger>
+              <TabsTrigger value="checklist"><ListChecks size={12} className="mr-1" /> Checklist</TabsTrigger>
+              <TabsTrigger value="tendencia"><TrendingUp size={12} className="mr-1" /> Tendência</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="trilha" className="mt-4">
+              <ImprovementTrack result={result} onStepAction={handleStepAction} />
+            </TabsContent>
+            <TabsContent value="checklist" className="mt-4">
+              <SectorOnboardingChecklist result={result} onItemAction={handleChecklistAction} />
+            </TabsContent>
+            <TabsContent value="tendencia" className="mt-4">
+              <MaturityTrendChart sector={sector} />
+            </TabsContent>
+          </Tabs>
+
+          <div className="mt-4 flex justify-end">
+            <Button size="sm" variant="outline" onClick={handleExport}>
+              <FileDown size={14} className="mr-1.5" /> Exportar PDF
+            </Button>
           </div>
         </SheetContent>
       </Sheet>

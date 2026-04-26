@@ -1,201 +1,114 @@
 
-# Onboarding Guiado por Setor — DP (piloto)
+# Evolução do Termômetro de Maturidade do DP
 
-O onboarding setorial é um **termômetro contínuo de maturidade do departamento**. Diferente do onboarding global (10 etapas, único por organização), ele:
-- É **escopado por módulo/setor** (DP, Financeiro, CRM, Contratos…).
-- Tem **score vivo**: recalcula sempre que dados são preenchidos/atualizados ou rotinas são cumpridas.
-- Aparece como **barra progressiva no topo do módulo** para o gestor do setor.
-- É consolidado no **Backoffice** com visão multi-organização.
-
-Vamos implementar o piloto no **DP**, com arquitetura preparada para replicar nos demais setores depois.
+Quatro entregas conectadas, sobre a base já existente (`sector_onboarding`, `useSectorOnboarding`, `evaluateDP`, `SectorOnboardingBar`).
 
 ---
 
-## 1. Modelo de Maturidade (DP)
+## 1. Trilha de melhoria sugerida (clicável)
 
-Score 0–100, composto por 3 dimensões com pesos:
+**Objetivo:** transformar o checklist em uma "trilha guiada" priorizada — o gestor sabe **o que atacar primeiro** para ganhar mais score com menos esforço.
 
-### A. Completude (peso 50)
-% de informações estruturais preenchidas. Cada item vale uma fração:
-- **Configurações tributárias** (`dp_config` preenchido com `inss_patronal_pct`, `fgts_pct`, `terceiros_pct`, `provisao_ferias_pct`, `provisao_13_pct`, `vt_desconto_pct`) — 10 pts
-- **Cargos cadastrados** (≥ 1 em `positions`) — 5 pts
-- **Cargos com responsabilidades + faixa salarial** — 5 pts
-- **Colaboradores cadastrados** (≥ 1 em `employees` ativo) — 5 pts
-- **Colaboradores com `position_id` + `cost_center_id` preenchidos** — 5 pts
-- **Benefícios cadastrados** (`dp_benefits`) — 5 pts
-- **Vínculos colaborador↔benefício** (≥ 80% dos colaboradores ativos com pelo menos 1 benefício ou opt-out registrado) — 5 pts
-- **Documentos obrigatórios em dia** (a partir de `employee_documents`, sem alertas vencidos) — 5 pts
-- **Calendário de dias úteis configurado** (`dp_business_days`) — 5 pts
+**Lógica (cliente):**
+- Novo módulo `src/lib/sectorMaturity/improvementTrack.ts`:
+  - Recebe `SectorMaturityResult`, retorna `ImprovementStep[]` com itens incompletos (`earned < weight`), ordenados por **(pts faltantes ÷ esforço estimado)**.
+  - Esforço estimado por chave (mapa `EFFORT_HINTS` — ex.: `dp-config-tributaria` = baixo, `dp-employees-link` = médio, `dp-routines` = alto).
+  - Agrupa em 3 marcos: **Configurar (Completude) → Atualizar (Frescor) → Operar (Rotinas)**, mostrando ganho potencial por marco.
 
-### B. Atualização (peso 25)
-Frescor das informações periódicas:
-- **Folha do mês anterior fechada** — 8 pts
-- **Reajustes salariais nos últimos 12 meses** registrados (para colaboradores há > 12 meses) — 5 pts
-- **Férias planejadas** para os colaboradores que ultrapassam 11 meses de aquisição — 6 pts
-- **Documentos com vencimento** atualizados (sem `DPDocumentAlerts` vermelhos) — 6 pts
-
-### C. Cumprimento de Rotinas (peso 25)
-Integra com `position_routines` + `requests (type='rotina_dp')`:
-- **% de rotinas concluídas** no mês corrente vs. geradas → escala linear até 25 pts
-- Atrasos ponderam negativo (rotinas com `due_date < hoje` e `status='aberta'` reduzem proporcionalmente)
-
-A faixa de Score gera um selo:
-- 0–39: **Crítico** (vermelho)
-- 40–69: **Em desenvolvimento** (âmbar)
-- 70–89: **Maduro** (azul)
-- 90–100: **Excelente** (verde)
-
-Cada dimensão exibe sub-barras detalhadas para o gestor saber exatamente onde mexer.
+**UI:** `src/components/sector-onboarding/ImprovementTrack.tsx`
+- Cards numerados com: título do item, ganho potencial (`+X pts`), badge de esforço, botão "Resolver agora" → usa o `ctaTab` já existente (mesma navegação do checklist) emitindo `onTabChange`.
+- Banner de topo: "Faltam **X pts** para a próxima faixa (Maduro/Excelente)".
+- Integração: nova aba **"Trilha"** no `Sheet` do `SectorOnboardingBar` (Tabs: Trilha / Checklist), padrão `focused-wizard-pattern`.
 
 ---
 
-## 2. Modelo de dados
+## 2. Notificações de checklist atrasado e meta de rotinas
 
-Nova tabela única, multi-setor:
+**Objetivo:** alertar gestores e colaboradores quando há item crítico ou rotinas abaixo da meta.
 
-```sql
-create table public.sector_onboarding (
-  id uuid primary key default gen_random_uuid(),
-  organization_id uuid not null references organizations(id) on delete cascade,
-  sector text not null,                          -- 'dp' | 'financeiro' | 'crm' | ...
-  score numeric not null default 0,              -- 0..100
-  completeness_score numeric not null default 0, -- 0..50
-  freshness_score numeric not null default 0,    -- 0..25
-  routines_score numeric not null default 0,     -- 0..25
-  maturity_label text,                           -- critico | desenvolvimento | maduro | excelente
-  checklist jsonb not null default '[]'::jsonb,  -- itens detalhados {key,label,done,weight,category}
-  last_calculated_at timestamptz not null default now(),
-  notes text,
-  user_id uuid not null,
-  unique (organization_id, sector)
-);
-```
+**Backend:**
+- Migration: nova coluna em `dp_config` → `meta_rotinas_pct numeric default 0.85` (meta de cumprimento mensal).
+- Edge function agendada **`sector-maturity-alerts`** (`supabase/functions/sector-maturity-alerts/index.ts`):
+  - Roda diariamente via `pg_cron` + `pg_net`.
+  - Para cada org com módulo DP ativo:
+    1. Lê `sector_onboarding` (cache mais recente).
+    2. **Gestores DP** (membros com permissão `dp.config` ou `owner/admin`): cria notificação se houver `ChecklistItem` com `category='atualizacao'` cujo `detail` contém "vencido" OU se `routines_score / 25 < meta_rotinas_pct`.
+    3. **Colaboradores**: cria notificação para o owner de cada `requests` (`type='rotina_dp'`) com `due_date < hoje` e status diferente de concluída/cancelada.
+  - Insere em `notifications` com `type='dp_maturity'`, `priority` derivada da gravidade, `reference_type='sector_onboarding'`. Idempotência por chave `(user_id, reference_id, date_trunc('day', created_at))`.
+- Cron via **insert tool** (não migration) com `net.http_post` para a função (padrão do projeto).
 
-RLS:
-- SELECT/UPDATE/INSERT por membros da organização (`is_org_member`).
-- SELECT extra para `has_backoffice_org_access`.
-
-> Observação: vamos **derivar** o score sempre dos dados-fonte (não duplicar). Esta tabela serve apenas como **cache materializado** para Backoffice e listas. A barra do gestor é recalculada **on-the-fly** no client (rápido, com os dados que já estão em memória) e o cache é gravado em `debouncedSave`.
+**UI:**
+- Nada novo: o `NotificationCenter` já consome `notifications` em realtime.
+- Acrescentar deep-link: notificações com `reference_type='sector_onboarding'` levam a `/dp` com query `?openMaturity=1` que abre o drawer já na aba Trilha.
 
 ---
 
-## 3. Hook `useSectorOnboarding('dp')`
+## 3. Exportar termômetro do DP em PDF
 
-`src/hooks/useSectorOnboarding.ts` — calcula tudo no client:
+**Objetivo:** PDF compartilhável com a alta gestão (score, sub-barras, checklist, faixa, data).
 
-- Faz queries para `dp_config`, `positions`, `employees`, `dp_benefits`, `employee_benefits`, `employee_documents`, `dp_business_days`, `payroll_runs`, `employee_vacations`, `requests` (tipo `rotina_dp` no mês corrente).
-- Em **modo Holding**, agrega por `activeOrgIds` e mostra média ponderada por nº de colaboradores.
-- Retorna:
-  ```ts
-  { score, completeness, freshness, routines, label, checklist, isLoading, refresh, persist }
-  ```
-- Cada item do `checklist` tem `{ key, label, category, done, weight, hint, ctaRoute }` para que ao clicar no item o gestor seja levado direto à aba que precisa preencher.
-- `persist()` grava em `sector_onboarding` (debounce 1s) para manter o Backoffice sincronizado.
-
----
-
-## 4. UI no módulo DP
-
-### a. `SectorOnboardingBar` (novo componente)
-`src/components/dp/SectorOnboardingBar.tsx` — barra colapsável colada abaixo do `PageHeader` em `DepartamentoPessoal.tsx`:
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│ Maturidade do DP   ███████████░░░░░░░  72%  • Maduro    [v]   │
-│ Completude 38/50   Atualização 18/25   Rotinas 16/25          │
-└───────────────────────────────────────────────────────────────┘
-```
-
-Quando expandido, mostra checklist agrupado por categoria com ícones de check/alerta + botão **“Ir para preencher”** que muda a aba ativa do `<Tabs>`.
-
-- Sempre visível para todos os usuários com acesso ao DP.
-- O gestor (`has_org_role owner|admin` ou responsável por CC do setor) vê também o botão **“Recalcular agora”** e a data do último cálculo.
-
-### b. Aba “Onboarding DP” (opcional, modo focused-wizard)
-`src/components/dp/DPOnboardingWizard.tsx` — versão expandida em accordion (padrão `focused-wizard-pattern`) acessível pela barra (“Abrir checklist completo”). Cada seção corresponde a uma dimensão do score com:
-- Itens marcáveis automaticamente (verde quando o sistema detecta que o dado existe).
-- Itens manuais (ex.: “revisei a tabela de cargos”) com checkbox em `checklist` jsonb.
-- Notas livres em `notes`.
-
-### c. Integração com rotinas
-- Reaproveita `useRoutineCalendar` para a dimensão **Cumprimento de Rotinas**.
-- Mostra mini-card: `12 de 18 rotinas concluídas no mês • 3 atrasadas`.
-- Link direto para `/tarefas?filter=rotina_dp&competencia=YYYY-MM`.
-
-### d. Dashboard DP
-Adiciona um KPI extra “Maturidade do Setor” no `DPDashboard` (mesmo número da barra) para reforçar visibilidade.
+**Implementação cliente (sem edge function — `jspdf` + `jspdf-autotable` já instalados):**
+- Novo `src/lib/sectorMaturity/exportMaturityPdf.ts`:
+  - Cabeçalho: nome da org, setor, data, score grande + faixa.
+  - Sub-barras (Completude / Atualização / Rotinas) desenhadas vetorialmente.
+  - Tabela `autoTable` por categoria com colunas: Item · Pontos · Detalhe · Status (✔/⚠/○).
+  - Rodapé com legenda de faixas e link da plataforma.
+- Botão **"Exportar PDF"** no header do `SectorOnboardingBar` (e também no drawer do Backoffice em `SectorMaturityTab`, usando o `result` do registro selecionado).
+- Nome do arquivo: `maturidade-dp-{org}-{YYYY-MM-DD}.pdf`.
 
 ---
 
-## 5. Backoffice
+## 4. Histórico de evolução (snapshots mensais)
 
-Estende `BackofficeOnboarding.tsx` com **nova aba “Maturidade Setorial”**:
+**Objetivo:** acompanhar tendência por org/setor.
 
-| Empresa | Setor | Score | Completude | Atualização | Rotinas | Última atualização |
-|---|---|---|---|---|---|---|
-| Acme Holding | DP | 72% (Maduro) | 38/50 | 18/25 | 16/25 | há 2h |
+**Schema (migration):**
+- Nova tabela `sector_onboarding_history`:
+  - `id uuid pk`, `organization_id uuid not null`, `sector text not null`,
+  - `period_month date not null` (sempre 1º dia do mês),
+  - `score, completeness_score, freshness_score, routines_score numeric`,
+  - `maturity_label text`, `checklist jsonb`, `snapshot_at timestamptz default now()`,
+  - **Unique** `(organization_id, sector, period_month)`.
+- RLS: leitura para membros da org + backoffice; insert apenas via service role (edge function).
 
-- Filtros por setor (no MVP só DP) e por faixa (Crítico/Desenvolvimento/Maduro/Excelente).
-- Stats no topo: nº de orgs em cada faixa para o setor selecionado.
-- Click → drill-down com o mesmo checklist do gestor (read-only, só visualiza).
-- Reaproveita o padrão visual já existente em `TrackingTab`.
+**Snapshot (escolhido: server-side, 1×/mês — mais confiável):**
+- Edge function **`sector-maturity-snapshot`** (cron no dia 1 às 03:00):
+  - Itera `sector_onboarding`, faz `upsert` em `sector_onboarding_history` com `period_month = date_trunc('month', now() - interval '1 day')`.
+  - Idempotente pelo unique key.
+- Backfill opcional: ao primeiro acesso do mês, o hook `useSectorOnboarding` faz `upsert` defensivo para o mês corrente (assim a tendência aparece desde já, sem esperar o cron).
 
----
-
-## 6. Permissões / Multi-tenancy
-
-- Hook `useSectorOnboarding` só dispara para usuários com `canAccessModule('dp')`.
-- Em **Holding mode**, agrega via `activeOrgIds` (mesmo padrão de `useDPBenefits` recém-corrigido).
-- O cache `sector_onboarding` é gravado **por organização individual** (não pela holding), e a holding lê N linhas.
-- Backoffice usa `has_backoffice_org_access` (já existente) para listar somente orgs autorizadas.
-
----
-
-## 7. Arquitetura para escalar a outros setores
-
-- Hook recebe `sector` como parâmetro: `useSectorOnboarding('financeiro')` no futuro plugará no mesmo modelo.
-- Lista de checks e pesos vive em `src/lib/sectorMaturity/dp.ts` (objeto `MATURITY_DEFINITIONS.dp`). Adicionar Financeiro = criar `financeiro.ts` com a mesma forma + adicionar entrada no registry.
-- `SectorOnboardingBar` é genérica (recebe `sector` prop). Criamos o wrapper `<SectorOnboardingBar sector="dp" />` no `DepartamentoPessoal.tsx`.
+**UI — gráfico de tendência:**
+- Componente `src/components/sector-onboarding/MaturityTrendChart.tsx` (recharts já no projeto):
+  - LineChart com 4 séries: Score / Completude / Atualização / Rotinas.
+  - Filtro de período (3m, 6m, 12m).
+- **Onde aparece:**
+  - **Drawer** do `SectorOnboardingBar` → 3ª aba "Tendência".
+  - **Backoffice** (`SectorMaturityTab`) → ao abrir o drawer da org selecionada, nova aba "Tendência" lado a lado com o checklist (cross-org tracking).
 
 ---
 
-## 8. Entregáveis
+## Arquivos a criar/editar
 
-### Migração SQL
-- Tabela `sector_onboarding` + índices (`organization_id`, `sector`) + RLS (org members + backoffice).
+**Criar:**
+- `src/lib/sectorMaturity/improvementTrack.ts`
+- `src/lib/sectorMaturity/exportMaturityPdf.ts`
+- `src/components/sector-onboarding/ImprovementTrack.tsx`
+- `src/components/sector-onboarding/MaturityTrendChart.tsx`
+- `src/hooks/useMaturityHistory.ts`
+- `supabase/functions/sector-maturity-alerts/index.ts`
+- `supabase/functions/sector-maturity-snapshot/index.ts`
+- Migration: `sector_onboarding_history` + coluna `dp_config.meta_rotinas_pct`.
 
-### Novos arquivos
-- `src/lib/sectorMaturity/types.ts` — tipos compartilhados.
-- `src/lib/sectorMaturity/dp.ts` — definições, pesos e função `evaluateDP(data)` pura (testável).
-- `src/hooks/useSectorOnboarding.ts` — orquestra queries + cálculo + persist.
-- `src/components/sector-onboarding/SectorOnboardingBar.tsx` — barra colapsável genérica.
-- `src/components/sector-onboarding/SectorOnboardingChecklist.tsx` — lista detalhada (usado na barra e no Backoffice).
-- `src/components/dp/DPOnboardingWizard.tsx` — wizard focused (accordion).
-- `src/pages/BackofficeSectorMaturity.tsx` — nova aba/visão (ou `SectorMaturityTab` dentro de `BackofficeOnboarding.tsx`).
-
-### Edições
-- `src/pages/DepartamentoPessoal.tsx` — injeta `SectorOnboardingBar` e nova aba “Onboarding”.
-- `src/components/dp/DPDashboard.tsx` — KPI “Maturidade DP”.
-- `src/pages/BackofficeOnboarding.tsx` — adiciona aba “Maturidade Setorial”.
-- `src/App.tsx` — (se necessário) rota nova; provavelmente fica como aba interna do Backoffice atual.
-
-### Testes
-- `src/lib/sectorMaturity/dp.test.ts` — casos: tudo zerado, parcial, completo, com rotinas atrasadas, em modo Holding.
+**Editar:**
+- `src/components/sector-onboarding/SectorOnboardingBar.tsx` — Tabs (Trilha/Checklist/Tendência), botão exportar, deep-link `?openMaturity=1`.
+- `src/components/sector-onboarding/SectorMaturityTab.tsx` — Tabs no drawer + exportar.
+- `src/hooks/useSectorOnboarding.ts` — backfill defensivo do snapshot do mês.
+- `mem://features/sector-onboarding-maturity.md` — documentar trilha, alertas, histórico.
 
 ---
 
-## 9. Memória do projeto
-
-Após implementação:
-- `mem://features/sector-onboarding-maturity` — descreve modelo (3 dimensões), cache `sector_onboarding`, padrão de extensão por setor.
-- Atualizar `mem://index.md` (Memories).
-
----
-
-## Decisões para confirmar
-
-1. **Lugar do checklist completo**: nova aba “Onboarding” dentro do DP **ou** modal/drawer aberto pela barra? (Sugiro **drawer** — mantém o número atual de abas e segue o padrão `focused-wizard-pattern`.)
-2. **Pesos das dimensões** (50/25/25): aceita esses ou prefere ajustar (ex.: 40/30/30 para dar mais peso à atualização contínua)?
-3. **Itens manuais** (checkboxes que o gestor marca explicitamente): incluir desde o MVP ou só itens automáticos derivados de dados?
-
-Posso seguir com os defaults sugeridos se você não tiver preferência — basta aprovar o plano.
+## Princípios respeitados
+- **Multi-tenant + RLS** em todas as novas tabelas.
+- **MECE**: histórico vive em tabela própria (`sector_onboarding_history`); cache atual continua em `sector_onboarding`.
+- **CFO-first**: PDF compartilhável e gráfico de tendência elevam o termômetro de operacional → narrativa para Conselho.
+- **Reuso**: `ctaTab` do checklist alimenta a Trilha; `notifications` + realtime já existem; libs PDF já instaladas.
