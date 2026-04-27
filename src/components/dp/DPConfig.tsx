@@ -113,7 +113,20 @@ export default function DPConfig() {
   const [propagateDialogOpen, setPropagateDialogOpen] = useState(false);
   const [selectedSubsidiaries, setSelectedSubsidiaries] = useState<Set<string>>(new Set());
 
-  // Sync local state when remote config loads
+  // Calendário de desembolsos
+  const [schedule, setSchedule] = useState({
+    advance_enabled: false,
+    advance_pct: 40,
+    advance_payment_day: 20,
+    salary_payment_day: 5,
+    salary_payment_basis: "business_day" as "business_day" | "calendar_day",
+    inss_due_day: 20,
+    fgts_due_day: 20,
+    irrf_due_day: 20,
+    benefits_payment_day: -1,
+    health_payment_day: 10,
+  });
+
   useEffect(() => {
     if (config) {
       setBase({
@@ -126,6 +139,19 @@ export default function DPConfig() {
         vt_desconto_pct: config.vt_desconto_pct ?? DEFAULTS.vt_desconto_pct,
       });
       setCustoms(Array.isArray((config as any).custom_items) ? ((config as any).custom_items as CustomItem[]) : []);
+      const c = config as any;
+      setSchedule({
+        advance_enabled: !!c.advance_enabled,
+        advance_pct: Number(c.advance_pct ?? 40),
+        advance_payment_day: Number(c.advance_payment_day ?? 20),
+        salary_payment_day: Number(c.salary_payment_day ?? 5),
+        salary_payment_basis: (c.salary_payment_basis ?? "business_day") as any,
+        inss_due_day: Number(c.inss_due_day ?? 20),
+        fgts_due_day: Number(c.fgts_due_day ?? 20),
+        irrf_due_day: Number(c.irrf_due_day ?? 20),
+        benefits_payment_day: Number(c.benefits_payment_day ?? -1),
+        health_payment_day: Number(c.health_payment_day ?? 10),
+      });
     }
   }, [config]);
 
