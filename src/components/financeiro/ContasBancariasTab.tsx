@@ -49,6 +49,11 @@ export function ContasBancariasTab() {
   const [showCreate, setShowCreate] = useState(false);
   const { holdingMode, subsidiaryOrgs } = useHolding();
   const { currentOrg } = useOrganization();
+  const { toast } = useToast();
+
+  // PIX dialog state
+  const [pixAccount, setPixAccount] = useState<BankAccount | null>(null);
+  const [pixValue, setPixValue] = useState("");
 
   // Balance dialog state
   const [balanceAccount, setBalanceAccount] = useState<BankAccount | null>(null);
