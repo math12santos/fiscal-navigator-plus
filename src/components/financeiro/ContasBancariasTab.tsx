@@ -647,6 +647,31 @@ export function ContasBancariasTab() {
         />
       )}
 
+      {/* PIX dialog */}
+      <Dialog open={!!pixAccount} onOpenChange={(open) => { if (!open) setPixAccount(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chave PIX — {pixAccount?.nome}</DialogTitle>
+            <DialogDescription>
+              CPF/CNPJ, e-mail, telefone ou chave aleatória vinculada a esta conta.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label>Chave PIX</Label>
+            <Input
+              value={pixValue}
+              maxLength={200}
+              onChange={(e) => setPixValue(e.target.value)}
+              placeholder="Ex: 12.345.678/0001-99"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPixAccount(null)}>Cancelar</Button>
+            <Button onClick={handleSavePix} disabled={update.isPending}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <BankAccountFormDialog
         open={showCreate}
         onOpenChange={setShowCreate}
