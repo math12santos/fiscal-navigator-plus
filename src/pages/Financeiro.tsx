@@ -63,6 +63,8 @@ export default function Financeiro() {
         description="Gestão financeira completa: contas, fluxo de caixa, conciliação e importações"
       />
 
+      <SectorOnboardingBar sector="financeiro" onTabChange={handleMaturityTabChange} />
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex-wrap">
           {allowedTabs.map((t) => (
