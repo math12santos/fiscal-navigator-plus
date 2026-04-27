@@ -34,6 +34,9 @@ export function useSectorOnboarding(
   const isDP = sector === "dp";
   const isFin = sector === "financeiro";
 
+  // Metas configuráveis (com fallback aos defaults quando não houver registro)
+  const { targets } = useSectorMaturityTargets(sector);
+
   // ============== Datasets DP (carregados só quando sector === "dp") ==============
   const { data: employees = [], isLoading: loadEmp } = useEmployees();
   const { data: payrollRuns = [], isLoading: loadPay } = usePayrollRuns();
