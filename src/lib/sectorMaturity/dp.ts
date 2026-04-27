@@ -376,8 +376,11 @@ export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
       detail = "cadastre rotinas por cargo primeiro";
     } else if (total > 0) {
       const completionRate = completed / total;
-      const overduePenalty = Math.min(0.5, (overdue / total) * 0.5);
-      earned = 15 * Math.max(0, completionRate - overduePenalty);
+      const overdueRate = overdue / total;
+      const tolerated = Math.max(0, overdueRate - targets.routines_overdue_tolerance_pct);
+      const overduePenalty = Math.min(0.5, tolerated * 0.5);
+      const adjusted = Math.max(0, completionRate - overduePenalty);
+      earned = 15 * Math.min(1, adjusted / Math.max(0.01, targets.routines_target_pct));
       detail = `${completed}/${total} concluídas${overdue > 0 ? ` • ${overdue} atrasadas` : ""}`;
     } else {
       // catálogo existe mas o mês ainda não gerou tarefas — neutro (metade)
