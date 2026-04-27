@@ -196,7 +196,7 @@ export function evaluateFinanceiro(input: EvaluateFinanceiroInput): SectorMaturi
   // ============== B. ATUALIZAÇÃO (25 pts) ==============
 
   // 1. Período fiscal do mês anterior fechado (8 pts)
-  {
+  if (targets.period_close_required) {
     const closed = input.prevPeriod?.status === "closed";
     const earned = closed ? 8 : 0;
     push({
@@ -209,7 +209,20 @@ export function evaluateFinanceiro(input: EvaluateFinanceiroInput): SectorMaturi
       ctaTab: "fluxo-caixa",
       detail: input.prevPeriod ? `status: ${input.prevPeriod.status}` : "não fechado",
     });
+  } else {
+    // Política da org: não exige fechamento — concede pontos cheios para não penalizar
+    push({
+      key: "fin-period-closed",
+      label: "Período fiscal do mês anterior fechado",
+      category: "atualizacao",
+      weight: 8,
+      earned: 8,
+      hint: "Política da organização: fechamento de período não exigido.",
+      ctaTab: "fluxo-caixa",
+      detail: "não exigido",
+    });
   }
+
 
   // 2. Saldos bancários atualizados (≤7 dias) (6 pts)
   {
