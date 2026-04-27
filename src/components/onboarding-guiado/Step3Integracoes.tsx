@@ -193,7 +193,7 @@ export function Step3Integracoes({ data, onChange }: Step3Props) {
         .insert(batch as any);
 
       if (error) {
-        console.error("Error inserting rows batch:", error);
+        if (import.meta.env.DEV) console.error("Error inserting rows batch:", error);
       }
     }
 

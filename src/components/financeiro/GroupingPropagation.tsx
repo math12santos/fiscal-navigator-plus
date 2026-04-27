@@ -176,7 +176,7 @@ export default function GroupingPropagation() {
       });
       setDialogOpen(false);
     } catch (err: any) {
-      console.error("Propagation error:", err);
+      if (import.meta.env.DEV) console.error("Propagation error:", err);
       toast({
         title: "Erro na propagação",
         description: err.message || "Ocorreu um erro ao propagar as configurações.",
