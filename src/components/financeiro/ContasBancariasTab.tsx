@@ -298,7 +298,7 @@ export function ContasBancariasTab() {
             <TableBody>
               {allBankAccounts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={holdingMode ? 9 : 8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={holdingMode ? 10 : 9} className="text-center text-muted-foreground py-8">
                     <Landmark className="h-8 w-8 mx-auto mb-2 opacity-30" />
                     Nenhuma conta bancária cadastrada
                   </TableCell>
