@@ -44,8 +44,18 @@ const SUB_CATEGORY_LABELS: Record<string, string> = {
   encargos_irrf: "IRRF",
   vt: "Vale Transporte",
   beneficios: "Benefícios",
+  beneficios_vr: "Vale Refeição",
+  beneficios_va: "Vale Alimentação",
+  beneficios_saude: "Plano de Saúde",
+  beneficios_outros: "Outros Benefícios",
+  provisao_acumulada: "Provisões Acumuladas (informativo)",
   provisoes: "Provisões (13º + Férias)",
 };
+
+/** Sub-categorias DP que NÃO impactam o caixa (são informativas / passivo). */
+export const DP_NON_CASHFLOW_SUBCATEGORIES = new Set([
+  "provisao_acumulada",
+]);
 
 /**
  * Generate payroll projections as virtual CashFlowEntry items — one per employee per sub-category.
