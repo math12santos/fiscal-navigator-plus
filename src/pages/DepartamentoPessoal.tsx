@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { TrendingUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { SectorOnboardingBar } from "@/components/sector-onboarding/SectorOnboardingBar";
