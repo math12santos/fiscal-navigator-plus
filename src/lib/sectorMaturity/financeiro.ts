@@ -224,20 +224,20 @@ export function evaluateFinanceiro(input: EvaluateFinanceiroInput): SectorMaturi
   }
 
 
-  // 2. Saldos bancários atualizados (≤7 dias) (6 pts)
+  // 2. Saldos bancários atualizados (≤ N dias) (6 pts)
   {
     const active = input.bankAccounts.filter((b: any) => b.active !== false);
-    const cutoff = new Date(today.getTime() - 7 * 24 * 3600 * 1000);
+    const cutoff = new Date(today.getTime() - targets.bank_freshness_days * 24 * 3600 * 1000);
     const ok = active.filter((b: any) => b.saldo_atualizado_em && new Date(b.saldo_atualizado_em) >= cutoff).length;
     const total = active.length;
     const earned = total > 0 ? 6 * pct(ok, total) : 0;
     push({
       key: "fin-bank-fresh",
-      label: "Saldos bancários atualizados nos últimos 7 dias",
+      label: `Saldos bancários atualizados nos últimos ${targets.bank_freshness_days} dias`,
       category: "atualizacao",
       weight: 6,
       earned,
-      hint: "Atualize o saldo de cada conta semanalmente.",
+      hint: `Atualize o saldo de cada conta a cada ${targets.bank_freshness_days} dias.`,
       ctaTab: "contas-bancarias",
       detail: total > 0 ? `${ok}/${total}` : "—",
     });
@@ -247,28 +247,29 @@ export function evaluateFinanceiro(input: EvaluateFinanceiroInput): SectorMaturi
   {
     const total = input.cashflowMonth.length;
     const ok = input.cashflowMonth.filter((e: any) => e.account_id && e.cost_center_id).length;
-    const earned = total > 0 ? 6 * pct(ok, total) : 6;
+    const targetPct = targets.classification_target_pct;
+    const rate = total > 0 ? ok / total : 1;
+    const earned = total > 0 ? 6 * Math.min(1, rate / Math.max(0.01, targetPct)) : 6;
     push({
       key: "fin-classification",
       label: "Lançamentos do mês classificados",
       category: "atualizacao",
       weight: 6,
       earned,
-      hint: "Cada entrada precisa de conta contábil e centro de custo.",
+      hint: `Meta: ${Math.round(targetPct * 100)}% das entradas com conta contábil e centro de custo.`,
       ctaTab: "pagar",
-      detail: total > 0 ? `${ok}/${total}` : "n/a",
+      detail: total > 0 ? `${ok}/${total} (${Math.round(rate * 100)}%)` : "n/a",
     });
   }
 
-  // 4. Sem atrasos críticos > 30 dias (5 pts)
+  // 4. Sem atrasos críticos > N dias (5 pts)
   {
     const overdue = input.overdueEntries.length;
-    // Penaliza linearmente: 0 atrasos = 5 pts; 10+ = 0 pts
-    const penalty = Math.min(1, overdue / 10);
+    const penalty = Math.min(1, overdue / Math.max(1, targets.overdue_max_count));
     const earned = 5 * (1 - penalty);
     push({
       key: "fin-no-overdue",
-      label: "Sem lançamentos vencidos há mais de 30 dias",
+      label: `Sem lançamentos vencidos há mais de ${targets.overdue_critical_days} dias`,
       category: "atualizacao",
       weight: 5,
       earned,
@@ -290,7 +291,7 @@ export function evaluateFinanceiro(input: EvaluateFinanceiroInput): SectorMaturi
     let detail = "sem lançamentos no mês anterior";
     if (total > 0) {
       const rate = realizados / total;
-      earned = 10 * Math.min(1, rate / 0.9); // meta = 90%
+      earned = 10 * Math.min(1, rate / Math.max(0.01, targets.reconciliation_target_pct));
       detail = `${realizados}/${total} realizados (${Math.round(rate * 100)}%)`;
     }
     push({
@@ -299,7 +300,7 @@ export function evaluateFinanceiro(input: EvaluateFinanceiroInput): SectorMaturi
       category: "rotinas",
       weight: 10,
       earned,
-      hint: "Pelo menos 90% dos lançamentos do mês anterior devem estar realizados.",
+      hint: `Meta: ${Math.round(targets.reconciliation_target_pct * 100)}% dos lançamentos do mês anterior realizados.`,
       ctaTab: "conciliacao",
       detail,
     });
@@ -314,8 +315,11 @@ export function evaluateFinanceiro(input: EvaluateFinanceiroInput): SectorMaturi
     let detail = "sem solicitações no mês";
     if (total > 0) {
       const completionRate = completed / total;
-      const overduePenalty = Math.min(0.5, (overdue / total) * 0.5);
-      earned = 15 * Math.max(0, completionRate - overduePenalty);
+      const overdueRate = overdue / total;
+      const tolerated = Math.max(0, overdueRate - targets.routines_overdue_tolerance_pct);
+      const overduePenalty = Math.min(0.5, tolerated * 0.5);
+      const adjusted = Math.max(0, completionRate - overduePenalty);
+      earned = 15 * Math.min(1, adjusted / Math.max(0.01, targets.routines_target_pct));
       detail = `${completed}/${total} concluídas${overdue > 0 ? ` • ${overdue} atrasadas` : ""}`;
     } else {
       // Sem solicitações no mês — neutro (metade)
