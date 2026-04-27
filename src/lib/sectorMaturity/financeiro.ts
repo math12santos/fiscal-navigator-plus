@@ -7,8 +7,10 @@ import {
   SectorMaturityResult,
   maturityLabelFromScore,
 } from "./types";
+import { DEFAULT_TARGETS, SectorMaturityTargets } from "./targets";
 
 interface EvaluateFinanceiroInput {
+  targets?: SectorMaturityTargets;
   // Estrutura
   chartAccounts: any[];           // chart_of_accounts (active)
   costCenters: any[];             // cost_centers
@@ -38,6 +40,7 @@ function pct(part: number, total: number) {
 
 export function evaluateFinanceiro(input: EvaluateFinanceiroInput): SectorMaturityResult {
   const today = input.refDate ?? new Date();
+  const targets = input.targets ?? DEFAULT_TARGETS;
   const items: ChecklistItem[] = [];
   const push = (i: ChecklistItem) => items.push({ ...i, done: i.earned >= i.weight });
 
