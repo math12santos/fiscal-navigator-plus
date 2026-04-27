@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { SectorOnboardingBar } from "@/components/sector-onboarding/SectorOnboardingBar";
 import { ContasAPagar } from "@/components/financeiro/ContasAPagar";
 import { ContasAReceber } from "@/components/financeiro/ContasAReceber";
 import { ContasBancariasTab } from "@/components/financeiro/ContasBancariasTab";
@@ -22,9 +24,29 @@ const ALL_TABS = [
 ];
 
 export default function Financeiro() {
+  const navigate = useNavigate();
   const { getAllowedTabs } = useUserPermissions();
   const allowedTabs = getAllowedTabs("financeiro", ALL_TABS);
   const [activeTab, setActiveTab] = useState(allowedTabs[0]?.key || "pagar");
+
+  // Mapeia CTAs do checklist/trilha de maturidade para abas internas ou rotas externas.
+  const handleMaturityTabChange = (tab: string) => {
+    const externalRoutes: Record<string, string> = {
+      "config-chart": "/configuracoes?tab=plano-contas",
+      "config-cc": "/configuracoes?tab=centros-custo",
+      "config-entities": "/configuracoes?tab=entidades",
+      "config-grouping": "/configuracoes?tab=aglutinacao",
+      "contratos": "/contratos",
+      "solicitacoes": "/solicitacoes",
+    };
+    if (externalRoutes[tab]) {
+      navigate(externalRoutes[tab]);
+      return;
+    }
+    if (allowedTabs.some((t) => t.key === tab)) {
+      setActiveTab(tab);
+    }
+  };
 
   if (allowedTabs.length === 0) {
     return (
@@ -40,6 +62,8 @@ export default function Financeiro() {
         title="Financeiro"
         description="Gestão financeira completa: contas, fluxo de caixa, conciliação e importações"
       />
+
+      <SectorOnboardingBar sector="financeiro" onTabChange={handleMaturityTabChange} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex-wrap">
