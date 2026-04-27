@@ -2,7 +2,7 @@
 // Reusa o mesmo motor de avaliação (`useSectorOnboarding`) que alimenta a
 // barra completa dentro de cada módulo, garantindo single source of truth.
 
-import { useMemo } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Gauge } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,11 +29,11 @@ export function SectorMaturityCard({ sector, onResult }: Props) {
   const navigate = useNavigate();
   const { result, isLoading } = useSectorOnboarding(sector);
 
-  // Reporta o resultado para o pai (sem useEffect para evitar loop: o hook
-  // já memoiza o objeto entre renders quando os inputs não mudam).
-  useMemo(() => {
+  // Reporta o resultado para o pai sempre que mudar.
+  useEffect(() => {
     onResult?.(sector, result ?? null);
-  }, [sector, result, onResult]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sector, result]);
 
   const meta = SECTOR_META[sector];
 
