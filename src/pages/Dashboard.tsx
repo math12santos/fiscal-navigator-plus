@@ -21,6 +21,7 @@ import { startOfMonth, subMonths, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 import DPCockpitSection from "@/components/dp/DPCockpitSection";
+import MaturityOverviewSection from "@/components/dashboard/MaturityOverviewSection";
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -420,6 +421,9 @@ export default function Dashboard() {
           Nenhum lançamento encontrado. Cadastre contratos ou lançamentos no Fluxo de Caixa para ver dados aqui.
         </div>
       )}
+
+      {/* SEÇÃO 2.4 — MATURIDADE POR SETOR */}
+      <MaturityOverviewSection />
 
       {/* SEÇÃO 2.5 — COCKPIT DP */}
       <DPCockpitSection />

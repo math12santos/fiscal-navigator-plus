@@ -1,96 +1,48 @@
-# Metas de Maturidade Configuráveis por Organização
+# Maturidade por Setor no Dashboard Geral
 
-Hoje os cortes do termômetro estão hardcoded nos avaliadores (`evaluateDP` / `evaluateFinanceiro`) e o único valor configurável é `dp_config.meta_rotinas_pct`. Vou unificar tudo numa única tabela `sector_maturity_targets` por organização+setor, com fallback de defaults globais.
+Adicionar uma seção no Dashboard que exibe, em uma única visão executiva, o nível de maturidade de cada departamento (DP e Financeiro hoje; CRM/Contratos/Planejamento ficam preparados para quando seus avaliadores existirem).
 
-## Modelo de dados
+## O que o usuário verá
 
-Nova tabela **`sector_maturity_targets`** (uma linha por org+setor):
+Um bloco "Maturidade dos Departamentos" no Dashboard, com:
 
-| Coluna | Tipo | Default | Significado |
-|---|---|---|---|
-| `id` | uuid | gen | PK |
-| `organization_id` | uuid FK | — | escopo |
-| `sector` | text | — | `dp` \| `financeiro` |
-| `routines_target_pct` | numeric | 0.85 | % de rotinas/requests cumpridas (DP+Fin) |
-| `routines_overdue_tolerance_pct` | numeric | 0.10 | tolerância de atraso antes de penalizar |
-| `reconciliation_target_pct` | numeric | 0.90 | % de conciliação (Fin) |
-| `classification_target_pct` | numeric | 0.95 | % de entries com `account_id`+`cost_center_id` (Fin) |
-| `bank_freshness_days` | integer | 7 | dias máximos para considerar saldo "fresco" (Fin) |
-| `overdue_critical_days` | integer | 30 | dias para classificar lançamento como "vencido crítico" (Fin) |
-| `overdue_max_count` | integer | 10 | quantos vencidos críticos zeram a nota (Fin) |
-| `documents_required` | text[] | `{contrato,rg,cpf}` | docs obrigatórios por colaborador (DP) |
-| `payroll_close_required` | bool | true | exige folha do mês anterior fechada (DP) |
-| `period_close_required` | bool | true | exige período fiscal anterior fechado (Fin) |
-| `created_at`/`updated_at` | timestamptz | now() | auditoria |
-| Unique | (organization_id, sector) | | |
+- Um card por setor implementado (DP, Financeiro), exibindo:
+  - Score 0–100 + label (Inicial / Básico / Intermediário / Avançado / Excelente) com a cor padrão do termômetro.
+  - Barra de progresso.
+  - Mini-breakdown 50/25/25 (Completude / Atualização / Rotinas).
+  - Quantidade de itens pendentes no checklist.
+  - Botão "Abrir setor" → navega para a página do módulo (DP/Financeiro), onde a `SectorOnboardingBar` completa já existe (trilha, checklist, tendência, metas, PDF).
+- Score consolidado da organização (média simples dos setores avaliados) no cabeçalho da seção, com label.
+- Estado vazio amigável quando nenhum setor estiver avaliado ainda.
+- Skeleton enquanto carrega.
 
-**RLS:** SELECT por membros da org; INSERT/UPDATE por owners/admins/master/backoffice.
+A seção fica logo acima do bloco DP existente (`DPCockpitSection`), respeitando a hierarquia executiva (visão geral → drill-down).
 
-**Sem trigger de seed**: os defaults vêm da própria coluna; quando não há linha, o avaliador usa constantes default em código (`DEFAULT_TARGETS`).
+## Como funciona
 
-`dp_config.meta_rotinas_pct` fica mantida por retrocompatibilidade — uma migration leve copia o valor para `sector_maturity_targets.routines_target_pct` quando existir, mas a fonte de verdade passa a ser a nova tabela.
+- Reusa o mesmo motor de avaliação que já roda em DP e Financeiro (`useSectorOnboarding`), garantindo número idêntico ao mostrado dentro de cada módulo (single source of truth).
+- O Dashboard chama o hook uma vez por setor suportado. Cada chamada já carrega só seus datasets e respeita as metas configuráveis (`sector_maturity_targets`).
+- Sem novas tabelas, sem nova migration, sem novo edge function.
 
-## Avaliadores
+## Detalhes técnicos
 
-Ambos `evaluateDP` e `evaluateFinanceiro` recebem um novo parâmetro `targets: SectorMaturityTargets` (já normalizado pelo hook, com fallback). Substituir os literais por `targets.*`:
+Arquivos novos:
+- `src/components/dashboard/MaturityOverviewSection.tsx` — seção completa (cabeçalho + grid de cards + score consolidado + empty/loading state).
+- `src/components/dashboard/SectorMaturityCard.tsx` — card por setor (score, label, progresso, mini 50/25/25, contagem de pendências, CTA "Abrir setor").
 
-- DP:
-  - rotinas: usa `routines_target_pct` e `routines_overdue_tolerance_pct`
-  - documentos obrigatórios: `documents_required`
-  - folha mês anterior: só pontua se `payroll_close_required`
-- Financeiro:
-  - conciliação: `10 * min(1, rate / reconciliation_target_pct)`
-  - classificação: `6 * min(1, rate / classification_target_pct)`
-  - saldo fresco: cutoff = `now() - bank_freshness_days`
-  - vencidos críticos: cutoff = `now() - overdue_critical_days`; penalidade linear até `overdue_max_count`
-  - período fechado: só pontua se `period_close_required`
-  - rotinas: idem DP
+Arquivos editados:
+- `src/pages/Dashboard.tsx` — importa e renderiza `<MaturityOverviewSection />` antes do `DPCockpitSection`.
 
-## Hook
-
-`useSectorOnboarding` carrega 1 query adicional `targets` (por org+setor), normaliza com `DEFAULT_TARGETS` quando ausente e injeta no avaliador.
-
-`useSectorMaturityTargets(sector)` exposto para a UI editar; mutação faz upsert em `(organization_id, sector)` e invalida o cache de maturidade.
-
-## UI: editor de metas
-
-Novo componente **`SectorMaturityTargetsDialog`** (drawer/modal compartilhado pelos dois setores).
-
-Acesso via:
-1. Botão **"Metas"** no `SectorOnboardingBar` (entre Trilha e Exportar), visível só para owner/admin/master.
-2. Aba **"Metas de Maturidade"** dentro do `SectorMaturityTab` no Backoffice (lê e edita por organização).
-
-Form contém apenas os campos relevantes do setor selecionado (DP esconde campos só do Financeiro e vice-versa). Cada campo mostra o valor default e botão "Restaurar padrão".
-
-**Validações** (zod):
-- pcts entre 0 e 1
-- inteiros >= 1 para `bank_freshness_days`/`overdue_critical_days`/`overdue_max_count`
-- `documents_required`: array não vazio, lowercase
-
-## Cron (`sector-maturity-alerts`)
-
-Substituir o fetch de `dp_config.meta_rotinas_pct` por `sector_maturity_targets` (com fallback 0.85). Estender o disparo de alertas para usar também os limites do Financeiro:
-- período fiscal anterior aberto após dia 5 do mês corrente
-- contas bancárias sem atualização > `bank_freshness_days`
-- vencidos > `overdue_critical_days`
-
-## Arquivos previstos
-
-Novos:
-- migration: `sector_maturity_targets` + RLS + backfill de `meta_rotinas_pct` para DP
-- `src/lib/sectorMaturity/targets.ts` — `DEFAULT_TARGETS`, tipo `SectorMaturityTargets`, normalizador
-- `src/hooks/useSectorMaturityTargets.ts` — read/write
-- `src/components/sector-onboarding/SectorMaturityTargetsDialog.tsx`
-
-Editados:
-- `src/lib/sectorMaturity/dp.ts` — receber `targets`, substituir literais
-- `src/lib/sectorMaturity/financeiro.ts` — receber `targets`, substituir literais
-- `src/hooks/useSectorOnboarding.ts` — carregar e injetar targets
-- `src/components/sector-onboarding/SectorOnboardingBar.tsx` — botão "Metas"
-- `src/components/sector-onboarding/SectorMaturityTab.tsx` — aba Backoffice "Metas"
-- `supabase/functions/sector-maturity-alerts/index.ts` — usar nova tabela
-- `mem://features/sector-onboarding-maturity.md` — documentar metas configuráveis
+Implementação:
+- Lista interna `SUPPORTED_SECTORS: SectorKey[] = ["dp", "financeiro"]` (fácil estender quando CRM/Contratos/Planejamento ganharem `evaluate*`).
+- Cada `SectorMaturityCard` consome `useSectorOnboarding(sector)` e usa `MATURITY_LABEL_META` + `SECTOR_META` para label/cor/rota.
+- Score consolidado = média dos `result.score` dos setores com resultado disponível.
+- Navegação via `useNavigate(SECTOR_META[sector].route)`.
+- Sem strings dinâmicas de Tailwind (respeita a regra do projeto): cores via `cn()` e classes pré-definidas em `MATURITY_LABEL_META.badgeClass`.
+- Sem alterações em RLS, schema, edge functions ou em `SectorOnboardingBar` / hooks existentes.
 
 ## Fora do escopo
-- Metas para CRM/Contratos/Planejamento (segue o mesmo padrão quando esses setores forem ativados).
-- Versionamento histórico das metas (não há registro auditável de mudanças além do `updated_at`).
+
+- Não cria avaliadores para CRM, Contratos ou Planejamento (esses serão pilotos próprios, como foi DP→Financeiro).
+- Não duplica trilha/checklist/tendência no Dashboard — esses continuam dentro de cada módulo via `SectorOnboardingBar` para evitar ruído na visão executiva.
+- Não altera as metas nem a persistência em `sector_onboarding`.
