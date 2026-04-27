@@ -151,7 +151,7 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         // PJ: pagamento bruto único (NF de serviço), sem INSS empregado, IRRF de pessoa jurídica
         // tratado em outro fluxo, sem FGTS, sem provisões trabalhistas.
         if (isPJ) {
-          const base = { contract_id: null, contract_installment_id: null, tipo: "saida" as const, categoria: "Pessoal", valor_realizado: null, data_prevista: monthDate, data_realizada: null, status: "previsto", account_id: null, cost_center_id: emp.cost_center_id ?? null, entity_id: null, source: "dp", created_at: now, updated_at: now };
+          const base = { contract_id: null, contract_installment_id: null, tipo: "saida" as const, categoria: "Pessoal", valor_realizado: null, data_prevista: monthDate, data_realizada: null, status: "previsto", account_id: acctSalario, cost_center_id: emp.cost_center_id ?? null, entity_id: null, source: "dp", created_at: now, updated_at: now };
           entries.push({
             ...base,
             id: `proj-dp-pj-${emp.id}-${monthKey}`,
@@ -184,25 +184,27 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         const terceirosVal = isEstagio ? 0 : salary * terceirosPct;
         const gpsTotal = inssPatronalVal + inssEmp + ratVal + terceirosVal;
 
-        const base = { contract_id: null, contract_installment_id: null, tipo: "saida" as const, categoria: "Pessoal", valor_realizado: null, data_prevista: monthDate, data_realizada: null, status: "previsto", account_id: null, cost_center_id: emp.cost_center_id ?? null, entity_id: null, source: "dp", created_at: now, updated_at: now };
+        const baseSal = { contract_id: null, contract_installment_id: null, tipo: "saida" as const, categoria: "Pessoal", valor_realizado: null, data_prevista: monthDate, data_realizada: null, status: "previsto", account_id: acctSalario, cost_center_id: emp.cost_center_id ?? null, entity_id: null, source: "dp", created_at: now, updated_at: now };
+        const baseEnc = { ...baseSal, account_id: acctEncargos };
+        const baseBen = { ...baseSal, account_id: acctBeneficios };
 
         // 1. Salário Líquido (includes VT discount deduction)
         const salNotes = `Base: ${salary.toFixed(0)} | INSS Emp: ${inssEmp.toFixed(0)} | IRRF: ${irrf.toFixed(0)}${vtDesconto > 0 ? ` | VT Desc: ${vtDesconto.toFixed(0)}` : ""} | Líquido: ${netSalary.toFixed(0)}`;
-        entries.push({ ...base, id: `proj-dp-sal-${emp.id}-${monthKey}`, descricao: `Salário Líquido — ${emp.name}`, valor_previsto: Math.round(netSalary * 100) / 100, notes: salNotes, dp_sub_category: "salario_liquido", source_ref: projectionKey.payroll(emp.id, "salario_liquido", monthKey) } as any);
+        entries.push({ ...baseSal, id: `proj-dp-sal-${emp.id}-${monthKey}`, descricao: `Salário Líquido — ${emp.name}`, valor_previsto: Math.round(netSalary * 100) / 100, notes: salNotes, dp_sub_category: "salario_liquido", source_ref: projectionKey.payroll(emp.id, "salario_liquido", monthKey) } as any);
 
         // 2. FGTS
         if (fgtsVal > 0) {
-          entries.push({ ...base, id: `proj-dp-fgts-${emp.id}-${monthKey}`, descricao: `FGTS — ${emp.name}`, valor_previsto: Math.round(fgtsVal * 100) / 100, notes: `${(fgtsPct * 100).toFixed(1)}% s/ ${salary.toFixed(0)}`, dp_sub_category: "encargos_fgts", source_ref: projectionKey.payroll(emp.id, "encargos_fgts", monthKey) } as any);
+          entries.push({ ...baseEnc, id: `proj-dp-fgts-${emp.id}-${monthKey}`, descricao: `FGTS — ${emp.name}`, valor_previsto: Math.round(fgtsVal * 100) / 100, notes: `${(fgtsPct * 100).toFixed(1)}% s/ ${salary.toFixed(0)}`, dp_sub_category: "encargos_fgts", source_ref: projectionKey.payroll(emp.id, "encargos_fgts", monthKey) } as any);
         }
 
         // 3. GPS / INSS
         if (gpsTotal > 0) {
-          entries.push({ ...base, id: `proj-dp-inss-${emp.id}-${monthKey}`, descricao: `INSS / GPS — ${emp.name}`, valor_previsto: Math.round(gpsTotal * 100) / 100, notes: `Patronal: ${inssPatronalVal.toFixed(0)} | Emp: ${inssEmp.toFixed(0)} | RAT: ${ratVal.toFixed(0)} | 3os: ${terceirosVal.toFixed(0)}`, dp_sub_category: "encargos_inss", source_ref: projectionKey.payroll(emp.id, "encargos_inss", monthKey) } as any);
+          entries.push({ ...baseEnc, id: `proj-dp-inss-${emp.id}-${monthKey}`, descricao: `INSS / GPS — ${emp.name}`, valor_previsto: Math.round(gpsTotal * 100) / 100, notes: `Patronal: ${inssPatronalVal.toFixed(0)} | Emp: ${inssEmp.toFixed(0)} | RAT: ${ratVal.toFixed(0)} | 3os: ${terceirosVal.toFixed(0)}`, dp_sub_category: "encargos_inss", source_ref: projectionKey.payroll(emp.id, "encargos_inss", monthKey) } as any);
         }
 
         // 4. IRRF
         if (irrf > 0) {
-          entries.push({ ...base, id: `proj-dp-irrf-${emp.id}-${monthKey}`, descricao: `IRRF — ${emp.name}`, valor_previsto: Math.round(irrf * 100) / 100, notes: `Base cálculo: ${baseIRRF.toFixed(0)}`, dp_sub_category: "encargos_irrf", source_ref: projectionKey.payroll(emp.id, "encargos_irrf", monthKey) } as any);
+          entries.push({ ...baseEnc, id: `proj-dp-irrf-${emp.id}-${monthKey}`, descricao: `IRRF — ${emp.name}`, valor_previsto: Math.round(irrf * 100) / 100, notes: `Base cálculo: ${baseIRRF.toFixed(0)}`, dp_sub_category: "encargos_irrf", source_ref: projectionKey.payroll(emp.id, "encargos_irrf", monthKey) } as any);
         }
 
         // VT (dynamic business days)
@@ -212,7 +214,7 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           const vtNet = Math.max(0, vtBruto - vtDescontoVal);
           if (vtNet > 0) {
             entries.push({
-              ...base,
+              ...baseBen,
               id: `proj-dp-vt-${emp.id}-${monthKey}`,
               descricao: `VT — ${emp.name}`,
               valor_previsto: Math.round(vtNet * 100) / 100,
@@ -223,34 +225,32 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           }
         }
 
-        // Benefits
-        const empBenefits = benefitsByEmployee.get(emp.id) ?? 0;
-        if (empBenefits > 0) {
-          entries.push({
-            id: `proj-dp-beneficios-${emp.id}-${monthKey}`,
-            contract_id: null,
-            contract_installment_id: null,
-            tipo: "saida",
-            categoria: "Pessoal",
-            descricao: `Benefícios — ${emp.name}`,
-            valor_previsto: empBenefits,
-            valor_realizado: null,
-            data_prevista: monthDate,
-            data_realizada: null,
-            status: "previsto",
-            account_id: null,
-            cost_center_id: emp.cost_center_id ?? null,
-            entity_id: null,
-            notes: null,
-            source: "dp",
-            source_ref: projectionKey.payroll(emp.id, "beneficios", monthKey),
-            dp_sub_category: "beneficios",
-            created_at: now,
-            updated_at: now,
-          } as any);
+        // Benefits — segregados por categoria contábil (VR, VA, Saúde, Outros)
+        const empBenefitsBySub = benefitsByEmployee.get(emp.id);
+        if (empBenefitsBySub) {
+          for (const [sub, total] of empBenefitsBySub.entries()) {
+            if (total <= 0) continue;
+            const label =
+              sub === "beneficios_vr" ? "VR"
+              : sub === "beneficios_va" ? "VA"
+              : sub === "beneficios_saude" ? "Saúde"
+              : "Benefícios";
+            entries.push({
+              ...baseBen,
+              id: `proj-dp-${sub}-${emp.id}-${monthKey}`,
+              descricao: `${label} — ${emp.name}`,
+              valor_previsto: Math.round(total * 100) / 100,
+              notes: null,
+              dp_sub_category: sub,
+              source_ref: projectionKey.payroll(emp.id, sub, monthKey),
+            } as any);
+          }
         }
 
-        // Provisions (13th + vacation) — somente CLT (estágio não tem 13/férias remuneradas)
+        // Provisions (13th + vacation) — somente CLT.
+        // Marcadas como `provisao_acumulada` (informativo / passivo trabalhista),
+        // NÃO somam no fluxo de caixa real — desembolso ocorre na rescisão,
+        // pagamento de férias gozadas e adiantamento/parcela do 13º.
         const provisoes = isEstagio ? 0 : salary * (provisao13Pct + provisaoFeriasPct);
         if (provisoes > 0) {
           entries.push({
@@ -259,19 +259,19 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
             contract_installment_id: null,
             tipo: "saida",
             categoria: "Pessoal",
-            descricao: `Provisões — ${emp.name}`,
+            descricao: `Provisão Acumulada (13º + Férias) — ${emp.name}`,
             valor_previsto: provisoes,
             valor_realizado: null,
             data_prevista: monthDate,
             data_realizada: null,
             status: "previsto",
-            account_id: null,
+            account_id: acctEncargos,
             cost_center_id: emp.cost_center_id ?? null,
             entity_id: null,
-            notes: null,
+            notes: "Informativo — compõe passivo trabalhista, não soma no caixa",
             source: "dp",
-            source_ref: projectionKey.payroll(emp.id, "provisoes", monthKey),
-            dp_sub_category: "provisoes",
+            source_ref: projectionKey.payroll(emp.id, "provisao_acumulada", monthKey),
+            dp_sub_category: "provisao_acumulada",
             created_at: now,
             updated_at: now,
           } as any);
