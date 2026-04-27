@@ -412,6 +412,8 @@ export function useSectorOnboarding(
     finGroupingMacrosQ.data, finGroupingGroupsQ.data, finGroupingRulesQ.data,
     finContractsQ.data, finCashflowMonthQ.data, finCashflowPrevQ.data,
     finOverdueQ.data, finPeriodQ.data, finRequestsQ.data,
+    // Targets
+    targets,
   ]);
 
   const isLoading = isDP
