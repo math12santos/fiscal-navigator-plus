@@ -107,15 +107,23 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
     const provisaoFeriasPct = (config?.provisao_ferias_pct ?? 11.11) / 100;
     const vtDescontoPct = (config?.vt_desconto_pct ?? 6) / 100;
 
-    // Index benefits by employee
-    const benefitsByEmployee = new Map<string, number>();
+    // Default chart-of-accounts mapping (CFO-readable books out of the box)
+    const acctSalario = (config as any)?.default_account_salario ?? null;
+    const acctEncargos = (config as any)?.default_account_encargos ?? null;
+    const acctBeneficios = (config as any)?.default_account_beneficios ?? null;
+
+    // Index benefits by employee, segregated by sub-category for accounting traceability.
+    // empId -> { sub_category -> total_value }
+    const benefitsByEmployee = new Map<string, Map<string, number>>();
     for (const eb of employeeBenefits) {
       if (!eb.active) continue;
-      const val = eb.custom_value ?? eb.dp_benefits?.default_value ?? 0;
-      benefitsByEmployee.set(
-        eb.employee_id,
-        (benefitsByEmployee.get(eb.employee_id) ?? 0) + Number(val)
-      );
+      const val = Number(eb.custom_value ?? eb.dp_benefits?.default_value ?? 0);
+      if (val === 0) continue;
+      const cat = eb.dp_benefits?.category ?? "outros";
+      const sub = BENEFIT_CATEGORY_TO_SUB[cat] ?? "beneficios_outros";
+      const inner = benefitsByEmployee.get(eb.employee_id) ?? new Map<string, number>();
+      inner.set(sub, (inner.get(sub) ?? 0) + val);
+      benefitsByEmployee.set(eb.employee_id, inner);
     }
 
     const entries: (Omit<CashFlowEntry, "user_id" | "organization_id"> & { dp_sub_category?: string })[] = [];
