@@ -338,6 +338,37 @@ export function ContasBancariasTab() {
                         {tipoContaLabels[acc.tipo_conta] || acc.tipo_conta}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 max-w-[200px]">
+                        {acc.pix_key ? (
+                          <>
+                            <span className="font-mono text-xs truncate" title={acc.pix_key}>
+                              {acc.pix_key}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0"
+                              title="Copiar chave PIX"
+                              onClick={() => handleCopyPix(acc.pix_key!)}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 ml-auto"
+                          title="Editar chave PIX"
+                          onClick={() => openPixDialog(acc)}
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <span className={`font-mono text-sm ${acc.saldo_atual < 0 ? "text-destructive" : "text-foreground"}`}>
