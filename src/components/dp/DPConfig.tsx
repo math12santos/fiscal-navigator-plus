@@ -165,7 +165,7 @@ export default function DPConfig() {
       .map((c) => ({ ...c, label: c.label.trim(), pct: Number(c.pct) || 0 }));
 
     mutate.mutate(
-      { ...base, custom_items: cleanCustoms } as any,
+      { ...base, ...schedule, custom_items: cleanCustoms } as any,
       {
         onSuccess: () => {
           toast({ title: "Configurações salvas" });
