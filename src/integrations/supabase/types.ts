@@ -1812,6 +1812,10 @@ export type Database = {
         Row: {
           created_at: string
           custom_items: Json
+          default_account_beneficios: string | null
+          default_account_encargos: string | null
+          default_account_rescisao: string | null
+          default_account_salario: string | null
           fgts_pct: number | null
           id: string
           inss_patronal_pct: number | null
@@ -1829,6 +1833,10 @@ export type Database = {
         Insert: {
           created_at?: string
           custom_items?: Json
+          default_account_beneficios?: string | null
+          default_account_encargos?: string | null
+          default_account_rescisao?: string | null
+          default_account_salario?: string | null
           fgts_pct?: number | null
           id?: string
           inss_patronal_pct?: number | null
@@ -1846,6 +1854,10 @@ export type Database = {
         Update: {
           created_at?: string
           custom_items?: Json
+          default_account_beneficios?: string | null
+          default_account_encargos?: string | null
+          default_account_rescisao?: string | null
+          default_account_salario?: string | null
           fgts_pct?: number | null
           id?: string
           inss_patronal_pct?: number | null
@@ -1861,6 +1873,34 @@ export type Database = {
           vt_desconto_pct?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "dp_config_default_account_beneficios_fkey"
+            columns: ["default_account_beneficios"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dp_config_default_account_encargos_fkey"
+            columns: ["default_account_encargos"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dp_config_default_account_rescisao_fkey"
+            columns: ["default_account_rescisao"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dp_config_default_account_salario_fkey"
+            columns: ["default_account_salario"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "dp_config_organization_id_fkey"
             columns: ["organization_id"]
