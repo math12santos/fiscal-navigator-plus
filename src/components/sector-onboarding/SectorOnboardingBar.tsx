@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  ChevronDown, ChevronUp, RefreshCw, Gauge, ListChecks, FileDown, Sparkles, TrendingUp,
+  ChevronDown, ChevronUp, RefreshCw, Gauge, ListChecks, FileDown, Sparkles, TrendingUp, Target,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,8 @@ import { ImprovementStep } from "@/lib/sectorMaturity/improvementTrack";
 import { SectorOnboardingChecklist } from "./SectorOnboardingChecklist";
 import { ImprovementTrack } from "./ImprovementTrack";
 import { MaturityTrendChart } from "./MaturityTrendChart";
+import { SectorMaturityTargetsDialog } from "./SectorMaturityTargetsDialog";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -38,8 +40,11 @@ export function SectorOnboardingBar({ sector, onTabChange }: Props) {
   const [open, setOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [drawerTab, setDrawerTab] = useState<"trilha" | "checklist" | "tendencia">("trilha");
+  const [targetsOpen, setTargetsOpen] = useState(false);
   const { result, isLoading, refresh } = useSectorOnboarding(sector);
   const { currentOrg } = useOrganization();
+  const { hasFullAccess } = useUserPermissions();
+  const canEditTargets = hasFullAccess;
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Snapshot mensal defensivo
@@ -132,6 +137,11 @@ export function SectorOnboardingBar({ sector, onTabChange }: Props) {
               <Button size="sm" variant="ghost" onClick={handleExport} title="Exportar PDF">
                 <FileDown size={14} />
               </Button>
+              {canEditTargets && (
+                <Button size="sm" variant="ghost" onClick={() => setTargetsOpen(true)} title="Metas de maturidade">
+                  <Target size={14} />
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={refresh} title="Recalcular">
                 <RefreshCw size={14} />
               </Button>
@@ -195,6 +205,14 @@ export function SectorOnboardingBar({ sector, onTabChange }: Props) {
           </div>
         </SheetContent>
       </Sheet>
+
+      {canEditTargets && (
+        <SectorMaturityTargetsDialog
+          open={targetsOpen}
+          onOpenChange={setTargetsOpen}
+          sector={sector}
+        />
+      )}
     </>
   );
 }

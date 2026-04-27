@@ -13,6 +13,7 @@ import { useDPBenefits, useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import { evaluateDP } from "@/lib/sectorMaturity/dp";
 import { evaluateFinanceiro } from "@/lib/sectorMaturity/financeiro";
 import { SectorKey, SectorMaturityResult } from "@/lib/sectorMaturity/types";
+import { useSectorMaturityTargets } from "@/hooks/useSectorMaturityTargets";
 
 interface UseSectorOnboardingOptions {
   autoPersist?: boolean; // default true
@@ -32,6 +33,9 @@ export function useSectorOnboarding(
   const competencia = format(today, "yyyy-MM");
   const isDP = sector === "dp";
   const isFin = sector === "financeiro";
+
+  // Metas configuráveis (com fallback aos defaults quando não houver registro)
+  const { targets } = useSectorMaturityTargets(sector);
 
   // ============== Datasets DP (carregados só quando sector === "dp") ==============
   const { data: employees = [], isLoading: loadEmp } = useEmployees();
@@ -343,6 +347,7 @@ export function useSectorOnboarding(
       ).length;
 
       return evaluateDP({
+        targets,
         dpConfig: dpConfig ?? null,
         businessDays: businessDaysQ.data ?? [],
         positions: positionsQ.data ?? [],
@@ -375,6 +380,7 @@ export function useSectorOnboarding(
       ).length;
 
       return evaluateFinanceiro({
+        targets,
         chartAccounts: finChartQ.data ?? [],
         costCenters: finCostCentersQ.data ?? [],
         bankAccounts: finBankQ.data ?? [],
@@ -406,6 +412,8 @@ export function useSectorOnboarding(
     finGroupingMacrosQ.data, finGroupingGroupsQ.data, finGroupingRulesQ.data,
     finContractsQ.data, finCashflowMonthQ.data, finCashflowPrevQ.data,
     finOverdueQ.data, finPeriodQ.data, finRequestsQ.data,
+    // Targets
+    targets,
   ]);
 
   const isLoading = isDP

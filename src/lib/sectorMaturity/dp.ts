@@ -6,8 +6,10 @@ import {
   SectorMaturityResult,
   maturityLabelFromScore,
 } from "./types";
+import { DEFAULT_TARGETS, SectorMaturityTargets } from "./targets";
 
 interface EvaluateDPInput {
+  targets?: SectorMaturityTargets;
   // Configurações
   dpConfig: any | null;
   businessDays: any[];           // dp_business_days
@@ -30,7 +32,7 @@ interface EvaluateDPInput {
   refDate?: Date;
 }
 
-const DOC_REQUIRED_TYPES = ["contrato", "rg", "cpf"];
+// Documentos obrigatórios podem ser sobrescritos via targets.documents_required.
 
 function pct(part: number, total: number) {
   if (total <= 0) return 0;
@@ -43,6 +45,8 @@ function monthsBetween(a: Date, b: Date) {
 
 export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
   const today = input.refDate ?? new Date();
+  const targets = input.targets ?? DEFAULT_TARGETS;
+  const DOC_REQUIRED_TYPES = targets.documents_required;
   const items: ChecklistItem[] = [];
   const push = (i: ChecklistItem) => items.push({ ...i, done: i.earned >= i.weight });
 
@@ -215,7 +219,7 @@ export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
   // ============== B. ATUALIZAÇÃO (25 pts) ==============
 
   // 1. Folha do mês anterior fechada (8 pts)
-  {
+  if (targets.payroll_close_required) {
     const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const prevKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
     const run = input.payrollRuns.find((r) => {
@@ -233,6 +237,17 @@ export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
       hint: "Feche e bloqueie a folha do mês passado para garantir o histórico.",
       ctaTab: "folha",
       detail: run ? (run.locked ? "fechada e travada" : `status: ${run.status}`) : "não encontrada",
+    });
+  } else {
+    push({
+      key: "dp-payroll-prev",
+      label: "Folha do mês anterior fechada",
+      category: "atualizacao",
+      weight: 8,
+      earned: 8,
+      hint: "Política da organização: fechamento de folha não exigido.",
+      ctaTab: "folha",
+      detail: "não exigido",
     });
   }
 
@@ -361,8 +376,11 @@ export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
       detail = "cadastre rotinas por cargo primeiro";
     } else if (total > 0) {
       const completionRate = completed / total;
-      const overduePenalty = Math.min(0.5, (overdue / total) * 0.5);
-      earned = 15 * Math.max(0, completionRate - overduePenalty);
+      const overdueRate = overdue / total;
+      const tolerated = Math.max(0, overdueRate - targets.routines_overdue_tolerance_pct);
+      const overduePenalty = Math.min(0.5, tolerated * 0.5);
+      const adjusted = Math.max(0, completionRate - overduePenalty);
+      earned = 15 * Math.min(1, adjusted / Math.max(0.01, targets.routines_target_pct));
       detail = `${completed}/${total} concluídas${overdue > 0 ? ` • ${overdue} atrasadas` : ""}`;
     } else {
       // catálogo existe mas o mês ainda não gerou tarefas — neutro (metade)
