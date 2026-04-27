@@ -217,9 +217,11 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
   }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections, filterByScope]);
 
   // KPIs (consolidated across realized + projected, no double counting).
+  // Provisões acumuladas (passivo trabalhista) NÃO impactam o caixa.
   const totals = useMemo(() => {
     let entradas = 0, saidas = 0;
     for (const e of allEntries) {
+      if ((e as any).dp_sub_category === "provisao_acumulada") continue;
       const val = e.valor_realizado ?? e.valor_previsto;
       if (e.tipo === "entrada") entradas += Number(val);
       else saidas += Number(val);
