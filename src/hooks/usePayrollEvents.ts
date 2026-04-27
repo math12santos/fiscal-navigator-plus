@@ -3,22 +3,36 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 
+/**
+ * `tributavel: true` → entra na base de cálculo do INSS/IRRF do empregado.
+ * Proventos isentos (ajuda de custo, diárias) somam ao bruto/líquido mas
+ * não impactam tributos.
+ */
 export const PAYROLL_EVENT_TYPES = [
-  { value: "hora_extra_50", label: "Hora extra 50%", signal: "provento" },
-  { value: "hora_extra_100", label: "Hora extra 100%", signal: "provento" },
-  { value: "adicional_noturno", label: "Adicional noturno", signal: "provento" },
-  { value: "bonus", label: "Bônus", signal: "provento" },
-  { value: "comissao_variavel", label: "Comissão variável", signal: "provento" },
-  { value: "outros_provento", label: "Outros proventos", signal: "provento" },
-  { value: "falta", label: "Falta", signal: "desconto" },
-  { value: "atraso", label: "Atraso", signal: "desconto" },
-  { value: "desconto_pontual", label: "Desconto pontual", signal: "desconto" },
-  { value: "adiantamento", label: "Adiantamento", signal: "desconto" },
-  { value: "vale", label: "Vale", signal: "desconto" },
-  { value: "outros_desconto", label: "Outros descontos", signal: "desconto" },
+  { value: "hora_extra_50", label: "Hora extra 50%", signal: "provento", tributavel: true },
+  { value: "hora_extra_100", label: "Hora extra 100%", signal: "provento", tributavel: true },
+  { value: "adicional_noturno", label: "Adicional noturno", signal: "provento", tributavel: true },
+  { value: "bonus", label: "Bônus", signal: "provento", tributavel: true },
+  { value: "comissao_variavel", label: "Comissão variável", signal: "provento", tributavel: true },
+  { value: "ajuda_custo", label: "Ajuda de custo (isento)", signal: "provento", tributavel: false },
+  { value: "diarias", label: "Diárias (isento até 50%)", signal: "provento", tributavel: false },
+  { value: "outros_provento", label: "Outros proventos", signal: "provento", tributavel: true },
+  { value: "falta", label: "Falta", signal: "desconto", tributavel: false },
+  { value: "atraso", label: "Atraso", signal: "desconto", tributavel: false },
+  { value: "desconto_pontual", label: "Desconto pontual", signal: "desconto", tributavel: false },
+  { value: "adiantamento", label: "Adiantamento", signal: "desconto", tributavel: false },
+  { value: "vale", label: "Vale", signal: "desconto", tributavel: false },
+  { value: "outros_desconto", label: "Outros descontos", signal: "desconto", tributavel: false },
 ] as const;
 
 export type PayrollEventType = (typeof PAYROLL_EVENT_TYPES)[number]["value"];
+
+/** Lookup: event_type → tributável? Default false (conservador). */
+export function isEventTributavel(eventType: string | null | undefined): boolean {
+  if (!eventType) return false;
+  const def = PAYROLL_EVENT_TYPES.find((e) => e.value === eventType);
+  return def?.tributavel ?? false;
+}
 
 export interface PayrollEvent {
   id: string;

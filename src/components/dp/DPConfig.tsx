@@ -36,7 +36,9 @@ import {
   CheckCircle2,
   XCircle,
   Send,
+  CalendarClock,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import DPBusinessDaysCalendar from "./DPBusinessDaysCalendar";
 import DPBusinessDaysOverridesReport from "./DPBusinessDaysOverridesReport";
 
@@ -111,7 +113,20 @@ export default function DPConfig() {
   const [propagateDialogOpen, setPropagateDialogOpen] = useState(false);
   const [selectedSubsidiaries, setSelectedSubsidiaries] = useState<Set<string>>(new Set());
 
-  // Sync local state when remote config loads
+  // Calendário de desembolsos
+  const [schedule, setSchedule] = useState({
+    advance_enabled: false,
+    advance_pct: 40,
+    advance_payment_day: 20,
+    salary_payment_day: 5,
+    salary_payment_basis: "business_day" as "business_day" | "calendar_day",
+    inss_due_day: 20,
+    fgts_due_day: 20,
+    irrf_due_day: 20,
+    benefits_payment_day: -1,
+    health_payment_day: 10,
+  });
+
   useEffect(() => {
     if (config) {
       setBase({
@@ -124,6 +139,19 @@ export default function DPConfig() {
         vt_desconto_pct: config.vt_desconto_pct ?? DEFAULTS.vt_desconto_pct,
       });
       setCustoms(Array.isArray((config as any).custom_items) ? ((config as any).custom_items as CustomItem[]) : []);
+      const c = config as any;
+      setSchedule({
+        advance_enabled: !!c.advance_enabled,
+        advance_pct: Number(c.advance_pct ?? 40),
+        advance_payment_day: Number(c.advance_payment_day ?? 20),
+        salary_payment_day: Number(c.salary_payment_day ?? 5),
+        salary_payment_basis: (c.salary_payment_basis ?? "business_day") as any,
+        inss_due_day: Number(c.inss_due_day ?? 20),
+        fgts_due_day: Number(c.fgts_due_day ?? 20),
+        irrf_due_day: Number(c.irrf_due_day ?? 20),
+        benefits_payment_day: Number(c.benefits_payment_day ?? -1),
+        health_payment_day: Number(c.health_payment_day ?? 10),
+      });
     }
   }, [config]);
 
@@ -137,7 +165,7 @@ export default function DPConfig() {
       .map((c) => ({ ...c, label: c.label.trim(), pct: Number(c.pct) || 0 }));
 
     mutate.mutate(
-      { ...base, custom_items: cleanCustoms } as any,
+      { ...base, ...schedule, custom_items: cleanCustoms } as any,
       {
         onSuccess: () => {
           toast({ title: "Configurações salvas" });
@@ -304,6 +332,135 @@ export default function DPConfig() {
 
       {/* Auditoria CFO-first: histórico completo de overrides mensais e individuais */}
       <DPBusinessDaysOverridesReport />
+
+      {/* Calendário de Desembolsos: alinha o fluxo de caixa com as datas reais de pagamento */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-start gap-2">
+            <CalendarClock size={16} className="mt-0.5 text-primary" />
+            <div>
+              <CardTitle className="text-sm">Calendário de Desembolsos</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Define quando salário, encargos e benefícios saem do caixa. Impacta o Fluxo de Caixa e as projeções financeiras.
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Adiantamento (vale) — opcional */}
+          <div className="rounded-md border border-border bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Pagar adiantamento (vale)</p>
+                <p className="text-xs text-muted-foreground">
+                  Quando ativo, parte do líquido é paga no mês de competência (ex.: 40% no dia 20) e o saldo no mês seguinte.
+                </p>
+              </div>
+              <Switch
+                checked={schedule.advance_enabled}
+                onCheckedChange={(v) => setSchedule((s) => ({ ...s, advance_enabled: v }))}
+              />
+            </div>
+            {schedule.advance_enabled && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">% do líquido pago como adiantamento</Label>
+                  <Input
+                    type="number" min="0" max="100" step="1"
+                    value={schedule.advance_pct}
+                    onChange={(e) => setSchedule((s) => ({ ...s, advance_pct: Number(e.target.value) }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Dia do pagamento (mês de competência)</Label>
+                  <Input
+                    type="number" min="1" max="31" step="1"
+                    value={schedule.advance_payment_day}
+                    onChange={(e) => setSchedule((s) => ({ ...s, advance_payment_day: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Salário */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Dia do pagamento do salário</Label>
+              <Input
+                type="number" min="1" max="31" step="1"
+                value={schedule.salary_payment_day}
+                onChange={(e) => setSchedule((s) => ({ ...s, salary_payment_day: Number(e.target.value) }))}
+              />
+              <p className="text-[10px] text-muted-foreground">No mês seguinte ao da competência</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Base do dia do salário</Label>
+              <Select
+                value={schedule.salary_payment_basis}
+                onValueChange={(v) => setSchedule((s) => ({ ...s, salary_payment_basis: v as any }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="business_day">Dia útil (ex.: 5º dia útil)</SelectItem>
+                  <SelectItem value="calendar_day">Dia calendário</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Vencimentos de tributos */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Vencimento GPS / INSS (dia)</Label>
+              <Input type="number" min="1" max="31" step="1"
+                value={schedule.inss_due_day}
+                onChange={(e) => setSchedule((s) => ({ ...s, inss_due_day: Number(e.target.value) }))} />
+              <p className="text-[10px] text-muted-foreground">Guia única consolidada — mês seguinte</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Vencimento FGTS / GRF (dia)</Label>
+              <Input type="number" min="1" max="31" step="1"
+                value={schedule.fgts_due_day}
+                onChange={(e) => setSchedule((s) => ({ ...s, fgts_due_day: Number(e.target.value) }))} />
+              <p className="text-[10px] text-muted-foreground">Guia única consolidada — mês seguinte</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Vencimento DARF IRRF (dia)</Label>
+              <Input type="number" min="1" max="31" step="1"
+                value={schedule.irrf_due_day}
+                onChange={(e) => setSchedule((s) => ({ ...s, irrf_due_day: Number(e.target.value) }))} />
+              <p className="text-[10px] text-muted-foreground">DARF código 0561 — mês seguinte</p>
+            </div>
+          </div>
+
+          {/* Benefícios */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Crédito de VT/VR/VA</Label>
+              <Select
+                value={String(schedule.benefits_payment_day)}
+                onValueChange={(v) => setSchedule((s) => ({ ...s, benefits_payment_day: Number(v) }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="-1">Último dia útil do mês anterior</SelectItem>
+                  <SelectItem value="25">Dia 25 do mês anterior</SelectItem>
+                  <SelectItem value="28">Dia 28 do mês anterior</SelectItem>
+                  <SelectItem value="30">Dia 30 do mês anterior</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Dia da fatura do plano de saúde</Label>
+              <Input type="number" min="1" max="31" step="1"
+                value={schedule.health_payment_day}
+                onChange={(e) => setSchedule((s) => ({ ...s, health_payment_day: Number(e.target.value) }))} />
+              <p className="text-[10px] text-muted-foreground">No mês de competência</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Banner de sugestão pendente vinda da Holding (apenas em subsidiárias) */}
       {pendingSuggestion && (
