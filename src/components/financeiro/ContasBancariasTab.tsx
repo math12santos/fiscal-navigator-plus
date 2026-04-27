@@ -10,7 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp, Info } from "lucide-react";
+import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp, Info, KeyRound, Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { useHolding } from "@/contexts/HoldingContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -48,6 +49,11 @@ export function ContasBancariasTab() {
   const [showCreate, setShowCreate] = useState(false);
   const { holdingMode, subsidiaryOrgs } = useHolding();
   const { currentOrg } = useOrganization();
+  const { toast } = useToast();
+
+  // PIX dialog state
+  const [pixAccount, setPixAccount] = useState<BankAccount | null>(null);
+  const [pixValue, setPixValue] = useState("");
 
   // Balance dialog state
   const [balanceAccount, setBalanceAccount] = useState<BankAccount | null>(null);
@@ -73,6 +79,28 @@ export function ContasBancariasTab() {
   const orgNameMap: Record<string, string> = {};
   if (currentOrg) orgNameMap[currentOrg.id] = currentOrg.name;
   subsidiaryOrgs.forEach((o) => { orgNameMap[o.id] = o.name; });
+
+  const openPixDialog = (acc: BankAccount) => {
+    setPixAccount(acc);
+    setPixValue(acc.pix_key || "");
+  };
+
+  const handleSavePix = () => {
+    if (!pixAccount) return;
+    const trimmed = pixValue.trim().slice(0, 200);
+    update.mutate({ id: pixAccount.id, pix_key: trimmed || null } as any);
+    setPixAccount(null);
+    setPixValue("");
+  };
+
+  const handleCopyPix = async (key: string) => {
+    try {
+      await navigator.clipboard.writeText(key);
+      toast({ title: "Chave PIX copiada" });
+    } catch {
+      toast({ title: "Não foi possível copiar", variant: "destructive" });
+    }
+  };
 
   const handleSaveBalance = () => {
     if (!balanceAccount) return;
@@ -258,6 +286,7 @@ export function ContasBancariasTab() {
                 <TableHead>Nome</TableHead>
                 <TableHead>Banco</TableHead>
                 <TableHead>Tipo</TableHead>
+                <TableHead>Chave PIX</TableHead>
                 <TableHead className="text-right">Saldo Atual</TableHead>
                 <TableHead className="text-right">Limite</TableHead>
                 <TableHead className="text-right">Disponível</TableHead>
@@ -269,7 +298,7 @@ export function ContasBancariasTab() {
             <TableBody>
               {allBankAccounts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={holdingMode ? 9 : 8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={holdingMode ? 10 : 9} className="text-center text-muted-foreground py-8">
                     <Landmark className="h-8 w-8 mx-auto mb-2 opacity-30" />
                     Nenhuma conta bancária cadastrada
                   </TableCell>
@@ -308,6 +337,37 @@ export function ContasBancariasTab() {
                       <Badge variant="secondary" className="text-[10px]">
                         {tipoContaLabels[acc.tipo_conta] || acc.tipo_conta}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 max-w-[200px]">
+                        {acc.pix_key ? (
+                          <>
+                            <span className="font-mono text-xs truncate" title={acc.pix_key}>
+                              {acc.pix_key}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0"
+                              title="Copiar chave PIX"
+                              onClick={() => handleCopyPix(acc.pix_key!)}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 ml-auto"
+                          title="Editar chave PIX"
+                          onClick={() => openPixDialog(acc)}
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -586,6 +646,31 @@ export function ContasBancariasTab() {
           onConfirm={handleConfirmOverdraft}
         />
       )}
+
+      {/* PIX dialog */}
+      <Dialog open={!!pixAccount} onOpenChange={(open) => { if (!open) setPixAccount(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chave PIX — {pixAccount?.nome}</DialogTitle>
+            <DialogDescription>
+              CPF/CNPJ, e-mail, telefone ou chave aleatória vinculada a esta conta.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label>Chave PIX</Label>
+            <Input
+              value={pixValue}
+              maxLength={200}
+              onChange={(e) => setPixValue(e.target.value)}
+              placeholder="Ex: 12.345.678/0001-99"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPixAccount(null)}>Cancelar</Button>
+            <Button onClick={handleSavePix} disabled={update.isPending}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <BankAccountFormDialog
         open={showCreate}
