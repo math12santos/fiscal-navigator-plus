@@ -219,7 +219,7 @@ export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
   // ============== B. ATUALIZAÇÃO (25 pts) ==============
 
   // 1. Folha do mês anterior fechada (8 pts)
-  {
+  if (targets.payroll_close_required) {
     const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const prevKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
     const run = input.payrollRuns.find((r) => {
@@ -237,6 +237,17 @@ export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
       hint: "Feche e bloqueie a folha do mês passado para garantir o histórico.",
       ctaTab: "folha",
       detail: run ? (run.locked ? "fechada e travada" : `status: ${run.status}`) : "não encontrada",
+    });
+  } else {
+    push({
+      key: "dp-payroll-prev",
+      label: "Folha do mês anterior fechada",
+      category: "atualizacao",
+      weight: 8,
+      earned: 8,
+      hint: "Política da organização: fechamento de folha não exigido.",
+      ctaTab: "folha",
+      detail: "não exigido",
     });
   }
 
