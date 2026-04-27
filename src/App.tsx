@@ -65,6 +65,7 @@ const IAFinanceira = lazyRetry(pageFactories.ia);
 const Configuracoes = lazyRetry(pageFactories.configuracoes);
 const Cadastros = lazyRetry(pageFactories.cadastros);
 const DepartamentoPessoal = lazyRetry(pageFactories.dp);
+const DepartamentoPessoalDesempenho = lazyRetry(pageFactories.dpDesempenho);
 const CRM = lazyRetry(pageFactories.crm);
 const Financeiro = lazyRetry(pageFactories.financeiro);
 const RelatorioKpi = lazyRetry(pageFactories.relatorioKpi);
