@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { TrendingUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { SectorOnboardingBar } from "@/components/sector-onboarding/SectorOnboardingBar";
@@ -39,6 +42,7 @@ const TAB_COMPONENTS: Record<string, React.ReactNode> = {
 
 export default function DepartamentoPessoal() {
   const { getAllowedTabs } = useUserPermissions();
+  const navigate = useNavigate();
   const allowedTabs = getAllowedTabs("dp", ALL_TABS);
   const [tab, setTab] = useState(allowedTabs[0]?.key || "dashboard");
 
@@ -55,7 +59,16 @@ export default function DepartamentoPessoal() {
       <PageHeader
         title="Departamento Pessoal"
         description="Gestão de colaboradores, folha de pagamento, encargos e planejamento de RH"
-      />
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/dp/desempenho")}
+          onMouseEnter={() => import("@/pages/DepartamentoPessoalDesempenho")}
+        >
+          <TrendingUp size={14} className="mr-1" /> Gestão de Desempenho
+        </Button>
+      </PageHeader>
 
       <SectorOnboardingBar sector="dp" onTabChange={setTab} />
 

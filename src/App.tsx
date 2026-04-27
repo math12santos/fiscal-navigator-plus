@@ -52,6 +52,7 @@ export const pageFactories = {
   relatorioKpi: () => import("@/pages/RelatorioKpi"),
   relatoriosDistribuicao: () => import("@/pages/RelatoriosDistribuicao"),
   onboardingGuiado: () => import("@/pages/OnboardingGuiado"),
+  dpDesempenho: () => import("@/pages/DepartamentoPessoalDesempenho"),
 } as const;
 
 // Lazy-loaded pages
@@ -64,6 +65,7 @@ const IAFinanceira = lazyRetry(pageFactories.ia);
 const Configuracoes = lazyRetry(pageFactories.configuracoes);
 const Cadastros = lazyRetry(pageFactories.cadastros);
 const DepartamentoPessoal = lazyRetry(pageFactories.dp);
+const DepartamentoPessoalDesempenho = lazyRetry(pageFactories.dpDesempenho);
 const CRM = lazyRetry(pageFactories.crm);
 const Financeiro = lazyRetry(pageFactories.financeiro);
 const RelatorioKpi = lazyRetry(pageFactories.relatorioKpi);
@@ -167,6 +169,7 @@ function ProtectedRoutes() {
           <Route path="/configuracoes" element={<RouteShell skeleton={<GenericPageSkeleton title="Configurações" />}><ModuleMaintenanceGuard moduleKey="configuracoes"><Configuracoes /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/cadastros" element={<RouteShell skeleton={<GenericPageSkeleton title="Cadastros" />}><ModuleMaintenanceGuard moduleKey="cadastro"><Cadastros /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/dp" element={<RouteShell skeleton={<DpSkeleton />}><ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoal /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/dp/desempenho" element={<RouteShell skeleton={<DpSkeleton />}><ModuleMaintenanceGuard moduleKey="dp"><DepartamentoPessoalDesempenho /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/crm" element={<RouteShell skeleton={<CrmSkeleton />}><ModuleMaintenanceGuard moduleKey="crm"><CRM /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/nova-empresa" element={<RouteShell skeleton={<GenericPageSkeleton title="Nova empresa" />}><CreateOrganization /></RouteShell>} />
           <Route path="/relatorios/kpi/:metric" element={<RouteShell skeleton={<RelatorioKpiSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard></RouteShell>} />
