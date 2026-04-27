@@ -34,8 +34,14 @@ interface BenefitRow {
   employee_id: string;
   active: boolean;
   custom_value: number | null;
-  dp_benefits: { name: string; type: string; default_value: number } | null;
+  dp_benefits: { name: string; type: string; default_value: number; category?: string | null } | null;
 }
+
+const BENEFIT_CATEGORY_TO_SUB: Record<string, string> = {
+  vale_refeicao: "beneficios_vr",
+  vale_alimentacao: "beneficios_va",
+  plano_saude: "beneficios_saude",
+};
 
 const SUB_CATEGORY_LABELS: Record<string, string> = {
   salario_liquido: "Salário Líquido",
