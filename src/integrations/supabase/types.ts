@@ -5569,6 +5569,68 @@ export type Database = {
           },
         ]
       }
+      sector_maturity_targets: {
+        Row: {
+          bank_freshness_days: number
+          classification_target_pct: number
+          created_at: string
+          documents_required: string[]
+          id: string
+          organization_id: string
+          overdue_critical_days: number
+          overdue_max_count: number
+          payroll_close_required: boolean
+          period_close_required: boolean
+          reconciliation_target_pct: number
+          routines_overdue_tolerance_pct: number
+          routines_target_pct: number
+          sector: string
+          updated_at: string
+        }
+        Insert: {
+          bank_freshness_days?: number
+          classification_target_pct?: number
+          created_at?: string
+          documents_required?: string[]
+          id?: string
+          organization_id: string
+          overdue_critical_days?: number
+          overdue_max_count?: number
+          payroll_close_required?: boolean
+          period_close_required?: boolean
+          reconciliation_target_pct?: number
+          routines_overdue_tolerance_pct?: number
+          routines_target_pct?: number
+          sector: string
+          updated_at?: string
+        }
+        Update: {
+          bank_freshness_days?: number
+          classification_target_pct?: number
+          created_at?: string
+          documents_required?: string[]
+          id?: string
+          organization_id?: string
+          overdue_critical_days?: number
+          overdue_max_count?: number
+          payroll_close_required?: boolean
+          period_close_required?: boolean
+          reconciliation_target_pct?: number
+          routines_overdue_tolerance_pct?: number
+          routines_target_pct?: number
+          sector?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sector_maturity_targets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sector_onboarding: {
         Row: {
           checklist: Json
