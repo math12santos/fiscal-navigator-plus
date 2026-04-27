@@ -205,6 +205,14 @@ export function SectorOnboardingBar({ sector, onTabChange }: Props) {
           </div>
         </SheetContent>
       </Sheet>
+
+      {canEditTargets && (
+        <SectorMaturityTargetsDialog
+          open={targetsOpen}
+          onOpenChange={setTargetsOpen}
+          sector={sector}
+        />
+      )}
     </>
   );
 }
