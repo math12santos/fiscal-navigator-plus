@@ -59,7 +59,16 @@ export default function DepartamentoPessoal() {
       <PageHeader
         title="Departamento Pessoal"
         description="Gestão de colaboradores, folha de pagamento, encargos e planejamento de RH"
-      />
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/dp/desempenho")}
+          onMouseEnter={() => import("@/pages/DepartamentoPessoalDesempenho")}
+        >
+          <TrendingUp size={14} className="mr-1" /> Gestão de Desempenho
+        </Button>
+      </PageHeader>
 
       <SectorOnboardingBar sector="dp" onTabChange={setTab} />
 
