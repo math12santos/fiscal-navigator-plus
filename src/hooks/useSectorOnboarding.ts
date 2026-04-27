@@ -13,6 +13,7 @@ import { useDPBenefits, useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import { evaluateDP } from "@/lib/sectorMaturity/dp";
 import { evaluateFinanceiro } from "@/lib/sectorMaturity/financeiro";
 import { SectorKey, SectorMaturityResult } from "@/lib/sectorMaturity/types";
+import { useSectorMaturityTargets } from "@/hooks/useSectorMaturityTargets";
 
 interface UseSectorOnboardingOptions {
   autoPersist?: boolean; // default true
