@@ -58,7 +58,7 @@ export function useOnboardingProgress() {
       .maybeSingle();
 
     if (error) {
-      console.error("Error fetching onboarding progress:", error);
+      if (import.meta.env.DEV) console.error("Error fetching onboarding progress:", error);
     }
     setProgress(data as unknown as OnboardingProgress | null);
     setLoading(false);
