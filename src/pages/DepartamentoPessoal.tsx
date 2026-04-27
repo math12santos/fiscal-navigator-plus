@@ -42,6 +42,7 @@ const TAB_COMPONENTS: Record<string, React.ReactNode> = {
 
 export default function DepartamentoPessoal() {
   const { getAllowedTabs } = useUserPermissions();
+  const navigate = useNavigate();
   const allowedTabs = getAllowedTabs("dp", ALL_TABS);
   const [tab, setTab] = useState(allowedTabs[0]?.key || "dashboard");
 
