@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, CalendarRange } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
