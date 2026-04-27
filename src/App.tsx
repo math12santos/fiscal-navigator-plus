@@ -52,6 +52,7 @@ export const pageFactories = {
   relatorioKpi: () => import("@/pages/RelatorioKpi"),
   relatoriosDistribuicao: () => import("@/pages/RelatoriosDistribuicao"),
   onboardingGuiado: () => import("@/pages/OnboardingGuiado"),
+  dpDesempenho: () => import("@/pages/DepartamentoPessoalDesempenho"),
 } as const;
 
 // Lazy-loaded pages
