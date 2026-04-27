@@ -80,6 +80,28 @@ export function ContasBancariasTab() {
   if (currentOrg) orgNameMap[currentOrg.id] = currentOrg.name;
   subsidiaryOrgs.forEach((o) => { orgNameMap[o.id] = o.name; });
 
+  const openPixDialog = (acc: BankAccount) => {
+    setPixAccount(acc);
+    setPixValue(acc.pix_key || "");
+  };
+
+  const handleSavePix = () => {
+    if (!pixAccount) return;
+    const trimmed = pixValue.trim().slice(0, 200);
+    update.mutate({ id: pixAccount.id, pix_key: trimmed || null } as any);
+    setPixAccount(null);
+    setPixValue("");
+  };
+
+  const handleCopyPix = async (key: string) => {
+    try {
+      await navigator.clipboard.writeText(key);
+      toast({ title: "Chave PIX copiada" });
+    } catch {
+      toast({ title: "Não foi possível copiar", variant: "destructive" });
+    }
+  };
+
   const handleSaveBalance = () => {
     if (!balanceAccount) return;
     const val = parseFloat(balanceValue.replace(/[^\d.,-]/g, "").replace(",", "."));
