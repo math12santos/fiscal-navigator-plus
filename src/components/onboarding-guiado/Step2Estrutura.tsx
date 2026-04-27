@@ -120,7 +120,7 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
         setSubsidiaries([]);
       }
     } catch (err) {
-      console.error("Error fetching subsidiaries:", err);
+      if (import.meta.env.DEV) console.error("Error fetching subsidiaries:", err);
     } finally {
       setLoadingSubs(false);
     }
@@ -147,7 +147,7 @@ export function Step2Estrutura({ data, onChange }: Step2EstruturaProps) {
         }))
       );
     } catch (err) {
-      console.error("Error fetching members:", err);
+      if (import.meta.env.DEV) console.error("Error fetching members:", err);
     } finally {
       setLoadingMembers(false);
     }

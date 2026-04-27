@@ -91,7 +91,7 @@ export function ExpenseRequestButton() {
         .from("request-attachments")
         .upload(filePath, file);
       if (uploadErr) {
-        console.error("Upload error:", uploadErr);
+        if (import.meta.env.DEV) console.error("Upload error:", uploadErr);
         continue;
       }
 

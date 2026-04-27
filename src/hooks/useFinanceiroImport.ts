@@ -197,7 +197,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       };
 
       if (fnError || data?.error) {
-        console.error("AI mapping error:", fnError || data?.error);
+        if (import.meta.env.DEV) console.error("AI mapping error:", fnError || data?.error);
         setDetectedFormat({
           separator: ";",
           date_format: "dd/MM/yyyy",
@@ -217,7 +217,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       }
       setStep("mapping");
     } catch (e) {
-      console.error("Parse error:", e);
+      if (import.meta.env.DEV) console.error("Parse error:", e);
       setError("Erro ao processar arquivo: " + (e instanceof Error ? e.message : "erro desconhecido"));
     }
   }, [toast]);
@@ -310,7 +310,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       .eq("active", true);
 
     if (e) {
-      console.error("Load entities error:", e);
+      if (import.meta.env.DEV) console.error("Load entities error:", e);
       toast({ title: "Erro ao carregar cadastros", description: e.message, variant: "destructive" });
       return false;
     }
@@ -516,7 +516,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       queryClient.invalidateQueries({ queryKey: ["cashflow-entries"] });
       toast({ title: "Importação concluída", description: `${imported} lançamentos importados com sucesso.` });
     } catch (e) {
-      console.error("Import error:", e);
+      if (import.meta.env.DEV) console.error("Import error:", e);
       setError("Erro na importação: " + (e instanceof Error ? e.message : "erro desconhecido"));
       setStep("preview");
     }
