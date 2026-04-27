@@ -347,6 +347,7 @@ export function useSectorOnboarding(
       ).length;
 
       return evaluateDP({
+        targets,
         dpConfig: dpConfig ?? null,
         businessDays: businessDaysQ.data ?? [],
         positions: positionsQ.data ?? [],
@@ -379,6 +380,7 @@ export function useSectorOnboarding(
       ).length;
 
       return evaluateFinanceiro({
+        targets,
         chartAccounts: finChartQ.data ?? [],
         costCenters: finCostCentersQ.data ?? [],
         bankAccounts: finBankQ.data ?? [],
