@@ -206,7 +206,7 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
     return filterByScope(merged);
   }, [entriesQuery.data, installmentsQuery.data, contracts, tipo, orgId, filterByScope, payrollProjections]);
 
-  // Totals
+  // Totals — provisões acumuladas (passivo trabalhista) NÃO entram no caixa
   const totals = useMemo(() => {
     let total_previsto = 0;
     let total_realizado = 0;
@@ -214,6 +214,7 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
     let count_pendente = 0;
 
     for (const e of allEntries) {
+      if ((e as any).dp_sub_category === "provisao_acumulada") continue;
       total_previsto += Number(e.valor_previsto);
       if (e.valor_realizado != null) {
         total_realizado += Number(e.valor_realizado);

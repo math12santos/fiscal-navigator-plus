@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEmployees, usePayrollRuns, useDPConfig, calcEncargosPatronais } from "@/hooks/useDP";
 import { useEmployeeBenefits, useDPBenefits } from "@/hooks/useDPBenefits";
-import { Users, DollarSign, TrendingUp, Percent, Bus, UtensilsCrossed, HeartPulse, Apple, Gift } from "lucide-react";
+import { Users, DollarSign, TrendingUp, Percent, Bus, UtensilsCrossed, HeartPulse, Apple, Gift, BarChart3, Wallet, ShieldAlert, Building2 } from "lucide-react";
+import { DpSection } from "./DpSection";
+import DPPayrollCycleCard from "./DPPayrollCycleCard";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -203,7 +205,7 @@ export default function DPDashboard() {
   const go = (m: string) => navigate(`/relatorios/kpi/${m}`);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="text-xs text-muted-foreground">
           Visão consolidada de pessoal — {format(new Date(), "MMMM/yyyy", { locale: ptBR })}
@@ -211,161 +213,190 @@ export default function DPDashboard() {
         <DPExportButton onPdf={exportPdf} onExcel={exportExcel} disabled={activeEmployees.length === 0} />
       </div>
 
-      {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          icon={<Users size={18} />}
-          title="Headcount Ativo"
-          value={String(activeEmployees.length)}
-          onClick={() => go("dp-headcount")}
-        />
-        <KPICard
-          icon={<DollarSign size={18} />}
-          title="Folha Bruta Total"
-          value={fmt(totalFolhaBruta)}
-          onClick={() => go("dp-folha-bruta")}
-        />
-        <KPICard
-          icon={<TrendingUp size={18} />}
-          title="Encargos Totais"
-          value={fmt(encargosTotal)}
-          onClick={() => go("dp-encargos")}
-        />
-        <KPICard
-          icon={<Percent size={18} />}
-          title="Custo Médio/Colab."
-          value={fmt(custoMedioPorColab)}
-          subtitle="salário + encargos"
-          onClick={() => go("dp-custo-medio")}
-        />
-      </div>
-
-      {/* Benefícios KPIs — totais somados por CATEGORIA do benefício (não por nome) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <KPICard
-          icon={<Bus size={18} />}
-          title="Vale Transporte"
-          value={fmt(vtStats.custoTotal)}
-          subtitle={`${vtStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`}
-          onClick={() => go("dp-vt")}
-        />
-        <KPICard
-          icon={<UtensilsCrossed size={18} />}
-          title="Vale Refeição"
-          value={fmt(vrStats.custoTotal)}
-          subtitle={
-            vrStats.hasPorDia
-              ? `${vrStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`
-              : `${vrStats.count} colaborador(es)`
-          }
-          onClick={() => go("dp-vr")}
-        />
-        <KPICard
-          icon={<Apple size={18} />}
-          title="Vale Alimentação"
-          value={fmt(vaStats.custoTotal)}
-          subtitle={
-            vaStats.hasPorDia
-              ? `${vaStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`
-              : `${vaStats.count} colaborador(es)`
-          }
-          onClick={() => go("dp-va")}
-        />
-        <KPICard
-          icon={<HeartPulse size={18} />}
-          title="Plano de Saúde"
-          value={fmt(saudeStats.custoTotal)}
-          subtitle={`${saudeStats.count} colaborador(es)`}
-          onClick={() => go("dp-saude")}
-        />
-        <KPICard
-          icon={<Gift size={18} />}
-          title="Bônus & Comissão"
-          value={fmt(variavelStats.custoTotal)}
-          subtitle={`${variavelStats.count} vínculo(s)`}
-          onClick={() => go("dp-variavel")}
-        />
-        {otherBenefits.length > 0 ? (
+      {/* === Visão Geral === */}
+      <DpSection
+        icon={BarChart3}
+        title="Visão Geral"
+        description="Headcount, folha bruta, encargos e custo médio por colaborador"
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <KPICard
+            icon={<Users size={18} />}
+            title="Headcount Ativo"
+            value={String(activeEmployees.length)}
+            onClick={() => go("dp-headcount")}
+          />
           <KPICard
             icon={<DollarSign size={18} />}
-            title="Outros Benefícios"
-            value={fmt(otherBenefits.reduce((s, b) => s + b.custoTotal, 0))}
-            subtitle={`${otherBenefits.length} tipo(s)`}
-            onClick={() => go("dp-outros-beneficios")}
+            title="Folha Bruta Total"
+            value={fmt(totalFolhaBruta)}
+            onClick={() => go("dp-folha-bruta")}
           />
-        ) : (
           <KPICard
-            icon={<DollarSign size={18} />}
-            title="Total Benefícios"
-            value={fmt(totalBeneficiosGeral)}
-            subtitle="VT + todos os benefícios"
-            onClick={() => go("dp-outros-beneficios")}
+            icon={<TrendingUp size={18} />}
+            title="Encargos Totais"
+            value={fmt(encargosTotal)}
+            onClick={() => go("dp-encargos")}
           />
-        )}
-      </div>
+          <KPICard
+            icon={<Percent size={18} />}
+            title="Custo Médio/Colab."
+            value={fmt(custoMedioPorColab)}
+            subtitle="salário + encargos"
+            onClick={() => go("dp-custo-medio")}
+          />
+        </div>
+      </DpSection>
 
-      <DPDocumentAlerts />
+      {/* === Benefícios e Vantagens === */}
+      <DpSection
+        icon={Gift}
+        title="Benefícios e Vantagens"
+        description="Custos consolidados por categoria de benefício"
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <KPICard
+            icon={<Bus size={18} />}
+            title="Vale Transporte"
+            value={fmt(vtStats.custoTotal)}
+            subtitle={`${vtStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`}
+            onClick={() => go("dp-vt")}
+          />
+          <KPICard
+            icon={<UtensilsCrossed size={18} />}
+            title="Vale Refeição"
+            value={fmt(vrStats.custoTotal)}
+            subtitle={
+              vrStats.hasPorDia
+                ? `${vrStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`
+                : `${vrStats.count} colaborador(es)`
+            }
+            onClick={() => go("dp-vr")}
+          />
+          <KPICard
+            icon={<Apple size={18} />}
+            title="Vale Alimentação"
+            value={fmt(vaStats.custoTotal)}
+            subtitle={
+              vaStats.hasPorDia
+                ? `${vaStats.count} colab. · ${DIAS_UTEIS_MES} dias úteis${businessDaysInfo.source === "monthly" ? " (calendário)" : ""}`
+                : `${vaStats.count} colaborador(es)`
+            }
+            onClick={() => go("dp-va")}
+          />
+          <KPICard
+            icon={<HeartPulse size={18} />}
+            title="Plano de Saúde"
+            value={fmt(saudeStats.custoTotal)}
+            subtitle={`${saudeStats.count} colaborador(es)`}
+            onClick={() => go("dp-saude")}
+          />
+          <KPICard
+            icon={<Gift size={18} />}
+            title="Bônus & Comissão"
+            value={fmt(variavelStats.custoTotal)}
+            subtitle={`${variavelStats.count} vínculo(s)`}
+            onClick={() => go("dp-variavel")}
+          />
+          {otherBenefits.length > 0 ? (
+            <KPICard
+              icon={<DollarSign size={18} />}
+              title="Outros Benefícios"
+              value={fmt(otherBenefits.reduce((s, b) => s + b.custoTotal, 0))}
+              subtitle={`${otherBenefits.length} tipo(s)`}
+              onClick={() => go("dp-outros-beneficios")}
+            />
+          ) : (
+            <KPICard
+              icon={<DollarSign size={18} />}
+              title="Total Benefícios"
+              value={fmt(totalBeneficiosGeral)}
+              subtitle="VT + todos os benefícios"
+              onClick={() => go("dp-outros-beneficios")}
+            />
+          )}
+        </div>
+      </DpSection>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Salários por colaborador */}
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Salário por Colaborador</CardTitle></CardHeader>
-          <CardContent className="h-64">
-            {folhaLiquida.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Nenhum colaborador cadastrado</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={folhaLiquida.slice(0, 15)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                  <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: number) => fmt(v)} />
-                  <Bar dataKey="salario" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+      {/* === Ciclo da Folha — integração viva DP ↔ Financeiro === */}
+      <DPPayrollCycleCard />
 
-        {/* Custo por centro de custo */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm">Custo por Centro de Custo</CardTitle>
-            <ToggleGroup
-              type="single"
-              size="sm"
-              value={ccView}
-              onValueChange={(v) => {
-                if (v === "salario" || v === "total") setCcView(v);
-              }}
-              aria-label="Visão de custo por centro de custo"
-            >
-              <ToggleGroupItem value="salario" className="h-6 px-2 text-[11px]">
-                Salário base
-              </ToggleGroupItem>
-              <ToggleGroupItem value="total" className="h-6 px-2 text-[11px]">
-                Com encargos
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </CardHeader>
-          <CardContent className="h-64">
-            {custoPorCC.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Sem dados</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={custoPorCC} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
-                    {custoPorCC.map((_, idx) => (
-                      <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v: number) => fmt(v)} />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* === Conformidade e Riscos === */}
+      <DpSection
+        icon={ShieldAlert}
+        title="Conformidade e Riscos"
+        description="Documentos, exames e obrigações trabalhistas a vencer"
+      >
+        <DPDocumentAlerts />
+      </DpSection>
+
+      {/* === Análise por Colaborador e Centro de Custo === */}
+      <DpSection
+        icon={Building2}
+        title="Análise por Colaborador e Centro de Custo"
+        description="Distribuição de salários e custo por área"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Salários por colaborador */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Salário por Colaborador</CardTitle></CardHeader>
+            <CardContent className="h-64">
+              {folhaLiquida.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Nenhum colaborador cadastrado</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={folhaLiquida.slice(0, 15)} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                    <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(v: number) => fmt(v)} />
+                    <Bar dataKey="salario" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Custo por centro de custo */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm">Custo por Centro de Custo</CardTitle>
+              <ToggleGroup
+                type="single"
+                size="sm"
+                value={ccView}
+                onValueChange={(v) => {
+                  if (v === "salario" || v === "total") setCcView(v);
+                }}
+                aria-label="Visão de custo por centro de custo"
+              >
+                <ToggleGroupItem value="salario" className="h-6 px-2 text-[11px]">
+                  Salário base
+                </ToggleGroupItem>
+                <ToggleGroupItem value="total" className="h-6 px-2 text-[11px]">
+                  Com encargos
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </CardHeader>
+            <CardContent className="h-64">
+              {custoPorCC.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Sem dados</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={custoPorCC} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
+                      {custoPorCC.map((_, idx) => (
+                        <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => fmt(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </DpSection>
     </div>
   );
 }
