@@ -6,8 +6,10 @@ import {
   SectorMaturityResult,
   maturityLabelFromScore,
 } from "./types";
+import { DEFAULT_TARGETS, SectorMaturityTargets } from "./targets";
 
 interface EvaluateDPInput {
+  targets?: SectorMaturityTargets;
   // Configurações
   dpConfig: any | null;
   businessDays: any[];           // dp_business_days
@@ -30,7 +32,7 @@ interface EvaluateDPInput {
   refDate?: Date;
 }
 
-const DOC_REQUIRED_TYPES = ["contrato", "rg", "cpf"];
+// Documentos obrigatórios podem ser sobrescritos via targets.documents_required.
 
 function pct(part: number, total: number) {
   if (total <= 0) return 0;
@@ -43,6 +45,8 @@ function monthsBetween(a: Date, b: Date) {
 
 export function evaluateDP(input: EvaluateDPInput): SectorMaturityResult {
   const today = input.refDate ?? new Date();
+  const targets = input.targets ?? DEFAULT_TARGETS;
+  const DOC_REQUIRED_TYPES = targets.documents_required;
   const items: ChecklistItem[] = [];
   const push = (i: ChecklistItem) => items.push({ ...i, done: i.earned >= i.weight });
 
