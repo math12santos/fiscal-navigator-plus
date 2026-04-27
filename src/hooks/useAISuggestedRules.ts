@@ -52,7 +52,7 @@ export function useAISuggestedRules() {
         toast({ title: "Nenhuma sugestão gerada. Verifique se há lançamentos suficientes." });
       }
     } catch (e: any) {
-      console.error("AI suggestions error:", e);
+      if (import.meta.env.DEV) console.error("AI suggestions error:", e);
       toast({ title: "Erro ao buscar sugestões da IA", variant: "destructive" });
     } finally {
       setIsLoading(false);

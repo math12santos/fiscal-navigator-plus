@@ -83,7 +83,7 @@ export function useOnboardingProgress() {
       .single();
 
     if (error) {
-      console.error("Error creating onboarding progress:", error);
+      if (import.meta.env.DEV) console.error("Error creating onboarding progress:", error);
       return null;
     }
     const result = data as unknown as OnboardingProgress;
@@ -100,7 +100,7 @@ export function useOnboardingProgress() {
         .eq("id", progress.id);
 
       if (error) {
-        console.error("Error saving onboarding progress:", error);
+        if (import.meta.env.DEV) console.error("Error saving onboarding progress:", error);
         toast({ title: "Erro ao salvar progresso", variant: "destructive" });
         return;
       }
