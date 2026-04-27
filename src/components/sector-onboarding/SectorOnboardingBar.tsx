@@ -43,8 +43,8 @@ export function SectorOnboardingBar({ sector, onTabChange }: Props) {
   const [targetsOpen, setTargetsOpen] = useState(false);
   const { result, isLoading, refresh } = useSectorOnboarding(sector);
   const { currentOrg } = useOrganization();
-  const { isOwner, isAdmin, isMaster, isBackofficeUser } = useUserPermissions();
-  const canEditTargets = isOwner || isAdmin || isMaster || isBackofficeUser;
+  const { hasFullAccess } = useUserPermissions();
+  const canEditTargets = hasFullAccess;
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Snapshot mensal defensivo
