@@ -48,13 +48,22 @@ Deno.serve(async (req) => {
       const orgId = row.organization_id as string;
       const checklist: ChecklistItem[] = Array.isArray(row.checklist) ? row.checklist : [];
 
-      // Meta de rotinas da org (default 0.85)
-      const { data: cfg } = await admin
-        .from("dp_config")
-        .select("meta_rotinas_pct")
+      // Meta de rotinas da org — preferir sector_maturity_targets, fallback dp_config (legado), default 0.85
+      const { data: targetsRow } = await admin
+        .from("sector_maturity_targets")
+        .select("routines_target_pct")
         .eq("organization_id", orgId)
+        .eq("sector", "dp")
         .maybeSingle();
-      const meta = Number(cfg?.meta_rotinas_pct ?? 0.85);
+      let meta = Number(targetsRow?.routines_target_pct ?? NaN);
+      if (!Number.isFinite(meta)) {
+        const { data: cfg } = await admin
+          .from("dp_config")
+          .select("meta_rotinas_pct")
+          .eq("organization_id", orgId)
+          .maybeSingle();
+        meta = Number(cfg?.meta_rotinas_pct ?? 0.85);
+      }
 
       // Itens críticos de atualização (vencidos ou folha não fechada)
       const criticalUpdate = checklist.filter(
