@@ -1810,63 +1810,93 @@ export type Database = {
       }
       dp_config: {
         Row: {
+          advance_enabled: boolean
+          advance_payment_day: number
+          advance_pct: number
+          benefits_payment_day: number
           created_at: string
           custom_items: Json
           default_account_beneficios: string | null
           default_account_encargos: string | null
           default_account_rescisao: string | null
           default_account_salario: string | null
+          fgts_due_day: number
           fgts_pct: number | null
+          health_payment_day: number
           id: string
+          inss_due_day: number
           inss_patronal_pct: number | null
+          irrf_due_day: number
           meta_rotinas_pct: number
           organization_id: string | null
           pending_holding_suggestion: Json | null
           provisao_13_pct: number | null
           provisao_ferias_pct: number | null
           rat_pct: number | null
+          salary_payment_basis: string
+          salary_payment_day: number
           terceiros_pct: number | null
           updated_at: string
           user_id: string
           vt_desconto_pct: number | null
         }
         Insert: {
+          advance_enabled?: boolean
+          advance_payment_day?: number
+          advance_pct?: number
+          benefits_payment_day?: number
           created_at?: string
           custom_items?: Json
           default_account_beneficios?: string | null
           default_account_encargos?: string | null
           default_account_rescisao?: string | null
           default_account_salario?: string | null
+          fgts_due_day?: number
           fgts_pct?: number | null
+          health_payment_day?: number
           id?: string
+          inss_due_day?: number
           inss_patronal_pct?: number | null
+          irrf_due_day?: number
           meta_rotinas_pct?: number
           organization_id?: string | null
           pending_holding_suggestion?: Json | null
           provisao_13_pct?: number | null
           provisao_ferias_pct?: number | null
           rat_pct?: number | null
+          salary_payment_basis?: string
+          salary_payment_day?: number
           terceiros_pct?: number | null
           updated_at?: string
           user_id: string
           vt_desconto_pct?: number | null
         }
         Update: {
+          advance_enabled?: boolean
+          advance_payment_day?: number
+          advance_pct?: number
+          benefits_payment_day?: number
           created_at?: string
           custom_items?: Json
           default_account_beneficios?: string | null
           default_account_encargos?: string | null
           default_account_rescisao?: string | null
           default_account_salario?: string | null
+          fgts_due_day?: number
           fgts_pct?: number | null
+          health_payment_day?: number
           id?: string
+          inss_due_day?: number
           inss_patronal_pct?: number | null
+          irrf_due_day?: number
           meta_rotinas_pct?: number
           organization_id?: string | null
           pending_holding_suggestion?: Json | null
           provisao_13_pct?: number | null
           provisao_ferias_pct?: number | null
           rat_pct?: number | null
+          salary_payment_basis?: string
+          salary_payment_day?: number
           terceiros_pct?: number | null
           updated_at?: string
           user_id?: string
