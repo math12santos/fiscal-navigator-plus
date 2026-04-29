@@ -676,6 +676,8 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     mappings,
     parsedRows,
     importCount,
+    skippedCount,
+    failedRows,
     error,
     excludedRows,
     entityMatches,
@@ -694,5 +696,8 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     createMissingEntities,
     executeImport,
     toggleRowExclusion,
+    setDateFormat,
+    setNumberFormat,
+    downloadFailedRowsCSV,
   };
 }
