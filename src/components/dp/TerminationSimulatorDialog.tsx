@@ -97,16 +97,19 @@ export default function TerminationSimulatorDialog({ open, onOpenChange, initial
     if (!simResult || !selectedEmpId) return;
     // contract_type agora é persistido como snapshot imutável do regime na data da rescisão.
     // hr_planning_item_id fecha o ciclo planejamento → execução (quando aplicável).
+    // status="registrada" garante que o colaborador seja marcado como desligado
+    // (o default da tabela é "simulacao", que NÃO altera o cadastro do colaborador).
     create.mutate({
       employee_id: selectedEmpId,
       termination_date: termDate,
       type: termType,
+      status: "registrada",
       hr_planning_item_id: hrPlanningItemId,
       ...simResult,
     }, {
       onSuccess: () => {
         toast({
-          title: hrPlanningItemId ? "Rescisão registrada e item de planejamento concluído" : "Rescisão registrada",
+          title: hrPlanningItemId ? "Rescisão registrada e item de planejamento concluído" : "Rescisão registrada — colaborador marcado como desligado",
         });
         onOpenChange(false);
       },
