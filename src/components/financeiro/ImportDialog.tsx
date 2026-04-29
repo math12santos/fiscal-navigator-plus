@@ -85,6 +85,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [previewFilter, setPreviewFilter] = useState<"all" | "errors" | "valid">("all");
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
 
   const duplicateIndices = useMemo(() => {
     if (imp.step !== "preview" || imp.parsedRows.length === 0) return new Set<number>();
