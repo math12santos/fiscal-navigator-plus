@@ -31,6 +31,8 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { GlobalFetchingIndicator } from "@/components/GlobalFetchingIndicator";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
+import { useThemePreference } from "@/hooks/useThemePreference";
+import { ThemePreferenceDialog } from "@/components/ThemePreferenceDialog";
 import { pageFactories } from "@/App";
 
 type PageFactoryKey = keyof typeof pageFactories;
@@ -72,6 +74,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const { signOut, user } = useAuth();
   const { canAccessModule, isMaster } = useUserPermissions();
   const { progress: onboardingProgress, loading: onboardingLoading } = useOnboardingProgress();
+  const { showDialog: showThemeDialog, dismissDialog: dismissThemeDialog } = useThemePreference();
   const showOnboardingLink = !onboardingLoading && (!onboardingProgress || onboardingProgress.status !== "concluido");
 
   const visibleNavItems = navItems.filter((item) => canAccessModule(item.module));
@@ -198,6 +201,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
         <div className="p-6 lg:p-8 pt-2">{children}</div>
       </main>
+      <ThemePreferenceDialog open={showThemeDialog} onChosen={dismissThemeDialog} />
     </div>
   );
 }

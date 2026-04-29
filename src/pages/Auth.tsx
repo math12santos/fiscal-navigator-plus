@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+
+const RESET_COOLDOWN_SEC = 60;
+const RESET_TS_KEY = "pwd_reset_last_ts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -15,9 +18,27 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [cooldownSec, setCooldownSec] = useState(0);
   const { toast } = useToast();
 
+  // Recover cooldown across page reloads (uses sessionStorage)
+  useEffect(() => {
+    const ts = Number(sessionStorage.getItem(RESET_TS_KEY) || 0);
+    if (!ts) return;
+    const elapsed = Math.floor((Date.now() - ts) / 1000);
+    const remaining = RESET_COOLDOWN_SEC - elapsed;
+    if (remaining > 0) setCooldownSec(remaining);
+  }, []);
+
+  // Tick down the cooldown
+  useEffect(() => {
+    if (cooldownSec <= 0) return;
+    const t = setInterval(() => setCooldownSec((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [cooldownSec]);
+
   const handleForgotPassword = async () => {
+    if (cooldownSec > 0) return;
     if (!email) {
       toast({
         title: "Informe seu e-mail",
@@ -28,19 +49,23 @@ export default function Auth() {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Fire-and-forget: do not reveal whether the email exists
+      await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
-      if (error) throw error;
+      sessionStorage.setItem(RESET_TS_KEY, String(Date.now()));
+      setCooldownSec(RESET_COOLDOWN_SEC);
       toast({
-        title: "E-mail enviado!",
-        description: "Verifique sua caixa de entrada e clique no link para definir uma nova senha.",
+        title: "Solicitação registrada",
+        description:
+          "Se este e-mail estiver cadastrado, você receberá em instantes um link para redefinir a senha.",
       });
     } catch (error: any) {
+      // Generic message to avoid user enumeration
       toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive",
+        title: "Solicitação registrada",
+        description:
+          "Se este e-mail estiver cadastrado, você receberá em instantes um link para redefinir a senha.",
       });
     } finally {
       setLoading(false);
@@ -152,10 +177,12 @@ export default function Auth() {
             <button
               type="button"
               onClick={handleForgotPassword}
-              className="text-sm text-muted-foreground hover:text-primary hover:underline w-full text-right"
-              disabled={loading}
+              className="text-sm text-muted-foreground hover:text-primary hover:underline w-full text-right disabled:opacity-50 disabled:hover:no-underline"
+              disabled={loading || cooldownSec > 0}
             >
-              Esqueci minha senha
+              {cooldownSec > 0
+                ? `Aguarde ${cooldownSec}s para reenviar`
+                : "Esqueci minha senha"}
             </button>
           )}
         </form>

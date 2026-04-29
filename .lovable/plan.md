@@ -1,77 +1,105 @@
-# Seletor de Mês Competência no Dashboard
+## Objetivo
 
-## Problema
+1. Confirmar e blindar o fluxo de "Esqueci a senha" para que o link **nunca conceda acesso** — apenas leve à redefinição e, em seguida, à tela de login.
+2. Aplicar 3 melhorias de segurança (sem 2FA): proteção contra senhas vazadas, throttle no botão de recuperação e reautenticação obrigatória ao trocar senha logado.
+3. Adicionar um passo de **escolha de tema (claro/escuro) no primeiro login**, persistindo a preferência no perfil para sincronizar entre dispositivos.
 
-No `src/pages/Dashboard.tsx` a referência temporal é fixa em `useMemo(() => new Date(), [])`. Todos os KPIs ("Receita Mensal", "Despesas Mensais", "Resultado Mensal", "Saldo do Período"), o gráfico de 6 meses e o "Despesas por Categoria" ficam travados no mês corrente do servidor. Não há como o CFO/Board:
-- revisitar fechamentos passados (ex.: "como fechou 03/2026?"),
-- antecipar projeções de meses futuros (ex.: "como está 06/2026 com base nos contratos e na folha provisionada?").
+---
 
-Isso quebra a promessa do produto de responder "Onde estamos hoje?" **e** "Para onde estamos indo?" a partir do mesmo painel.
+## Fluxo final de senha (confirmação)
 
-## Solução
+```text
+Auth (Esqueci a senha)
+   ↓ digita e-mail
+   ↓ resetPasswordForEmail({ redirectTo: /reset-password })
+E-mail com link
+   ↓ clique
+/reset-password
+   ↓ detecta evento PASSWORD_RECOVERY
+   ↓ exige nova senha + confirmação
+   ↓ updateUser({ password })
+   ↓ signOut() forçado  ← garante que o link NÃO concede acesso
+/auth (login limpo com a nova senha)
+```
 
-Adicionar um **seletor de mês competência** no header do Dashboard, que controla todo o estado temporal da página. O range de 6 meses do gráfico desliza junto: passa a ser **[mês selecionado − 5, mês selecionado]**, mantendo o mês escolhido como o "atual" da análise. O comparativo "vs mês anterior" passa a ser sempre relativo ao mês selecionado.
+Esse fluxo já está implementado em `src/pages/ResetPassword.tsx` e `src/pages/Auth.tsx` (com `redirectTo` apontando para `/reset-password`). O plano abaixo apenas reforça e adiciona as proteções.
 
-Quando o mês selecionado é futuro, o painel mostra os mesmos números, mas alimentados pela engine de projeções já existente (contratos recorrentes, folha provisionada, VR/VA antecipados, CRM ponderado) — exatamente os dados que `useFinancialSummary` já retorna via `cashflow_entries` + projeções virtuais (`proj-*`).
+---
 
-### UX
+## Mudanças
 
-- No `PageHeader` do Dashboard, à direita do título, um **MonthPicker** compacto:
-  - Botão com label "Competência: **abr/2026**" + ícone calendar.
-  - Setas `‹ ›` para navegar mês a mês.
-  - Popover com `Calendar` shadcn em modo `month` (ano + grid de 12 meses), permitindo escolher qualquer mês entre `2000` e `2099` (respeita memória `date-entry-logic`).
-  - Botão "Hoje" para voltar ao mês corrente.
-- Badge sutil ao lado quando mês ≠ corrente:
-  - Mês passado → badge cinza "Histórico".
-  - Mês futuro → badge primary outline "Projeção".
-- Subtítulo do `PageHeader` reflete: `"Visão consolidada — Acme · abr/2026 (Projeção)"`.
-- Estado persistido em `sessionStorage` (`dashboard.referenceMonth`) para sobreviver a navegação intra-sessão sem poluir preferências de longo prazo.
+### 1. Proteção contra senhas vazadas (HIBP)
+- Habilitar `password_hibp_enabled: true` via configuração de auth da Lovable Cloud.
+- Efeito: senhas presentes em vazamentos públicos são rejeitadas no signup, no `/reset-password` e na troca de senha do `/perfil`. Sem ação extra do usuário.
 
-### Comportamento por bloco
+### 2. Throttle de 60s no "Esqueci a senha"
+Em `src/pages/Auth.tsx`:
+- Adicionar estado `cooldownSec` (number).
+- Ao clicar em "Esqueci minha senha" com sucesso, iniciar contagem regressiva de 60s.
+- Botão fica desabilitado e exibe "Aguarde 60s" → "Aguarde 59s"... durante a janela.
+- Persistir o timestamp da última solicitação em `sessionStorage` (`pwd_reset_last_ts`) para resistir a recarregamentos da página.
+- Mantém a mensagem genérica de sucesso (não revela se o e-mail existe).
 
-| Bloco | Antes | Depois |
-|---|---|---|
-| KPIs "Receita / Despesas / Resultado Mensal" | Mês corrente vs anterior | Mês selecionado vs imediatamente anterior |
-| KPI "Saldo do Período" | Últimos 6 meses até hoje | 6 meses encerrando no mês selecionado |
-| Gráfico Receita × Despesas (6m) | Fixo até hoje | Janela deslizante até o mês selecionado |
-| Despesas por Categoria | Mês corrente | Mês selecionado |
-| Group Share (Holding) | Totais do range fixo | Totais do range deslizante (mesmo `useGroupTotals`) |
-| Cards estáticos (Runway, Contingências, Contratos ativos, CRM) | Snapshot atual | **Mantêm snapshot atual** — são leituras de "estado da empresa hoje", não competência. Recebem badge "snapshot" para deixar claro. |
+### 3. Reautenticação obrigatória no `/perfil` → "Alterar senha"
+Em `src/pages/Perfil.tsx`:
+- Adicionar campo `currentPassword` (PasswordInput) acima dos campos de nova senha.
+- Antes de chamar `updateUser({ password })`, validar a senha atual com:
+  ```ts
+  await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
+  ```
+  Se falhar → toast "Senha atual incorreta" e aborta.
+- Só então chama `updateUser({ password: newPassword })`.
+- Mantém HIBP atuando automaticamente.
 
-Runway, contratos ativos, contingências e CRM são intencionalmente desacoplados do mês escolhido: representam posição/estoque, não fluxo competência. O comportamento será documentado no tooltip do KPI.
+### 4. Escolha de tema no primeiro login
+**Banco** — adicionar coluna em `profiles`:
+```sql
+ALTER TABLE public.profiles
+ADD COLUMN theme_preference text CHECK (theme_preference IN ('light','dark'));
+```
+(nullable; quando `NULL` significa "ainda não escolheu").
 
-## Arquivos
+**Componente novo** `src/components/ThemePreferenceDialog.tsx`:
+- Dialog modal (não fechável por overlay/ESC) com dois cards visuais grandes: **Claro** (ícone Sun) e **Escuro** (ícone Moon), com preview de cores.
+- Ao selecionar:
+  - Aplica imediatamente no `<html>` (`classList.add/remove("dark")`).
+  - Salva em `localStorage.theme` (mantém compatibilidade com `ThemeToggle` existente).
+  - Faz `update profiles set theme_preference = ...` para o usuário logado.
+  - Fecha o dialog.
 
-**Novos**
-- `src/components/MonthPicker.tsx` — componente reutilizável (Popover + Calendar shadcn em modo mês, setas, botão "Hoje", limite 2000–2099).
-- `src/hooks/useReferenceMonth.ts` — hook que expõe `{ referenceMonth, setReferenceMonth, isCurrent, isFuture, isPast }`, persistindo em `sessionStorage` com chave por página (`dashboard`).
+**Hook novo** `src/hooks/useThemePreference.ts`:
+- Em `App.tsx`/`AppLayout.tsx`, ao carregar o usuário:
+  - Lê `profiles.theme_preference`.
+  - Se `NULL` → seta `showThemeDialog = true`.
+  - Se preenchido e diferente do `localStorage.theme` atual → sincroniza local com o do banco (preferência do banco vence, mantendo escolha entre dispositivos).
 
-**Editados**
-- `src/pages/Dashboard.tsx`:
-  - Substituir `const now = useMemo(() => new Date(), [])` por `const { referenceMonth } = useReferenceMonth("dashboard")`.
-  - Recalcular `rangeFrom`, `rangeTo`, `prevMonthStart/End`, `curMonthStart/End`, `monthlyData` a partir de `referenceMonth`.
-  - Renderizar `<MonthPicker />` no header e badge de contexto (Histórico / Projeção / Atual).
-  - Atualizar subtitle do `PageHeader`.
-- `src/components/PageHeader.tsx` — adicionar prop opcional `actions?: ReactNode` (se ainda não existir) para receber o picker à direita. Verificar antes de duplicar.
+**Sincronização contínua**:
+- Atualizar `ThemeToggle.tsx` para, além de gravar no `localStorage`, também persistir em `profiles.theme_preference` quando houver usuário logado (fire-and-forget). Assim a preferência segue o usuário em qualquer dispositivo.
 
-**Não tocar nesta iteração** (escopo intencionalmente fechado para evitar regressão):
-- `DPDashboard`, `DPCockpitSection`, `BackofficeDashboard`, `MaturityOverviewSection`. Cada um tem semântica própria de período (folha do mês, maturidade vigente). Podem ganhar o mesmo seletor numa segunda passagem se o usuário pedir — o componente `MonthPicker` e o hook ficam prontos para reuso.
+**Onde renderizar o dialog**:
+- Em `AppLayout.tsx`, montar `<ThemePreferenceDialog />` controlado pelo hook. Aparece na primeira tela autenticada e só some após a escolha.
 
-## Detalhes técnicos
+---
 
-- `useReferenceMonth(scope: string)` retorna sempre `startOfMonth(date)` para evitar bugs de fuso/dia.
-- `MonthPicker` usa o `Calendar` do shadcn (`mode="default"` com captionLayout `"dropdown-buttons"` limitado a meses) — segue a memória `shadcn-datepicker` (incluir `pointer-events-auto`).
-- `useFinancialSummary(rangeFrom, rangeTo)` já aceita range arbitrário e já materializa projeções virtuais (`proj-*`) — não precisa de mudança.
-- `useGroupTotals(rangeFrom, rangeTo)` idem.
-- Comparativo "vs mês anterior" continua usando `pctChange`; quando o mês selecionado for futuro e o anterior também não tiver realizado, o cálculo cai naturalmente em projeção vs projeção (consistente).
-- Persistência em `sessionStorage` (não `localStorage`): o CFO sempre abre o produto no "hoje" no início do dia; a navegação por meses é exploratória.
-- Acessibilidade: setas com `aria-label`, botão do popover com `aria-expanded`, valor anunciado em `aria-live="polite"` quando muda.
+## Arquivos afetados
 
-## Critérios de aceite
+- **Edit** `src/pages/Auth.tsx` — throttle 60s no botão de reset.
+- **Edit** `src/pages/Perfil.tsx` — campo "Senha atual" + reautenticação antes de `updateUser`.
+- **Edit** `src/components/ThemeToggle.tsx` — persistir `theme_preference` em `profiles` quando logado.
+- **Edit** `src/components/AppLayout.tsx` — montar o `ThemePreferenceDialog`.
+- **Create** `src/components/ThemePreferenceDialog.tsx` — modal de escolha inicial.
+- **Create** `src/hooks/useThemePreference.ts` — leitura, sincronização e gating do dialog.
+- **Migration** — `ALTER TABLE profiles ADD COLUMN theme_preference text` + check constraint.
+- **Auth config** — habilitar `password_hibp_enabled: true`.
+- **Memory update** `mem://features/password-recovery-flow` — registrar HIBP, throttle, reauth e `theme_preference`.
 
-1. Ao abrir o Dashboard, mostra o mês corrente — comportamento idêntico ao atual.
-2. Clicando `‹` uma vez, todos os KPIs de mês, gráfico de 6 meses e "Despesas por Categoria" recalculam para o mês anterior; badge "Histórico" aparece.
-3. Clicando `›` para um mês futuro: KPIs mostram valores da projeção (vindos das engines de contratos + folha + VR/VA já existentes); badge "Projeção" aparece.
-4. Botão "Hoje" volta ao mês corrente e remove o badge.
-5. Estado sobrevive a navegação interna (Tarefas → Dashboard mantém o mês escolhido) e é zerado ao recarregar a aba.
-6. Runway, Contratos Ativos, Contingências e CRM não mudam ao trocar o mês (snapshot) e exibem tooltip "Posição atual da empresa — independente do mês selecionado".
+---
+
+## Considerações de UX
+
+- O e-mail de recuperação continua sendo o template padrão da Lovable Cloud (não vamos customizar agora). Se quiser branding, posso fazer em uma rodada separada.
+- A mensagem de sucesso no "Esqueci a senha" permanece genérica ("Se o e-mail estiver cadastrado, você receberá um link") para evitar enumeração de usuários.
+- O dialog de tema bloqueia a interação até a escolha — é rápido (2 cliques) e só acontece uma vez na vida do usuário.
+- A escolha pode ser trocada depois pelo `ThemeToggle` no header (já existente) e fica sincronizada entre dispositivos.
+
+Posso seguir com a implementação?

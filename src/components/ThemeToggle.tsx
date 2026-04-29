@@ -1,6 +1,7 @@
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 function getInitialTheme(): "dark" | "light" {
   if (typeof window === "undefined") return "dark";
@@ -20,6 +21,18 @@ export function ThemeToggle() {
       root.classList.remove("dark");
     }
     localStorage.setItem("theme", theme);
+
+    // Persist preference for the logged user (fire-and-forget) so the
+    // choice follows them across devices.
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id;
+      if (!uid) return;
+      supabase
+        .from("profiles")
+        .update({ theme_preference: theme } as any)
+        .eq("id", uid)
+        .then(() => {});
+    });
   }, [theme]);
 
   return (
