@@ -542,12 +542,25 @@ function OneOnOneDialog({ open, onOpenChange, editing, employees, onSave }: any)
   );
 }
 
-// ====== 9 Box ======
+// ====== 9 Box (criteriosa) ======
+const STATUS_META: Record<string, { label: string; class: string }> = {
+  rascunho: { label: "Rascunho", class: "bg-muted text-muted-foreground border-border" },
+  em_calibracao: { label: "Em calibração", class: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
+  calibrada: { label: "Calibrada", class: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+};
+
+function confidenceBadge(c: number): { label: string; class: string } {
+  if (c >= 70) return { label: "Alta", class: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };
+  if (c >= 40) return { label: "Média", class: "bg-amber-500/10 text-amber-600 border-amber-500/30" };
+  return { label: "Baixa", class: "bg-destructive/10 text-destructive border-destructive/30" };
+}
+
 function NineBoxTab({ evaluations, employees, employeeMap, latest, bscList }: any) {
   const [open, setOpen] = useState(false);
-  const { create, remove } = useMutateNineBox();
+  const { remove } = useMutateNineBox();
+  const finalize = useFinalize9Box();
 
-  // Agrupa por quadrante
+  // Agrupa por quadrante (apenas calibradas pesam mais, mas exibimos todas as últimas)
   const byQuadrant = useMemo(() => {
     const groups = new Map<number, any[]>();
     for (let q = 1; q <= 9; q++) groups.set(q, []);
@@ -557,20 +570,48 @@ function NineBoxTab({ evaluations, employees, employeeMap, latest, bscList }: an
     return groups;
   }, [latest]);
 
+  // Detector de viés sobre as últimas avaliações
+  const bias = useMemo(() => {
+    const team = Array.from(latest.values() as Iterable<any>).map((ev) => ({
+      quadrante: ev.quadrante,
+      sourcesSubmittedCount: 1, // simplificado: usaremos contagem real quando hooks de fontes consolidados
+    }));
+    return detectBias(team);
+  }, [latest]);
+
   return (
     <div className="space-y-4">
       <Card>
         <CardContent className="pt-4 flex justify-between items-center">
-          <p className="text-sm text-muted-foreground">{evaluations.length} avaliação(ões) — última por colaborador é exibida na matriz.</p>
+          <div>
+            <p className="text-sm text-muted-foreground">
+              {evaluations.length} avaliação(ões) — {bias.total} colaborador(es) na matriz.
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Visível apenas para gestores; colaboradores não veem 9 Box.
+            </p>
+          </div>
           <Button size="sm" onClick={() => setOpen(true)}>
             <Plus size={14} className="mr-1" /> Nova Avaliação 9 Box
           </Button>
         </CardContent>
       </Card>
 
+      {(bias.inflationAlert || bias.deflationAlert || bias.unilateralAlert) && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="pt-4 flex gap-2 items-start">
+            <ShieldAlert size={16} className="text-amber-600 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <p className="font-semibold text-amber-700 dark:text-amber-400">Alerta de viés do gestor</p>
+              {bias.notes.map((n, i) => <p key={i}>{n}</p>)}
+              <p className="text-muted-foreground">Recomendado revisar critérios e evidências antes de calibrar.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Matriz visual 3x3 */}
       <div className="grid grid-cols-3 gap-3">
-        {/* Linha potencial alto: Q7, Q8, Q9 */}
         {[7, 8, 9, 4, 5, 6, 1, 2, 3].map((q) => {
           const meta = QUADRANT_META[q];
           const tone = QUADRANT_TONE_CLASS[meta.tone];
@@ -585,7 +626,10 @@ function NineBoxTab({ evaluations, employees, employeeMap, latest, bscList }: an
                 <p className="text-[10px] text-muted-foreground leading-tight">{meta.description}</p>
                 <div className="space-y-1">
                   {items.slice(0, 4).map((ev: any) => (
-                    <p key={ev.id} className="text-xs truncate">{employeeMap.get(ev.employee_id)?.name || "—"}</p>
+                    <p key={ev.id} className="text-xs truncate flex items-center gap-1">
+                      {employeeMap.get(ev.employee_id)?.name || "—"}
+                      {ev.status === "calibrada" && <ShieldCheck size={10} className="text-emerald-600" />}
+                    </p>
                   ))}
                   {items.length > 4 && <p className="text-[10px] text-muted-foreground">+{items.length - 4} mais</p>}
                 </div>
@@ -606,130 +650,70 @@ function NineBoxTab({ evaluations, employees, employeeMap, latest, bscList }: an
                 <TableHead>Desempenho</TableHead>
                 <TableHead>Potencial</TableHead>
                 <TableHead>Quadrante</TableHead>
-                <TableHead>Recomendação</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Confiança</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {evaluations.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Nenhuma avaliação ainda.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Nenhuma avaliação ainda.</TableCell></TableRow>
               )}
-              {evaluations.map((ev: any) => (
-                <TableRow key={ev.id}>
-                  <TableCell className="font-medium">{employeeMap.get(ev.employee_id)?.name || "—"}</TableCell>
-                  <TableCell className="text-xs">{ev.data_avaliacao}</TableCell>
-                  <TableCell className="text-xs">{ev.nota_desempenho} ({ev.nivel_desempenho})</TableCell>
-                  <TableCell className="text-xs">{ev.nota_potencial} ({ev.nivel_potencial})</TableCell>
-                  <TableCell><Badge variant="outline">Q{ev.quadrante}</Badge></TableCell>
-                  <TableCell className="text-xs">{ev.recomendacao}</TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" onClick={() => {
-                      if (confirm("Excluir avaliação?")) remove.mutate(ev.id, { onSuccess: () => toast.success("Excluída") });
-                    }}>Excluir</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {evaluations.map((ev: any) => {
+                const st = STATUS_META[ev.status as string] ?? STATUS_META.rascunho;
+                const cb = confidenceBadge(Number(ev.confiabilidade ?? 0));
+                return (
+                  <TableRow key={ev.id}>
+                    <TableCell className="font-medium">{employeeMap.get(ev.employee_id)?.name || "—"}</TableCell>
+                    <TableCell className="text-xs">{ev.data_avaliacao}</TableCell>
+                    <TableCell className="text-xs">{Number(ev.nota_desempenho).toFixed(1)} ({ev.nivel_desempenho})</TableCell>
+                    <TableCell className="text-xs">{Number(ev.nota_potencial).toFixed(1)} ({ev.nivel_potencial})</TableCell>
+                    <TableCell><Badge variant="outline">Q{ev.quadrante}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className={st.class}>{st.label}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cb.class}>
+                        {cb.label} · {Number(ev.confiabilidade ?? 0)}%
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right space-x-1">
+                      {ev.status === "em_calibracao" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            await finalize.mutateAsync({
+                              id: ev.id,
+                              nota_desempenho: ev.nota_desempenho,
+                              nota_potencial: ev.nota_potencial,
+                              confiabilidade: ev.confiabilidade ?? 0,
+                              status: "calibrada",
+                              action: "calibracao_concluida",
+                            });
+                            toast.success("Avaliação calibrada");
+                          }}
+                        >
+                          Calibrar
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        if (confirm("Excluir avaliação?")) remove.mutate(ev.id, { onSuccess: () => toast.success("Excluída") });
+                      }}>Excluir</Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      <NineBoxDialog open={open} onOpenChange={setOpen} employees={employees} bscList={bscList} onSave={async (data) => {
-        await create.mutateAsync(data);
-        toast.success("Avaliação criada");
-        setOpen(false);
-      }} />
+      <NineBoxWizardDialog
+        open={open}
+        onOpenChange={setOpen}
+        employees={employees}
+        bscList={bscList}
+      />
     </div>
-  );
-}
-
-function NineBoxDialog({ open, onOpenChange, employees, bscList, onSave }: any) {
-  const [employeeId, setEmployeeId] = useState("");
-  const [notaDes, setNotaDes] = useState(3);
-  const [notaPot, setNotaPot] = useState(3);
-  const [justif, setJustif] = useState("");
-  const [recomendacao, setRecomendacao] = useState("manter");
-
-  // Sugestão a partir do BSC do colaborador (último ativo)
-  const suggestedBsc = useMemo(() => {
-    if (!employeeId) return null;
-    const empBsc = bscList.find((b: any) => b.employee_id === employeeId && b.status === "ativo");
-    if (!empBsc) return null;
-    // Converte resultado_geral (0-100+) em nota 1-5
-    const pct = Number(empBsc.resultado_geral);
-    const nota = Math.max(1, Math.min(5, Math.round((pct / 100) * 5 * 10) / 10));
-    return { bsc: empBsc, nota };
-  }, [employeeId, bscList]);
-
-  const quadrante = quadrantFrom(notaDes, notaPot);
-  const meta = QUADRANT_META[quadrante];
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Nova avaliação 9 Box</DialogTitle>
-          <DialogDescription>Notas 1–5 (1-2 baixo · 3 médio · 4-5 alto)</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label>Colaborador *</Label>
-            <Select value={employeeId} onValueChange={setEmployeeId}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {employees.map((e: any) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          {suggestedBsc && (
-            <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs space-y-2">
-              <p>BSC ativo "<span className="font-semibold">{suggestedBsc.bsc.nome}</span>" sugere desempenho <span className="font-semibold">{suggestedBsc.nota}</span>.</p>
-              <Button size="sm" variant="outline" onClick={() => setNotaDes(suggestedBsc.nota)}>Aplicar sugestão</Button>
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Nota desempenho (1–5) *</Label>
-              <Input type="number" min={1} max={5} step={0.5} value={notaDes} onChange={(e) => setNotaDes(Number(e.target.value))} />
-            </div>
-            <div>
-              <Label>Nota potencial (1–5) *</Label>
-              <Input type="number" min={1} max={5} step={0.5} value={notaPot} onChange={(e) => setNotaPot(Number(e.target.value))} />
-            </div>
-          </div>
-          <div className={`rounded-md border p-3 ${QUADRANT_TONE_CLASS[meta.tone]}`}>
-            <p className="text-xs font-semibold">Quadrante {quadrante} · {meta.label}</p>
-            <p className="text-[11px] mt-1">{meta.description}</p>
-          </div>
-          <div>
-            <Label>Recomendação</Label>
-            <Select value={recomendacao} onValueChange={setRecomendacao}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manter">Manter</SelectItem>
-                <SelectItem value="desenvolver">Desenvolver</SelectItem>
-                <SelectItem value="promover">Promover</SelectItem>
-                <SelectItem value="realocar">Realocar</SelectItem>
-                <SelectItem value="acompanhar">Acompanhar</SelectItem>
-                <SelectItem value="desligamento_em_analise">Desligamento em análise</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div><Label>Justificativa</Label><Textarea value={justif} onChange={(e) => setJustif(e.target.value)} rows={2} /></div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button disabled={!employeeId} onClick={() => onSave({
-            employee_id: employeeId,
-            nota_desempenho: notaDes,
-            nota_potencial: notaPot,
-            justificativa: justif,
-            recomendacao,
-            bsc_score_snapshot: suggestedBsc?.bsc?.resultado_geral || null,
-          })}>Salvar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
