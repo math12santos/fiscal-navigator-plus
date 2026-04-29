@@ -36,6 +36,9 @@ import {
   AlertTriangle,
   Copy,
   EyeOff,
+  Download,
+  Lightbulb,
+  XCircle,
 } from "lucide-react";
 import {
   useFinanceiroImport,
@@ -44,6 +47,7 @@ import {
 } from "@/hooks/useFinanceiroImport";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { detectImportDuplicates } from "@/hooks/useDuplicateDetection";
+import { summarizeRowErrors } from "@/hooks/financeiroImportErrors";
 import { EntityMatchingStep } from "./EntityMatchingStep";
 import { cn } from "@/lib/utils";
 
