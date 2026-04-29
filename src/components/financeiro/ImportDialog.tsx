@@ -26,6 +26,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import {
   Upload,
   Loader2,
@@ -39,11 +49,13 @@ import {
   Download,
   Lightbulb,
   XCircle,
+  Pencil,
 } from "lucide-react";
 import {
   useFinanceiroImport,
   TARGET_FIELDS,
   type ImportStep,
+  type ParsedRow,
 } from "@/hooks/useFinanceiroImport";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { detectImportDuplicates } from "@/hooks/useDuplicateDetection";
