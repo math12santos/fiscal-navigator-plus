@@ -198,6 +198,95 @@ export type Database = {
           },
         ]
       }
+      bank_statement_entries: {
+        Row: {
+          bank_account_id: string
+          cashflow_entry_id: string | null
+          created_at: string
+          data: string
+          descricao: string
+          documento: string | null
+          id: string
+          import_id: string | null
+          notes: string | null
+          organization_id: string
+          reconciled_at: string | null
+          reconciled_by: string | null
+          source_ref: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          bank_account_id: string
+          cashflow_entry_id?: string | null
+          created_at?: string
+          data: string
+          descricao: string
+          documento?: string | null
+          id?: string
+          import_id?: string | null
+          notes?: string | null
+          organization_id: string
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          source_ref?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          bank_account_id?: string
+          cashflow_entry_id?: string | null
+          created_at?: string
+          data?: string
+          descricao?: string
+          documento?: string | null
+          id?: string
+          import_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          source_ref?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_statement_entries_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_entries_cashflow_entry_id_fkey"
+            columns: ["cashflow_entry_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_entries_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_lines: {
         Row: {
           account_id: string | null
@@ -6289,6 +6378,20 @@ export type Database = {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean
       }
+      match_statement_to_cashflow: {
+        Args: { p_statement_id: string }
+        Returns: {
+          cashflow_id: string
+          data_prevista: string
+          data_realizada: string
+          descricao: string
+          score: number
+          status: string
+          tipo: string
+          valor_previsto: number
+          valor_realizado: number
+        }[]
+      }
       propagate_benefit_to_subsidiaries: {
         Args: { p_benefit_id: string }
         Returns: Json
@@ -6301,8 +6404,16 @@ export type Database = {
         Args: { p_run_id: string }
         Returns: undefined
       }
+      reconcile_statement_entry: {
+        Args: { p_cashflow_id: string; p_statement_id: string }
+        Returns: undefined
+      }
       remove_org_member: {
         Args: { _org_id: string; _target_user_id: string }
+        Returns: undefined
+      }
+      unreconcile_statement_entry: {
+        Args: { p_statement_id: string }
         Returns: undefined
       }
     }
