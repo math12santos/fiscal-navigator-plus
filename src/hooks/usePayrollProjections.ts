@@ -294,11 +294,11 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           entries.push({
             ...baseEmp,
             id: `proj-dp-adiant-${emp.id}-${monthKey}`,
-            descricao: `Adiantamento (vale ${advancePct.toFixed(0)}%) — ${emp.name}`,
+            descricao: `Adiantamento (vale ${advancePct.toFixed(0)}%) — ${emp.name} (competência ${monthLabel})`,
             valor_previsto: calc.adiantamento,
             data_prevista: dtAdiant,
             account_id: acctSalario,
-            notes: `Vale pago em ${dtAdiant} — saldo líquido: ${calc.saldo.toFixed(0)}`,
+            notes: `Vale referente à competência ${competencyLong}, pago em ${dtAdiant} — saldo líquido: ${calc.saldo.toFixed(0)}`,
             dp_sub_category: "salario_adiantamento",
             source_ref: projectionKey.payroll(emp.id, "salario_adiantamento", monthKey),
           } as any);
