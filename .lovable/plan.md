@@ -1,63 +1,59 @@
-# Corrigir duplicidade no recálculo da Folha de Pagamento
+# Persistência automática do Líquido a partir de payroll_events
 
-## Problema diagnosticado
+## Problema atual
 
-A tabela `payroll_items` (migration `20260223130915`) **não possui constraint UNIQUE** em `(payroll_run_id, employee_id)`. Combinado com o uso de `supabase.from("payroll_items").upsert(...)` em `src/hooks/useDP.ts` (linha 287) **sem `onConflict`**, o Postgres cai no comportamento default (conflito por PK `id`). Como o cliente nunca envia `id`, cada chamada gera uma linha nova.
+Hoje `payroll_items.total_liquido` (e `total_bruto`/`total_descontos`) só é atualizado quando o usuário clica em **"Calcular Folha"** em `DPFolha.tsx`. Eventos variáveis (`payroll_events` — horas extras, faltas, bônus, vales) ficam em tabela separada e **não impactam o líquido materializado** até alguém recalcular. Isso quebra:
 
-Resultado: a cada clique em "Calcular Folha" em `DPFolha.tsx` (que chama `upsertItem` em loop por colaborador) os itens são duplicados, inflando totais e quebrando relatórios.
+- Relatórios e dashboards que leem `total_liquido` direto.
+- Sincronização com cashflow (vide memória `Termination → Cashflow Sync`), que pode ler valor desatualizado.
+- Confiança do CFO/board: o líquido mostrado não reflete os eventos lançados.
 
-## Plano de correção
+## Solução: colunas dedicadas + trigger de agregação
 
-### 1. Migration: deduplicar e adicionar UNIQUE
+### 1. Migration
 
-Nova migration SQL que:
-
-a. **Deduplica registros existentes** mantendo o mais recente por `(payroll_run_id, employee_id)`:
-```sql
-DELETE FROM public.payroll_items a
-USING public.payroll_items b
-WHERE a.payroll_run_id = b.payroll_run_id
-  AND a.employee_id = b.employee_id
-  AND a.created_at < b.created_at;
--- desempate por id para empates exatos de timestamp
-DELETE FROM public.payroll_items a
-USING public.payroll_items b
-WHERE a.payroll_run_id = b.payroll_run_id
-  AND a.employee_id = b.employee_id
-  AND a.created_at = b.created_at
-  AND a.id < b.id;
-```
-
-b. **Adiciona a constraint**:
+a. **Adicionar colunas em `payroll_items`** para isolar a parte vinda de eventos (preserva auditoria entre "fixos calculados" e "variáveis lançados"):
 ```sql
 ALTER TABLE public.payroll_items
-  ADD CONSTRAINT payroll_items_run_employee_unique
-  UNIQUE (payroll_run_id, employee_id);
+  ADD COLUMN eventos_proventos numeric NOT NULL DEFAULT 0,
+  ADD COLUMN eventos_descontos numeric NOT NULL DEFAULT 0,
+  ADD COLUMN eventos_atualizado_em timestamptz;
 ```
 
-### 2. Ajustar `upsertItem` em `src/hooks/useDP.ts`
-
-Trocar:
-```ts
-.from("payroll_items").upsert({ ...item, ... })
+b. **Função de recomputação** (`recompute_payroll_item_from_events`): para um par `(payroll_run_id, employee_id)`, soma os eventos por `signal`, faz upsert da linha em `payroll_items` (criando-a se ainda não existir) e recalcula:
 ```
-por:
-```ts
-.from("payroll_items").upsert(
-  { ...item, user_id: user!.id, organization_id: currentOrg!.id },
-  { onConflict: "payroll_run_id,employee_id", ignoreDuplicates: false }
-)
+total_bruto    = salario_base + horas_extras + comissoes + adicionais + dsr + eventos_proventos
+total_descontos = inss_empregado + irrf + vt_desconto + faltas_desconto + outros_descontos + eventos_descontos
+total_liquido  = total_bruto - total_descontos
 ```
+A função respeita o flag `payroll_runs.locked` — se a folha estiver fechada, **não** atualiza (raise notice + return).
 
-Isso garante que o segundo cálculo da mesma folha **atualiza** a linha do colaborador em vez de inserir nova.
+c. **Trigger `trg_payroll_events_sync_item`** em `payroll_events` AFTER INSERT/UPDATE/DELETE chamando a função para o `(payroll_run_id, employee_id)` afetado (e também para o par antigo, em caso de UPDATE que mude a vinculação).
 
-### 3. Validação após implementação
+A trigger só roda quando `payroll_run_id IS NOT NULL` (eventos avulsos sem run vinculado não materializam).
 
-- Rodar "Calcular Folha" duas vezes na mesma run e confirmar via consulta que `count(*)` por `(payroll_run_id, employee_id)` permanece 1.
-- Confirmar que totais em `payroll_runs` (calculados em `handleCalcPayroll`) batem com a soma dos itens.
+d. **Backfill único** ao final da migration: rodar a função para todos os pares `(payroll_run_id, employee_id)` distintos já existentes em `payroll_events`, garantindo que folhas atuais já reflitam os eventos lançados.
+
+### 2. Ajuste em `DPFolha.tsx` / `useDP.ts`
+
+O cálculo manual continua válido (recomputa fixos: salário, INSS, IRRF, VT, encargos), mas o `upsertItem` precisa **preservar** as colunas de eventos. Solução: na função `handleCalcPayroll`, após gravar os fixos via `upsertItem`, chamar a mesma `recompute_payroll_item_from_events` via RPC para garantir consistência total. Alternativamente — e mais limpo — a função SQL recebe um parâmetro opcional para sobrescrever só os fixos, mantendo eventos.
+
+Abordagem escolhida: o `upsertItem` continua gravando apenas as colunas fixas (sem mexer em `eventos_*`); ao final do loop em `handleCalcPayroll`, o cliente dispara um `supabase.rpc("recompute_payroll_run_totals", { p_run_id })` que itera todos os funcionários da run e roda a recomputação para cada par. Isso garante:
+
+- Inserção de evento → trigger atualiza item daquele funcionário.
+- Recálculo manual → atualiza fixos + recomputa totais incluindo eventos.
+
+### 3. Validações pós-implementação
+
+- Inserir evento de bônus em folha aberta: `total_liquido` daquele funcionário deve subir automaticamente.
+- Editar evento (mudar valor): líquido reflete novo valor.
+- Deletar evento: líquido volta ao anterior.
+- Inserir evento em folha `locked=true`: trigger não altera item; aplicação deve impedir o lançamento na UI (já há `locked` no schema; recomendo guard adicional em `useMutatePayrollEvent.create` — verificar `payroll_runs.locked` antes de inserir).
+- Backfill: folhas antigas com eventos passam a ter líquido correto sem clicar em recalcular.
 
 ## Notas
 
-- A constraint não impacta RLS nem triggers existentes (não há triggers em `payroll_items`).
-- Não há outros pontos no código que façam INSERT em `payroll_items` além de `upsertItem` (verificado via `rg`), então o ajuste é suficiente.
-- A deduplicação preserva a versão mais recente — alinhada à premissa do produto de "passado imutável" considerando o último cálculo como a verdade vigente da folha em aberto. Folhas com `locked=true` raramente teriam duplicatas, mas a regra de manter o mais recente também as cobre sem perder dados estruturais.
+- Trigger é `SECURITY DEFINER` com `search_path = public` para conseguir gravar em `payroll_items` mesmo que o usuário não tenha permissão direta de UPDATE — necessário porque o usuário pode ter permissão em `payroll_events` mas o item pertence ao mesmo escopo.
+- Idempotente: rodar duas vezes com o mesmo conjunto de eventos produz o mesmo resultado.
+- Não cria duplicidade graças à constraint `payroll_items_run_employee_unique` adicionada na migration anterior.
+- Logging via `RAISE NOTICE` para folhas locked, sem console.error em cliente (alinhado à política `Error Handling Policy`).
