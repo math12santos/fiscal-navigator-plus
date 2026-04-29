@@ -112,6 +112,11 @@ export default function DPColaboradores() {
     });
     const empBenefits = allEmployeeBenefits.filter((eb: any) => eb.employee_id === e.id);
     setSelectedBenefitIds(empBenefits.map((eb: any) => eb.benefit_id));
+    const cv: Record<string, string> = {};
+    empBenefits.forEach((eb: any) => {
+      if (eb.custom_value != null) cv[eb.benefit_id] = String(eb.custom_value);
+    });
+    setBenefitCustomValues(cv);
     setDialogOpen(true);
   };
 
