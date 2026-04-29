@@ -284,11 +284,14 @@ export function useMutatePayroll() {
 
   const upsertItem = useMutation({
     mutationFn: async (item: any) => {
-      const { error } = await supabase.from("payroll_items").upsert({
-        ...item,
-        user_id: user!.id,
-        organization_id: currentOrg!.id,
-      });
+      const { error } = await supabase.from("payroll_items").upsert(
+        {
+          ...item,
+          user_id: user!.id,
+          organization_id: currentOrg!.id,
+        },
+        { onConflict: "payroll_run_id,employee_id", ignoreDuplicates: false }
+      );
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["payroll_items"] }),
