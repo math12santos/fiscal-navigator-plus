@@ -243,8 +243,30 @@ export default function Dashboard() {
       {/* HEADER */}
       <PageHeader
         title="Dashboard Financeiro"
-        description={currentOrg ? `Visão consolidada — ${currentOrg.name}` : "Visão consolidada da empresa ou holding"}
-      />
+        description={
+          currentOrg
+            ? `Visão consolidada — ${currentOrg.name} · ${format(referenceMonth, "MMMM 'de' yyyy", { locale: ptBR })}`
+            : `Visão consolidada · ${format(referenceMonth, "MMMM 'de' yyyy", { locale: ptBR })}`
+        }
+      >
+        <div className="flex items-center gap-2">
+          {!isCurrentMonth && (
+            <Badge
+              variant={isFutureMonth ? "outline" : "secondary"}
+              className={isFutureMonth ? "border-primary/40 text-primary" : ""}
+            >
+              {isFutureMonth ? "Projeção" : "Histórico"}
+            </Badge>
+          )}
+          <MonthPicker
+            value={referenceMonth}
+            onChange={setReferenceMonth}
+            onResetToday={resetToToday}
+            minDate={refMinDate}
+            maxDate={refMaxDate}
+          />
+        </div>
+      </PageHeader>
 
       {/* SEÇÃO 1 — KPIs PRINCIPAIS (Linha 1) */}
       <section className="space-y-4">
