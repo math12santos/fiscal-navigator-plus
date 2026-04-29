@@ -305,6 +305,10 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
         } else if (target === "data_prevista" || target === "data_realizada") {
           mapped[target] = parseDate(val);
           if (!mapped[target] && val.trim()) errors.push(`Data inválida: "${val}"`);
+        } else if (target === "competencia") {
+          const norm = normalizeCompetencia(val);
+          mapped[target] = norm;
+          if (!norm && val.trim()) errors.push(`Competência inválida: "${val}" (use YYYY-MM ou MM/YYYY)`);
         } else {
           mapped[target] = val.trim() || null;
         }
@@ -313,6 +317,11 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       if (!mapped.descricao) errors.push("Descrição ausente");
       if (!mapped.valor_previsto && mapped.valor_previsto !== 0) errors.push("Valor ausente");
       if (!mapped.data_prevista) errors.push("Data ausente");
+
+      // Fallback: competência ausente → mês de data_prevista (mantém MECE)
+      if (!mapped.competencia && mapped.data_prevista) {
+        mapped.competencia = String(mapped.data_prevista).slice(0, 7);
+      }
 
       return { raw: rawObj, mapped, errors };
     });
