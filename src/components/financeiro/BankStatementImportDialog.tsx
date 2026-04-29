@@ -38,7 +38,7 @@ const STEP_LABELS: Record<StatementImportStep, string> = {
 
 export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccountId }: Props) {
   const imp = useBankStatementImport();
-  const { accounts } = useBankAccounts();
+  const { bankAccounts: accounts } = useBankAccounts();
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [previewFilter, setPreviewFilter] = useState<"all" | "errors" | "valid">("all");
