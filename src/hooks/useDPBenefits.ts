@@ -88,12 +88,60 @@ export function useMutateEmployeeBenefit() {
 
   const assign = useMutation({
     mutationFn: async (items: { employee_id: string; benefit_id: string; custom_value?: number }[]) => {
+      if (items.length === 0) return;
+
+      // 1) Resolve categoria de cada benefício recebido para detectar conflitos
+      const incomingBenefitIds = Array.from(new Set(items.map((i) => i.benefit_id)));
+      const { data: benefitMeta, error: metaErr } = await supabase
+        .from("dp_benefits")
+        .select("id, category")
+        .in("id", incomingBenefitIds);
+      if (metaErr) throw metaErr;
+
+      const catById = new Map<string, string>(
+        (benefitMeta ?? []).map((b: any) => [b.id, b.category || "outros"]),
+      );
+
+      // 2) Para cada (employee_id, categoria) com categoria != "outros",
+      // remove vínculos ativos pré-existentes de OUTROS benefícios na mesma categoria.
+      // Comportamento: substituir silenciosamente (sem erro de duplicidade).
+      const employeeIds = Array.from(new Set(items.map((i) => i.employee_id)));
+      const { data: existingLinks, error: existErr } = await supabase
+        .from("employee_benefits")
+        .select("id, employee_id, benefit_id, active, dp_benefits(category)")
+        .in("employee_id", employeeIds);
+      if (existErr) throw existErr;
+
+      const toDeleteIds: string[] = [];
+      for (const item of items) {
+        const cat = catById.get(item.benefit_id) || "outros";
+        if (cat === "outros") continue;
+        for (const link of existingLinks ?? []) {
+          if (link.employee_id !== item.employee_id) continue;
+          if (link.benefit_id === item.benefit_id) continue;
+          const linkCat = (link as any).dp_benefits?.category || "outros";
+          if (linkCat === cat) toDeleteIds.push(link.id);
+        }
+      }
+      if (toDeleteIds.length > 0) {
+        const uniqueIds = Array.from(new Set(toDeleteIds));
+        const { error: delErr } = await supabase
+          .from("employee_benefits")
+          .delete()
+          .in("id", uniqueIds);
+        if (delErr) throw delErr;
+      }
+
+      // 3) Upsert dos novos vínculos
       const rows = items.map((i) => ({
         ...i,
+        active: true,
         user_id: user!.id,
         organization_id: currentOrg!.id,
       }));
-      const { error } = await supabase.from("employee_benefits").upsert(rows, { onConflict: "employee_id,benefit_id" });
+      const { error } = await supabase
+        .from("employee_benefits")
+        .upsert(rows, { onConflict: "employee_id,benefit_id" });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["employee_benefits"] }),
