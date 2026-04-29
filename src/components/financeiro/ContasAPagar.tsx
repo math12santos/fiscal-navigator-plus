@@ -12,6 +12,7 @@ import { DuplicateAlerts } from "./DuplicateAlerts";
 import { ExpenseRequestButton } from "./ExpenseRequestButton";
 import { PendingExpenseRequests } from "./PendingExpenseRequests";
 import { ImportDialog } from "./ImportDialog";
+import { PMPMRKpiCard } from "./PMPMRKpiCard";
 import { Plus, Loader2, TrendingDown, Wallet, Clock, FileUp } from "lucide-react";
 import { useUpdateRequest, type Request } from "@/hooks/useRequests";
 import { useAuth } from "@/contexts/AuthContext";
