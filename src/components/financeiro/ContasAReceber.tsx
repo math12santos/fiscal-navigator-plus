@@ -7,6 +7,7 @@ import { FinanceiroEntryDialog } from "./FinanceiroEntryDialog";
 import { FinanceiroTable } from "./FinanceiroTable";
 import { ImportDialog } from "./ImportDialog";
 import { DuplicateAlerts } from "./DuplicateAlerts";
+import { PMPMRKpiCard } from "./PMPMRKpiCard";
 import { Plus, Loader2, TrendingUp, Wallet, Clock, FileUp } from "lucide-react";
 
 const fmt = (v: number) =>
