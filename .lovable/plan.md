@@ -1,88 +1,55 @@
-## Diagnóstico
+## Objetivo
 
-A página **Conciliação Bancária** está 100% mockada — usa `bankReconciliation` de `src/data/mockData.ts`, sem filtro por organização. Por isso o mesmo dado fictício aparece em todas as empresas do grupo Avante Brasil.
+No preview da importação (Financeiro → Importar CSV/XLS), ao clicar em uma linha marcada com **erro**, abrir um editor inline que permita corrigir os campos problemáticos (descrição, valor, data de vencimento, data de pagamento, fornecedor) **sem excluir a linha**. Quando todos os erros forem resolvidos, a linha passa automaticamente para "válida" e entra na importação — preservando a deduplicação já existente.
 
-Não existe tabela real de conciliação nem de extrato bancário. Existe apenas `bank_accounts` (saldos) e `cashflow_entries` (com colunas já prontas: `conta_bancaria_id`, `data_realizada`, `valor_realizado`, `conciliacao_id`).
+## Comportamento
 
-Sobre a importação de **Contas a Pagar**: hoje, ao importar uma linha já paga (com data de pagamento preenchida), o sistema marca `status = 'pago'`, mas **não preenche `conta_bancaria_id` nem `valor_realizado`** — então a despesa entra no fluxo de caixa, mas fica órfã da conta bancária e portanto invisível para qualquer rotina de conciliação.
+1. Cada linha com badge "X erros" recebe um botão **Corrigir** (ícone de lápis) ao lado do badge.
+2. Clicar abre um drawer/sheet lateral com:
+   - Os 5 campos chave editáveis: Descrição, Valor (input numérico BR), Data Vencimento, Data Pagamento (opcional), Fornecedor.
+   - Painel "Problemas detectados" listando cada erro com a solução sugerida (reaproveitando `financeiroImportErrors`).
+   - Pré-visualização do payload corrigido.
+3. Ao salvar:
+   - Os valores em `parsedRow.mapped` são sobrescritos.
+   - Os erros são re-validados (mesmas regras de `buildPreview`: descrição ausente, valor ausente/zero, data ausente/inválida).
+   - Se `errors.length === 0`, a linha sai do estado de erro e fica elegível para importação automaticamente.
+4. Botão **Cancelar** descarta as edições. Não há opção de "excluir" nesse fluxo (a exclusão continua disponível pelo checkbox da própria linha, conforme já existe).
+5. Linhas duplicatas continuam destacadas em âmbar mesmo após edição.
 
----
+## Implementação técnica
 
-## O que será entregue
+### `src/hooks/useFinanceiroImport.ts`
 
-### 1. Tirar o mock da conciliação (todas as empresas)
+- Adicionar função `updateParsedRow(index: number, patch: Partial<ParsedRow["mapped"]>)`:
+  - Atualiza `mapped` da linha.
+  - Re-roda a validação de campos obrigatórios (mesmas regras das linhas 289-291): `descricao`, `valor_previsto != null && != 0`, `data_prevista`.
+  - Recalcula `errors` (limpando os antigos relativos a esses campos).
+  - Atualiza `parsedRows` imutavelmente.
+- Exportar `updateParsedRow` no `return`.
 
-- Remover `bankReconciliation` de `src/data/mockData.ts`
-- Reescrever `src/pages/Conciliacao.tsx` e `src/components/financeiro/ConciliacaoTab.tsx` para consumir dados reais filtrados por `organization_id`
-- Estado vazio amigável quando não houver extrato importado
+### `src/components/financeiro/ImportDialog.tsx`
 
-### 2. Conciliação real com banco de dados
+- Importar `Sheet` (shadcn) ou usar `Dialog` aninhado controlado por `editingRowIndex: number | null`.
+- No `<TableCell>` do Status (linha 447-460), quando `hasErrors`, renderizar:
+  - Badge de erros (mantém tooltip atual).
+  - Botão `Pencil` pequeno → `setEditingRowIndex(i)`.
+- Novo componente local `RowErrorEditor` (mesmo arquivo, ~80 linhas):
+  - Props: `row`, `index`, `onSave(patch)`, `onClose`.
+  - Estado local com os 5 campos.
+  - Lista de erros + dicas via `summarizeRowErrors([row])`.
+  - Botão Salvar chama `imp.updateParsedRow(index, patch)` e fecha.
 
-Criar a infraestrutura mínima para conciliação verdadeira:
+### Validação após edição
 
-- Nova tabela `bank_statement_entries` (linhas do extrato bancário importado) — com `organization_id`, `bank_account_id`, `data`, `descricao`, `valor`, `documento`, `import_id`, `source_ref`, `cashflow_entry_id` (vínculo quando conciliada), `status` (`pendente | conciliado | divergente | ignorado`)
-- Índice unique parcial `(organization_id, bank_account_id, source_ref)` para idempotência (mesmo padrão dos `cashflow_entries`)
-- RLS por organização (mesmo padrão de `bank_accounts`)
-- Função `match_statement_to_cashflow(p_statement_id uuid)` que sugere candidatos do `cashflow_entries` por **valor (±2%) + data (±3 dias) + mesma conta bancária**
+Reutilizar exatamente as três checagens existentes para garantir consistência com o resto do fluxo (deduplicação intra-arquivo, pré-check de banco e `source_ref` determinístico permanecem intocados — a linha corrigida participa naturalmente desses passos).
 
-### 3. Importação de extrato bancário (XLS/CSV)
+## Arquivos afetados
 
-Reaproveitar 100% o fluxo já existente de Contas a Pagar (`useFinanceiroImport` + `ImportDialog`), criando uma versão dedicada para extrato:
+- `src/hooks/useFinanceiroImport.ts` — nova função `updateParsedRow` + export.
+- `src/components/financeiro/ImportDialog.tsx` — botão "Corrigir" na coluna Status + componente `RowErrorEditor` inline.
 
-- Novo hook `useBankStatementImport` (mesma estrutura: detect → mapping → preview → entity matching → done)
-- Mesmos benefícios já entregues: catálogo de erros com soluções, quick-fix de formato BR/US, deduplicação 3 níveis (intra-arquivo / banco / unique index), batching resiliente, CSV de falhas
-- Campos mapeáveis: Data, Histórico/Descrição, Valor (sinal: positivo = crédito, negativo = débito), Documento, Conta Bancária (selecionada antes da importação)
-- Botão **"Importar Extrato"** na nova tela de Conciliação
+## Fora do escopo
 
-### 4. Reconciliação automática + manual
-
-Na tela de Conciliação:
-
-- KPIs reais: Taxa de conciliação, Divergências, Pendentes (calculados sobre `bank_statement_entries`)
-- Lista de linhas do extrato com **sugestão automática** de matching (ranking por proximidade de valor + data)
-- Ações por linha: **Conciliar** (vincula a um `cashflow_entry`), **Marcar como divergente**, **Ignorar**, **Criar lançamento a partir do extrato**
-- Filtros: por conta bancária, por status, por intervalo de datas
-
-### 5. Corrigir o ciclo "pagamento importado → fluxo de caixa → conciliação"
-
-No `useFinanceiroImport`:
-
-- Quando a linha importada vier com **data de pagamento** preenchida:
-  - Preencher `valor_realizado` = valor importado
-  - Permitir o usuário escolher **uma conta bancária padrão** para o lote no preview (Select no rodapé do passo Preview) → grava `conta_bancaria_id` em todas as linhas pagas do batch
-  - Garantir `status = 'pago'` e `data_realizada` preservada
-- Documentar isso na tela final ("X lançamentos pagos vinculados à conta Y, prontos para conciliação")
-
-### 6. Limpeza dos demais mocks órfãos do `mockData.ts`
-
-Verificar e remover qualquer outro export do `mockData.ts` que esteja sendo importado por páginas de produção (escopo limitado: não vou tocar em mocks usados apenas em demo/storybook).
-
----
-
-## Detalhes técnicos
-
-**Arquivos novos**
-- `supabase/migrations/<ts>_bank_statement_entries.sql` — tabela + RLS + índices + função de matching
-- `src/hooks/useBankStatementImport.ts` — hook de importação dedicado
-- `src/hooks/useConciliacao.ts` — leitura, KPIs e ações de conciliação
-- `src/components/financeiro/BankStatementImportDialog.tsx` — wrapper sobre `ImportDialog` configurado para extrato
-
-**Arquivos editados**
-- `src/data/mockData.ts` — remove `bankReconciliation`
-- `src/pages/Conciliacao.tsx` — reescrito com dados reais
-- `src/components/financeiro/ConciliacaoTab.tsx` — reescrito com dados reais
-- `src/hooks/useFinanceiroImport.ts` — preencher `conta_bancaria_id` + `valor_realizado` quando linha vier paga
-- `src/components/financeiro/ImportDialog.tsx` — Select de "Conta bancária para lançamentos pagos" no passo Preview
-
-**Padrões reusados**
-- `source_ref = 'statement_import:<importId>:<rowIndex>'` para garantir idempotência via unique index
-- Mesma estratégia de `upsert({ ignoreDuplicates: true, onConflict: 'organization_id,bank_account_id,source_ref' })`
-- RLS via `is_org_member` + `has_backoffice_org_access` (mesmo padrão atual)
-
----
-
-## Observações
-
-- Não vou remover nenhum dado real do banco — o "lixo" da Avante Brasil é só o mock no front-end, então a limpeza é instantânea ao trocar a fonte de dados.
-- A conciliação automática usa heurística simples (valor + data + conta). Conciliação por OCR/regras avançadas pode ser próxima iteração.
-- Importação de extrato CSV/XLS reaproveita ~90% do código de Contas a Pagar — entrega rápida e consistente.
+- Edição em massa (bulk edit) de erros do mesmo tipo — pode ser uma evolução futura.
+- Edição de campos secundários (categoria, centro de custo) — esses não geram erros bloqueantes.
+- Alterações no fluxo de deduplicação ou no pipeline de batch (já robusto).
