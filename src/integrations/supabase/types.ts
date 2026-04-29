@@ -6241,6 +6241,10 @@ export type Database = {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean
       }
+      propagate_benefit_to_subsidiaries: {
+        Args: { p_benefit_id: string }
+        Returns: Json
+      }
       recompute_payroll_item_from_events: {
         Args: { p_employee_id: string; p_run_id: string }
         Returns: undefined

@@ -68,6 +68,8 @@ export default function DPColaboradores() {
     vt_ativo: false, vt_diario: "",
   });
   const [selectedBenefitIds, setSelectedBenefitIds] = useState<string[]>([]);
+  // Map benefit_id -> custom_value (used for plano_saude where each employee has own price)
+  const [benefitCustomValues, setBenefitCustomValues] = useState<Record<string, string>>({});
 
   const filtered = useMemo(() => {
     return employees.filter((e: any) => {
@@ -93,6 +95,7 @@ export default function DPColaboradores() {
     setEditing(null);
     setForm({ name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT", salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "", status: "ativo", notes: "", comissao_tipo: "nenhuma", comissao_valor: "", vt_ativo: false, vt_diario: "" });
     setSelectedBenefitIds([]);
+    setBenefitCustomValues({});
     setDialogOpen(true);
   };
 
@@ -109,6 +112,11 @@ export default function DPColaboradores() {
     });
     const empBenefits = allEmployeeBenefits.filter((eb: any) => eb.employee_id === e.id);
     setSelectedBenefitIds(empBenefits.map((eb: any) => eb.benefit_id));
+    const cv: Record<string, string> = {};
+    empBenefits.forEach((eb: any) => {
+      if (eb.custom_value != null) cv[eb.benefit_id] = String(eb.custom_value);
+    });
+    setBenefitCustomValues(cv);
     setDialogOpen(true);
   };
 
@@ -126,6 +134,23 @@ export default function DPColaboradores() {
     };
 
     const saveBenefits = async (employeeId: string) => {
+      // 0) Validate plano_saude requires custom_value > 0
+      const planoSaudeMissing = selectedBenefitIds
+        .map((bid) => allBenefits.find((b: any) => b.id === bid))
+        .filter((b: any) => b && b.category === "plano_saude")
+        .filter((b: any) => {
+          const v = Number(benefitCustomValues[b.id] || 0);
+          return !v || v <= 0;
+        });
+      if (planoSaudeMissing.length > 0) {
+        toast({
+          title: "Valor do Plano de Saúde obrigatório",
+          description: `Informe o valor mensal para: ${planoSaudeMissing.map((b: any) => b.name).join(", ")}.`,
+          variant: "destructive",
+        });
+        throw new Error("plano_saude_missing_value");
+      }
+
       // Sincronização completa em 2 etapas:
       // 1) Remove vínculos desmarcados explicitamente.
       // 2) Remove vínculos pré-existentes que conflitem por CATEGORIA com algum
@@ -170,10 +195,17 @@ export default function DPColaboradores() {
             .in("id", allRemove.map((eb: any) => eb.id));
           if (delErr) throw delErr;
         }
-        if (toAdd.length > 0) {
-          await assignBenefits.mutateAsync(
-            toAdd.map((bid) => ({ employee_id: employeeId, benefit_id: bid })),
-          );
+        // Upsert ALL selected (including existing) so custom_value is updated as well
+        if (selectedBenefitIds.length > 0) {
+          const rows = selectedBenefitIds.map((bid) => {
+            const cv = benefitCustomValues[bid];
+            return {
+              employee_id: employeeId,
+              benefit_id: bid,
+              custom_value: cv != null && cv !== "" ? Number(cv) : undefined,
+            };
+          });
+          await assignBenefits.mutateAsync(rows as any);
         }
         if (removedNames.length > 0) {
           toast({
@@ -187,6 +219,7 @@ export default function DPColaboradores() {
           description: err?.message || "Verifique se há benefícios duplicados na mesma categoria.",
           variant: "destructive",
         });
+        throw err;
       }
     };
 
@@ -469,47 +502,78 @@ export default function DPColaboradores() {
                         )
                       : null;
                     return (
-                      <label
-                        key={b.id}
-                        className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
-                          conflictWith ? "bg-warning/10 border border-warning/40" : "border border-transparent"
-                        }`}
-                        title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={(checked) => {
-                            setSelectedBenefitIds((prev) => {
-                              if (!checked) return prev.filter((id) => id !== b.id);
-                              // Substituir outros benefícios da mesma categoria (exceto "outros")
-                              if (cat === "outros") return [...prev, b.id];
-                              const replaced = prev
-                                .map((id) => allBenefits.find((x: any) => x.id === id))
-                                .filter((x: any) => x && x.id !== b.id && (x.category || "outros") === cat);
-                              const next = prev.filter((id) => {
-                                const other = allBenefits.find((x: any) => x.id === id);
-                                return (other?.category || "outros") !== cat;
-                              });
-                              if (replaced.length > 0) {
-                                toast({
-                                  title: "Benefício substituído",
-                                  description: `"${b.name}" substituiu "${replaced.map((r: any) => r.name).join(", ")}" na categoria ${cat}.`,
+                      <div key={b.id} className="flex flex-col gap-1">
+                        <label
+                          className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
+                            conflictWith ? "bg-warning/10 border border-warning/40" : "border border-transparent"
+                          }`}
+                          title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              setSelectedBenefitIds((prev) => {
+                                if (!checked) {
+                                  // Limpa o custom_value desse benefício ao desmarcar
+                                  setBenefitCustomValues((cv) => {
+                                    const next = { ...cv };
+                                    delete next[b.id];
+                                    return next;
+                                  });
+                                  return prev.filter((id) => id !== b.id);
+                                }
+                                // Substituir outros benefícios da mesma categoria (exceto "outros")
+                                if (cat === "outros") return [...prev, b.id];
+                                const replaced = prev
+                                  .map((id) => allBenefits.find((x: any) => x.id === id))
+                                  .filter((x: any) => x && x.id !== b.id && (x.category || "outros") === cat);
+                                const next = prev.filter((id) => {
+                                  const other = allBenefits.find((x: any) => x.id === id);
+                                  return (other?.category || "outros") !== cat;
                                 });
+                                if (replaced.length > 0) {
+                                  toast({
+                                    title: "Benefício substituído",
+                                    description: `"${b.name}" substituiu "${replaced.map((r: any) => r.name).join(", ")}" na categoria ${cat}.`,
+                                  });
+                                }
+                                return [...next, b.id];
+                              });
+                            }}
+                          />
+                          <span className={conflictWith ? "font-medium" : ""}>{b.name}</span>
+                          {cat === "plano_saude" ? (
+                            <span className="text-muted-foreground text-xs">(valor manual)</span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">
+                              ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
+                            </span>
+                          )}
+                          {conflictWith && (
+                            <span className="ml-auto text-[10px] text-warning font-medium">
+                              substitui {conflictWith.name}
+                            </span>
+                          )}
+                        </label>
+                        {isSelected && cat === "plano_saude" && (
+                          <div className="ml-7 flex items-center gap-2">
+                            <Label className="text-[11px] text-muted-foreground whitespace-nowrap">
+                              Valor mensal (R$) *
+                            </Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="h-7 text-sm"
+                              value={benefitCustomValues[b.id] ?? ""}
+                              onChange={(e) =>
+                                setBenefitCustomValues((cv) => ({ ...cv, [b.id]: e.target.value }))
                               }
-                              return [...next, b.id];
-                            });
-                          }}
-                        />
-                        <span className={conflictWith ? "font-medium" : ""}>{b.name}</span>
-                        <span className="text-muted-foreground text-xs">
-                          ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
-                        </span>
-                        {conflictWith && (
-                          <span className="ml-auto text-[10px] text-warning font-medium">
-                            substitui {conflictWith.name}
-                          </span>
+                              placeholder="Ex: 350.00"
+                            />
+                          </div>
                         )}
-                      </label>
+                      </div>
                     );
                   })}
                 </div>

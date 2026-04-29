@@ -6,12 +6,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit2, Trash2 } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Building2 } from "lucide-react";
 import { useDPBenefits, useMutateDPBenefit } from "@/hooks/useDPBenefits";
 import { useEmployees } from "@/hooks/useDP";
 import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import { useToast } from "@/hooks/use-toast";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
+import { supabase } from "@/integrations/supabase/client";
 import { DPExportButton } from "./DPExportButton";
 import { generateDPExcelReport } from "@/lib/dpExports";
 
@@ -40,7 +42,31 @@ export default function DPBeneficios() {
   const { data: employees = [] } = useEmployees();
   const { data: empBenefits = [] } = useEmployeeBenefits();
   const { currentOrg } = useOrganization();
+  const { isHolding } = useHolding();
   const { toast } = useToast();
+  const [propagatingId, setPropagatingId] = useState<string | null>(null);
+
+  const handlePropagate = async (b: any) => {
+    if (!confirm(`Copiar o benefício "${b.name}" para todas as empresas filiadas? Filiadas que já tenham um benefício com o mesmo nome serão ignoradas.`)) return;
+    setPropagatingId(b.id);
+    try {
+      const { data, error } = await (supabase.rpc as any)("propagate_benefit_to_subsidiaries", { p_benefit_id: b.id });
+      if (error) throw error;
+      const result = (data ?? {}) as { inserted?: number; skipped?: number };
+      toast({
+        title: "Propagação concluída",
+        description: `${result.inserted ?? 0} filiada(s) receberam o benefício. ${result.skipped ?? 0} ignorada(s) (já existia).`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Falha na propagação",
+        description: err?.message || "Verifique se você é owner/admin desta Holding.",
+        variant: "destructive",
+      });
+    } finally {
+      setPropagatingId(null);
+    }
+  };
 
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -197,6 +223,18 @@ export default function DPBeneficios() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(b)}><Edit2 size={13} /></Button>
+                      {isHolding && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-primary"
+                          title="Propagar para empresas filiadas (cópia)"
+                          disabled={propagatingId === b.id}
+                          onClick={() => handlePropagate(b)}
+                        >
+                          <Building2 size={13} />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(b.id)}><Trash2 size={13} /></Button>
                     </div>
                   </TableCell>
