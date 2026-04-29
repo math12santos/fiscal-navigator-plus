@@ -81,6 +81,8 @@ const BackofficeConfig = lazyRetry(() => import("@/pages/BackofficeConfig"));
 const BackofficeSystem = lazyRetry(() => import("@/pages/BackofficeSystem"));
 const BackofficeOnboarding = lazyRetry(() => import("@/pages/BackofficeOnboarding"));
 const Auth = lazyRetry(() => import("@/pages/Auth"));
+const ResetPassword = lazyRetry(() => import("@/pages/ResetPassword"));
+const Perfil = lazyRetry(() => import("@/pages/Perfil"));
 const NotFound = lazyRetry(() => import("@/pages/NotFound"));
 const ModuleMaintenanceGuard = lazyRetry(() => import("@/components/ModuleMaintenanceGuard"));
 const DashboardOrEffectiveHome = lazyRetry(() =>
@@ -174,6 +176,7 @@ function ProtectedRoutes() {
           <Route path="/nova-empresa" element={<RouteShell skeleton={<GenericPageSkeleton title="Nova empresa" />}><CreateOrganization /></RouteShell>} />
           <Route path="/relatorios/kpi/:metric" element={<RouteShell skeleton={<RelatorioKpiSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/relatorios/distribuicao" element={<RouteShell skeleton={<GenericPageSkeleton title="Distribuição de Relatórios" />}><ModuleMaintenanceGuard moduleKey="relatorios-out"><RelatoriosDistribuicao /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/perfil" element={<RouteShell skeleton={<GenericPageSkeleton title="Meu Perfil" />}><Perfil /></RouteShell>} />
           <Route path="*" element={<RouteShell skeleton={<GenericPageSkeleton />}><NotFound /></RouteShell>} />
         </Routes>
       </AppLayout>
@@ -285,6 +288,7 @@ const App = () => (
             <HoldingProvider>
               <Routes>
                 <Route path="/auth" element={<AuthRoute />} />
+                <Route path="/reset-password" element={<Suspense fallback={<FullScreenLoader />}><ResetPassword /></Suspense>} />
                 <Route path="/onboarding" element={<OnboardingRoute />} />
                 <Route path="/onboarding-guiado" element={<GuidedOnboardingRoute />} />
                 <Route path="/backoffice/*" element={<BackofficeRoutes />} />
