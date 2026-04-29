@@ -26,6 +26,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import {
   Upload,
   Loader2,
@@ -39,11 +49,13 @@ import {
   Download,
   Lightbulb,
   XCircle,
+  Pencil,
 } from "lucide-react";
 import {
   useFinanceiroImport,
   TARGET_FIELDS,
   type ImportStep,
+  type ParsedRow,
 } from "@/hooks/useFinanceiroImport";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { detectImportDuplicates } from "@/hooks/useDuplicateDetection";
@@ -73,6 +85,7 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [previewFilter, setPreviewFilter] = useState<"all" | "errors" | "valid">("all");
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
 
   const duplicateIndices = useMemo(() => {
     if (imp.step !== "preview" || imp.parsedRows.length === 0) return new Set<number>();
@@ -446,18 +459,29 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                             <TableCell className="text-xs max-w-[130px] truncate">{r.mapped.entity_name || "—"}</TableCell>
                             <TableCell>
                               {hasErrors ? (
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Badge variant="destructive" className="text-[10px]">
-                                      {r.errors.length} erro{r.errors.length > 1 ? "s" : ""}
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-xs">
-                                    <ul className="text-xs list-disc pl-3 space-y-0.5">
-                                      {r.errors.map((e, ei) => <li key={ei}>{e}</li>)}
-                                    </ul>
-                                  </TooltipContent>
-                                </Tooltip>
+                                <div className="flex items-center gap-1">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingRowIndex(i)}
+                                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 bg-destructive/15 hover:bg-destructive/25 transition-colors"
+                                        aria-label="Corrigir linha"
+                                      >
+                                        <Badge variant="destructive" className="text-[10px] pointer-events-none">
+                                          {r.errors.length} erro{r.errors.length > 1 ? "s" : ""}
+                                        </Badge>
+                                        <Pencil className="h-3 w-3 text-destructive" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left" className="max-w-xs">
+                                      <p className="text-[11px] font-medium mb-1">Clique para corrigir:</p>
+                                      <ul className="text-xs list-disc pl-3 space-y-0.5">
+                                        {r.errors.map((e, ei) => <li key={ei}>{e}</li>)}
+                                      </ul>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
                               ) : isDup ? (
                                 <Tooltip>
                                   <TooltipTrigger>
@@ -628,6 +652,185 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
           </div>
         )}
       </DialogContent>
+
+      {/* Editor inline de linha com erro */}
+      <RowErrorEditor
+        row={editingRowIndex != null ? imp.parsedRows[editingRowIndex] ?? null : null}
+        index={editingRowIndex}
+        onClose={() => setEditingRowIndex(null)}
+        onSave={(idx, patch) => {
+          imp.updateParsedRow(idx, patch);
+          setEditingRowIndex(null);
+        }}
+      />
     </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Editor inline para linhas com erro no preview
+// ─────────────────────────────────────────────────────────────────────────────
+interface RowErrorEditorProps {
+  row: ParsedRow | null;
+  index: number | null;
+  onClose: () => void;
+  onSave: (index: number, patch: Partial<ParsedRow["mapped"]>) => void;
+}
+
+function RowErrorEditor({ row, index, onClose, onSave }: RowErrorEditorProps) {
+  const open = row != null && index != null;
+
+  // Estado local controlado, reinicializado ao abrir uma nova linha
+  const [descricao, setDescricao] = useState("");
+  const [valor, setValor] = useState("");
+  const [dataPrevista, setDataPrevista] = useState("");
+  const [dataRealizada, setDataRealizada] = useState("");
+  const [entityName, setEntityName] = useState("");
+
+  // Reset ao trocar de linha
+  useMemo(() => {
+    if (row) {
+      setDescricao(String(row.mapped.descricao ?? ""));
+      setValor(
+        row.mapped.valor_previsto != null && !Number.isNaN(row.mapped.valor_previsto)
+          ? String(row.mapped.valor_previsto).replace(".", ",")
+          : ""
+      );
+      setDataPrevista(String(row.mapped.data_prevista ?? ""));
+      setDataRealizada(String(row.mapped.data_realizada ?? ""));
+      setEntityName(String(row.mapped.entity_name ?? ""));
+    }
+  }, [row]);
+
+  const summary = row ? summarizeRowErrors([row]) : [];
+
+  const handleSave = () => {
+    if (index == null) return;
+    // Converte valor BR -> número
+    const cleaned = valor.replace(/\./g, "").replace(",", ".").trim();
+    const valorNum = cleaned ? Number(cleaned) : null;
+
+    onSave(index, {
+      descricao: descricao.trim() || null,
+      valor_previsto: valorNum != null && !Number.isNaN(valorNum) ? valorNum : null,
+      data_prevista: dataPrevista.trim() || null,
+      data_realizada: dataRealizada.trim() || null,
+      entity_name: entityName.trim() || null,
+    });
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Corrigir linha {index != null ? index + 1 : ""}</SheetTitle>
+          <SheetDescription>
+            Edite os campos para resolver os erros. A linha não será excluída — ao salvar, a importação a reavalia automaticamente.
+          </SheetDescription>
+        </SheetHeader>
+
+        {row && (
+          <div className="space-y-5 py-5">
+            {/* Painel de problemas detectados */}
+            {summary.length > 0 && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                  <p className="text-xs font-semibold text-destructive">Problemas detectados</p>
+                </div>
+                <ul className="space-y-2">
+                  {summary.map((s, i) => (
+                    <li key={i} className="text-xs space-y-0.5">
+                      <p className="font-medium">{s.info.title}</p>
+                      {s.info.solution && (
+                        <p className="text-muted-foreground flex items-start gap-1">
+                          <Lightbulb className="h-3 w-3 mt-0.5 shrink-0" />
+                          <span>{s.info.solution}</span>
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-descricao" className="text-xs">Descrição *</Label>
+              <Input
+                id="edit-descricao"
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                placeholder="Descrição do lançamento"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-valor" className="text-xs">Valor (R$) *</Label>
+                <Input
+                  id="edit-valor"
+                  value={valor}
+                  onChange={(e) => setValor(e.target.value)}
+                  placeholder="1.234,56"
+                  inputMode="decimal"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-fornecedor" className="text-xs">Fornecedor / Cliente</Label>
+                <Input
+                  id="edit-fornecedor"
+                  value={entityName}
+                  onChange={(e) => setEntityName(e.target.value)}
+                  placeholder="Nome"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-dt-venc" className="text-xs">Data Vencimento *</Label>
+                <Input
+                  id="edit-dt-venc"
+                  type="date"
+                  value={dataPrevista}
+                  onChange={(e) => setDataPrevista(e.target.value)}
+                  maxLength={10}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-dt-pgto" className="text-xs">Data Pagamento</Label>
+                <Input
+                  id="edit-dt-pgto"
+                  type="date"
+                  value={dataRealizada}
+                  onChange={(e) => setDataRealizada(e.target.value)}
+                  maxLength={10}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-md border bg-muted/30 p-2">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                Linha original do arquivo
+              </p>
+              <p className="text-[11px] font-mono text-muted-foreground line-clamp-3 break-all">
+                {Object.entries(row.raw)
+                  .filter(([, v]) => v && String(v).trim())
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join(" · ")}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <SheetFooter className="gap-2">
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave}>
+            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+            Salvar e revalidar
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -650,6 +650,47 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     URL.revokeObjectURL(url);
   }, [failedRows, rawHeaders]);
 
+  /** Edita uma linha do preview e re-valida os erros bloqueantes (mesmas regras de buildPreview) */
+  const updateParsedRow = useCallback((index: number, patch: Partial<ParsedRow["mapped"]>) => {
+    setParsedRows((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+      const current = prev[index];
+      const newMapped = { ...current.mapped, ...patch };
+
+      // Mantém erros que NÃO são dos campos que revalidamos aqui
+      const blockingPatterns = [
+        /^Descrição ausente$/,
+        /^Valor ausente$/,
+        /^Valor inválido/,
+        /^Data ausente$/,
+        /^Data inválida/,
+      ];
+      const keptErrors = current.errors.filter((e) => !blockingPatterns.some((p) => p.test(e)));
+      const errors = [...keptErrors];
+
+      if (!newMapped.descricao || String(newMapped.descricao).trim() === "") {
+        errors.push("Descrição ausente");
+      }
+      if (newMapped.valor_previsto == null || newMapped.valor_previsto === 0 || Number.isNaN(newMapped.valor_previsto)) {
+        errors.push("Valor ausente");
+      }
+      if (!newMapped.data_prevista) {
+        errors.push("Data ausente");
+      }
+
+      const next = [...prev];
+      next[index] = { ...current, mapped: newMapped, errors };
+      return next;
+    });
+    // Se a linha estava excluída automaticamente, garante reinclusão ao corrigir
+    setExcludedRows((prev) => {
+      if (!prev.has(index)) return prev;
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
+  }, []);
+
   const toggleRowExclusion = useCallback((index: number) => {
     setExcludedRows((prev) => {
       const next = new Set(prev);
@@ -696,6 +737,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     createMissingEntities,
     executeImport,
     toggleRowExclusion,
+    updateParsedRow,
     setDateFormat,
     setNumberFormat,
     downloadFailedRowsCSV,
