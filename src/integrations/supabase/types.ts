@@ -4525,6 +4525,9 @@ export type Database = {
           created_at: string
           dsr: number | null
           employee_id: string
+          eventos_atualizado_em: string | null
+          eventos_descontos: number
+          eventos_proventos: number
           faltas_desconto: number | null
           fgts: number | null
           horas_extras: number | null
@@ -4549,6 +4552,9 @@ export type Database = {
           created_at?: string
           dsr?: number | null
           employee_id: string
+          eventos_atualizado_em?: string | null
+          eventos_descontos?: number
+          eventos_proventos?: number
           faltas_desconto?: number | null
           fgts?: number | null
           horas_extras?: number | null
@@ -4573,6 +4579,9 @@ export type Database = {
           created_at?: string
           dsr?: number | null
           employee_id?: string
+          eventos_atualizado_em?: string | null
+          eventos_descontos?: number
+          eventos_proventos?: number
           faltas_desconto?: number | null
           fgts?: number | null
           horas_extras?: number | null
@@ -6231,6 +6240,14 @@ export type Database = {
       is_org_member: {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean
+      }
+      recompute_payroll_item_from_events: {
+        Args: { p_employee_id: string; p_run_id: string }
+        Returns: undefined
+      }
+      recompute_payroll_run_totals: {
+        Args: { p_run_id: string }
+        Returns: undefined
       }
       remove_org_member: {
         Args: { _org_id: string; _target_user_id: string }
