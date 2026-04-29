@@ -737,6 +737,7 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     createMissingEntities,
     executeImport,
     toggleRowExclusion,
+    updateParsedRow,
     setDateFormat,
     setNumberFormat,
     downloadFailedRowsCSV,
