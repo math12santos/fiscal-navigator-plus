@@ -393,12 +393,22 @@ export function useMutateTermination() {
       // Idempotente via dedup_hash (UNIQUE INDEX em organization_id|source|source_ref).
       await syncTerminationCashflow(data, user!.id, currentOrg!.id);
 
+      // Marca o colaborador como desligado quando a rescisão é efetiva
+      // (qualquer status diferente de "simulacao"). Simulações não alteram o cadastro.
+      if (data?.employee_id && data?.status && data.status !== "simulacao") {
+        await supabase
+          .from("employees")
+          .update({ status: "desligado" })
+          .eq("id", data.employee_id);
+      }
+
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["terminations"] });
       qc.invalidateQueries({ queryKey: ["hr_planning"] });
       qc.invalidateQueries({ queryKey: ["cashflow_entries"] });
+      qc.invalidateQueries({ queryKey: ["employees"] });
     },
   });
 
@@ -413,11 +423,21 @@ export function useMutateTermination() {
       if (error) throw error;
       // Re-sincroniza o lançamento financeiro (valor, data ou status podem ter mudado).
       if (data) await syncTerminationCashflow(data, user!.id, currentOrg!.id);
+
+      // Sincroniza o status do colaborador conforme o status da rescisão.
+      if (data?.employee_id && data?.status) {
+        const newEmpStatus = data.status === "simulacao" ? "ativo" : "desligado";
+        await supabase
+          .from("employees")
+          .update({ status: newEmpStatus })
+          .eq("id", data.employee_id);
+      }
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["terminations"] });
       qc.invalidateQueries({ queryKey: ["cashflow_entries"] });
+      qc.invalidateQueries({ queryKey: ["employees"] });
     },
   });
 
