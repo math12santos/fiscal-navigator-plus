@@ -123,6 +123,8 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
   const [mappings, setMappings] = useState<MappingItem[]>([]);
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [importCount, setImportCount] = useState(0);
+  const [skippedCount, setSkippedCount] = useState(0);
+  const [failedRows, setFailedRows] = useState<{ rowIndex: number; raw: Record<string, string>; error: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [excludedRows, setExcludedRows] = useState<Set<number>>(new Set());
   const [entityMatches, setEntityMatches] = useState<EntityMatch[]>([]);
