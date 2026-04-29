@@ -1,141 +1,63 @@
-## Problema
+# Corrigir duplicidade no recálculo da Folha de Pagamento
 
-Hoje a Matriz 9 Box é totalmente subjetiva: o gestor digita "nota desempenho 1–5" e "nota potencial 1–5" sem nenhuma âncora, sem rubrica, sem evidência e sem ninguém para contestar. Resultado: avaliação vira opinião, perde valor para sucessão, PDI e decisões de board.
+## Problema diagnosticado
 
-## Objetivo
+A tabela `payroll_items` (migration `20260223130915`) **não possui constraint UNIQUE** em `(payroll_run_id, employee_id)`. Combinado com o uso de `supabase.from("payroll_items").upsert(...)` em `src/hooks/useDP.ts` (linha 287) **sem `onConflict`**, o Postgres cai no comportamento default (conflito por PK `id`). Como o cliente nunca envia `id`, cada chamada gera uma linha nova.
 
-Manter a autonomia do gestor, mas obrigar que cada nota seja **derivada de critérios objetivos, evidências registradas e calibrada por um segundo olhar**, deixando rastro auditável.
+Resultado: a cada clique em "Calcular Folha" em `DPFolha.tsx` (que chama `upsertItem` em loop por colaborador) os itens são duplicados, inflando totais e quebrando relatórios.
 
-## Solução proposta — 5 camadas de objetividade
+## Plano de correção
 
-### 1. Rubrica configurável (Critérios)
+### 1. Migration: deduplicar e adicionar UNIQUE
 
-Em vez de uma nota única, desempenho e potencial passam a ser compostos por **critérios ponderados**, cada um com âncoras descritivas por nível 1–5.
+Nova migration SQL que:
 
-- **Desempenho (default, editável por org):**
-  - Entrega de resultados (peso 40%) — puxa BSC do colaborador
-  - Qualidade técnica (20%)
-  - Cumprimento de prazos (15%)
-  - Colaboração / trabalho em equipe (15%)
-  - Aderência a valores/cultura (10%)
-- **Potencial (default, editável):**
-  - Capacidade de aprendizado (25%)
-  - Liderança / influência (25%)
-  - Adaptabilidade (20%)
-  - Visão estratégica (20%)
-  - Mobilidade / disponibilidade (10%)
-  &nbsp;
+a. **Deduplica registros existentes** mantendo o mais recente por `(payroll_run_id, employee_id)`:
+```sql
+DELETE FROM public.payroll_items a
+USING public.payroll_items b
+WHERE a.payroll_run_id = b.payroll_run_id
+  AND a.employee_id = b.employee_id
+  AND a.created_at < b.created_at;
+-- desempate por id para empates exatos de timestamp
+DELETE FROM public.payroll_items a
+USING public.payroll_items b
+WHERE a.payroll_run_id = b.payroll_run_id
+  AND a.employee_id = b.employee_id
+  AND a.created_at = b.created_at
+  AND a.id < b.id;
+```
 
-Cada critério exibe uma **âncora textual** ("Nota 4 = entregou >100% das metas, …") para o gestor escolher pelo comportamento, não pelo número.
+b. **Adiciona a constraint**:
+```sql
+ALTER TABLE public.payroll_items
+  ADD CONSTRAINT payroll_items_run_employee_unique
+  UNIQUE (payroll_run_id, employee_id);
+```
 
-A nota final 1–5 é **calculada automaticamente** (média ponderada) — o gestor não digita mais a nota cheia, ele avalia critério a critério.
+### 2. Ajustar `upsertItem` em `src/hooks/useDP.ts`
 
-### 2. Evidências obrigatórias
+Trocar:
+```ts
+.from("payroll_items").upsert({ ...item, ... })
+```
+por:
+```ts
+.from("payroll_items").upsert(
+  { ...item, user_id: user!.id, organization_id: currentOrg!.id },
+  { onConflict: "payroll_run_id,employee_id", ignoreDuplicates: false }
+)
+```
 
-- Para nota **≥ 4** ou **≤ 2** em qualquer critério: campo de **evidência obrigatória** (texto curto + opção de anexar link/documento).
-- Sem evidência → não salva.
-- Critério "Entrega de resultados" puxa automaticamente o **BSC ativo** como evidência (snapshot do percentual de atingimento).
+Isso garante que o segundo cálculo da mesma folha **atualiza** a linha do colaborador em vez de inserir nova.
 
-### 3. Triangulação (anti-viés do gestor único)
+### 3. Validação após implementação
 
-Cada avaliação 9 Box passa a ter até 3 fontes ponderadas:
+- Rodar "Calcular Folha" duas vezes na mesma run e confirmar via consulta que `count(*)` por `(payroll_run_id, employee_id)` permanece 1.
+- Confirmar que totais em `payroll_runs` (calculados em `handleCalcPayroll`) batem com a soma dos itens.
 
-- **Auto-avaliação** do colaborador (peso 20%)
-- **Gestor direto** (peso 60%)
-- **Par/skip-level** opcional (peso 20%)
+## Notas
 
-Quando só o gestor avaliou, o sistema mostra um **selo "Avaliação unilateral"** e desconta confiabilidade no card.
-
-### 4. Calibração (workflow obrigatório antes de virar oficial)
-
-Toda avaliação nasce em status `**rascunho**` → vai para `**em_calibração**` (revisão por RH ou gestor do gestor) → `**calibrada**` → `**liberada para colaborador**`.
-
-Na tela de calibração:
-
-- Visão consolidada do time inteiro do gestor
-- **Detector de viés**: alerta quando >60% do time está em quadrantes 8/9 (inflação) ou >50% em 1/2 (deflação)
-- Distribuição forçada sugerida (ex.: máx 20% no Q9)
-- Histórico de notas anteriores do colaborador (evita salto sem justificativa)
-- Comparação com percentual de atingimento BSC e PDI
-
-### 5. Auditoria e versionamento
-
-- Toda avaliação salva snapshot dos critérios, pesos, evidências e quem calibrou.
-- Reabrir uma avaliação cria nova versão; histórico fica imutável.
-- Log de quem viu/alterou/liberou.
-
----
-
-## Detalhes técnicos
-
-### Banco
-
-Novas tabelas (migration):
-
-- `hr_9box_criteria_templates` — rubrica padrão e por organização (critério, dimensão `desempenho`/`potencial`, peso, âncoras 1–5).
-- `hr_9box_evaluation_scores` — 1 linha por critério avaliado (evaluation_id, criterio_id, fonte `auto`/`gestor`/`par`, nota 1–5, evidência texto, evidência URL).
-- `hr_9box_evaluation_sources` — quem avaliou (auto/gestor/par), peso, status individual.
-- `hr_9box_calibration_log` — quem calibrou, quando, mudança aplicada, observação.
-
-Em `hr_9box_evaluations`, adicionar:
-
-- `status` enum: `rascunho` | `em_calibracao` | `calibrada` | `liberada`
-- `confiabilidade` numeric (0–100) — derivado de quantas fontes responderam + cobertura de evidências
-- `versao` int e `evaluation_pai_id` (versionamento)
-- `viés_detectado` jsonb (snapshot dos alertas no momento do salvamento)
-
-Trigger `compute_9box_quadrante` reescrito para **recalcular nota_desempenho/nota_potencial a partir da média ponderada dos critérios e fontes**, em vez de usar o valor cru digitado.
-
-RLS: avaliação só fica visível ao colaborador quando `status = 'liberada'`.
-
-### Backend / lógica pura
-
-- `src/lib/performance/scoring.ts` — funções puras: `weightedScore(criteria[])`, `triangulate(sources[])`, `confidenceScore(evaluation)`, `detectBias(teamEvaluations[])`.
-- Testes unitários cobrindo cada função.
-
-### Frontend
-
-- **Substituir** `NineBoxDialog` por um wizard focado (padrão `focused-wizard`) em 4 passos colapsáveis:
-  1. Selecionar colaborador + fontes que vão avaliar
-  2. Avaliar critérios de desempenho (sliders + âncoras + evidências)
-  3. Avaliar critérios de potencial (idem)
-  4. Revisão: quadrante calculado + confiabilidade + envio para calibração
-- Nova **aba "Calibração"** dentro de 9 Box, visível só para RH/gestor do gestor, com a matriz do time + detector de viés + ações em massa.
-- Nova **tela de configuração de rubrica** em Configurações → Desempenho, para o RH ajustar critérios, pesos e âncoras.
-- Cards do quadrante passam a exibir **badge de confiabilidade** (Alta/Média/Baixa) e ícone de status (rascunho/em calibração/calibrada/liberada).
-
-### Integração com módulos existentes
-
-- BSC: critério "Entrega de resultados" puxa automaticamente `resultado_geral` do BSC ativo do colaborador (já existe `bsc_score_snapshot`).
-- PDI: ao concluir avaliação calibrada, sugere automaticamente criar/atualizar PDI quando quadrante ∈ {1, 2, 4, 7}.
-- Sucessão: quadrantes 8/9 calibrados marcam `indicacao_sucessao = true` automaticamente.
-
----
-
-## O que NÃO muda
-
-- Conceito dos 9 quadrantes e regras de faixa (1-2 baixo / 3 médio / 4-5 alto) em `quadrante.ts`.
-- Visual da matriz 3x3 e cores por tom semântico.
-- Hook `useNineBox` (apenas estendido).
-
----
-
-## Entregáveis (ordem de execução)
-
-1. Migration (tabelas, enum status, colunas novas, RLS, trigger atualizado).
-2. `src/lib/performance/scoring.ts` + testes.
-3. Hooks: `useNineBoxCriteria`, `useNineBoxScores`, `useNineBoxCalibration`.
-4. Wizard substituindo `NineBoxDialog`.
-5. Aba "Calibração" + detector de viés.
-6. Configuração de rubrica em Configurações.
-7. Atualização da matriz visual com badges de confiabilidade/status.
-8. Atualização de `mem://features/...` documentando a nova lógica.
-
----
-
-## Pontos para você decidir antes de eu implementar
-
-1. **Rubrica padrão:** uso a sugerida acima ou prefere que eu apenas crie a estrutura e o RH preenche do zero?
-2. **Triangulação:** já entrego com auto-avaliação + par opcional, ou começo só com gestor + 1 calibrador (mais simples) e deixo par/auto para fase 2?
-3. **Distribuição forçada:** aplico só como **alerta** (recomendado) ou como **trava dura** (impede salvar se passar do %)?
-4. **Visibilidade ao colaborador:** mantenho o flag `liberado_para_colaborador` manual, ou libero automaticamente após calibração?
+- A constraint não impacta RLS nem triggers existentes (não há triggers em `payroll_items`).
+- Não há outros pontos no código que façam INSERT em `payroll_items` além de `upsertItem` (verificado via `rg`), então o ajuste é suficiente.
+- A deduplicação preserva a versão mais recente — alinhada à premissa do produto de "passado imutável" considerando o último cálculo como a verdade vigente da folha em aberto. Folhas com `locked=true` raramente teriam duplicatas, mas a regra de manter o mais recente também as cobre sem perder dados estruturais.
