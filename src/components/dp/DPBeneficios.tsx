@@ -223,6 +223,18 @@ export default function DPBeneficios() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(b)}><Edit2 size={13} /></Button>
+                      {isHolding && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-primary"
+                          title="Propagar para empresas filiadas (cópia)"
+                          disabled={propagatingId === b.id}
+                          onClick={() => handlePropagate(b)}
+                        >
+                          <Building2 size={13} />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(b.id)}><Trash2 size={13} /></Button>
                     </div>
                   </TableCell>
