@@ -319,7 +319,7 @@ export default function BackofficeCompany() {
     }
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
       toast({ title: "E-mail de redefinição enviado", description: `Um link de redefinição foi enviado para ${email}.` });
