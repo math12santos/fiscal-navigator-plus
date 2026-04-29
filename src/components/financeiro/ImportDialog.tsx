@@ -459,18 +459,29 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                             <TableCell className="text-xs max-w-[130px] truncate">{r.mapped.entity_name || "—"}</TableCell>
                             <TableCell>
                               {hasErrors ? (
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Badge variant="destructive" className="text-[10px]">
-                                      {r.errors.length} erro{r.errors.length > 1 ? "s" : ""}
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-xs">
-                                    <ul className="text-xs list-disc pl-3 space-y-0.5">
-                                      {r.errors.map((e, ei) => <li key={ei}>{e}</li>)}
-                                    </ul>
-                                  </TooltipContent>
-                                </Tooltip>
+                                <div className="flex items-center gap-1">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingRowIndex(i)}
+                                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 bg-destructive/15 hover:bg-destructive/25 transition-colors"
+                                        aria-label="Corrigir linha"
+                                      >
+                                        <Badge variant="destructive" className="text-[10px] pointer-events-none">
+                                          {r.errors.length} erro{r.errors.length > 1 ? "s" : ""}
+                                        </Badge>
+                                        <Pencil className="h-3 w-3 text-destructive" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left" className="max-w-xs">
+                                      <p className="text-[11px] font-medium mb-1">Clique para corrigir:</p>
+                                      <ul className="text-xs list-disc pl-3 space-y-0.5">
+                                        {r.errors.map((e, ei) => <li key={ei}>{e}</li>)}
+                                      </ul>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
                               ) : isDup ? (
                                 <Tooltip>
                                   <TooltipTrigger>
