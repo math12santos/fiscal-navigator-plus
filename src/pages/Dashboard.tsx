@@ -51,9 +51,18 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { progress: onboardingProgress, loading: onboardingLoading } = useOnboardingProgress();
 
-  const now = useMemo(() => new Date(), []);
-  const rangeFrom = useMemo(() => startOfMonth(subMonths(now, 5)), [now]);
-  const rangeTo = useMemo(() => endOfMonth(now), [now]);
+  const {
+    referenceMonth,
+    setReferenceMonth,
+    resetToToday,
+    isCurrent: isCurrentMonth,
+    isFuture: isFutureMonth,
+    minDate: refMinDate,
+    maxDate: refMaxDate,
+  } = useReferenceMonth("dashboard");
+
+  const rangeFrom = useMemo(() => startOfMonth(subMonths(referenceMonth, 5)), [referenceMonth]);
+  const rangeTo = useMemo(() => endOfMonth(referenceMonth), [referenceMonth]);
 
   const {
     entries,
