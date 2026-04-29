@@ -2209,11 +2209,13 @@ export type Database = {
           dias_vendidos: number | null
           employee_id: string
           id: string
+          observacoes: string | null
           organization_id: string | null
           periodo_aquisitivo_fim: string
           periodo_aquisitivo_inicio: string
           provisao_mensal: number | null
           status: string
+          tipo: string
           updated_at: string
           user_id: string
           valor_ferias: number | null
@@ -2228,11 +2230,13 @@ export type Database = {
           dias_vendidos?: number | null
           employee_id: string
           id?: string
+          observacoes?: string | null
           organization_id?: string | null
           periodo_aquisitivo_fim: string
           periodo_aquisitivo_inicio: string
           provisao_mensal?: number | null
           status?: string
+          tipo?: string
           updated_at?: string
           user_id: string
           valor_ferias?: number | null
@@ -2247,11 +2251,13 @@ export type Database = {
           dias_vendidos?: number | null
           employee_id?: string
           id?: string
+          observacoes?: string | null
           organization_id?: string | null
           periodo_aquisitivo_fim?: string
           periodo_aquisitivo_inicio?: string
           provisao_mensal?: number | null
           status?: string
+          tipo?: string
           updated_at?: string
           user_id?: string
           valor_ferias?: number | null

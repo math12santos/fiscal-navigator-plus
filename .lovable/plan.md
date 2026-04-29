@@ -1,59 +1,79 @@
-# Persistência automática do Líquido a partir de payroll_events
+# Reformulação do Controle de Férias (CLT)
 
 ## Problema atual
+Hoje `DPFerias.tsx` usa só `admission_date` para calcular um único "período corrente" e classifica em Regular / Urgente / Vencida. Isso ignora a CLT:
+- Cada 12 meses gera **um novo período aquisitivo** (PA).
+- O empregador tem **12 meses concessivos** após o fim do PA para conceder o gozo. Passou disso → férias em dobro (multa).
+- Um colaborador pode ter **vários PAs em aberto** (até 2 já é alerta máximo).
+- Faltam: registrar gozos efetivos, venda de até 1/3 (abono pecuniário), e tempo até o próximo PA vencer.
 
-Hoje `payroll_items.total_liquido` (e `total_bruto`/`total_descontos`) só é atualizado quando o usuário clica em **"Calcular Folha"** em `DPFolha.tsx`. Eventos variáveis (`payroll_events` — horas extras, faltas, bônus, vales) ficam em tabela separada e **não impactam o líquido materializado** até alguém recalcular. Isso quebra:
+A tabela `employee_vacations` já tem `periodo_aquisitivo_inicio/fim`, `dias_gozados`, `dias_vendidos` — mas o componente não consome esses dados.
 
-- Relatórios e dashboards que leem `total_liquido` direto.
-- Sincronização com cashflow (vide memória `Termination → Cashflow Sync`), que pode ler valor desatualizado.
-- Confiança do CFO/board: o líquido mostrado não reflete os eventos lançados.
+## O que vamos entregar
 
-## Solução: colunas dedicadas + trigger de agregação
+### 1. Engine de cálculo CLT (novo `src/lib/vacationCalculations.ts`)
+Para cada colaborador ativo (CLT), gerar a lista de períodos aquisitivos desde a admissão até hoje:
+- PA `n`: início = `admissão + (n-1) anos`, fim = `admissão + n anos`.
+- Limite concessivo (deadline para gozo) = `fim do PA + 12 meses`.
+- Para cada PA, agregar de `employee_vacations`: `dias_gozados`, `dias_vendidos`, saldo restante (`30 - gozados - vendidos`).
+- Status do PA:
+  - `gozado` — saldo = 0 e há gozo registrado.
+  - `agendado` — existe vacation com `data_inicio` futura.
+  - `em_dia` — PA ainda dentro do prazo concessivo, sem urgência.
+  - `proximo_vencimento` — faltam ≤ 3 meses para o limite concessivo.
+  - `vencido_em_dobro` — passou do limite concessivo sem gozo → multa (dobra).
+- Próximo PA a vencer: PA aberto mais antigo + sua `limitDate`.
+- Tempo até próximo PA: meses entre hoje e o fim do próximo PA ainda não adquirido.
 
-### 1. Migration
+### 2. UI de `DPFerias.tsx` reformulada
+**Coluna "Meses Trabalhados" → "Meses com Férias Acumuladas"** (saldo de dias não gozados convertido em meses-equivalente, ou mostrar `dias acumulados`).
 
-a. **Adicionar colunas em `payroll_items`** para isolar a parte vinda de eventos (preserva auditoria entre "fixos calculados" e "variáveis lançados"):
-```sql
-ALTER TABLE public.payroll_items
-  ADD COLUMN eventos_proventos numeric NOT NULL DEFAULT 0,
-  ADD COLUMN eventos_descontos numeric NOT NULL DEFAULT 0,
-  ADD COLUMN eventos_atualizado_em timestamptz;
-```
+Nova tabela "Controle de Férias" por colaborador (uma linha por colaborador, colunas):
+1. Colaborador
+2. Períodos em aberto (badge contador, ex.: `2 PA abertos`)
+3. Dias acumulados não gozados
+4. Próximo PA — data limite concessivo
+5. **Tempo até vencer** (ex.: "em 4 meses", "vencido há 2 meses")
+6. **Tempo até próximas férias** (quando se completa o próximo PA ainda não adquirido)
+7. Status (badges):
+   - `Em dia`
+   - `Próximo do vencimento` (≤ 3 meses)
+   - `Vencido — pagamento em dobro` (vermelho)
+   - `2+ PAs em aberto` (vermelho — risco de multa iminente)
+8. Provisão acumulada (R$)
+9. Ações: **Registrar gozo** / **Registrar venda (abono)**
 
-b. **Função de recomputação** (`recompute_payroll_item_from_events`): para um par `(payroll_run_id, employee_id)`, soma os eventos por `signal`, faz upsert da linha em `payroll_items` (criando-a se ainda não existir) e recalcula:
-```
-total_bruto    = salario_base + horas_extras + comissoes + adicionais + dsr + eventos_proventos
-total_descontos = inss_empregado + irrf + vt_desconto + faltas_desconto + outros_descontos + eventos_descontos
-total_liquido  = total_bruto - total_descontos
-```
-A função respeita o flag `payroll_runs.locked` — se a folha estiver fechada, **não** atualiza (raise notice + return).
+Linha expansível (Accordion) mostrando cada PA do colaborador com: período, dias gozados, vendidos, saldo, status individual.
 
-c. **Trigger `trg_payroll_events_sync_item`** em `payroll_events` AFTER INSERT/UPDATE/DELETE chamando a função para o `(payroll_run_id, employee_id)` afetado (e também para o par antigo, em caso de UPDATE que mude a vinculação).
+### 3. Diálogo "Registrar Gozo / Venda" (novo `RegisterVacationDialog.tsx`)
+Campos:
+- Período aquisitivo (select dos PAs em aberto do colaborador)
+- Tipo: **Gozo** (data início + dias, máx. 30 - já usados) **ou** **Venda — abono pecuniário** (dias, máx. **1/3** = 10 dias por PA, conforme CLT art. 143)
+- Data início (gozo) / data referência (venda)
+- Cálculo automático de `valor_ferias`, `valor_terco`, `valor_total` baseado em `salary_base`
+- Validações:
+  - `dias_gozados + dias_vendidos ≤ 30` por PA
+  - `dias_vendidos ≤ 10` por PA
+  - Gozo mínimo de 14 dias contínuos (alerta, não bloqueio — fracionamento permitido pela Reforma Trabalhista)
 
-A trigger só roda quando `payroll_run_id IS NOT NULL` (eventos avulsos sem run vinculado não materializam).
+Persiste em `employee_vacations` (insert ou update do registro do PA).
 
-d. **Backfill único** ao final da migration: rodar a função para todos os pares `(payroll_run_id, employee_id)` distintos já existentes em `payroll_events`, garantindo que folhas atuais já reflitam os eventos lançados.
+### 4. Migration leve
+Adicionar (nullable, defaults):
+- `employee_vacations.tipo` text default `'gozo'` — valores: `gozo`, `abono_venda`, `programado`.
+- `employee_vacations.observacoes` text.
+- Constraint check: `dias_vendidos <= 10` e `(dias_gozados + dias_vendidos) <= 30` por linha.
+- Index `(organization_id, employee_id, periodo_aquisitivo_inicio)`.
 
-### 2. Ajuste em `DPFolha.tsx` / `useDP.ts`
+### 5. Exports atualizados
+PDF/Excel passam a refletir as novas colunas (Meses Acumulados, Tempo até vencer, Status CLT, PAs abertos).
 
-O cálculo manual continua válido (recomputa fixos: salário, INSS, IRRF, VT, encargos), mas o `upsertItem` precisa **preservar** as colunas de eventos. Solução: na função `handleCalcPayroll`, após gravar os fixos via `upsertItem`, chamar a mesma `recompute_payroll_item_from_events` via RPC para garantir consistência total. Alternativamente — e mais limpo — a função SQL recebe um parâmetro opcional para sobrescrever só os fixos, mantendo eventos.
+## Detalhes técnicos
+- `differenceInMonths` de `date-fns` para todos os cálculos de tempo.
+- Toda a lógica nova fica em `src/lib/vacationCalculations.ts` com testes unitários (`*.test.ts`) cobrindo: 1 PA em dia, 1 PA próximo, 1 PA vencido (dobra), 2 PAs simultâneos, gozo parcial, venda 10 dias.
+- `useVacations` continua igual; a agregação por PA é feita no client (volume baixo).
+- Memória atualizada: criar `mem://features/vacation-clt-engine`.
 
-Abordagem escolhida: o `upsertItem` continua gravando apenas as colunas fixas (sem mexer em `eventos_*`); ao final do loop em `handleCalcPayroll`, o cliente dispara um `supabase.rpc("recompute_payroll_run_totals", { p_run_id })` que itera todos os funcionários da run e roda a recomputação para cada par. Isso garante:
-
-- Inserção de evento → trigger atualiza item daquele funcionário.
-- Recálculo manual → atualiza fixos + recomputa totais incluindo eventos.
-
-### 3. Validações pós-implementação
-
-- Inserir evento de bônus em folha aberta: `total_liquido` daquele funcionário deve subir automaticamente.
-- Editar evento (mudar valor): líquido reflete novo valor.
-- Deletar evento: líquido volta ao anterior.
-- Inserir evento em folha `locked=true`: trigger não altera item; aplicação deve impedir o lançamento na UI (já há `locked` no schema; recomendo guard adicional em `useMutatePayrollEvent.create` — verificar `payroll_runs.locked` antes de inserir).
-- Backfill: folhas antigas com eventos passam a ter líquido correto sem clicar em recalcular.
-
-## Notas
-
-- Trigger é `SECURITY DEFINER` com `search_path = public` para conseguir gravar em `payroll_items` mesmo que o usuário não tenha permissão direta de UPDATE — necessário porque o usuário pode ter permissão em `payroll_events` mas o item pertence ao mesmo escopo.
-- Idempotente: rodar duas vezes com o mesmo conjunto de eventos produz o mesmo resultado.
-- Não cria duplicidade graças à constraint `payroll_items_run_employee_unique` adicionada na migration anterior.
-- Logging via `RAISE NOTICE` para folhas locked, sem console.error em cliente (alinhado à política `Error Handling Policy`).
+## Fora do escopo
+- Geração automática de evento de pagamento na folha quando o gozo é registrado (pode entrar em segunda iteração via `payroll_events`).
+- Abono de 1/3 constitucional na rescisão (já existe em `terminationCalculations`).
