@@ -31,6 +31,8 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { GlobalFetchingIndicator } from "@/components/GlobalFetchingIndicator";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
+import { useThemePreference } from "@/hooks/useThemePreference";
+import { ThemePreferenceDialog } from "@/components/ThemePreferenceDialog";
 import { pageFactories } from "@/App";
 
 type PageFactoryKey = keyof typeof pageFactories;
