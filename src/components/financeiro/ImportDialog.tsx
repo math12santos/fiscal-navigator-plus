@@ -328,6 +328,68 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                   )}
                 </div>
 
+                {/* ── Painel de erros agrupados com soluções e quick-fixes ── */}
+                {errorCount > 0 && (() => {
+                  const errorRows = imp.parsedRows.filter((r) => r.errors.length > 0);
+                  const summary = summarizeRowErrors(errorRows);
+                  const handleQuickFix = (qf: string | null | undefined) => {
+                    if (!qf) return;
+                    if (qf === "switch_date_to_us") imp.setDateFormat("MM/dd/yyyy");
+                    else if (qf === "switch_date_to_br") imp.setDateFormat("dd/MM/yyyy");
+                    else if (qf === "switch_number_to_us") imp.setNumberFormat("us");
+                    else if (qf === "switch_number_to_br") imp.setNumberFormat("br");
+                    else if (qf === "open_mapping") imp.goToMapping();
+                    if (["switch_date_to_us","switch_date_to_br","switch_number_to_us","switch_number_to_br"].includes(qf)) {
+                      // Refaz preview com novo formato
+                      setTimeout(() => imp.buildPreview(), 0);
+                    }
+                  };
+                  return (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        Como corrigir os {errorCount} erro{errorCount > 1 ? "s" : ""} encontrado{errorCount > 1 ? "s" : ""}
+                      </div>
+                      <div className="space-y-2">
+                        {summary.map((s) => (
+                          <div key={s.info.code} className="rounded border bg-background p-2.5 text-xs space-y-1.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="font-medium text-sm flex items-center gap-2">
+                                  <Badge variant="destructive" className="text-[10px]">{s.count}×</Badge>
+                                  {s.info.title}
+                                </div>
+                                <div className="mt-1 text-muted-foreground">
+                                  <span className="font-medium text-foreground">Causa:</span> {s.info.cause}
+                                </div>
+                                <div className="mt-0.5 text-muted-foreground flex items-start gap-1">
+                                  <Lightbulb className="h-3 w-3 mt-0.5 text-amber-500 shrink-0" />
+                                  <span><span className="font-medium text-foreground">Solução:</span> {s.info.solution}</span>
+                                </div>
+                                {s.sampleRows.length > 0 && (
+                                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                                    Exemplos: linha{s.sampleRows.length > 1 ? "s" : ""} {s.sampleRows.join(", ")}
+                                  </div>
+                                )}
+                              </div>
+                              {s.info.quickFix && s.info.quickFixLabel && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs shrink-0"
+                                  onClick={() => handleQuickFix(s.info.quickFix)}
+                                >
+                                  {s.info.quickFixLabel}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="border rounded-md overflow-auto max-h-[calc(92vh-280px)]">
                   <Table>
                     <TableHeader className="sticky top-0 bg-background z-10">
