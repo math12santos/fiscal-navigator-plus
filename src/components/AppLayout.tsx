@@ -74,6 +74,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const { signOut, user } = useAuth();
   const { canAccessModule, isMaster } = useUserPermissions();
   const { progress: onboardingProgress, loading: onboardingLoading } = useOnboardingProgress();
+  const { showDialog: showThemeDialog, dismissDialog: dismissThemeDialog } = useThemePreference();
   const showOnboardingLink = !onboardingLoading && (!onboardingProgress || onboardingProgress.status !== "concluido");
 
   const visibleNavItems = navItems.filter((item) => canAccessModule(item.module));
