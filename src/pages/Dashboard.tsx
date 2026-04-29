@@ -22,6 +22,9 @@ import { ptBR } from "date-fns/locale";
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 import DPCockpitSection from "@/components/dp/DPCockpitSection";
 import MaturityOverviewSection from "@/components/dashboard/MaturityOverviewSection";
+import { MonthPicker } from "@/components/MonthPicker";
+import { useReferenceMonth } from "@/hooks/useReferenceMonth";
+import { Badge } from "@/components/ui/badge";
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -48,9 +51,18 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { progress: onboardingProgress, loading: onboardingLoading } = useOnboardingProgress();
 
-  const now = useMemo(() => new Date(), []);
-  const rangeFrom = useMemo(() => startOfMonth(subMonths(now, 5)), [now]);
-  const rangeTo = useMemo(() => endOfMonth(now), [now]);
+  const {
+    referenceMonth,
+    setReferenceMonth,
+    resetToToday,
+    isCurrent: isCurrentMonth,
+    isFuture: isFutureMonth,
+    minDate: refMinDate,
+    maxDate: refMaxDate,
+  } = useReferenceMonth("dashboard");
+
+  const rangeFrom = useMemo(() => startOfMonth(subMonths(referenceMonth, 5)), [referenceMonth]);
+  const rangeTo = useMemo(() => endOfMonth(referenceMonth), [referenceMonth]);
 
   const {
     entries,
@@ -77,10 +89,10 @@ export default function Dashboard() {
     [isPerCompany, groupTotals]
   );
 
-  const prevMonthStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
-  const prevMonthEnd = useMemo(() => endOfMonth(subMonths(now, 1)), [now]);
-  const curMonthStart = useMemo(() => startOfMonth(now), [now]);
-  const curMonthEnd = useMemo(() => endOfMonth(now), [now]);
+  const prevMonthStart = useMemo(() => startOfMonth(subMonths(referenceMonth, 1)), [referenceMonth]);
+  const prevMonthEnd = useMemo(() => endOfMonth(subMonths(referenceMonth, 1)), [referenceMonth]);
+  const curMonthStart = useMemo(() => startOfMonth(referenceMonth), [referenceMonth]);
+  const curMonthEnd = useMemo(() => endOfMonth(referenceMonth), [referenceMonth]);
 
   const { currentMonth, previousMonth } = useMemo(() => {
     let curEntradas = 0, curSaidas = 0, prevEntradas = 0, prevSaidas = 0;
@@ -108,7 +120,7 @@ export default function Dashboard() {
   const monthlyData = useMemo(() => {
     const months: Record<string, { receita: number; despesas: number; dp: number }> = {};
     for (let i = 5; i >= 0; i--) {
-      const key = format(subMonths(now, i), "yyyy-MM");
+      const key = format(subMonths(referenceMonth, i), "yyyy-MM");
       months[key] = { receita: 0, despesas: 0, dp: 0 };
     }
     for (const e of entries) {
@@ -130,7 +142,7 @@ export default function Dashboard() {
       resultado: v.receita - v.despesas,
       dp: v.dp,
     }));
-  }, [entries]);
+  }, [entries, referenceMonth]);
 
   // Expense by category (current month)
   const expenseByCategory = useMemo(() => {
@@ -231,8 +243,30 @@ export default function Dashboard() {
       {/* HEADER */}
       <PageHeader
         title="Dashboard Financeiro"
-        description={currentOrg ? `Visão consolidada — ${currentOrg.name}` : "Visão consolidada da empresa ou holding"}
-      />
+        description={
+          currentOrg
+            ? `Visão consolidada — ${currentOrg.name} · ${format(referenceMonth, "MMMM 'de' yyyy", { locale: ptBR })}`
+            : `Visão consolidada · ${format(referenceMonth, "MMMM 'de' yyyy", { locale: ptBR })}`
+        }
+      >
+        <div className="flex items-center gap-2">
+          {!isCurrentMonth && (
+            <Badge
+              variant={isFutureMonth ? "outline" : "secondary"}
+              className={isFutureMonth ? "border-primary/40 text-primary" : ""}
+            >
+              {isFutureMonth ? "Projeção" : "Histórico"}
+            </Badge>
+          )}
+          <MonthPicker
+            value={referenceMonth}
+            onChange={setReferenceMonth}
+            onResetToday={resetToToday}
+            minDate={refMinDate}
+            maxDate={refMaxDate}
+          />
+        </div>
+      </PageHeader>
 
       {/* SEÇÃO 1 — KPIs PRINCIPAIS (Linha 1) */}
       <section className="space-y-4">

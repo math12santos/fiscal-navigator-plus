@@ -1,79 +1,77 @@
-# Reformulação do Controle de Férias (CLT)
+# Seletor de Mês Competência no Dashboard
 
-## Problema atual
-Hoje `DPFerias.tsx` usa só `admission_date` para calcular um único "período corrente" e classifica em Regular / Urgente / Vencida. Isso ignora a CLT:
-- Cada 12 meses gera **um novo período aquisitivo** (PA).
-- O empregador tem **12 meses concessivos** após o fim do PA para conceder o gozo. Passou disso → férias em dobro (multa).
-- Um colaborador pode ter **vários PAs em aberto** (até 2 já é alerta máximo).
-- Faltam: registrar gozos efetivos, venda de até 1/3 (abono pecuniário), e tempo até o próximo PA vencer.
+## Problema
 
-A tabela `employee_vacations` já tem `periodo_aquisitivo_inicio/fim`, `dias_gozados`, `dias_vendidos` — mas o componente não consome esses dados.
+No `src/pages/Dashboard.tsx` a referência temporal é fixa em `useMemo(() => new Date(), [])`. Todos os KPIs ("Receita Mensal", "Despesas Mensais", "Resultado Mensal", "Saldo do Período"), o gráfico de 6 meses e o "Despesas por Categoria" ficam travados no mês corrente do servidor. Não há como o CFO/Board:
+- revisitar fechamentos passados (ex.: "como fechou 03/2026?"),
+- antecipar projeções de meses futuros (ex.: "como está 06/2026 com base nos contratos e na folha provisionada?").
 
-## O que vamos entregar
+Isso quebra a promessa do produto de responder "Onde estamos hoje?" **e** "Para onde estamos indo?" a partir do mesmo painel.
 
-### 1. Engine de cálculo CLT (novo `src/lib/vacationCalculations.ts`)
-Para cada colaborador ativo (CLT), gerar a lista de períodos aquisitivos desde a admissão até hoje:
-- PA `n`: início = `admissão + (n-1) anos`, fim = `admissão + n anos`.
-- Limite concessivo (deadline para gozo) = `fim do PA + 12 meses`.
-- Para cada PA, agregar de `employee_vacations`: `dias_gozados`, `dias_vendidos`, saldo restante (`30 - gozados - vendidos`).
-- Status do PA:
-  - `gozado` — saldo = 0 e há gozo registrado.
-  - `agendado` — existe vacation com `data_inicio` futura.
-  - `em_dia` — PA ainda dentro do prazo concessivo, sem urgência.
-  - `proximo_vencimento` — faltam ≤ 3 meses para o limite concessivo.
-  - `vencido_em_dobro` — passou do limite concessivo sem gozo → multa (dobra).
-- Próximo PA a vencer: PA aberto mais antigo + sua `limitDate`.
-- Tempo até próximo PA: meses entre hoje e o fim do próximo PA ainda não adquirido.
+## Solução
 
-### 2. UI de `DPFerias.tsx` reformulada
-**Coluna "Meses Trabalhados" → "Meses com Férias Acumuladas"** (saldo de dias não gozados convertido em meses-equivalente, ou mostrar `dias acumulados`).
+Adicionar um **seletor de mês competência** no header do Dashboard, que controla todo o estado temporal da página. O range de 6 meses do gráfico desliza junto: passa a ser **[mês selecionado − 5, mês selecionado]**, mantendo o mês escolhido como o "atual" da análise. O comparativo "vs mês anterior" passa a ser sempre relativo ao mês selecionado.
 
-Nova tabela "Controle de Férias" por colaborador (uma linha por colaborador, colunas):
-1. Colaborador
-2. Períodos em aberto (badge contador, ex.: `2 PA abertos`)
-3. Dias acumulados não gozados
-4. Próximo PA — data limite concessivo
-5. **Tempo até vencer** (ex.: "em 4 meses", "vencido há 2 meses")
-6. **Tempo até próximas férias** (quando se completa o próximo PA ainda não adquirido)
-7. Status (badges):
-   - `Em dia`
-   - `Próximo do vencimento` (≤ 3 meses)
-   - `Vencido — pagamento em dobro` (vermelho)
-   - `2+ PAs em aberto` (vermelho — risco de multa iminente)
-8. Provisão acumulada (R$)
-9. Ações: **Registrar gozo** / **Registrar venda (abono)**
+Quando o mês selecionado é futuro, o painel mostra os mesmos números, mas alimentados pela engine de projeções já existente (contratos recorrentes, folha provisionada, VR/VA antecipados, CRM ponderado) — exatamente os dados que `useFinancialSummary` já retorna via `cashflow_entries` + projeções virtuais (`proj-*`).
 
-Linha expansível (Accordion) mostrando cada PA do colaborador com: período, dias gozados, vendidos, saldo, status individual.
+### UX
 
-### 3. Diálogo "Registrar Gozo / Venda" (novo `RegisterVacationDialog.tsx`)
-Campos:
-- Período aquisitivo (select dos PAs em aberto do colaborador)
-- Tipo: **Gozo** (data início + dias, máx. 30 - já usados) **ou** **Venda — abono pecuniário** (dias, máx. **1/3** = 10 dias por PA, conforme CLT art. 143)
-- Data início (gozo) / data referência (venda)
-- Cálculo automático de `valor_ferias`, `valor_terco`, `valor_total` baseado em `salary_base`
-- Validações:
-  - `dias_gozados + dias_vendidos ≤ 30` por PA
-  - `dias_vendidos ≤ 10` por PA
-  - Gozo mínimo de 14 dias contínuos (alerta, não bloqueio — fracionamento permitido pela Reforma Trabalhista)
+- No `PageHeader` do Dashboard, à direita do título, um **MonthPicker** compacto:
+  - Botão com label "Competência: **abr/2026**" + ícone calendar.
+  - Setas `‹ ›` para navegar mês a mês.
+  - Popover com `Calendar` shadcn em modo `month` (ano + grid de 12 meses), permitindo escolher qualquer mês entre `2000` e `2099` (respeita memória `date-entry-logic`).
+  - Botão "Hoje" para voltar ao mês corrente.
+- Badge sutil ao lado quando mês ≠ corrente:
+  - Mês passado → badge cinza "Histórico".
+  - Mês futuro → badge primary outline "Projeção".
+- Subtítulo do `PageHeader` reflete: `"Visão consolidada — Acme · abr/2026 (Projeção)"`.
+- Estado persistido em `sessionStorage` (`dashboard.referenceMonth`) para sobreviver a navegação intra-sessão sem poluir preferências de longo prazo.
 
-Persiste em `employee_vacations` (insert ou update do registro do PA).
+### Comportamento por bloco
 
-### 4. Migration leve
-Adicionar (nullable, defaults):
-- `employee_vacations.tipo` text default `'gozo'` — valores: `gozo`, `abono_venda`, `programado`.
-- `employee_vacations.observacoes` text.
-- Constraint check: `dias_vendidos <= 10` e `(dias_gozados + dias_vendidos) <= 30` por linha.
-- Index `(organization_id, employee_id, periodo_aquisitivo_inicio)`.
+| Bloco | Antes | Depois |
+|---|---|---|
+| KPIs "Receita / Despesas / Resultado Mensal" | Mês corrente vs anterior | Mês selecionado vs imediatamente anterior |
+| KPI "Saldo do Período" | Últimos 6 meses até hoje | 6 meses encerrando no mês selecionado |
+| Gráfico Receita × Despesas (6m) | Fixo até hoje | Janela deslizante até o mês selecionado |
+| Despesas por Categoria | Mês corrente | Mês selecionado |
+| Group Share (Holding) | Totais do range fixo | Totais do range deslizante (mesmo `useGroupTotals`) |
+| Cards estáticos (Runway, Contingências, Contratos ativos, CRM) | Snapshot atual | **Mantêm snapshot atual** — são leituras de "estado da empresa hoje", não competência. Recebem badge "snapshot" para deixar claro. |
 
-### 5. Exports atualizados
-PDF/Excel passam a refletir as novas colunas (Meses Acumulados, Tempo até vencer, Status CLT, PAs abertos).
+Runway, contratos ativos, contingências e CRM são intencionalmente desacoplados do mês escolhido: representam posição/estoque, não fluxo competência. O comportamento será documentado no tooltip do KPI.
+
+## Arquivos
+
+**Novos**
+- `src/components/MonthPicker.tsx` — componente reutilizável (Popover + Calendar shadcn em modo mês, setas, botão "Hoje", limite 2000–2099).
+- `src/hooks/useReferenceMonth.ts` — hook que expõe `{ referenceMonth, setReferenceMonth, isCurrent, isFuture, isPast }`, persistindo em `sessionStorage` com chave por página (`dashboard`).
+
+**Editados**
+- `src/pages/Dashboard.tsx`:
+  - Substituir `const now = useMemo(() => new Date(), [])` por `const { referenceMonth } = useReferenceMonth("dashboard")`.
+  - Recalcular `rangeFrom`, `rangeTo`, `prevMonthStart/End`, `curMonthStart/End`, `monthlyData` a partir de `referenceMonth`.
+  - Renderizar `<MonthPicker />` no header e badge de contexto (Histórico / Projeção / Atual).
+  - Atualizar subtitle do `PageHeader`.
+- `src/components/PageHeader.tsx` — adicionar prop opcional `actions?: ReactNode` (se ainda não existir) para receber o picker à direita. Verificar antes de duplicar.
+
+**Não tocar nesta iteração** (escopo intencionalmente fechado para evitar regressão):
+- `DPDashboard`, `DPCockpitSection`, `BackofficeDashboard`, `MaturityOverviewSection`. Cada um tem semântica própria de período (folha do mês, maturidade vigente). Podem ganhar o mesmo seletor numa segunda passagem se o usuário pedir — o componente `MonthPicker` e o hook ficam prontos para reuso.
 
 ## Detalhes técnicos
-- `differenceInMonths` de `date-fns` para todos os cálculos de tempo.
-- Toda a lógica nova fica em `src/lib/vacationCalculations.ts` com testes unitários (`*.test.ts`) cobrindo: 1 PA em dia, 1 PA próximo, 1 PA vencido (dobra), 2 PAs simultâneos, gozo parcial, venda 10 dias.
-- `useVacations` continua igual; a agregação por PA é feita no client (volume baixo).
-- Memória atualizada: criar `mem://features/vacation-clt-engine`.
 
-## Fora do escopo
-- Geração automática de evento de pagamento na folha quando o gozo é registrado (pode entrar em segunda iteração via `payroll_events`).
-- Abono de 1/3 constitucional na rescisão (já existe em `terminationCalculations`).
+- `useReferenceMonth(scope: string)` retorna sempre `startOfMonth(date)` para evitar bugs de fuso/dia.
+- `MonthPicker` usa o `Calendar` do shadcn (`mode="default"` com captionLayout `"dropdown-buttons"` limitado a meses) — segue a memória `shadcn-datepicker` (incluir `pointer-events-auto`).
+- `useFinancialSummary(rangeFrom, rangeTo)` já aceita range arbitrário e já materializa projeções virtuais (`proj-*`) — não precisa de mudança.
+- `useGroupTotals(rangeFrom, rangeTo)` idem.
+- Comparativo "vs mês anterior" continua usando `pctChange`; quando o mês selecionado for futuro e o anterior também não tiver realizado, o cálculo cai naturalmente em projeção vs projeção (consistente).
+- Persistência em `sessionStorage` (não `localStorage`): o CFO sempre abre o produto no "hoje" no início do dia; a navegação por meses é exploratória.
+- Acessibilidade: setas com `aria-label`, botão do popover com `aria-expanded`, valor anunciado em `aria-live="polite"` quando muda.
+
+## Critérios de aceite
+
+1. Ao abrir o Dashboard, mostra o mês corrente — comportamento idêntico ao atual.
+2. Clicando `‹` uma vez, todos os KPIs de mês, gráfico de 6 meses e "Despesas por Categoria" recalculam para o mês anterior; badge "Histórico" aparece.
+3. Clicando `›` para um mês futuro: KPIs mostram valores da projeção (vindos das engines de contratos + folha + VR/VA já existentes); badge "Projeção" aparece.
+4. Botão "Hoje" volta ao mês corrente e remove o badge.
+5. Estado sobrevive a navegação interna (Tarefas → Dashboard mantém o mês escolhido) e é zerado ao recarregar a aba.
+6. Runway, Contratos Ativos, Contingências e CRM não mudam ao trocar o mês (snapshot) e exibem tooltip "Posição atual da empresa — independente do mês selecionado".
