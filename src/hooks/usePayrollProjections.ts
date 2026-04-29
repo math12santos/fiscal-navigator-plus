@@ -310,7 +310,9 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           entries.push({
             ...baseEmp,
             id: `proj-dp-sal-${emp.id}-${monthKey}`,
-            descricao: calc.adiantamento > 0 ? `Salário (saldo) — ${emp.name}` : `Salário Líquido — ${emp.name}`,
+            descricao: calc.adiantamento > 0
+              ? `Salário (saldo) — ${emp.name} (competência ${monthLabel})`
+              : `Salário Líquido — ${emp.name} (competência ${monthLabel})`,
             valor_previsto: calc.saldo,
             data_prevista: dtSalario,
             account_id: acctSalario,
