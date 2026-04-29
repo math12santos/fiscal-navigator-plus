@@ -22,6 +22,9 @@ import { ptBR } from "date-fns/locale";
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 import DPCockpitSection from "@/components/dp/DPCockpitSection";
 import MaturityOverviewSection from "@/components/dashboard/MaturityOverviewSection";
+import { MonthPicker } from "@/components/MonthPicker";
+import { useReferenceMonth } from "@/hooks/useReferenceMonth";
+import { Badge } from "@/components/ui/badge";
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
