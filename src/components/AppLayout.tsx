@@ -201,6 +201,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
         <div className="p-6 lg:p-8 pt-2">{children}</div>
       </main>
+      <ThemePreferenceDialog open={showThemeDialog} onChosen={dismissThemeDialog} />
     </div>
   );
 }
