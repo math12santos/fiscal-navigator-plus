@@ -458,7 +458,7 @@ async function syncTerminationCashflow(termination: any, userId: string, orgId: 
 
   const { error } = await supabase
     .from("cashflow_entries" as any)
-    .upsert(payload, { onConflict: "dedup_hash" } as any);
+    .upsert(payload, { onConflict: "organization_id,source,source_ref" } as any);
 
   // Falha silenciosa: não bloqueia o registro da rescisão se a materialização
   // falhar (ex: índice ausente). Logamos no console em DEV.
@@ -773,7 +773,7 @@ export function useMutateHRPlanning() {
         impacto_fluxo_caixa: true,
         impacto_orcamento: true,
         notes: `Gerado a partir de Planejamento RH (${item.type}). Item: ${item.id}`,
-      } as any, { onConflict: "dedup_hash" } as any);
+      } as any, { onConflict: "organization_id,source,source_ref" } as any);
       if (cfErr) throw cfErr;
 
       const { error } = await supabase

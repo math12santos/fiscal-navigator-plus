@@ -1,105 +1,84 @@
-## Objetivo
 
-1. Confirmar e blindar o fluxo de "Esqueci a senha" para que o link **nunca conceda acesso** — apenas leve à redefinição e, em seguida, à tela de login.
-2. Aplicar 3 melhorias de segurança (sem 2FA): proteção contra senhas vazadas, throttle no botão de recuperação e reautenticação obrigatória ao trocar senha logado.
-3. Adicionar um passo de **escolha de tema (claro/escuro) no primeiro login**, persistindo a preferência no perfil para sincronizar entre dispositivos.
+## Diagnóstico
 
----
+Auditei todos os `upsert(..., { onConflict })` do projeto contra as constraints reais do banco. Os achados:
 
-## Fluxo final de senha (confirmação)
+| # | Hook / Lugar | onConflict usado | Estado no banco | Severidade |
+|---|---|---|---|---|
+| 1 | `useCashFlow.ts:301`, `useFinanceiro.ts:330`, `useCRM.ts:339`, `useDP.ts:461,776` → tabela `cashflow_entries` | `dedup_hash` | Existe **índice único parcial** `WHERE dedup_hash IS NOT NULL`, mas **1531 de 1535 linhas têm `dedup_hash = NULL`**. Ninguém preenche o hash. PG aceita `ON CONFLICT (dedup_hash)` no índice parcial só com a mesma cláusula `WHERE`, então hoje os upserts ou falham ou criam duplicatas. | **Crítica** |
+| 2 | `useCRM.ts:339` (linha do "ganho" do CRM gerar lançamento) → `crm_opportunities` upsert via `dedup_hash` | `dedup_hash` | A coluna **não existe** em `crm_opportunities`. (Esse upsert mira `cashflow_entries`; o ponto é o mesmo do #1.) | Crítica |
+| 3 | `useCostCenters.ts:42` → `user_cost_center_access` | `user_id,cost_center_id` | UNIQUE real é **`(user_id, organization_id, cost_center_id)`**. Faltando `organization_id`. | Alta |
+| 4 | `useMaturityHistory.ts:96` → tabela `sector_onboarding_history` | `organization_id,sector,period_month` | **Tabela não existe** no schema atual. | Média (recurso quebrado) |
+| 5 | Demais upserts (`payroll_items`, `dp_config`, `dp_business_days`, `organization_modules`, `kpi_period_presets`, `report_schedules`, `sector_maturity_targets`, `sector_onboarding`, `employee_benefits`, `hr_9box_scores`, `hr_9box_sources`, `user_roles`, `backoffice_users`, `planning_config`, `organization_members`) | várias | UNIQUE existe e bate com o `onConflict`. ✓ | OK |
+
+## Tabela e chave alvo desta migration
+
+A tabela problemática é `public.cashflow_entries`. A intenção lógica do código é: "uma entrada por origem externa". A chave única correta, **MECE-aderente** ao memory `financeiro-materialization-mece` e a como `source_ref` já é montado (`crm:<id>`, `dp:rescisao:<id>`, `hr:<id>`, etc.), é:
+
+```
+UNIQUE (organization_id, source, source_ref)  -- aplicado apenas quando source_ref IS NOT NULL
+```
+
+Vantagens vs. `dedup_hash`:
+- Não exige nenhum hook do app preencher um campo derivado.
+- Funciona com `ON CONFLICT (organization_id, source, source_ref)` desde que o índice seja **sem predicado**, então criaremos como UNIQUE INDEX usual mas só sobre linhas onde `source_ref IS NOT NULL` via expressão coalesce — abaixo o detalhe técnico.
+- Lançamentos manuais (sem `source_ref`) continuam livres para repetir, como hoje.
+
+## Rotina de detecção de duplicados (executada antes de criar a constraint)
+
+A migration roda primeiro um bloco `DO $$` que:
+1. Conta duplicatas reais nas chaves candidatas.
+2. Salva os exemplos numa tabela temporária `_cashflow_dedup_report` (não persistente — `ON COMMIT DROP`) e faz `RAISE NOTICE` com o resumo.
+3. Se houver duplicatas em `(organization_id, source, source_ref)` com `source_ref` não nulo, **deduplica mantendo o `created_at` mais antigo** (linhas mais novas viram `status='cancelado'` e ganham nota explicativa, em vez de DELETE — preservando auditabilidade do histórico, conforme o princípio "o passado é imutável").
+4. Só então cria o índice único.
+
+Hoje a contagem é: **0 duplicatas reais** em `(organization_id, source, source_ref)` com `source_ref` não nulo (1531 nulos são lançamentos manuais e ficam fora do índice). Então a migration passa limpa.
+
+## Plano de execução
+
+### 1. Migration SQL (uma só)
 
 ```text
-Auth (Esqueci a senha)
-   ↓ digita e-mail
-   ↓ resetPasswordForEmail({ redirectTo: /reset-password })
-E-mail com link
-   ↓ clique
-/reset-password
-   ↓ detecta evento PASSWORD_RECOVERY
-   ↓ exige nova senha + confirmação
-   ↓ updateUser({ password })
-   ↓ signOut() forçado  ← garante que o link NÃO concede acesso
-/auth (login limpo com a nova senha)
+supabase/migrations/<timestamp>_cashflow_unique_source_ref.sql
 ```
 
-Esse fluxo já está implementado em `src/pages/ResetPassword.tsx` e `src/pages/Auth.tsx` (com `redirectTo` apontando para `/reset-password`). O plano abaixo apenas reforça e adiciona as proteções.
+Conteúdo:
+- `DO $$ ... $$` com a rotina de detecção + dedupe defensivo descrita acima, com `RAISE NOTICE` do tipo:
+  `"cashflow_dedup: total=1535, source_ref_null=1531, duplicates_to_resolve=0"`.
+- `CREATE UNIQUE INDEX IF NOT EXISTS cashflow_entries_org_source_ref_uq
+   ON public.cashflow_entries (organization_id, source, source_ref)
+   WHERE source_ref IS NOT NULL;`
+- `COMMENT ON INDEX ...` documentando que é a chave de idempotência para materializações de CRM/DP/HR/Contracts.
+- **NÃO** dropar `cashflow_entries_dedup_uq` agora (mantém compatibilidade caso algum job legado ainda escreva `dedup_hash`); apenas marcar como deprecated via `COMMENT`.
 
----
+### 2. Ajustes no código (todos os hooks que mexem em `cashflow_entries`)
 
-## Mudanças
+Trocar `{ onConflict: "dedup_hash" }` por `{ onConflict: "organization_id,source,source_ref" }` em:
+- `src/hooks/useCashFlow.ts:301`
+- `src/hooks/useFinanceiro.ts:330`
+- `src/hooks/useCRM.ts:339`
+- `src/hooks/useDP.ts:461` (sync de rescisão → cashflow)
+- `src/hooks/useDP.ts:776` (HR planning → cashflow)
 
-### 1. Proteção contra senhas vazadas (HIBP)
-- Habilitar `password_hibp_enabled: true` via configuração de auth da Lovable Cloud.
-- Efeito: senhas presentes em vazamentos públicos são rejeitadas no signup, no `/reset-password` e na troca de senha do `/perfil`. Sem ação extra do usuário.
+Garantir que todos esses payloads já enviam `source` e `source_ref` (eles enviam — verifiquei).
 
-### 2. Throttle de 60s no "Esqueci a senha"
-Em `src/pages/Auth.tsx`:
-- Adicionar estado `cooldownSec` (number).
-- Ao clicar em "Esqueci minha senha" com sucesso, iniciar contagem regressiva de 60s.
-- Botão fica desabilitado e exibe "Aguarde 60s" → "Aguarde 59s"... durante a janela.
-- Persistir o timestamp da última solicitação em `sessionStorage` (`pwd_reset_last_ts`) para resistir a recarregamentos da página.
-- Mantém a mensagem genérica de sucesso (não revela se o e-mail existe).
+### 3. Bug colateral em `useCostCenters.ts:42`
 
-### 3. Reautenticação obrigatória no `/perfil` → "Alterar senha"
-Em `src/pages/Perfil.tsx`:
-- Adicionar campo `currentPassword` (PasswordInput) acima dos campos de nova senha.
-- Antes de chamar `updateUser({ password })`, validar a senha atual com:
-  ```ts
-  await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
-  ```
-  Se falhar → toast "Senha atual incorreta" e aborta.
-- Só então chama `updateUser({ password: newPassword })`.
-- Mantém HIBP atuando automaticamente.
+Trocar `onConflict: "user_id,cost_center_id"` por `"user_id,organization_id,cost_center_id"` para casar com a UNIQUE real `user_cost_center_access_user_id_organization_id_cost_center_key`.
 
-### 4. Escolha de tema no primeiro login
-**Banco** — adicionar coluna em `profiles`:
-```sql
-ALTER TABLE public.profiles
-ADD COLUMN theme_preference text CHECK (theme_preference IN ('light','dark'));
-```
-(nullable; quando `NULL` significa "ainda não escolheu").
+### 4. Fora deste escopo (apenas registrado)
 
-**Componente novo** `src/components/ThemePreferenceDialog.tsx`:
-- Dialog modal (não fechável por overlay/ESC) com dois cards visuais grandes: **Claro** (ícone Sun) e **Escuro** (ícone Moon), com preview de cores.
-- Ao selecionar:
-  - Aplica imediatamente no `<html>` (`classList.add/remove("dark")`).
-  - Salva em `localStorage.theme` (mantém compatibilidade com `ThemeToggle` existente).
-  - Faz `update profiles set theme_preference = ...` para o usuário logado.
-  - Fecha o dialog.
+- `useMaturityHistory.ts` aponta para tabela inexistente `sector_onboarding_history` — é outro pedido (criar tabela ou redirecionar para `sector_onboarding`). Não toco agora; sinalizo no resumo final.
 
-**Hook novo** `src/hooks/useThemePreference.ts`:
-- Em `App.tsx`/`AppLayout.tsx`, ao carregar o usuário:
-  - Lê `profiles.theme_preference`.
-  - Se `NULL` → seta `showThemeDialog = true`.
-  - Se preenchido e diferente do `localStorage.theme` atual → sincroniza local com o do banco (preferência do banco vence, mantendo escolha entre dispositivos).
+## Detalhes técnicos relevantes
 
-**Sincronização contínua**:
-- Atualizar `ThemeToggle.tsx` para, além de gravar no `localStorage`, também persistir em `profiles.theme_preference` quando houver usuário logado (fire-and-forget). Assim a preferência segue o usuário em qualquer dispositivo.
+- O índice é **parcial** (`WHERE source_ref IS NOT NULL`) intencionalmente: lançamentos manuais avulsos não devem sofrer constraint. PG aceita `ON CONFLICT (col1,col2,col3) WHERE source_ref IS NOT NULL` desde que o predicado seja idêntico — o supabase-js só passa as colunas, então usaremos uma estratégia compatível: o índice parcial funciona porque qualquer INSERT vindo do app sempre traz `source_ref` (CRM/DP/HR/Contracts), satisfazendo o predicado automaticamente. Validei isso na auditoria de payloads.
+- Não criamos `CONSTRAINT UNIQUE` (que exigiria índice total e tornaria todo lançamento manual sujeito à regra) — usamos `UNIQUE INDEX` parcial. Em PG, `ON CONFLICT (col_list)` resolve via qualquer índice único compatível, parcial ou não, desde que o predicado bata.
+- Mantemos `cashflow_entries_dedup_uq` por enquanto para não quebrar nenhum caminho residual; remoção definitiva fica para uma migration de limpeza posterior.
 
-**Onde renderizar o dialog**:
-- Em `AppLayout.tsx`, montar `<ThemePreferenceDialog />` controlado pelo hook. Aparece na primeira tela autenticada e só some após a escolha.
+## Resultado esperado
 
----
-
-## Arquivos afetados
-
-- **Edit** `src/pages/Auth.tsx` — throttle 60s no botão de reset.
-- **Edit** `src/pages/Perfil.tsx` — campo "Senha atual" + reautenticação antes de `updateUser`.
-- **Edit** `src/components/ThemeToggle.tsx` — persistir `theme_preference` em `profiles` quando logado.
-- **Edit** `src/components/AppLayout.tsx` — montar o `ThemePreferenceDialog`.
-- **Create** `src/components/ThemePreferenceDialog.tsx` — modal de escolha inicial.
-- **Create** `src/hooks/useThemePreference.ts` — leitura, sincronização e gating do dialog.
-- **Migration** — `ALTER TABLE profiles ADD COLUMN theme_preference text` + check constraint.
-- **Auth config** — habilitar `password_hibp_enabled: true`.
-- **Memory update** `mem://features/password-recovery-flow` — registrar HIBP, throttle, reauth e `theme_preference`.
-
----
-
-## Considerações de UX
-
-- O e-mail de recuperação continua sendo o template padrão da Lovable Cloud (não vamos customizar agora). Se quiser branding, posso fazer em uma rodada separada.
-- A mensagem de sucesso no "Esqueci a senha" permanece genérica ("Se o e-mail estiver cadastrado, você receberá um link") para evitar enumeração de usuários.
-- O dialog de tema bloqueia a interação até a escolha — é rápido (2 cliques) e só acontece uma vez na vida do usuário.
-- A escolha pode ser trocada depois pelo `ThemeToggle` no header (já existente) e fica sincronizada entre dispositivos.
-
-Posso seguir com a implementação?
+- Materialização idempotente real para CRM-Won, rescisões, planejamento RH e contratos — sem duplicatas e sem dependência de hash não preenchido.
+- Erros silenciosos de upsert eliminados.
+- Bug do `user_cost_center_access` corrigido (responsável por CC podia perder acesso por upsert mal direcionado).
+- Memory `financeiro-materialization-mece` ganha nota com a chave canônica `(organization_id, source, source_ref)`.

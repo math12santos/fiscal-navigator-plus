@@ -298,7 +298,7 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
       // Upsert by dedup_hash (UNIQUE INDEX). If the projection was already
       // materialized, this updates the existing row instead of duplicating.
       const { error } = sourceRef
-        ? await supabase.from("cashflow_entries" as any).upsert(payload, { onConflict: "dedup_hash" } as any)
+        ? await supabase.from("cashflow_entries" as any).upsert(payload, { onConflict: "organization_id,source,source_ref" } as any)
         : await supabase.from("cashflow_entries" as any).insert(payload);
       if (error) throw error;
     },
