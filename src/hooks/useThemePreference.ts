@@ -29,13 +29,17 @@ export function useThemePreference() {
 
       if (cancelled) return;
 
-      const pref = (data as any)?.theme_preference as "light" | "dark" | null | undefined;
+      const pref = (data as any)?.theme_preference as "light" | "dark" | "system" | null | undefined;
 
       if (!pref) {
         setShowDialog(true);
       } else {
+        const resolved =
+          pref === "system"
+            ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+            : pref;
         const root = document.documentElement;
-        if (pref === "dark") root.classList.add("dark");
+        if (resolved === "dark") root.classList.add("dark");
         else root.classList.remove("dark");
         localStorage.setItem("theme", pref);
       }
