@@ -6,12 +6,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit2, Trash2 } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Building2 } from "lucide-react";
 import { useDPBenefits, useMutateDPBenefit } from "@/hooks/useDPBenefits";
 import { useEmployees } from "@/hooks/useDP";
 import { useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import { useToast } from "@/hooks/use-toast";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
+import { supabase } from "@/integrations/supabase/client";
 import { DPExportButton } from "./DPExportButton";
 import { generateDPExcelReport } from "@/lib/dpExports";
 
