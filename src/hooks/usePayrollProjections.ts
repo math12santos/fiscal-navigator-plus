@@ -284,6 +284,7 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           cost_center_id: emp.cost_center_id ?? null,
           entity_id: null,
           source: "dp",
+          reference_month: dtCompetencia,
           created_at: now,
           updated_at: now,
         };
