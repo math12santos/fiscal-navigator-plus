@@ -741,11 +741,11 @@ function RowErrorEditor({ row, index, onClose, onSave }: RowErrorEditorProps) {
                 <ul className="space-y-2">
                   {summary.map((s, i) => (
                     <li key={i} className="text-xs space-y-0.5">
-                      <p className="font-medium">{s.title}</p>
-                      {s.solution && (
+                      <p className="font-medium">{s.info.title}</p>
+                      {s.info.solution && (
                         <p className="text-muted-foreground flex items-start gap-1">
                           <Lightbulb className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span>{s.solution}</span>
+                          <span>{s.info.solution}</span>
                         </p>
                       )}
                     </li>
