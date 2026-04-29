@@ -2829,12 +2829,127 @@ export type Database = {
           },
         ]
       }
+      hr_9box_calibration_log: {
+        Row: {
+          action: string
+          calibrator_user_id: string
+          changes: Json | null
+          created_at: string
+          evaluation_id: string
+          id: string
+          notes: string | null
+          organization_id: string
+        }
+        Insert: {
+          action: string
+          calibrator_user_id: string
+          changes?: Json | null
+          created_at?: string
+          evaluation_id: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+        }
+        Update: {
+          action?: string
+          calibrator_user_id?: string
+          changes?: Json | null
+          created_at?: string
+          evaluation_id?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_9box_calibration_log_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "hr_9box_evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_9box_calibration_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_9box_criteria: {
+        Row: {
+          active: boolean
+          anchor_1: string | null
+          anchor_2: string | null
+          anchor_3: string | null
+          anchor_4: string | null
+          anchor_5: string | null
+          created_at: string
+          description: string | null
+          dimension: Database["public"]["Enums"]["nine_box_dimension"]
+          id: string
+          is_system_template: boolean
+          name: string
+          order_index: number
+          organization_id: string | null
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          active?: boolean
+          anchor_1?: string | null
+          anchor_2?: string | null
+          anchor_3?: string | null
+          anchor_4?: string | null
+          anchor_5?: string | null
+          created_at?: string
+          description?: string | null
+          dimension: Database["public"]["Enums"]["nine_box_dimension"]
+          id?: string
+          is_system_template?: boolean
+          name: string
+          order_index?: number
+          organization_id?: string | null
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          active?: boolean
+          anchor_1?: string | null
+          anchor_2?: string | null
+          anchor_3?: string | null
+          anchor_4?: string | null
+          anchor_5?: string | null
+          created_at?: string
+          description?: string | null
+          dimension?: Database["public"]["Enums"]["nine_box_dimension"]
+          id?: string
+          is_system_template?: boolean
+          name?: string
+          order_index?: number
+          organization_id?: string | null
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_9box_criteria_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_9box_evaluations: {
         Row: {
           bsc_score_snapshot: number | null
+          confiabilidade: number
           created_at: string
           data_avaliacao: string
           employee_id: string
+          evaluation_pai_id: string | null
           evaluator_user_id: string
           id: string
           indicacao_sucessao: boolean
@@ -2850,14 +2965,19 @@ export type Database = {
           quadrante: number | null
           recomendacao: Database["public"]["Enums"]["nine_box_recomendacao"]
           risco_perda: string | null
+          status: Database["public"]["Enums"]["nine_box_status"]
           updated_at: string
           user_id: string
+          versao: number
+          vies_detectado: Json | null
         }
         Insert: {
           bsc_score_snapshot?: number | null
+          confiabilidade?: number
           created_at?: string
           data_avaliacao?: string
           employee_id: string
+          evaluation_pai_id?: string | null
           evaluator_user_id: string
           id?: string
           indicacao_sucessao?: boolean
@@ -2873,14 +2993,19 @@ export type Database = {
           quadrante?: number | null
           recomendacao?: Database["public"]["Enums"]["nine_box_recomendacao"]
           risco_perda?: string | null
+          status?: Database["public"]["Enums"]["nine_box_status"]
           updated_at?: string
           user_id: string
+          versao?: number
+          vies_detectado?: Json | null
         }
         Update: {
           bsc_score_snapshot?: number | null
+          confiabilidade?: number
           created_at?: string
           data_avaliacao?: string
           employee_id?: string
+          evaluation_pai_id?: string | null
           evaluator_user_id?: string
           id?: string
           indicacao_sucessao?: boolean
@@ -2896,8 +3021,11 @@ export type Database = {
           quadrante?: number | null
           recomendacao?: Database["public"]["Enums"]["nine_box_recomendacao"]
           risco_perda?: string | null
+          status?: Database["public"]["Enums"]["nine_box_status"]
           updated_at?: string
           user_id?: string
+          versao?: number
+          vies_detectado?: Json | null
         }
         Relationships: [
           {
@@ -2908,7 +3036,129 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "hr_9box_evaluations_evaluation_pai_id_fkey"
+            columns: ["evaluation_pai_id"]
+            isOneToOne: false
+            referencedRelation: "hr_9box_evaluations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "hr_9box_evaluations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_9box_scores: {
+        Row: {
+          created_at: string
+          criterion_id: string
+          evaluation_id: string
+          evidence_text: string | null
+          evidence_url: string | null
+          id: string
+          organization_id: string
+          score: number
+          source: Database["public"]["Enums"]["nine_box_source"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criterion_id: string
+          evaluation_id: string
+          evidence_text?: string | null
+          evidence_url?: string | null
+          id?: string
+          organization_id: string
+          score: number
+          source: Database["public"]["Enums"]["nine_box_source"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criterion_id?: string
+          evaluation_id?: string
+          evidence_text?: string | null
+          evidence_url?: string | null
+          id?: string
+          organization_id?: string
+          score?: number
+          source?: Database["public"]["Enums"]["nine_box_source"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_9box_scores_criterion_id_fkey"
+            columns: ["criterion_id"]
+            isOneToOne: false
+            referencedRelation: "hr_9box_criteria"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_9box_scores_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "hr_9box_evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_9box_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_9box_sources: {
+        Row: {
+          created_at: string
+          evaluation_id: string
+          evaluator_user_id: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          source: Database["public"]["Enums"]["nine_box_source"]
+          submitted: boolean
+          submitted_at: string | null
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          evaluation_id: string
+          evaluator_user_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          source: Database["public"]["Enums"]["nine_box_source"]
+          submitted?: boolean
+          submitted_at?: string | null
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          evaluation_id?: string
+          evaluator_user_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          source?: Database["public"]["Enums"]["nine_box_source"]
+          submitted?: boolean
+          submitted_at?: string | null
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_9box_sources_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "hr_9box_evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_9box_sources_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -5994,6 +6244,7 @@ export type Database = {
       bsc_perspectiva: "financeira" | "clientes" | "processos" | "aprendizado"
       bsc_status: "em_elaboracao" | "ativo" | "encerrado"
       bsc_tipo: "individual" | "departamento" | "empresa"
+      nine_box_dimension: "desempenho" | "potencial"
       nine_box_recomendacao:
         | "manter"
         | "desenvolver"
@@ -6001,6 +6252,8 @@ export type Database = {
         | "realocar"
         | "acompanhar"
         | "desligamento_em_analise"
+      nine_box_source: "gestor" | "auto" | "par"
+      nine_box_status: "rascunho" | "em_calibracao" | "calibrada"
       one_on_one_humor: "muito_bom" | "bom" | "neutro" | "ruim" | "critico"
       one_on_one_status:
         | "agendada"
@@ -6157,6 +6410,7 @@ export const Constants = {
       bsc_perspectiva: ["financeira", "clientes", "processos", "aprendizado"],
       bsc_status: ["em_elaboracao", "ativo", "encerrado"],
       bsc_tipo: ["individual", "departamento", "empresa"],
+      nine_box_dimension: ["desempenho", "potencial"],
       nine_box_recomendacao: [
         "manter",
         "desenvolver",
@@ -6165,6 +6419,8 @@ export const Constants = {
         "acompanhar",
         "desligamento_em_analise",
       ],
+      nine_box_source: ["gestor", "auto", "par"],
+      nine_box_status: ["rascunho", "em_calibracao", "calibrada"],
       one_on_one_humor: ["muito_bom", "bom", "neutro", "ruim", "critico"],
       one_on_one_status: [
         "agendada",
