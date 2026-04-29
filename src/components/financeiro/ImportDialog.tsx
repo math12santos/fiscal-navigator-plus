@@ -815,6 +815,24 @@ function RowErrorEditor({ row, index, onClose, onSave }: RowErrorEditorProps) {
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edit-competencia" className="text-xs">Mês Competência</Label>
+                {competenciaAuto && (
+                  <span className="text-[10px] text-muted-foreground italic">auto-preenchido pelo vencimento</span>
+                )}
+              </div>
+              <Input
+                id="edit-competencia"
+                type="month"
+                value={competencia}
+                onChange={(e) => { setCompetencia(e.target.value); setCompetenciaAuto(false); }}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Mês a que o gasto pertence (usado para PMP/PMR). Vazio = mês do vencimento.
+              </p>
+            </div>
+
             <div className="rounded-md border bg-muted/30 p-2">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
                 Linha original do arquivo
