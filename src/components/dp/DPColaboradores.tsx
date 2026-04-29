@@ -502,47 +502,78 @@ export default function DPColaboradores() {
                         )
                       : null;
                     return (
-                      <label
-                        key={b.id}
-                        className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
-                          conflictWith ? "bg-warning/10 border border-warning/40" : "border border-transparent"
-                        }`}
-                        title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={(checked) => {
-                            setSelectedBenefitIds((prev) => {
-                              if (!checked) return prev.filter((id) => id !== b.id);
-                              // Substituir outros benefícios da mesma categoria (exceto "outros")
-                              if (cat === "outros") return [...prev, b.id];
-                              const replaced = prev
-                                .map((id) => allBenefits.find((x: any) => x.id === id))
-                                .filter((x: any) => x && x.id !== b.id && (x.category || "outros") === cat);
-                              const next = prev.filter((id) => {
-                                const other = allBenefits.find((x: any) => x.id === id);
-                                return (other?.category || "outros") !== cat;
-                              });
-                              if (replaced.length > 0) {
-                                toast({
-                                  title: "Benefício substituído",
-                                  description: `"${b.name}" substituiu "${replaced.map((r: any) => r.name).join(", ")}" na categoria ${cat}.`,
+                      <div key={b.id} className="flex flex-col gap-1">
+                        <label
+                          className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
+                            conflictWith ? "bg-warning/10 border border-warning/40" : "border border-transparent"
+                          }`}
+                          title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              setSelectedBenefitIds((prev) => {
+                                if (!checked) {
+                                  // Limpa o custom_value desse benefício ao desmarcar
+                                  setBenefitCustomValues((cv) => {
+                                    const next = { ...cv };
+                                    delete next[b.id];
+                                    return next;
+                                  });
+                                  return prev.filter((id) => id !== b.id);
+                                }
+                                // Substituir outros benefícios da mesma categoria (exceto "outros")
+                                if (cat === "outros") return [...prev, b.id];
+                                const replaced = prev
+                                  .map((id) => allBenefits.find((x: any) => x.id === id))
+                                  .filter((x: any) => x && x.id !== b.id && (x.category || "outros") === cat);
+                                const next = prev.filter((id) => {
+                                  const other = allBenefits.find((x: any) => x.id === id);
+                                  return (other?.category || "outros") !== cat;
                                 });
+                                if (replaced.length > 0) {
+                                  toast({
+                                    title: "Benefício substituído",
+                                    description: `"${b.name}" substituiu "${replaced.map((r: any) => r.name).join(", ")}" na categoria ${cat}.`,
+                                  });
+                                }
+                                return [...next, b.id];
+                              });
+                            }}
+                          />
+                          <span className={conflictWith ? "font-medium" : ""}>{b.name}</span>
+                          {cat === "plano_saude" ? (
+                            <span className="text-muted-foreground text-xs">(valor manual)</span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">
+                              ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
+                            </span>
+                          )}
+                          {conflictWith && (
+                            <span className="ml-auto text-[10px] text-warning font-medium">
+                              substitui {conflictWith.name}
+                            </span>
+                          )}
+                        </label>
+                        {isSelected && cat === "plano_saude" && (
+                          <div className="ml-7 flex items-center gap-2">
+                            <Label className="text-[11px] text-muted-foreground whitespace-nowrap">
+                              Valor mensal (R$) *
+                            </Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="h-7 text-sm"
+                              value={benefitCustomValues[b.id] ?? ""}
+                              onChange={(e) =>
+                                setBenefitCustomValues((cv) => ({ ...cv, [b.id]: e.target.value }))
                               }
-                              return [...next, b.id];
-                            });
-                          }}
-                        />
-                        <span className={conflictWith ? "font-medium" : ""}>{b.name}</span>
-                        <span className="text-muted-foreground text-xs">
-                          ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
-                        </span>
-                        {conflictWith && (
-                          <span className="ml-auto text-[10px] text-warning font-medium">
-                            substitui {conflictWith.name}
-                          </span>
+                              placeholder="Ex: 350.00"
+                            />
+                          </div>
                         )}
-                      </label>
+                      </div>
                     );
                   })}
                 </div>
