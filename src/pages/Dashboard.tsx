@@ -120,7 +120,7 @@ export default function Dashboard() {
   const monthlyData = useMemo(() => {
     const months: Record<string, { receita: number; despesas: number; dp: number }> = {};
     for (let i = 5; i >= 0; i--) {
-      const key = format(subMonths(now, i), "yyyy-MM");
+      const key = format(subMonths(referenceMonth, i), "yyyy-MM");
       months[key] = { receita: 0, despesas: 0, dp: 0 };
     }
     for (const e of entries) {
@@ -142,7 +142,7 @@ export default function Dashboard() {
       resultado: v.receita - v.despesas,
       dp: v.dp,
     }));
-  }, [entries]);
+  }, [entries, referenceMonth]);
 
   // Expense by category (current month)
   const expenseByCategory = useMemo(() => {
