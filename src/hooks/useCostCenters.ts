@@ -39,7 +39,7 @@ async function syncResponsibleAccess(
       .from("user_cost_center_access" as any)
       .upsert(
         { user_id: newResponsible, cost_center_id: costCenterId, organization_id: orgId, granted_by: "system" },
-        { onConflict: "user_id,cost_center_id" }
+        { onConflict: "user_id,organization_id,cost_center_id" }
       );
   }
   if (oldResponsible && oldResponsible !== newResponsible) {

@@ -336,7 +336,7 @@ export function useCRMOpportunities() {
             impacto_fluxo_caixa: true,
             impacto_orcamento: true,
             notes: `Gerado a partir de oportunidade CRM ganha. opp:${id}`,
-          } as any, { onConflict: "dedup_hash" } as any);
+          } as any, { onConflict: "organization_id,source,source_ref" } as any);
         }
       }
     },

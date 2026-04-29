@@ -327,7 +327,7 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
 
         // Upsert by dedup_hash → repeated clicks won't duplicate.
         const { error } = sourceRef
-          ? await supabase.from("cashflow_entries" as any).upsert(payload, { onConflict: "dedup_hash" } as any)
+          ? await supabase.from("cashflow_entries" as any).upsert(payload, { onConflict: "organization_id,source,source_ref" } as any)
           : await supabase.from("cashflow_entries" as any).insert(payload);
         if (error) throw error;
 
