@@ -123,6 +123,8 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
   const [mappings, setMappings] = useState<MappingItem[]>([]);
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [importCount, setImportCount] = useState(0);
+  const [skippedCount, setSkippedCount] = useState(0);
+  const [failedRows, setFailedRows] = useState<{ rowIndex: number; raw: Record<string, string>; error: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [excludedRows, setExcludedRows] = useState<Set<number>>(new Set());
   const [entityMatches, setEntityMatches] = useState<EntityMatch[]>([]);
@@ -136,9 +138,21 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     setMappings([]);
     setParsedRows([]);
     setImportCount(0);
+    setSkippedCount(0);
+    setFailedRows([]);
     setError(null);
     setExcludedRows(new Set());
     setEntityMatches([]);
+  }, []);
+
+  /** Quick-fix: troca formato de data e refaz preview */
+  const setDateFormat = useCallback((fmt: "dd/MM/yyyy" | "MM/dd/yyyy") => {
+    setDetectedFormat((prev) => (prev ? { ...prev, date_format: fmt } : prev));
+  }, []);
+
+  /** Quick-fix: troca formato de número e refaz preview */
+  const setNumberFormat = useCallback((fmt: "br" | "us") => {
+    setDetectedFormat((prev) => (prev ? { ...prev, number_format: fmt } : prev));
   }, []);
 
   const parseFile = useCallback(async (file: File) => {
@@ -432,6 +446,8 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     if (!user?.id || !currentOrg?.id) return;
     setStep("importing");
     setError(null);
+    setSkippedCount(0);
+    setFailedRows([]);
 
     try {
       const validRows = parsedRows
@@ -448,10 +464,10 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
         if (m.source_column && m.target_field !== "ignorar") fieldByHeader[m.source_column] = m.target_field;
       });
 
-      // Build entityName → entityId map from current matches
       const nameToEntityId = new Map<string, string | null>();
       entityMatches.forEach((m) => nameToEntityId.set(m.importedName, m.matchedEntityId));
 
+      // ── Cria registro de importação (header) ──
       const { data: importRecord, error: importErr } = await supabase
         .from("data_imports")
         .insert({
@@ -467,60 +483,172 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
         .single();
 
       if (importErr) throw importErr;
+      const importId = importRecord.id;
 
-      const batchSize = 50;
+      // ── Deduplicação Nível 2: pré-check no banco para o conjunto de chaves ──
+      // Constrói o source_ref determinístico: import:<importId>:<rowIndex>
+      // Para detectar duplicidade contra outros imports anteriores, busca por
+      // (valor, data, descrição) já existentes na org com source='importacao'.
+      const candidateKeys = validRows.map(({ row, idx }) => ({
+        idx,
+        descricao: (row.mapped.descricao || "").toString().trim().toLowerCase(),
+        valor: Math.abs(row.mapped.valor_previsto || 0),
+        data: row.mapped.data_prevista || null,
+      }));
+
+      const dataMin = candidateKeys.reduce<string | null>((m, k) => (k.data && (!m || k.data < m) ? k.data : m), null);
+      const dataMax = candidateKeys.reduce<string | null>((m, k) => (k.data && (!m || k.data > m) ? k.data : m), null);
+
+      const preExistingKeys = new Set<string>();
+      if (dataMin && dataMax) {
+        const { data: existing } = await supabase
+          .from("cashflow_entries")
+          .select("descricao, valor_previsto, data_prevista")
+          .eq("organization_id", currentOrg.id)
+          .eq("tipo", tipo)
+          .eq("source", "importacao")
+          .gte("data_prevista", dataMin)
+          .lte("data_prevista", dataMax);
+        (existing || []).forEach((e: any) => {
+          const k = `${(e.descricao || "").toString().trim().toLowerCase()}|${Math.abs(Number(e.valor_previsto) || 0).toFixed(2)}|${e.data_prevista}`;
+          preExistingKeys.add(k);
+        });
+      }
+
+      // ── Deduplicação Nível 1: intra-arquivo ──
+      const intraKeySeen = new Set<string>();
+      let skipped = 0;
       let imported = 0;
+      const failed: { rowIndex: number; raw: Record<string, string>; error: string }[] = [];
 
-      for (let i = 0; i < validRows.length; i += batchSize) {
-        const batch = validRows.slice(i, i + batchSize);
-        const entries = batch.map(({ row: r }) => {
-          const importedName = (r.mapped.entity_name || "").toString().trim();
-          const entityId = importedName ? nameToEntityId.get(importedName) ?? null : null;
-          return {
+      const eligible: { row: ParsedRow; idx: number; payload: any }[] = [];
+
+      for (const { row, idx } of validRows) {
+        const desc = (row.mapped.descricao || "Sem descrição").toString().trim();
+        const valor = Math.abs(row.mapped.valor_previsto || 0);
+        const data = row.mapped.data_prevista || new Date().toISOString().slice(0, 10);
+        const dedupKey = `${desc.toLowerCase()}|${valor.toFixed(2)}|${data}`;
+
+        if (intraKeySeen.has(dedupKey)) {
+          skipped++;
+          continue;
+        }
+        intraKeySeen.add(dedupKey);
+
+        if (preExistingKeys.has(dedupKey)) {
+          skipped++;
+          continue;
+        }
+
+        const importedName = (row.mapped.entity_name || "").toString().trim();
+        const entityId = importedName ? nameToEntityId.get(importedName) ?? null : null;
+
+        eligible.push({
+          row,
+          idx,
+          payload: {
             user_id: user.id,
             organization_id: currentOrg.id,
-            import_id: importRecord.id,
+            import_id: importId,
             tipo,
             source: "importacao",
-            descricao: r.mapped.descricao || "Sem descrição",
-            valor_previsto: Math.abs(r.mapped.valor_previsto || 0),
-            valor_bruto: Math.abs(r.mapped.valor_previsto || 0),
+            source_ref: `import:${importId}:${idx}`,
+            descricao: desc,
+            valor_previsto: valor,
+            valor_bruto: valor,
             valor_desconto: 0,
             valor_juros_multa: 0,
-            data_prevista: r.mapped.data_prevista || new Date().toISOString().slice(0, 10),
-            data_realizada: r.mapped.data_realizada || null,
-            data_vencimento: r.mapped.data_prevista || null,
-            status: r.mapped.data_realizada ? "pago" : "pendente",
-            categoria: r.mapped.categoria || null,
-            documento: r.mapped.documento || null,
-            notes: r.mapped.notes || null,
+            data_prevista: data,
+            data_realizada: row.mapped.data_realizada || null,
+            data_vencimento: data,
+            status: row.mapped.data_realizada ? "pago" : "pendente",
+            categoria: row.mapped.categoria || null,
+            documento: row.mapped.documento || null,
+            notes: row.mapped.notes || null,
             entity_id: entityId,
             impacto_fluxo_caixa: true,
             impacto_orcamento: true,
             afeta_caixa_no_vencimento: true,
-          };
+          },
         });
+      }
 
-        const { error: batchErr } = await supabase.from("cashflow_entries").insert(entries);
-        if (batchErr) throw batchErr;
-        imported += batch.length;
+      // ── Batching resiliente: cada batch isolado, falha não derruba o resto ──
+      const batchSize = 50;
+      for (let i = 0; i < eligible.length; i += batchSize) {
+        const batch = eligible.slice(i, i + batchSize);
+        const payloads = batch.map((b) => b.payload);
+
+        const { data: inserted, error: batchErr } = await supabase
+          .from("cashflow_entries")
+          .upsert(payloads, {
+            onConflict: "organization_id,source,source_ref",
+            ignoreDuplicates: true,
+          })
+          .select("id");
+
+        if (batchErr) {
+          // Marca todo o batch como falho mas continua
+          batch.forEach((b) => {
+            failed.push({ rowIndex: b.idx + 1, raw: b.row.raw, error: batchErr.message });
+          });
+          continue;
+        }
+
+        const insertedCount = inserted?.length ?? 0;
+        imported += insertedCount;
+        // Diferença = ignorados pelo unique index (Nível 3)
+        const ignored = batch.length - insertedCount;
+        if (ignored > 0) skipped += ignored;
       }
 
       await supabase
         .from("data_imports")
-        .update({ status: "completed", imported_at: new Date().toISOString() })
-        .eq("id", importRecord.id);
+        .update({
+          status: failed.length > 0 ? "completed_with_errors" : "completed",
+          imported_at: new Date().toISOString(),
+        })
+        .eq("id", importId);
 
       setImportCount(imported);
+      setSkippedCount(skipped);
+      setFailedRows(failed);
       setStep("done");
       queryClient.invalidateQueries({ queryKey: ["cashflow-entries"] });
-      toast({ title: "Importação concluída", description: `${imported} lançamentos importados com sucesso.` });
+
+      const summaryParts = [`${imported} importados`];
+      if (skipped > 0) summaryParts.push(`${skipped} duplicatas puladas`);
+      if (failed.length > 0) summaryParts.push(`${failed.length} falharam`);
+      toast({
+        title: failed.length > 0 ? "Importação parcial" : "Importação concluída",
+        description: summaryParts.join(" · "),
+        variant: failed.length > 0 ? "destructive" : "default",
+      });
     } catch (e) {
       if (import.meta.env.DEV) console.error("Import error:", e);
       setError("Erro na importação: " + (e instanceof Error ? e.message : "erro desconhecido"));
       setStep("preview");
     }
   }, [parsedRows, mappings, tipo, user, currentOrg, fileName, queryClient, toast, excludedRows, entityMatches]);
+
+  /** Gera CSV das linhas que falharam para o usuário corrigir e reimportar */
+  const downloadFailedRowsCSV = useCallback(() => {
+    if (failedRows.length === 0) return;
+    const headers = [...rawHeaders, "_erro"];
+    const lines = [headers.map((h) => `"${h.replace(/"/g, '""')}"`).join(",")];
+    failedRows.forEach((f) => {
+      const cells = rawHeaders.map((h) => `"${(f.raw[h] || "").toString().replace(/"/g, '""')}"`);
+      cells.push(`"${f.error.replace(/"/g, '""')}"`);
+      lines.push(cells.join(","));
+    });
+    const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `falhas-importacao-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [failedRows, rawHeaders]);
 
   const toggleRowExclusion = useCallback((index: number) => {
     setExcludedRows((prev) => {
@@ -548,6 +676,8 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     mappings,
     parsedRows,
     importCount,
+    skippedCount,
+    failedRows,
     error,
     excludedRows,
     entityMatches,
@@ -566,5 +696,8 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     createMissingEntities,
     executeImport,
     toggleRowExclusion,
+    setDateFormat,
+    setNumberFormat,
+    downloadFailedRowsCSV,
   };
 }

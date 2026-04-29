@@ -36,6 +36,9 @@ import {
   AlertTriangle,
   Copy,
   EyeOff,
+  Download,
+  Lightbulb,
+  XCircle,
 } from "lucide-react";
 import {
   useFinanceiroImport,
@@ -44,6 +47,7 @@ import {
 } from "@/hooks/useFinanceiroImport";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { detectImportDuplicates } from "@/hooks/useDuplicateDetection";
+import { summarizeRowErrors } from "@/hooks/financeiroImportErrors";
 import { EntityMatchingStep } from "./EntityMatchingStep";
 import { cn } from "@/lib/utils";
 
@@ -324,6 +328,68 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
                   )}
                 </div>
 
+                {/* ── Painel de erros agrupados com soluções e quick-fixes ── */}
+                {errorCount > 0 && (() => {
+                  const errorRows = imp.parsedRows.filter((r) => r.errors.length > 0);
+                  const summary = summarizeRowErrors(errorRows);
+                  const handleQuickFix = (qf: string | null | undefined) => {
+                    if (!qf) return;
+                    if (qf === "switch_date_to_us") imp.setDateFormat("MM/dd/yyyy");
+                    else if (qf === "switch_date_to_br") imp.setDateFormat("dd/MM/yyyy");
+                    else if (qf === "switch_number_to_us") imp.setNumberFormat("us");
+                    else if (qf === "switch_number_to_br") imp.setNumberFormat("br");
+                    else if (qf === "open_mapping") imp.goToMapping();
+                    if (["switch_date_to_us","switch_date_to_br","switch_number_to_us","switch_number_to_br"].includes(qf)) {
+                      // Refaz preview com novo formato
+                      setTimeout(() => imp.buildPreview(), 0);
+                    }
+                  };
+                  return (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        Como corrigir os {errorCount} erro{errorCount > 1 ? "s" : ""} encontrado{errorCount > 1 ? "s" : ""}
+                      </div>
+                      <div className="space-y-2">
+                        {summary.map((s) => (
+                          <div key={s.info.code} className="rounded border bg-background p-2.5 text-xs space-y-1.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="font-medium text-sm flex items-center gap-2">
+                                  <Badge variant="destructive" className="text-[10px]">{s.count}×</Badge>
+                                  {s.info.title}
+                                </div>
+                                <div className="mt-1 text-muted-foreground">
+                                  <span className="font-medium text-foreground">Causa:</span> {s.info.cause}
+                                </div>
+                                <div className="mt-0.5 text-muted-foreground flex items-start gap-1">
+                                  <Lightbulb className="h-3 w-3 mt-0.5 text-amber-500 shrink-0" />
+                                  <span><span className="font-medium text-foreground">Solução:</span> {s.info.solution}</span>
+                                </div>
+                                {s.sampleRows.length > 0 && (
+                                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                                    Exemplos: linha{s.sampleRows.length > 1 ? "s" : ""} {s.sampleRows.join(", ")}
+                                  </div>
+                                )}
+                              </div>
+                              {s.info.quickFix && s.info.quickFixLabel && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs shrink-0"
+                                  onClick={() => handleQuickFix(s.info.quickFix)}
+                                >
+                                  {s.info.quickFixLabel}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="border rounded-md overflow-auto max-h-[calc(92vh-280px)]">
                   <Table>
                     <TableHeader className="sticky top-0 bg-background z-10">
@@ -445,14 +511,67 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
 
           {/* STEP: Done */}
           {imp.step === "done" && (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-              <p className="text-lg font-medium">{imp.importCount} lançamentos importados</p>
-              <p className="text-sm text-muted-foreground">Os dados foram adicionados à lista de {tipo === "saida" ? "contas a pagar" : "contas a receber"}.</p>
-              <p className="text-xs text-muted-foreground max-w-md text-center mt-1">
+            <div className="flex flex-col items-center justify-center py-12 gap-4 max-w-2xl mx-auto">
+              {imp.failedRows.length === 0 ? (
+                <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="h-12 w-12 text-amber-500" />
+              )}
+              <p className="text-lg font-medium">
+                {imp.failedRows.length === 0 ? "Importação concluída" : "Importação concluída com avisos"}
+              </p>
+
+              {/* Resumo detalhado X / Y / Z */}
+              <div className="grid grid-cols-3 gap-3 w-full">
+                <div className="rounded-md border bg-emerald-500/10 p-3 text-center">
+                  <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-emerald-600" />
+                  <div className="text-2xl font-bold tabular-nums">{imp.importCount}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Importados</div>
+                </div>
+                <div className="rounded-md border bg-amber-500/10 p-3 text-center">
+                  <Copy className="h-5 w-5 mx-auto mb-1 text-amber-600" />
+                  <div className="text-2xl font-bold tabular-nums">{imp.skippedCount}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Duplicatas puladas</div>
+                </div>
+                <div className={cn(
+                  "rounded-md border p-3 text-center",
+                  imp.failedRows.length > 0 ? "bg-destructive/10" : "bg-muted/40"
+                )}>
+                  <XCircle className={cn(
+                    "h-5 w-5 mx-auto mb-1",
+                    imp.failedRows.length > 0 ? "text-destructive" : "text-muted-foreground"
+                  )} />
+                  <div className="text-2xl font-bold tabular-nums">{imp.failedRows.length}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Falharam</div>
+                </div>
+              </div>
+
+              {imp.skippedCount > 0 && (
+                <p className="text-xs text-muted-foreground text-center max-w-md">
+                  Duplicatas detectadas dentro do arquivo, contra importações anteriores ou pela proteção do banco de dados foram puladas automaticamente.
+                </p>
+              )}
+
+              {imp.failedRows.length > 0 && (
+                <div className="w-full rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                  <p className="text-sm font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    {imp.failedRows.length} linha{imp.failedRows.length > 1 ? "s" : ""} não pôde ser importada
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Baixe o CSV abaixo com apenas as linhas que falharam (com a coluna <strong>_erro</strong> explicando o motivo), corrija no Excel e reimporte.
+                  </p>
+                  <Button size="sm" variant="outline" onClick={imp.downloadFailedRowsCSV} className="w-full">
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Baixar CSV das falhas
+                  </Button>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground max-w-md text-center">
                 Verifique a aba <strong>Aglutinação</strong> para revisar categorias e padrões importados que ainda não existem na estrutura do sistema.
               </p>
-              <Button size="sm" onClick={() => handleClose(false)} className="mt-4">
+              <Button size="sm" onClick={() => handleClose(false)} className="mt-2">
                 Fechar
               </Button>
             </div>
