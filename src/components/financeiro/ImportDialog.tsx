@@ -511,14 +511,67 @@ export function ImportDialog({ open, onOpenChange, tipo }: ImportDialogProps) {
 
           {/* STEP: Done */}
           {imp.step === "done" && (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-              <p className="text-lg font-medium">{imp.importCount} lançamentos importados</p>
-              <p className="text-sm text-muted-foreground">Os dados foram adicionados à lista de {tipo === "saida" ? "contas a pagar" : "contas a receber"}.</p>
-              <p className="text-xs text-muted-foreground max-w-md text-center mt-1">
+            <div className="flex flex-col items-center justify-center py-12 gap-4 max-w-2xl mx-auto">
+              {imp.failedRows.length === 0 ? (
+                <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="h-12 w-12 text-amber-500" />
+              )}
+              <p className="text-lg font-medium">
+                {imp.failedRows.length === 0 ? "Importação concluída" : "Importação concluída com avisos"}
+              </p>
+
+              {/* Resumo detalhado X / Y / Z */}
+              <div className="grid grid-cols-3 gap-3 w-full">
+                <div className="rounded-md border bg-emerald-500/10 p-3 text-center">
+                  <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-emerald-600" />
+                  <div className="text-2xl font-bold tabular-nums">{imp.importCount}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Importados</div>
+                </div>
+                <div className="rounded-md border bg-amber-500/10 p-3 text-center">
+                  <Copy className="h-5 w-5 mx-auto mb-1 text-amber-600" />
+                  <div className="text-2xl font-bold tabular-nums">{imp.skippedCount}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Duplicatas puladas</div>
+                </div>
+                <div className={cn(
+                  "rounded-md border p-3 text-center",
+                  imp.failedRows.length > 0 ? "bg-destructive/10" : "bg-muted/40"
+                )}>
+                  <XCircle className={cn(
+                    "h-5 w-5 mx-auto mb-1",
+                    imp.failedRows.length > 0 ? "text-destructive" : "text-muted-foreground"
+                  )} />
+                  <div className="text-2xl font-bold tabular-nums">{imp.failedRows.length}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Falharam</div>
+                </div>
+              </div>
+
+              {imp.skippedCount > 0 && (
+                <p className="text-xs text-muted-foreground text-center max-w-md">
+                  Duplicatas detectadas dentro do arquivo, contra importações anteriores ou pela proteção do banco de dados foram puladas automaticamente.
+                </p>
+              )}
+
+              {imp.failedRows.length > 0 && (
+                <div className="w-full rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                  <p className="text-sm font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    {imp.failedRows.length} linha{imp.failedRows.length > 1 ? "s" : ""} não pôde ser importada
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Baixe o CSV abaixo com apenas as linhas que falharam (com a coluna <strong>_erro</strong> explicando o motivo), corrija no Excel e reimporte.
+                  </p>
+                  <Button size="sm" variant="outline" onClick={imp.downloadFailedRowsCSV} className="w-full">
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Baixar CSV das falhas
+                  </Button>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground max-w-md text-center">
                 Verifique a aba <strong>Aglutinação</strong> para revisar categorias e padrões importados que ainda não existem na estrutura do sistema.
               </p>
-              <Button size="sm" onClick={() => handleClose(false)} className="mt-4">
+              <Button size="sm" onClick={() => handleClose(false)} className="mt-2">
                 Fechar
               </Button>
             </div>
