@@ -1,84 +1,88 @@
-
 ## Diagnóstico
 
-Auditei todos os `upsert(..., { onConflict })` do projeto contra as constraints reais do banco. Os achados:
+A página **Conciliação Bancária** está 100% mockada — usa `bankReconciliation` de `src/data/mockData.ts`, sem filtro por organização. Por isso o mesmo dado fictício aparece em todas as empresas do grupo Avante Brasil.
 
-| # | Hook / Lugar | onConflict usado | Estado no banco | Severidade |
-|---|---|---|---|---|
-| 1 | `useCashFlow.ts:301`, `useFinanceiro.ts:330`, `useCRM.ts:339`, `useDP.ts:461,776` → tabela `cashflow_entries` | `dedup_hash` | Existe **índice único parcial** `WHERE dedup_hash IS NOT NULL`, mas **1531 de 1535 linhas têm `dedup_hash = NULL`**. Ninguém preenche o hash. PG aceita `ON CONFLICT (dedup_hash)` no índice parcial só com a mesma cláusula `WHERE`, então hoje os upserts ou falham ou criam duplicatas. | **Crítica** |
-| 2 | `useCRM.ts:339` (linha do "ganho" do CRM gerar lançamento) → `crm_opportunities` upsert via `dedup_hash` | `dedup_hash` | A coluna **não existe** em `crm_opportunities`. (Esse upsert mira `cashflow_entries`; o ponto é o mesmo do #1.) | Crítica |
-| 3 | `useCostCenters.ts:42` → `user_cost_center_access` | `user_id,cost_center_id` | UNIQUE real é **`(user_id, organization_id, cost_center_id)`**. Faltando `organization_id`. | Alta |
-| 4 | `useMaturityHistory.ts:96` → tabela `sector_onboarding_history` | `organization_id,sector,period_month` | **Tabela não existe** no schema atual. | Média (recurso quebrado) |
-| 5 | Demais upserts (`payroll_items`, `dp_config`, `dp_business_days`, `organization_modules`, `kpi_period_presets`, `report_schedules`, `sector_maturity_targets`, `sector_onboarding`, `employee_benefits`, `hr_9box_scores`, `hr_9box_sources`, `user_roles`, `backoffice_users`, `planning_config`, `organization_members`) | várias | UNIQUE existe e bate com o `onConflict`. ✓ | OK |
+Não existe tabela real de conciliação nem de extrato bancário. Existe apenas `bank_accounts` (saldos) e `cashflow_entries` (com colunas já prontas: `conta_bancaria_id`, `data_realizada`, `valor_realizado`, `conciliacao_id`).
 
-## Tabela e chave alvo desta migration
+Sobre a importação de **Contas a Pagar**: hoje, ao importar uma linha já paga (com data de pagamento preenchida), o sistema marca `status = 'pago'`, mas **não preenche `conta_bancaria_id` nem `valor_realizado`** — então a despesa entra no fluxo de caixa, mas fica órfã da conta bancária e portanto invisível para qualquer rotina de conciliação.
 
-A tabela problemática é `public.cashflow_entries`. A intenção lógica do código é: "uma entrada por origem externa". A chave única correta, **MECE-aderente** ao memory `financeiro-materialization-mece` e a como `source_ref` já é montado (`crm:<id>`, `dp:rescisao:<id>`, `hr:<id>`, etc.), é:
+---
 
-```
-UNIQUE (organization_id, source, source_ref)  -- aplicado apenas quando source_ref IS NOT NULL
-```
+## O que será entregue
 
-Vantagens vs. `dedup_hash`:
-- Não exige nenhum hook do app preencher um campo derivado.
-- Funciona com `ON CONFLICT (organization_id, source, source_ref)` desde que o índice seja **sem predicado**, então criaremos como UNIQUE INDEX usual mas só sobre linhas onde `source_ref IS NOT NULL` via expressão coalesce — abaixo o detalhe técnico.
-- Lançamentos manuais (sem `source_ref`) continuam livres para repetir, como hoje.
+### 1. Tirar o mock da conciliação (todas as empresas)
 
-## Rotina de detecção de duplicados (executada antes de criar a constraint)
+- Remover `bankReconciliation` de `src/data/mockData.ts`
+- Reescrever `src/pages/Conciliacao.tsx` e `src/components/financeiro/ConciliacaoTab.tsx` para consumir dados reais filtrados por `organization_id`
+- Estado vazio amigável quando não houver extrato importado
 
-A migration roda primeiro um bloco `DO $$` que:
-1. Conta duplicatas reais nas chaves candidatas.
-2. Salva os exemplos numa tabela temporária `_cashflow_dedup_report` (não persistente — `ON COMMIT DROP`) e faz `RAISE NOTICE` com o resumo.
-3. Se houver duplicatas em `(organization_id, source, source_ref)` com `source_ref` não nulo, **deduplica mantendo o `created_at` mais antigo** (linhas mais novas viram `status='cancelado'` e ganham nota explicativa, em vez de DELETE — preservando auditabilidade do histórico, conforme o princípio "o passado é imutável").
-4. Só então cria o índice único.
+### 2. Conciliação real com banco de dados
 
-Hoje a contagem é: **0 duplicatas reais** em `(organization_id, source, source_ref)` com `source_ref` não nulo (1531 nulos são lançamentos manuais e ficam fora do índice). Então a migration passa limpa.
+Criar a infraestrutura mínima para conciliação verdadeira:
 
-## Plano de execução
+- Nova tabela `bank_statement_entries` (linhas do extrato bancário importado) — com `organization_id`, `bank_account_id`, `data`, `descricao`, `valor`, `documento`, `import_id`, `source_ref`, `cashflow_entry_id` (vínculo quando conciliada), `status` (`pendente | conciliado | divergente | ignorado`)
+- Índice unique parcial `(organization_id, bank_account_id, source_ref)` para idempotência (mesmo padrão dos `cashflow_entries`)
+- RLS por organização (mesmo padrão de `bank_accounts`)
+- Função `match_statement_to_cashflow(p_statement_id uuid)` que sugere candidatos do `cashflow_entries` por **valor (±2%) + data (±3 dias) + mesma conta bancária**
 
-### 1. Migration SQL (uma só)
+### 3. Importação de extrato bancário (XLS/CSV)
 
-```text
-supabase/migrations/<timestamp>_cashflow_unique_source_ref.sql
-```
+Reaproveitar 100% o fluxo já existente de Contas a Pagar (`useFinanceiroImport` + `ImportDialog`), criando uma versão dedicada para extrato:
 
-Conteúdo:
-- `DO $$ ... $$` com a rotina de detecção + dedupe defensivo descrita acima, com `RAISE NOTICE` do tipo:
-  `"cashflow_dedup: total=1535, source_ref_null=1531, duplicates_to_resolve=0"`.
-- `CREATE UNIQUE INDEX IF NOT EXISTS cashflow_entries_org_source_ref_uq
-   ON public.cashflow_entries (organization_id, source, source_ref)
-   WHERE source_ref IS NOT NULL;`
-- `COMMENT ON INDEX ...` documentando que é a chave de idempotência para materializações de CRM/DP/HR/Contracts.
-- **NÃO** dropar `cashflow_entries_dedup_uq` agora (mantém compatibilidade caso algum job legado ainda escreva `dedup_hash`); apenas marcar como deprecated via `COMMENT`.
+- Novo hook `useBankStatementImport` (mesma estrutura: detect → mapping → preview → entity matching → done)
+- Mesmos benefícios já entregues: catálogo de erros com soluções, quick-fix de formato BR/US, deduplicação 3 níveis (intra-arquivo / banco / unique index), batching resiliente, CSV de falhas
+- Campos mapeáveis: Data, Histórico/Descrição, Valor (sinal: positivo = crédito, negativo = débito), Documento, Conta Bancária (selecionada antes da importação)
+- Botão **"Importar Extrato"** na nova tela de Conciliação
 
-### 2. Ajustes no código (todos os hooks que mexem em `cashflow_entries`)
+### 4. Reconciliação automática + manual
 
-Trocar `{ onConflict: "dedup_hash" }` por `{ onConflict: "organization_id,source,source_ref" }` em:
-- `src/hooks/useCashFlow.ts:301`
-- `src/hooks/useFinanceiro.ts:330`
-- `src/hooks/useCRM.ts:339`
-- `src/hooks/useDP.ts:461` (sync de rescisão → cashflow)
-- `src/hooks/useDP.ts:776` (HR planning → cashflow)
+Na tela de Conciliação:
 
-Garantir que todos esses payloads já enviam `source` e `source_ref` (eles enviam — verifiquei).
+- KPIs reais: Taxa de conciliação, Divergências, Pendentes (calculados sobre `bank_statement_entries`)
+- Lista de linhas do extrato com **sugestão automática** de matching (ranking por proximidade de valor + data)
+- Ações por linha: **Conciliar** (vincula a um `cashflow_entry`), **Marcar como divergente**, **Ignorar**, **Criar lançamento a partir do extrato**
+- Filtros: por conta bancária, por status, por intervalo de datas
 
-### 3. Bug colateral em `useCostCenters.ts:42`
+### 5. Corrigir o ciclo "pagamento importado → fluxo de caixa → conciliação"
 
-Trocar `onConflict: "user_id,cost_center_id"` por `"user_id,organization_id,cost_center_id"` para casar com a UNIQUE real `user_cost_center_access_user_id_organization_id_cost_center_key`.
+No `useFinanceiroImport`:
 
-### 4. Fora deste escopo (apenas registrado)
+- Quando a linha importada vier com **data de pagamento** preenchida:
+  - Preencher `valor_realizado` = valor importado
+  - Permitir o usuário escolher **uma conta bancária padrão** para o lote no preview (Select no rodapé do passo Preview) → grava `conta_bancaria_id` em todas as linhas pagas do batch
+  - Garantir `status = 'pago'` e `data_realizada` preservada
+- Documentar isso na tela final ("X lançamentos pagos vinculados à conta Y, prontos para conciliação")
 
-- `useMaturityHistory.ts` aponta para tabela inexistente `sector_onboarding_history` — é outro pedido (criar tabela ou redirecionar para `sector_onboarding`). Não toco agora; sinalizo no resumo final.
+### 6. Limpeza dos demais mocks órfãos do `mockData.ts`
 
-## Detalhes técnicos relevantes
+Verificar e remover qualquer outro export do `mockData.ts` que esteja sendo importado por páginas de produção (escopo limitado: não vou tocar em mocks usados apenas em demo/storybook).
 
-- O índice é **parcial** (`WHERE source_ref IS NOT NULL`) intencionalmente: lançamentos manuais avulsos não devem sofrer constraint. PG aceita `ON CONFLICT (col1,col2,col3) WHERE source_ref IS NOT NULL` desde que o predicado seja idêntico — o supabase-js só passa as colunas, então usaremos uma estratégia compatível: o índice parcial funciona porque qualquer INSERT vindo do app sempre traz `source_ref` (CRM/DP/HR/Contracts), satisfazendo o predicado automaticamente. Validei isso na auditoria de payloads.
-- Não criamos `CONSTRAINT UNIQUE` (que exigiria índice total e tornaria todo lançamento manual sujeito à regra) — usamos `UNIQUE INDEX` parcial. Em PG, `ON CONFLICT (col_list)` resolve via qualquer índice único compatível, parcial ou não, desde que o predicado bata.
-- Mantemos `cashflow_entries_dedup_uq` por enquanto para não quebrar nenhum caminho residual; remoção definitiva fica para uma migration de limpeza posterior.
+---
 
-## Resultado esperado
+## Detalhes técnicos
 
-- Materialização idempotente real para CRM-Won, rescisões, planejamento RH e contratos — sem duplicatas e sem dependência de hash não preenchido.
-- Erros silenciosos de upsert eliminados.
-- Bug do `user_cost_center_access` corrigido (responsável por CC podia perder acesso por upsert mal direcionado).
-- Memory `financeiro-materialization-mece` ganha nota com a chave canônica `(organization_id, source, source_ref)`.
+**Arquivos novos**
+- `supabase/migrations/<ts>_bank_statement_entries.sql` — tabela + RLS + índices + função de matching
+- `src/hooks/useBankStatementImport.ts` — hook de importação dedicado
+- `src/hooks/useConciliacao.ts` — leitura, KPIs e ações de conciliação
+- `src/components/financeiro/BankStatementImportDialog.tsx` — wrapper sobre `ImportDialog` configurado para extrato
+
+**Arquivos editados**
+- `src/data/mockData.ts` — remove `bankReconciliation`
+- `src/pages/Conciliacao.tsx` — reescrito com dados reais
+- `src/components/financeiro/ConciliacaoTab.tsx` — reescrito com dados reais
+- `src/hooks/useFinanceiroImport.ts` — preencher `conta_bancaria_id` + `valor_realizado` quando linha vier paga
+- `src/components/financeiro/ImportDialog.tsx` — Select de "Conta bancária para lançamentos pagos" no passo Preview
+
+**Padrões reusados**
+- `source_ref = 'statement_import:<importId>:<rowIndex>'` para garantir idempotência via unique index
+- Mesma estratégia de `upsert({ ignoreDuplicates: true, onConflict: 'organization_id,bank_account_id,source_ref' })`
+- RLS via `is_org_member` + `has_backoffice_org_access` (mesmo padrão atual)
+
+---
+
+## Observações
+
+- Não vou remover nenhum dado real do banco — o "lixo" da Avante Brasil é só o mock no front-end, então a limpeza é instantânea ao trocar a fonte de dados.
+- A conciliação automática usa heurística simples (valor + data + conta). Conciliação por OCR/regras avançadas pode ser próxima iteração.
+- Importação de extrato CSV/XLS reaproveita ~90% do código de Contas a Pagar — entrega rápida e consistente.
