@@ -322,18 +322,18 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           } as any);
         }
 
-        // 3. VT (líquido) — crédito antecipado.
+        // 3. VT (líquido) — crédito antecipado no mês ANTERIOR à competência (CLT/PAT).
         if (vtBruto > 0) {
           const vtNet = Math.max(0, vtBruto - calc.vtDesconto);
           if (vtNet > 0) {
             entries.push({
               ...baseEmp,
               id: `proj-dp-vt-${emp.id}-${monthKey}`,
-              descricao: `VT — ${emp.name}`,
+              descricao: `VT — ${emp.name} (competência ${monthLabel})`,
               valor_previsto: round2(vtNet),
               data_prevista: dtBeneficios,
               account_id: acctBeneficios,
-              notes: `${businessDays} dias úteis × R$${Number(emp.vt_diario).toFixed(2)} = ${vtBruto.toFixed(0)} | Desc 6%: ${calc.vtDesconto.toFixed(0)} | Líq: ${vtNet.toFixed(0)}`,
+              notes: `Crédito antecipado em ${dtBeneficios} para uso ao longo de ${competencyLong}. ${businessDays} dias úteis × R$${Number(emp.vt_diario).toFixed(2)} = ${vtBruto.toFixed(0)} | Desc 6%: ${calc.vtDesconto.toFixed(0)} | Líq: ${vtNet.toFixed(0)}`,
               dp_sub_category: "vt",
               source_ref: projectionKey.payroll(emp.id, "vt", monthKey),
             } as any);
