@@ -18,6 +18,7 @@ import {
   benefitsPaymentDate,
   healthPaymentDate,
   fmtISO,
+  formatCompetencyLong,
 } from "@/lib/payrollSchedule";
 
 /** Count Mon–Fri business days in a given month */
@@ -170,6 +171,7 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
     while (!isAfter(cursor, rangeTo)) {
       const monthKey = format(cursor, "yyyy-MM");
       const monthLabel = format(cursor, "MM/yyyy");
+      const competencyLong = formatCompetencyLong(cursor);
 
       // Datas de desembolso para esta competência.
       const dtSalario = fmtISO(salaryPaymentDate(cursor, config as any));
@@ -211,7 +213,7 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
             contract_installment_id: null,
             tipo: "saida",
             categoria: "Pessoal",
-            descricao: `Prestação de Serviço PJ — ${emp.name}`,
+            descricao: `Prestação de Serviço PJ — ${emp.name} (competência ${monthLabel})`,
             valor_previsto: round2(salary),
             valor_realizado: null,
             data_prevista: dtSalario,
@@ -220,10 +222,11 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
             account_id: acctSalario,
             cost_center_id: emp.cost_center_id ?? null,
             entity_id: null,
-            notes: `Pagamento bruto contratual — sem encargos trabalhistas`,
+            notes: `Pagamento bruto contratual referente à competência ${competencyLong} — sem encargos trabalhistas`,
             source: "dp",
             source_ref: projectionKey.payroll(emp.id, "salario_liquido", monthKey),
             dp_sub_category: "salario_liquido",
+            reference_month: dtCompetencia,
             created_at: now,
             updated_at: now,
           } as any);
@@ -281,6 +284,7 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           cost_center_id: emp.cost_center_id ?? null,
           entity_id: null,
           source: "dp",
+          reference_month: dtCompetencia,
           created_at: now,
           updated_at: now,
         };
@@ -290,11 +294,11 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           entries.push({
             ...baseEmp,
             id: `proj-dp-adiant-${emp.id}-${monthKey}`,
-            descricao: `Adiantamento (vale ${advancePct.toFixed(0)}%) — ${emp.name}`,
+            descricao: `Adiantamento (vale ${advancePct.toFixed(0)}%) — ${emp.name} (competência ${monthLabel})`,
             valor_previsto: calc.adiantamento,
             data_prevista: dtAdiant,
             account_id: acctSalario,
-            notes: `Vale pago em ${dtAdiant} — saldo líquido: ${calc.saldo.toFixed(0)}`,
+            notes: `Vale referente à competência ${competencyLong}, pago em ${dtAdiant} — saldo líquido: ${calc.saldo.toFixed(0)}`,
             dp_sub_category: "salario_adiantamento",
             source_ref: projectionKey.payroll(emp.id, "salario_adiantamento", monthKey),
           } as any);
@@ -306,7 +310,9 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           entries.push({
             ...baseEmp,
             id: `proj-dp-sal-${emp.id}-${monthKey}`,
-            descricao: calc.adiantamento > 0 ? `Salário (saldo) — ${emp.name}` : `Salário Líquido — ${emp.name}`,
+            descricao: calc.adiantamento > 0
+              ? `Salário (saldo) — ${emp.name} (competência ${monthLabel})`
+              : `Salário Líquido — ${emp.name} (competência ${monthLabel})`,
             valor_previsto: calc.saldo,
             data_prevista: dtSalario,
             account_id: acctSalario,
@@ -316,18 +322,18 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           } as any);
         }
 
-        // 3. VT (líquido) — crédito antecipado.
+        // 3. VT (líquido) — crédito antecipado no mês ANTERIOR à competência (CLT/PAT).
         if (vtBruto > 0) {
           const vtNet = Math.max(0, vtBruto - calc.vtDesconto);
           if (vtNet > 0) {
             entries.push({
               ...baseEmp,
               id: `proj-dp-vt-${emp.id}-${monthKey}`,
-              descricao: `VT — ${emp.name}`,
+              descricao: `VT — ${emp.name} (competência ${monthLabel})`,
               valor_previsto: round2(vtNet),
               data_prevista: dtBeneficios,
               account_id: acctBeneficios,
-              notes: `${businessDays} dias úteis × R$${Number(emp.vt_diario).toFixed(2)} = ${vtBruto.toFixed(0)} | Desc 6%: ${calc.vtDesconto.toFixed(0)} | Líq: ${vtNet.toFixed(0)}`,
+              notes: `Crédito antecipado em ${dtBeneficios} para uso ao longo de ${competencyLong}. ${businessDays} dias úteis × R$${Number(emp.vt_diario).toFixed(2)} = ${vtBruto.toFixed(0)} | Desc 6%: ${calc.vtDesconto.toFixed(0)} | Líq: ${vtNet.toFixed(0)}`,
               dp_sub_category: "vt",
               source_ref: projectionKey.payroll(emp.id, "vt", monthKey),
             } as any);
@@ -335,24 +341,29 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         }
 
         // 4. Benefícios — segregados por categoria contábil.
+        // VR/VA são antecipados no mês N-1 (CLT/PAT). Plano de saúde é fatura no mês de competência.
         const empBenefitsBySub = benefitsByEmployee.get(emp.id);
         if (empBenefitsBySub) {
           for (const [sub, total] of empBenefitsBySub.entries()) {
             if (total <= 0) continue;
+            const isAntecipado = sub !== "beneficios_saude";
             const dt = sub === "beneficios_saude" ? dtSaude : dtBeneficios;
             const label =
               sub === "beneficios_vr" ? "VR"
               : sub === "beneficios_va" ? "VA"
               : sub === "beneficios_saude" ? "Saúde"
               : "Benefícios";
+            const noteText = isAntecipado
+              ? `Crédito antecipado em ${dt} para uso ao longo de ${competencyLong} (CLT/PAT — pago no mês anterior à competência).`
+              : `Fatura referente à competência ${competencyLong}, com vencimento em ${dt}.`;
             entries.push({
               ...baseEmp,
               id: `proj-dp-${sub}-${emp.id}-${monthKey}`,
-              descricao: `${label} — ${emp.name}`,
+              descricao: `${label} — ${emp.name} (competência ${monthLabel})`,
               valor_previsto: round2(total),
               data_prevista: dt,
               account_id: acctBeneficios,
-              notes: null,
+              notes: noteText,
               dp_sub_category: sub,
               source_ref: projectionKey.payroll(emp.id, sub, monthKey),
             } as any);
@@ -388,6 +399,7 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         cost_center_id: null, // guias são corporativas, não rateadas por CC
         entity_id: null,
         source: "dp",
+        reference_month: dtCompetencia,
         created_at: now,
         updated_at: now,
         account_id: acctEncargos,

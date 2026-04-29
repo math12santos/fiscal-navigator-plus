@@ -148,3 +148,79 @@ export function healthPaymentDate(competencyMonth: Date, c?: DPScheduleConfig | 
 export function fmtISO(d: Date): string {
   return format(d, "yyyy-MM-dd");
 }
+
+/** Sufixo ordinal pt-BR para 1..31 (1º, 2º, 3º…). */
+function ordinalPt(n: number): string {
+  return `${n}º`;
+}
+
+/**
+ * Descreve, em linguagem natural, como o dia do salário será resolvido.
+ * Ex.: "5º dia útil", "Dia 5 (calendário)".
+ */
+export function describeSalaryPaymentDay(c?: DPScheduleConfig | null): string {
+  const cfg = resolveCfg(c);
+  if (cfg.salary_payment_basis === "calendar_day") {
+    return `Dia ${cfg.salary_payment_day} (calendário)`;
+  }
+  return `${ordinalPt(cfg.salary_payment_day)} dia útil`;
+}
+
+/** Rótulo curto da competência: "MM/AAAA". */
+export function formatCompetencyLabel(competencyMonth: Date): string {
+  return format(startOfMonth(competencyMonth), "MM/yyyy");
+}
+
+/** Rótulo extenso pt-BR: "maio/2026" (sem locale para manter o bundle leve). */
+const MESES_PT = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
+export function formatCompetencyLong(competencyMonth: Date): string {
+  const d = startOfMonth(competencyMonth);
+  return `${MESES_PT[d.getMonth()]}/${d.getFullYear()}`;
+}
+
+export interface ResolvedPaymentRow {
+  competencyMonth: Date;
+  competencyLabel: string;        // "05/2026"
+  competencyLongLabel: string;    // "maio/2026"
+  advance: Date | null;           // null se advance_enabled=false
+  salary: Date;
+  inss: Date;
+  fgts: Date;
+  irrf: Date;
+  benefits: Date;                 // VT/VR/VA — pago ANTES (mês N-1)
+  health: Date;
+}
+
+/**
+ * Lista as próximas N competências com TODAS as datas resolvidas, para o quadro
+ * "Calendário de Desembolsos" exibido ao CFO. A primeira competência é a do mês
+ * corrente (referência operacional do mês em curso).
+ */
+export function nextNPaymentDates(
+  n: number,
+  c?: DPScheduleConfig | null,
+  fromCompetency?: Date,
+): ResolvedPaymentRow[] {
+  const cfg = resolveCfg(c);
+  const start = startOfMonth(fromCompetency ?? new Date());
+  const rows: ResolvedPaymentRow[] = [];
+  for (let i = 0; i < Math.max(1, n); i += 1) {
+    const competency = addMonths(start, i);
+    rows.push({
+      competencyMonth: competency,
+      competencyLabel: formatCompetencyLabel(competency),
+      competencyLongLabel: formatCompetencyLong(competency),
+      advance: cfg.advance_enabled ? advancePaymentDate(competency, cfg) : null,
+      salary: salaryPaymentDate(competency, cfg),
+      inss: inssDueDate(competency, cfg),
+      fgts: fgtsDueDate(competency, cfg),
+      irrf: irrfDueDate(competency, cfg),
+      benefits: benefitsPaymentDate(competency, cfg),
+      health: healthPaymentDate(competency, cfg),
+    });
+  }
+  return rows;
+}

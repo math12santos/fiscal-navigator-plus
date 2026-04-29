@@ -41,6 +41,14 @@ import {
 import { Switch } from "@/components/ui/switch";
 import DPBusinessDaysCalendar from "./DPBusinessDaysCalendar";
 import DPBusinessDaysOverridesReport from "./DPBusinessDaysOverridesReport";
+import {
+  describeSalaryPaymentDay,
+  nextNPaymentDates,
+  salaryPaymentDate,
+  formatCompetencyLong,
+  fmtISO,
+} from "@/lib/payrollSchedule";
+import { format } from "date-fns";
 
 type Category = "encargo" | "provisao" | "desconto";
 
@@ -392,7 +400,14 @@ export default function DPConfig() {
                 value={schedule.salary_payment_day}
                 onChange={(e) => setSchedule((s) => ({ ...s, salary_payment_day: Number(e.target.value) }))}
               />
-              <p className="text-[10px] text-muted-foreground">No mês seguinte ao da competência</p>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                <span className="font-medium text-foreground">Próximo pagamento:</span>{" "}
+                {(() => {
+                  const today = new Date();
+                  const nextSal = salaryPaymentDate(today, schedule as any);
+                  return `${format(nextSal, "dd/MM/yyyy")} (${describeSalaryPaymentDay(schedule as any)} de ${formatCompetencyLong(nextSal)})`;
+                })()}
+              </p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Base do dia do salário</Label>
@@ -406,6 +421,7 @@ export default function DPConfig() {
                   <SelectItem value="calendar_day">Dia calendário</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-[10px] text-muted-foreground">No mês seguinte ao da competência. Sábados e domingos não contam como dia útil.</p>
             </div>
           </div>
 
@@ -450,6 +466,11 @@ export default function DPConfig() {
                   <SelectItem value="30">Dia 30 do mês anterior</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                <span className="font-medium text-foreground">Antecipado (CLT/PAT):</span>{" "}
+                o crédito sai sempre no mês <span className="font-medium">anterior</span> à competência.
+                Ex.: o VR de maio é creditado no fim de abril, para uso ao longo de maio.
+              </p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Dia da fatura do plano de saúde</Label>
@@ -459,6 +480,69 @@ export default function DPConfig() {
               <p className="text-[10px] text-muted-foreground">No mês de competência</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Calendário resolvido — próximas 3 competências (CFO-first: data real x número configurado) */}
+      <Card className="border-primary/30 bg-primary/[0.03]">
+        <CardHeader className="pb-3">
+          <div className="flex items-start gap-2">
+            <CalendarClock size={16} className="mt-0.5 text-primary" />
+            <div>
+              <CardTitle className="text-sm">Calendário resolvido — próximas 3 competências</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Datas reais que serão usadas no Fluxo de Caixa, recalculadas em tempo real conforme você muda a configuração acima.
+                VT/VR/VA aparecem na competência ao lado, mas o crédito acontece no mês anterior (CLT/PAT).
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="text-left py-2 pr-3 font-medium">Competência</th>
+                  {schedule.advance_enabled && (
+                    <th className="text-left py-2 pr-3 font-medium">Adiantamento</th>
+                  )}
+                  <th className="text-left py-2 pr-3 font-medium">Salário</th>
+                  <th className="text-left py-2 pr-3 font-medium">GPS (INSS)</th>
+                  <th className="text-left py-2 pr-3 font-medium">GRF (FGTS)</th>
+                  <th className="text-left py-2 pr-3 font-medium">DARF IRRF</th>
+                  <th className="text-left py-2 pr-3 font-medium">VT / VR / VA</th>
+                  <th className="text-left py-2 pr-3 font-medium">Plano de Saúde</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nextNPaymentDates(3, schedule as any).map((row) => (
+                  <tr key={row.competencyLabel} className="border-b border-border/40 last:border-0">
+                    <td className="py-2 pr-3 font-medium text-foreground whitespace-nowrap">{row.competencyLabel}</td>
+                    {schedule.advance_enabled && (
+                      <td className="py-2 pr-3 whitespace-nowrap">{row.advance ? format(row.advance, "dd/MM/yyyy") : "—"}</td>
+                    )}
+                    <td className="py-2 pr-3 whitespace-nowrap">
+                      <span className="font-semibold text-primary">{format(row.salary, "dd/MM/yyyy")}</span>
+                      <span className="ml-1 text-[10px] text-muted-foreground">({describeSalaryPaymentDay(schedule as any)})</span>
+                    </td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{format(row.inss, "dd/MM/yyyy")}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{format(row.fgts, "dd/MM/yyyy")}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{format(row.irrf, "dd/MM/yyyy")}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">
+                      {format(row.benefits, "dd/MM/yyyy")}
+                      <span className="ml-1 text-[10px] text-muted-foreground">(antecipado)</span>
+                    </td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{format(row.health, "dd/MM/yyyy")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-[10px] text-muted-foreground leading-snug">
+            <span className="font-medium text-foreground">Observação:</span> o cálculo de "dia útil" considera apenas
+            segunda a sexta. Feriados nacionais ainda não são considerados — registre overrides em "Calendário de
+            dias úteis" quando precisar ajustar um mês específico.
+          </p>
         </CardContent>
       </Card>
 
