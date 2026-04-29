@@ -7,6 +7,7 @@ import { FinanceiroEntryDialog } from "./FinanceiroEntryDialog";
 import { FinanceiroTable } from "./FinanceiroTable";
 import { ImportDialog } from "./ImportDialog";
 import { DuplicateAlerts } from "./DuplicateAlerts";
+import { PMPMRKpiCard } from "./PMPMRKpiCard";
 import { Plus, Loader2, TrendingUp, Wallet, Clock, FileUp } from "lucide-react";
 
 const fmt = (v: number) =>
@@ -24,10 +25,11 @@ export function ContasAReceber() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard title="Total Previsto" value={fmt(totals.total_previsto)} icon={<TrendingUp size={20} />} />
         <KPICard title="Total Recebido" value={fmt(totals.total_realizado)} icon={<Wallet size={20} />} />
         <KPICard title="Pendente" value={`${fmt(totals.pendente)} (${totals.count_pendente})`} icon={<Clock size={20} />} />
+        <PMPMRKpiCard tipo="entrada" />
       </div>
 
       <DuplicateAlerts duplicates={duplicates} onDelete={(id) => remove.mutate(id)} />

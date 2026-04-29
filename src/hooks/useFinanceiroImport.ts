@@ -26,6 +26,7 @@ export const TARGET_FIELDS = [
   { value: "valor_previsto", label: "Valor", required: true },
   { value: "data_prevista", label: "Data Vencimento", required: true },
   { value: "data_realizada", label: "Data Pagamento", required: false },
+  { value: "competencia", label: "Mês Competência", required: false },
   { value: "entity_name", label: "Fornecedor / Cliente", required: false },
   { value: "categoria", label: "Categoria", required: false },
   { value: "documento", label: "Nº Documento", required: false },
@@ -33,6 +34,29 @@ export const TARGET_FIELDS = [
   { value: "notes", label: "Observações", required: false },
   { value: "ignorar", label: "Ignorar", required: false },
 ] as const;
+
+/** Normaliza diferentes formatos de competência para "YYYY-MM". Retorna null se irreconhecível. */
+function normalizeCompetencia(val: string): string | null {
+  const v = (val || "").trim();
+  if (!v) return null;
+  // YYYY-MM
+  if (/^\d{4}-\d{2}$/.test(v)) return v;
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 7);
+  // MM/YYYY
+  let m = v.match(/^(\d{2})\/(\d{4})$/);
+  if (m) return `${m[2]}-${m[1]}`;
+  // MM-YYYY
+  m = v.match(/^(\d{2})-(\d{4})$/);
+  if (m) return `${m[2]}-${m[1]}`;
+  // M/YYYY
+  m = v.match(/^(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[2]}-${m[1].padStart(2, "0")}`;
+  // DD/MM/YYYY → pega MM-YYYY
+  m = v.match(/^\d{1,2}\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[2]}-${m[1].padStart(2, "0")}`;
+  return null;
+}
 
 function parseBRNumber(val: string): number {
   if (!val || !val.trim()) return 0;
@@ -281,6 +305,10 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
         } else if (target === "data_prevista" || target === "data_realizada") {
           mapped[target] = parseDate(val);
           if (!mapped[target] && val.trim()) errors.push(`Data inválida: "${val}"`);
+        } else if (target === "competencia") {
+          const norm = normalizeCompetencia(val);
+          mapped[target] = norm;
+          if (!norm && val.trim()) errors.push(`Competência inválida: "${val}" (use YYYY-MM ou MM/YYYY)`);
         } else {
           mapped[target] = val.trim() || null;
         }
@@ -289,6 +317,11 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
       if (!mapped.descricao) errors.push("Descrição ausente");
       if (!mapped.valor_previsto && mapped.valor_previsto !== 0) errors.push("Valor ausente");
       if (!mapped.data_prevista) errors.push("Data ausente");
+
+      // Fallback: competência ausente → mês de data_prevista (mantém MECE)
+      if (!mapped.competencia && mapped.data_prevista) {
+        mapped.competencia = String(mapped.data_prevista).slice(0, 7);
+      }
 
       return { raw: rawObj, mapped, errors };
     });
@@ -561,7 +594,11 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
             data_prevista: data,
             data_realizada: row.mapped.data_realizada || null,
             data_vencimento: data,
+            // Quando importamos uma linha já paga, refletimos o valor realizado para o caixa
+            valor_realizado: row.mapped.data_realizada ? valor : null,
             status: row.mapped.data_realizada ? "pago" : "pendente",
+            // Mês de competência: usa o informado ou o fallback gerado em buildPreview
+            competencia: row.mapped.competencia || (data ? String(data).slice(0, 7) : null),
             categoria: row.mapped.categoria || null,
             documento: row.mapped.documento || null,
             notes: row.mapped.notes || null,

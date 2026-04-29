@@ -686,6 +686,8 @@ function RowErrorEditor({ row, index, onClose, onSave }: RowErrorEditorProps) {
   const [dataPrevista, setDataPrevista] = useState("");
   const [dataRealizada, setDataRealizada] = useState("");
   const [entityName, setEntityName] = useState("");
+  const [competencia, setCompetencia] = useState("");
+  const [competenciaAuto, setCompetenciaAuto] = useState(false);
 
   // Reset ao trocar de linha
   useMemo(() => {
@@ -699,6 +701,10 @@ function RowErrorEditor({ row, index, onClose, onSave }: RowErrorEditorProps) {
       setDataPrevista(String(row.mapped.data_prevista ?? ""));
       setDataRealizada(String(row.mapped.data_realizada ?? ""));
       setEntityName(String(row.mapped.entity_name ?? ""));
+      const comp = row.mapped.competencia ? String(row.mapped.competencia) : "";
+      const dataComp = row.mapped.data_prevista ? String(row.mapped.data_prevista).slice(0, 7) : "";
+      setCompetencia(comp || dataComp);
+      setCompetenciaAuto(!comp && !!dataComp);
     }
   }, [row]);
 
@@ -706,7 +712,6 @@ function RowErrorEditor({ row, index, onClose, onSave }: RowErrorEditorProps) {
 
   const handleSave = () => {
     if (index == null) return;
-    // Converte valor BR -> número
     const cleaned = valor.replace(/\./g, "").replace(",", ".").trim();
     const valorNum = cleaned ? Number(cleaned) : null;
 
@@ -716,6 +721,7 @@ function RowErrorEditor({ row, index, onClose, onSave }: RowErrorEditorProps) {
       data_prevista: dataPrevista.trim() || null,
       data_realizada: dataRealizada.trim() || null,
       entity_name: entityName.trim() || null,
+      competencia: competencia.trim() || (dataPrevista ? dataPrevista.slice(0, 7) : null),
     });
   };
 
@@ -807,6 +813,24 @@ function RowErrorEditor({ row, index, onClose, onSave }: RowErrorEditorProps) {
                   maxLength={10}
                 />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edit-competencia" className="text-xs">Mês Competência</Label>
+                {competenciaAuto && (
+                  <span className="text-[10px] text-muted-foreground italic">auto-preenchido pelo vencimento</span>
+                )}
+              </div>
+              <Input
+                id="edit-competencia"
+                type="month"
+                value={competencia}
+                onChange={(e) => { setCompetencia(e.target.value); setCompetenciaAuto(false); }}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Mês a que o gasto pertence (usado para PMP/PMR). Vazio = mês do vencimento.
+              </p>
             </div>
 
             <div className="rounded-md border bg-muted/30 p-2">
