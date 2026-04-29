@@ -89,10 +89,10 @@ export default function Dashboard() {
     [isPerCompany, groupTotals]
   );
 
-  const prevMonthStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
-  const prevMonthEnd = useMemo(() => endOfMonth(subMonths(now, 1)), [now]);
-  const curMonthStart = useMemo(() => startOfMonth(now), [now]);
-  const curMonthEnd = useMemo(() => endOfMonth(now), [now]);
+  const prevMonthStart = useMemo(() => startOfMonth(subMonths(referenceMonth, 1)), [referenceMonth]);
+  const prevMonthEnd = useMemo(() => endOfMonth(subMonths(referenceMonth, 1)), [referenceMonth]);
+  const curMonthStart = useMemo(() => startOfMonth(referenceMonth), [referenceMonth]);
+  const curMonthEnd = useMemo(() => endOfMonth(referenceMonth), [referenceMonth]);
 
   const { currentMonth, previousMonth } = useMemo(() => {
     let curEntradas = 0, curSaidas = 0, prevEntradas = 0, prevSaidas = 0;
