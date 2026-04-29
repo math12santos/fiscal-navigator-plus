@@ -138,9 +138,21 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
     setMappings([]);
     setParsedRows([]);
     setImportCount(0);
+    setSkippedCount(0);
+    setFailedRows([]);
     setError(null);
     setExcludedRows(new Set());
     setEntityMatches([]);
+  }, []);
+
+  /** Quick-fix: troca formato de data e refaz preview */
+  const setDateFormat = useCallback((fmt: "dd/MM/yyyy" | "MM/dd/yyyy") => {
+    setDetectedFormat((prev) => (prev ? { ...prev, date_format: fmt } : prev));
+  }, []);
+
+  /** Quick-fix: troca formato de número e refaz preview */
+  const setNumberFormat = useCallback((fmt: "br" | "us") => {
+    setDetectedFormat((prev) => (prev ? { ...prev, number_format: fmt } : prev));
   }, []);
 
   const parseFile = useCallback(async (file: File) => {
