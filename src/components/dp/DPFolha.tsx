@@ -115,6 +115,10 @@ export default function DPFolha() {
       });
     }
 
+    // Reapply variable events on top of fixed values just persisted
+    const { supabase } = await import("@/integrations/supabase/client");
+    await (supabase.rpc as any)("recompute_payroll_run_totals", { p_run_id: selectedRunId });
+
     updateRun.mutate({
       id: selectedRunId,
       total_bruto: totalBruto,
