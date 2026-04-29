@@ -34,6 +34,12 @@ export interface CashFlowEntry {
   source: string;
   /** Canonical projection key — see src/lib/projectionRegistry.ts. Null for purely manual entries. */
   source_ref?: string | null;
+  /** Competency month (yyyy-MM-dd, first day) stored on materialized rows. */
+  competencia?: string | null;
+  /** Same as competencia, populated by virtual projections (`proj-*`). */
+  reference_month?: string | null;
+  /** Sub-category from DP projections (e.g. salario_liquido, vr, va, vt). */
+  dp_sub_category?: string | null;
   created_at: string;
   updated_at: string;
 }
