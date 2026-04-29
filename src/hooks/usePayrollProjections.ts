@@ -18,6 +18,7 @@ import {
   benefitsPaymentDate,
   healthPaymentDate,
   fmtISO,
+  formatCompetencyLong,
 } from "@/lib/payrollSchedule";
 
 /** Count Mon–Fri business days in a given month */
