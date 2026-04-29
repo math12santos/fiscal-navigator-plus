@@ -399,6 +399,7 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         cost_center_id: null, // guias são corporativas, não rateadas por CC
         entity_id: null,
         source: "dp",
+        reference_month: dtCompetencia,
         created_at: now,
         updated_at: now,
         account_id: acctEncargos,
