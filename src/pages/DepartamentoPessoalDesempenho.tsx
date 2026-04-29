@@ -28,6 +28,10 @@ import { useNineBoxEvaluations, useLatest9BoxByEmployee, useMutateNineBox } from
 import { useBSCScorecards, useMutateBSC } from "@/hooks/useBSC";
 import { QUADRANT_META, QUADRANT_TONE_CLASS, quadrantFrom } from "@/lib/performance/quadrante";
 import { PDICharts, OneOnOneCharts, BSCCharts } from "@/components/desempenho/DesempenhoCharts";
+import { NineBoxWizardDialog } from "@/components/desempenho/NineBoxWizardDialog";
+import { useFinalize9Box, use9BoxSources } from "@/hooks/useNineBoxRubric";
+import { detectBias } from "@/lib/performance/scoring";
+import { ShieldCheck, ShieldAlert } from "lucide-react";
 
 const PDI_STATUS_META: Record<string, { label: string; class: string }> = {
   nao_iniciado: { label: "Não iniciado", class: "bg-muted text-foreground border-border" },
