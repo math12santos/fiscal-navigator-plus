@@ -594,7 +594,11 @@ export function useFinanceiroImport(tipo: "saida" | "entrada") {
             data_prevista: data,
             data_realizada: row.mapped.data_realizada || null,
             data_vencimento: data,
+            // Quando importamos uma linha já paga, refletimos o valor realizado para o caixa
+            valor_realizado: row.mapped.data_realizada ? valor : null,
             status: row.mapped.data_realizada ? "pago" : "pendente",
+            // Mês de competência: usa o informado ou o fallback gerado em buildPreview
+            competencia: row.mapped.competencia || (data ? String(data).slice(0, 7) : null),
             categoria: row.mapped.categoria || null,
             documento: row.mapped.documento || null,
             notes: row.mapped.notes || null,
