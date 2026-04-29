@@ -95,6 +95,7 @@ export default function DPColaboradores() {
     setEditing(null);
     setForm({ name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT", salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "", status: "ativo", notes: "", comissao_tipo: "nenhuma", comissao_valor: "", vt_ativo: false, vt_diario: "" });
     setSelectedBenefitIds([]);
+    setBenefitCustomValues({});
     setDialogOpen(true);
   };
 
