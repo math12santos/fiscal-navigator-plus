@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logSecurityEvent } from "@/lib/securityEvents";
 
 const RESET_COOLDOWN_SEC = 60;
 const RESET_TS_KEY = "pwd_reset_last_ts";
@@ -38,7 +39,10 @@ export default function Auth() {
   }, [cooldownSec]);
 
   const handleForgotPassword = async () => {
-    if (cooldownSec > 0) return;
+    if (cooldownSec > 0) {
+      logSecurityEvent({ type: "rate_limit_blocked", email, metadata: { action: "password_reset_request" } });
+      return;
+    }
     if (!email) {
       toast({
         title: "Informe seu e-mail",
@@ -49,10 +53,10 @@ export default function Auth() {
     }
     setLoading(true);
     try {
-      // Fire-and-forget: do not reveal whether the email exists
       await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
+      logSecurityEvent({ type: "password_reset_requested", email });
       sessionStorage.setItem(RESET_TS_KEY, String(Date.now()));
       setCooldownSec(RESET_COOLDOWN_SEC);
       toast({
@@ -61,7 +65,6 @@ export default function Auth() {
           "Se este e-mail estiver cadastrado, você receberá em instantes um link para redefinir a senha.",
       });
     } catch (error: any) {
-      // Generic message to avoid user enumeration
       toast({
         title: "Solicitação registrada",
         description:
@@ -78,8 +81,12 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          logSecurityEvent({ type: "login_failed", email, metadata: { reason: error.message } });
+          throw error;
+        }
+        logSecurityEvent({ type: "login_success", userId: data.user?.id, email });
         if (!rememberMe) {
           sessionStorage.setItem("session_only", "true");
         } else {
