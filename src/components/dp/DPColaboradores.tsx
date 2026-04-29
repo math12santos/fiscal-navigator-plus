@@ -68,6 +68,8 @@ export default function DPColaboradores() {
     vt_ativo: false, vt_diario: "",
   });
   const [selectedBenefitIds, setSelectedBenefitIds] = useState<string[]>([]);
+  // Map benefit_id -> custom_value (used for plano_saude where each employee has own price)
+  const [benefitCustomValues, setBenefitCustomValues] = useState<Record<string, string>>({});
 
   const filtered = useMemo(() => {
     return employees.filter((e: any) => {
