@@ -52,7 +52,7 @@ export default function DPColaboradores() {
   const businessDaysInfo = useBusinessDaysForMonth(new Date());
   const DIAS_UTEIS_MES = businessDaysInfo.days;
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("__all__");
+  const [statusFilter, setStatusFilter] = useState("ativo");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [terminateEmpId, setTerminateEmpId] = useState<string | null>(null);
@@ -72,11 +72,19 @@ export default function DPColaboradores() {
   const [benefitCustomValues, setBenefitCustomValues] = useState<Record<string, string>>({});
 
   const filtered = useMemo(() => {
-    return employees.filter((e: any) => {
-      const matchSearch = !search || e.name.toLowerCase().includes(search.toLowerCase()) || (e.cpf || "").includes(search);
-      const matchStatus = statusFilter === "__all__" || e.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
+    const STATUS_PRIORITY: Record<string, number> = { ativo: 0, ferias: 1, afastado: 2, desligado: 3 };
+    return employees
+      .filter((e: any) => {
+        const matchSearch = !search || e.name.toLowerCase().includes(search.toLowerCase()) || (e.cpf || "").includes(search);
+        const matchStatus = statusFilter === "__all__" || e.status === statusFilter;
+        return matchSearch && matchStatus;
+      })
+      .sort((a: any, b: any) => {
+        const pa = STATUS_PRIORITY[a.status] ?? 99;
+        const pb = STATUS_PRIORITY[b.status] ?? 99;
+        if (pa !== pb) return pa - pb;
+        return (a.name || "").localeCompare(b.name || "", "pt-BR");
+      });
   }, [employees, search, statusFilter]);
 
   const posMap = useMemo(() => {
