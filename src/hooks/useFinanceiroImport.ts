@@ -26,6 +26,7 @@ export const TARGET_FIELDS = [
   { value: "valor_previsto", label: "Valor", required: true },
   { value: "data_prevista", label: "Data Vencimento", required: true },
   { value: "data_realizada", label: "Data Pagamento", required: false },
+  { value: "competencia", label: "Mês Competência", required: false },
   { value: "entity_name", label: "Fornecedor / Cliente", required: false },
   { value: "categoria", label: "Categoria", required: false },
   { value: "documento", label: "Nº Documento", required: false },
@@ -33,6 +34,29 @@ export const TARGET_FIELDS = [
   { value: "notes", label: "Observações", required: false },
   { value: "ignorar", label: "Ignorar", required: false },
 ] as const;
+
+/** Normaliza diferentes formatos de competência para "YYYY-MM". Retorna null se irreconhecível. */
+function normalizeCompetencia(val: string): string | null {
+  const v = (val || "").trim();
+  if (!v) return null;
+  // YYYY-MM
+  if (/^\d{4}-\d{2}$/.test(v)) return v;
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 7);
+  // MM/YYYY
+  let m = v.match(/^(\d{2})\/(\d{4})$/);
+  if (m) return `${m[2]}-${m[1]}`;
+  // MM-YYYY
+  m = v.match(/^(\d{2})-(\d{4})$/);
+  if (m) return `${m[2]}-${m[1]}`;
+  // M/YYYY
+  m = v.match(/^(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[2]}-${m[1].padStart(2, "0")}`;
+  // DD/MM/YYYY → pega MM-YYYY
+  m = v.match(/^\d{1,2}\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[2]}-${m[1].padStart(2, "0")}`;
+  return null;
+}
 
 function parseBRNumber(val: string): number {
   if (!val || !val.trim()) return 0;
