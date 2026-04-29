@@ -25,6 +25,7 @@ export default function Perfil() {
   const [phone, setPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -100,6 +101,11 @@ export default function Perfil() {
   };
 
   const handleChangePassword = async () => {
+    if (!user?.email) return;
+    if (!currentPassword) {
+      toast({ title: "Informe a senha atual", variant: "destructive" });
+      return;
+    }
     if (newPassword.length < 6) {
       toast({ title: "Senha curta", description: "Use ao menos 6 caracteres.", variant: "destructive" });
       return;
@@ -108,12 +114,27 @@ export default function Perfil() {
       toast({ title: "Senhas não conferem", variant: "destructive" });
       return;
     }
+    if (newPassword === currentPassword) {
+      toast({ title: "Escolha uma senha diferente da atual", variant: "destructive" });
+      return;
+    }
     setPwLoading(true);
+    // Reauth: verify current password before allowing change
+    const { error: reauthErr } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+    if (reauthErr) {
+      setPwLoading(false);
+      toast({ title: "Senha atual incorreta", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setPwLoading(false);
     if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao alterar senha", description: error.message, variant: "destructive" });
     } else {
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       toast({ title: "Senha alterada com sucesso" });
@@ -200,6 +221,19 @@ export default function Perfil() {
           <CardDescription>Defina uma nova senha de acesso ao sistema.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2 max-w-sm">
+            <Label htmlFor="currentPassword">Senha atual</Label>
+            <PasswordInput
+              id="currentPassword"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+            />
+            <p className="text-xs text-muted-foreground">
+              Por segurança, confirme sua senha atual antes de definir uma nova.
+            </p>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="newPassword">Nova senha</Label>
@@ -209,6 +243,7 @@ export default function Perfil() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 minLength={6}
                 placeholder="••••••••"
+                autoComplete="new-password"
               />
             </div>
             <div className="space-y-2">
@@ -219,6 +254,7 @@ export default function Perfil() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 minLength={6}
                 placeholder="••••••••"
+                autoComplete="new-password"
               />
             </div>
           </div>
