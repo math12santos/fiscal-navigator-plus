@@ -18,6 +18,7 @@ import {
   Rocket,
   BookUser,
   Send,
+  UserCog,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -154,7 +155,19 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 <ShieldCheck size={14} /> Voltar ao BackOffice
               </button>
             )}
-            <div className="text-xs text-sidebar-foreground/70 truncate">{user?.email}</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-sidebar-foreground/70 truncate flex-1" title={user?.email ?? undefined}>
+                {user?.email}
+              </div>
+              <button
+                onClick={() => navigate("/perfil")}
+                className="rounded-md p-1.5 text-sidebar-foreground/70 hover:bg-primary/10 hover:text-primary transition-colors shrink-0"
+                title="Meu perfil"
+                aria-label="Abrir meu perfil"
+              >
+                <UserCog size={14} />
+              </button>
+            </div>
             <button
               onClick={signOut}
               className="flex items-center gap-2 text-xs text-sidebar-foreground/70 hover:text-destructive transition-colors w-full"

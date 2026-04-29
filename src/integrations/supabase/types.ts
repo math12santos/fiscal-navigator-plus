@@ -5138,6 +5138,7 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          avatar_url: string | null
           cargo: string | null
           company_name: string | null
           created_at: string
@@ -5145,10 +5146,12 @@ export type Database = {
           full_name: string | null
           id: string
           must_change_password: boolean
+          phone: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
+          avatar_url?: string | null
           cargo?: string | null
           company_name?: string | null
           created_at?: string
@@ -5156,10 +5159,12 @@ export type Database = {
           full_name?: string | null
           id: string
           must_change_password?: boolean
+          phone?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean
+          avatar_url?: string | null
           cargo?: string | null
           company_name?: string | null
           created_at?: string
@@ -5167,6 +5172,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           must_change_password?: boolean
+          phone?: string | null
           updated_at?: string
         }
         Relationships: []

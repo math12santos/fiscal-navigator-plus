@@ -29,12 +29,12 @@ export default function Auth() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
       toast({
         title: "E-mail enviado!",
-        description: "Verifique sua caixa de entrada para redefinir a senha.",
+        description: "Verifique sua caixa de entrada e clique no link para definir uma nova senha.",
       });
     } catch (error: any) {
       toast({
