@@ -171,6 +171,7 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
     while (!isAfter(cursor, rangeTo)) {
       const monthKey = format(cursor, "yyyy-MM");
       const monthLabel = format(cursor, "MM/yyyy");
+      const competencyLong = formatCompetencyLong(cursor);
 
       // Datas de desembolso para esta competência.
       const dtSalario = fmtISO(salaryPaymentDate(cursor, config as any));
