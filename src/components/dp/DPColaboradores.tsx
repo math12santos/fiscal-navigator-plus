@@ -134,6 +134,23 @@ export default function DPColaboradores() {
     };
 
     const saveBenefits = async (employeeId: string) => {
+      // 0) Validate plano_saude requires custom_value > 0
+      const planoSaudeMissing = selectedBenefitIds
+        .map((bid) => allBenefits.find((b: any) => b.id === bid))
+        .filter((b: any) => b && b.category === "plano_saude")
+        .filter((b: any) => {
+          const v = Number(benefitCustomValues[b.id] || 0);
+          return !v || v <= 0;
+        });
+      if (planoSaudeMissing.length > 0) {
+        toast({
+          title: "Valor do Plano de Saúde obrigatório",
+          description: `Informe o valor mensal para: ${planoSaudeMissing.map((b: any) => b.name).join(", ")}.`,
+          variant: "destructive",
+        });
+        throw new Error("plano_saude_missing_value");
+      }
+
       // Sincronização completa em 2 etapas:
       // 1) Remove vínculos desmarcados explicitamente.
       // 2) Remove vínculos pré-existentes que conflitem por CATEGORIA com algum
@@ -178,10 +195,17 @@ export default function DPColaboradores() {
             .in("id", allRemove.map((eb: any) => eb.id));
           if (delErr) throw delErr;
         }
-        if (toAdd.length > 0) {
-          await assignBenefits.mutateAsync(
-            toAdd.map((bid) => ({ employee_id: employeeId, benefit_id: bid })),
-          );
+        // Upsert ALL selected (including existing) so custom_value is updated as well
+        if (selectedBenefitIds.length > 0) {
+          const rows = selectedBenefitIds.map((bid) => {
+            const cv = benefitCustomValues[bid];
+            return {
+              employee_id: employeeId,
+              benefit_id: bid,
+              custom_value: cv != null && cv !== "" ? Number(cv) : undefined,
+            };
+          });
+          await assignBenefits.mutateAsync(rows as any);
         }
         if (removedNames.length > 0) {
           toast({
@@ -195,6 +219,7 @@ export default function DPColaboradores() {
           description: err?.message || "Verifique se há benefícios duplicados na mesma categoria.",
           variant: "destructive",
         });
+        throw err;
       }
     };
 
