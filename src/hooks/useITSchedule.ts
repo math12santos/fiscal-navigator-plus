@@ -46,7 +46,7 @@ export function useITMaterialize() {
   const qc = useQueryClient();
 
   const materializeRecurring = useMutation({
-    mutationFn: async (monthsAhead = 12) => {
+    mutationFn: async (monthsAhead: number = 12) => {
       const { data, error } = await supabase.rpc("it_materialize_recurring_costs" as any, {
         p_org_id: currentOrg!.id,
         p_months_ahead: monthsAhead,
