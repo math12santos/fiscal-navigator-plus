@@ -1,96 +1,147 @@
-## Objetivo
+# Análise & Plano — Módulo Financeiro
 
-Garantir que todo lançamento financeiro tenha **mês de competência** registrado e expor os indicadores **PMP (Prazo Médio de Pagamento)** e **PMR (Prazo Médio de Recebimento)** nos respectivos módulos.
+Posiciono o módulo como **hub centralizador**: ingestão por importação + webhooks de ERPs, com motor próprio de classificação, conciliação e governança. Não é bookkeeping; é cockpit auditável.
 
-## Conceito
+## Diagnóstico por aba
 
-- **Competência** = mês ao qual o gasto/receita "pertence" economicamente (quando o serviço foi prestado / a obrigação foi gerada), independente de quando é pago.
-- **PMP** = média ponderada (por valor) de dias entre **competência** e **data de pagamento realizada** das contas pagas.
-- **PMR** = mesmo cálculo para contas recebidas.
+### 1. Contas a Pagar / Contas a Receber
 
-Fórmula:
+- KPIs do `useFinanceiro.totals` somam **previsto + realizado**, gerando dupla contagem em parcelas pagas (a paga ainda entra em `total_previsto`).
+- Geração de parcelas (`create`) usa `Math.round((valor/n)*100)/100` — última parcela não recebe o resíduo, gerando diferença de centavos.
+- `data_prevista`, `data_vencimento`, `data_prevista_pagamento` são 3 campos sobrepostos com regras implícitas — fonte recorrente de bug.
+- AR não tem painel de pendências/triagem nem botão de importar de webhook (CA Pagar tem `PendenciasPanel`, `ExpenseRequestButton`).
+- Status livre em `text` (sem enum) → "paga"/"pago", "pendente"/"previsto" coexistem.
+
+### 2. Aging List
+
+- Buckets corretos, mas `differenceInDays` recalculado a cada render (today novo a cada chamada → invalida memos).
+- Faltam **filtros** (empresa, fornecedor, faixa de valor) e **ações em lote** (marcar pago, lançar transferência).
+- Auditoria saldo×conciliados foi adicionada; precisa virar **card destacado** no topo quando divergência > X%.
+- Posição de caixa por empresa abre Dialog — bom; falta **drill-down por conta** dentro do Dialog.
+
+### 3. Fluxo de Caixa
+
+- KPIs do "Realizado" usam `valor_realizado ?? valor_previsto` — quando o pago veio com valor menor, o card mistura previsto+realizado para o mesmo registro nas outras subabas.
+- Sem **saldo acumulado** (running balance) por dia/mês — peça-chave para CFO ver runway.
+- Sem comparativo Previsto vs Realizado nem variação MoM.
+- Não há export (CSV/PDF) do fluxo.
+
+### 4. Conciliação
+
+- Algoritmo de match (`match_statement_to_cashflow` RPC) usa ±10% e ±7d; precisa **sugerir múltiplos** com peso de descrição (não só valor+data).
+- Sem **conciliação em lote** (auto-match score > 95%).
+- Sem **regras persistidas** ("descrição X sempre vai para conta Y") — toda conciliação é manual.
+- Falta visão de **divergências saldo banco vs livro** (já calculado no Aging — duplicar/centralizar aqui).
+- Sem mecanismo de import de arquivo OFX 
+
+### 5. Contas Bancárias
+
+- 683 linhas em um componente, vários Dialogs inline — refatorar em subcomponentes.
+- Saldo manual é "fonte da verdade" (memória), mas não há **histórico de saldos** (snapshots) para auditoria temporal.
+- Cheque especial bem modelado, mas sem **alerta proativo** quando consumo > 70% do limite.
+- Gestão de limites de crédito e capital de giro confusa
+
+### 6. Importações
+
+- Bom: histórico, períodos fiscais, undo. Faltam:
+  - **Detecção de duplicatas pré-import** (já existe `useDuplicateDetection` mas só pós-import).
+  - **Templates salvos** por ERP (Omie, Conta Azul, Bling, etc.) para mapeamento 1-clique.
+  - **Agendamento de import recorrente** (drop em pasta / endpoint).
+- Hoje **não há ingestão por webhook** — gap principal vs. visão de hub.
+
+### 7. Transversal
+
+- `cashflow_entries.status` e `tipo` em `text` → criar enums.
+- `conciliacao_id` é `text` (deveria ser uuid).
+- Sem **trilha de auditoria** (`cashflow_audit_log`) — quem mudou valor, quando.
+- 1356 lançamentos pagos **sem conta bancária** vinculada — distorce a auditoria de saldo.
+- Sem rate limit / validação Zod nas Edge Functions de import.
+
+---
+
+## Plano de melhorias (4 fases)
+
+### Fase 1 — Correções de cálculo & integridade (quick wins)
+
+1. **Totais corretos em `useFinanceiro**`: separar `previsto_pendente` (só status previsto/confirmado) de `realizado` (só pago/recebido). Eliminar dupla contagem.
+2. **Parcelamento sem resíduo**: última parcela recebe `valor - sum(parcelas anteriores)`.
+3. **Unificar datas**: usar `data_vencimento` como única fonte; `data_prevista` é derivada (= vencimento se vazio). Migration backfill.
+4. **Backfill `conta_bancaria_id**` nos 1356 lançamentos pagos: tentar via conciliação; restantes ficam em "Conta indefinida" sinalizada.
+5. **Enums Postgres** para `cashflow_entries.status` e `tipo` (com migration de normalização).
+6. **Tabela `cashflow_audit_log**` + trigger AFTER UPDATE/DELETE em `cashflow_entries`.
+
+### Fase 2 — Conciliação & governança
+
+7. **Tabela `reconciliation_rules**` (org_id, padrão_descricao regex, account_id, cost_center_id, entity_id, conta_bancaria_id) aplicada automaticamente no import e na conciliação.
+8. **Auto-match em lote** na aba Conciliação: botão "Conciliar automaticamente score ≥ 95%" + log do que casou.
+9. **RPC `match_statement_to_cashflow` v2**: pesos = 50% valor, 30% data, 20% similaridade descrição (Jaro-Winkler).
+10. **Card "Divergência de saldo"** no topo do Aging quando |saldo_atual - reconciled| > 1% por conta.
+11. **Snapshot diário de saldos** (`bank_balance_snapshots`) via cron pg_cron — base para gráfico runway.
+
+### Fase 3 — Hub: webhooks + ingestão
+
+12. **Tabela `integration_endpoints**` (org_id, provider, secret_hash, target='cashflow_entry'|'bank_statement'|'invoice', mapping_template).
+13. **Edge Function `webhook-ingest**` pública, autenticada por secret no header, com validação Zod, idempotência por `external_id`, gravação em `data_imports` + materialização opcional. Suporte para Omie/Conta Azul/Bling/genérico JSON.
+14. **Página "Integrações" dentro do Financeiro** (nova aba): listar endpoints, copiar URL+secret, ver últimas 50 chamadas, status, últimos erros.
+15. **Templates de mapeamento por ERP** salvos (`import_templates`) — escolhe-se no ImportDialog para pular o passo de mapeamento.
+16. **Detecção de duplicata pré-import** no preview do `ImportDialog`, usando `dedup_hash` + `useDuplicateDetection`.
+
+### Fase 4 — UX & cockpit CFO
+
+17. **Fluxo de Caixa: saldo acumulado** (linha + área) com previsto vs realizado e marca de runway (saldo zero).
+18. **Filtros globais no Financeiro** (empresa, período, conta bancária, centro de custo) persistidos em URL.
+19. **Refator `ContasBancariasTab**` em 4 subcomponentes (lista, dialog saldo, dialog limite, dialog PIX).
+20. **AR ganha PendenciasPanel** equivalente ao do AP (cobrança/baixa de recebíveis projetados).
+21. **Padronizar nº contábil**: aplicar `fmtAcc` (negativos em parênteses + vermelho) em todas as tabelas do módulo (FluxoCaixa, Conciliação, ContasBancárias).
+22. **Export CSV/PDF** do Fluxo de Caixa (mesma lib do PDF de posição de caixa).
+
+---
+
+## Estrutura técnica
 
 ```text
-PMP = Σ(valor_pago × (data_pagamento − último dia do mês de competência)) / Σ(valor_pago)
+supabase/migrations/
+  - cashflow_status_enum.sql            (Fase 1)
+  - cashflow_audit_log.sql              (Fase 1)
+  - reconciliation_rules.sql            (Fase 2)
+  - bank_balance_snapshots.sql          (Fase 2)
+  - integration_endpoints.sql           (Fase 3)
+  - import_templates.sql                (Fase 3)
+
+supabase/functions/
+  - webhook-ingest/index.ts             (Fase 3, novo)
+  - reconcile-auto/index.ts             (Fase 2, novo)
+  - bank-balance-snapshot/index.ts      (Fase 2, cron)
+
+src/components/financeiro/
+  - IntegrationsTab.tsx                 (Fase 3, novo)
+  - ReconciliationRulesDialog.tsx       (Fase 2, novo)
+  - BalanceDivergenceCard.tsx           (Fase 2, novo)
+  - BalanceHistoryChart.tsx             (Fase 4, novo)
+  - bank/{BankAccountList,BalanceDialog,LimitDialog,PixDialog}.tsx  (Fase 4, refactor)
+
+src/hooks/
+  - useFinanceiro.ts                    (Fase 1, fix totals + parcelas)
+  - useReconciliationRules.ts           (Fase 2, novo)
+  - useBankBalanceHistory.ts            (Fase 2, novo)
+  - useIntegrationEndpoints.ts          (Fase 3, novo)
+
+src/lib/
+  - financialMath.ts                    (Fase 1, novo — splitInstallments, accBalance)
 ```
 
-## 1. Captura da competência (3 frentes)
+## Impactos & cuidados
 
-### A. Importação CSV/XLS (`useFinanceiroImport.ts` + `ImportDialog.tsx`)
+- Mudanças de schema (enums) exigem normalização prévia de dados existentes — incluído em cada migration.
+- Webhook público requer rate limit (in-memory por org+IP) + secret rotacionável + log de auditoria.
+- Backfill de `conta_bancaria_id` tem risco de associar errado: marcar `notes` com prefixo `[backfill-auto]` para reversão.
+- Audit log infla rapidamente — incluir TTL/partição por mês.
 
-- Adicionar campo `competencia` em `TARGET_FIELDS`:
-  ```ts
-  { value: "competencia", label: "Mês Competência", required: false }
-  ```
-- No `buildPreview`, parsear o valor:
-  - Se vier como `MM/YYYY`, `YYYY-MM`, ou data completa → normalizar para `YYYY-MM`.
-  - Se ausente → fallback automático = mês de `data_prevista` (`YYYY-MM`).
-- No editor inline de erros (recém criado), incluir campo `Mês Competência` (input `type="month"`) com badge "auto-preenchido" quando vier do fallback.
+## Fora de escopo (futuro)
 
-### B. Edge function `detect-import-mapping`
+- Emissão fiscal (NFe/NFSe).
+- Conciliação Open Finance via Belvo/Pluggy.
+- Multi-moeda.
+- Razão contábil completo (DRE/Balanço já existem em outro módulo; aqui só feed).
 
-- Acrescentar `competencia` à lista de targets sugeridos (sinônimos: "competência", "mês ref", "ref", "período", "competence", "ref month").
-
-### C. Lançamento manual (`FinanceiroEntryDialog.tsx`)
-
-- Já existe input. Adicionar **fallback automático**: se usuário não preencher, salvar `format(data_prevista, "yyyy-MM")` antes do submit.
-
-### D. Materialização de virtuais (contratos, folha, Notas Fiscais via XML e PDF etc.)
-
-- Verificar nos hooks `usePayrollProjections`, contratos, CRM: garantir que ao materializar a `cashflow_entry` o campo `competencia` seja preenchido (folha já tem `reference_month`; mapear para `competencia`).
-
-## 2. Cálculo e exibição de PMP/PMR
-
-Novo hook `src/hooks/useFinanceiroAvgTerms.ts`:
-
-- Recebe `tipo: "saida" | "entrada"` e janela (default últimos 90 dias por `data_realizada`).
-- Query: `cashflow_entries` onde `status` ∈ {pago, recebido}, `data_realizada` não nulo, `competencia` não nulo, `organization_id`.
-- Calcula:
-  - `pmp` (ou `pmr`) ponderado por `valor_realizado`.
-  - `cobertura` = % de lançamentos pagos com competência preenchida (alerta se < 80%).
-  - Série mensal (últimos 6 meses) para mini-gráfico.
-
-### Onde exibir
-
-- **Contas a Pagar** (`ContasAPagar.tsx`): novo `KPICard` "PMP — últimos 90 dias" com valor em dias + sub `cobertura X%`.
-- **Contas a Receber** (`ContasAReceber.tsx`): `KPICard` "PMR — últimos 90 dias".
-- Tooltip explicando a fórmula e link "Ver detalhes" abrindo dialog com:
-  - Distribuição por faixa (0–30, 31–60, 61–90, 90+ dias).
-  - Top 5 fornecedores/clientes por prazo.
-  - Lista de lançamentos sem competência (link para corrigir).
-
-## 3. Banco de dados
-
-Criar **trigger** `cashflow_entries_set_competencia_default`:
-
-- BEFORE INSERT/UPDATE: se `NEW.competencia IS NULL` e `NEW.data_prevista IS NOT NULL`, preenche com `to_char(NEW.data_prevista, 'YYYY-MM')`.
-- Garante MECE: nenhum lançamento fica sem competência.
-
-Backfill (insert tool, via script SQL): atualizar `cashflow_entries` históricos onde `competencia IS NULL` usando `to_char(data_prevista, 'YYYY-MM')`.
-
-Índice: `CREATE INDEX idx_cashflow_competencia ON cashflow_entries(organization_id, tipo, competencia)` para acelerar agregações.
-
-## 4. Memória
-
-Salvar memória `mem://features/financial-pmp-pmr` documentando:
-
-- Convenção `competencia = "YYYY-MM"` (texto).
-- Fallback automático = mês de `data_prevista`.
-- Fórmula PMP/PMR ponderada por valor.
-
-## Arquivos afetados
-
-- `supabase/migrations/<new>.sql` — trigger + índice.
-- `src/hooks/useFinanceiroImport.ts` — novo target field + parsing + fallback.
-- `src/components/financeiro/ImportDialog.tsx` — editor inline ganha campo competência.
-- `src/components/financeiro/FinanceiroEntryDialog.tsx` — fallback no submit.
-- `src/components/financeiro/ContasAPagar.tsx` + `ContasAReceber.tsx` — KPI PMP/PMR.
-- `src/hooks/useFinanceiroAvgTerms.ts` — **novo** (cálculo).
-- `src/components/financeiro/AvgTermsDetailDialog.tsx` — **novo** (drill-down).
-- `supabase/functions/detect-import-mapping/index.ts` — sugerir competência.
-- Backfill via insert tool + memória.
-
-## Fora do escopo
-
-- PMP/PMR por centro de custo/cliente individual no dashboard executivo (pode ser evolução).
-- Reclassificação retroativa de competência em lote (hoje basta editar lançamento por lançamento).
+Aprovando este plano, executo em ordem (Fase 1 → 4) com confirmação no final de cada fase.
