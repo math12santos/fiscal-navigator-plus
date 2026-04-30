@@ -72,6 +72,7 @@ const Financeiro = lazyRetry(pageFactories.financeiro);
 const RelatorioKpi = lazyRetry(pageFactories.relatorioKpi);
 const RelatoriosDistribuicao = lazyRetry(pageFactories.relatoriosDistribuicao);
 const OnboardingGuiado = lazyRetry(pageFactories.onboardingGuiado);
+const TI = lazyRetry(pageFactories.ti);
 const CreateOrganization = lazyRetry(() => import("@/pages/CreateOrganization"));
 const Onboarding = lazyRetry(() => import("@/pages/Onboarding"));
 const BackofficeDashboard = lazyRetry(() => import("@/pages/BackofficeDashboard"));
