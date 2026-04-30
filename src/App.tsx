@@ -54,6 +54,7 @@ export const pageFactories = {
   onboardingGuiado: () => import("@/pages/OnboardingGuiado"),
   dpDesempenho: () => import("@/pages/DepartamentoPessoalDesempenho"),
   ti: () => import("@/pages/TI"),
+  juridico: () => import("@/pages/Juridico"),
 } as const;
 
 // Lazy-loaded pages
@@ -73,6 +74,7 @@ const RelatorioKpi = lazyRetry(pageFactories.relatorioKpi);
 const RelatoriosDistribuicao = lazyRetry(pageFactories.relatoriosDistribuicao);
 const OnboardingGuiado = lazyRetry(pageFactories.onboardingGuiado);
 const TI = lazyRetry(pageFactories.ti);
+const Juridico = lazyRetry(pageFactories.juridico);
 const CreateOrganization = lazyRetry(() => import("@/pages/CreateOrganization"));
 const Onboarding = lazyRetry(() => import("@/pages/Onboarding"));
 const BackofficeDashboard = lazyRetry(() => import("@/pages/BackofficeDashboard"));
@@ -180,6 +182,7 @@ function ProtectedRoutes() {
           <Route path="/relatorios/distribuicao" element={<RouteShell skeleton={<GenericPageSkeleton title="Distribuição de Relatórios" />}><ModuleMaintenanceGuard moduleKey="relatorios-out"><RelatoriosDistribuicao /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/perfil" element={<RouteShell skeleton={<GenericPageSkeleton title="Meu Perfil" />}><Perfil /></RouteShell>} />
           <Route path="/ti" element={<RouteShell skeleton={<GenericPageSkeleton title="TI & Ativos" />}><ModuleMaintenanceGuard moduleKey="ti"><TI /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/juridico" element={<RouteShell skeleton={<GenericPageSkeleton title="Jurídico" />}><ModuleMaintenanceGuard moduleKey="juridico"><Juridico /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="*" element={<RouteShell skeleton={<GenericPageSkeleton />}><NotFound /></RouteShell>} />
         </Routes>
       </AppLayout>
