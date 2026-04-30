@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import {
   useEtlJobs,
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Play, RefreshCw, X, AlertCircle } from "lucide-react";
-import { Helmet } from "react-helmet-async";
+
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -140,6 +140,10 @@ export default function EtlOps() {
     for (const j of jobs) c[j.status] = (c[j.status] ?? 0) + 1;
     return c;
   }, [jobs]);
+
+  useEffect(() => {
+    document.title = "ETL Ops — Pipelines de dados | FinCore";
+  }, []);
 
   if (!currentOrg) {
     return (
