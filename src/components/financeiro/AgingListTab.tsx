@@ -645,16 +645,16 @@ export function AgingListTab() {
                     <TableCell className="font-medium">{ba.nome}</TableCell>
                     <TableCell>{ba.banco ?? "—"}</TableCell>
                     <TableCell><Badge variant="secondary" className="text-xs capitalize">{ba.tipo_conta}</Badge></TableCell>
-                    <TableCell className="text-right font-medium">{fmt(Number(ba.saldo_atual ?? 0))}</TableCell>
-                    <TableCell className="text-right">{fmt(Number(ba.limite_credito ?? 0))}</TableCell>
-                    <TableCell className="text-right font-bold">{fmt(Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0))}</TableCell>
+                    <TableCell className="text-right font-medium"><AccVal v={Number(ba.saldo_atual ?? 0)} /></TableCell>
+                    <TableCell className="text-right"><AccVal v={Number(ba.limite_credito ?? 0)} /></TableCell>
+                    <TableCell className={`text-right font-bold ${Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0) < 0 ? "text-destructive" : ""}`}>{fmtAcc(Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0))}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/50 font-bold">
                   <TableCell colSpan={3}>Total</TableCell>
-                  <TableCell className="text-right">{fmt(bankTotals.saldoTotal)}</TableCell>
-                  <TableCell className="text-right">{fmt(bankTotals.limiteTotal)}</TableCell>
-                  <TableCell className="text-right">{fmt(bankTotals.disponibilidadeTotal)}</TableCell>
+                  <TableCell className="text-right"><AccVal v={bankTotals.saldoTotal} /></TableCell>
+                  <TableCell className="text-right"><AccVal v={bankTotals.limiteTotal} /></TableCell>
+                  <TableCell className="text-right"><AccVal v={bankTotals.disponibilidadeTotal} /></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
