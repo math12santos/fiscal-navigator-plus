@@ -52,6 +52,8 @@ export function useITEquipment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["it_equipment"] });
       qc.invalidateQueries({ queryKey: ["it_depreciation"] });
+      qc.invalidateQueries({ queryKey: ["cashflow"] });
+      qc.invalidateQueries({ queryKey: ["financeiro"] });
       toast.success("Equipamento salvo");
     },
     onError: (e: any) => toast.error(e.message ?? "Erro ao salvar"),
