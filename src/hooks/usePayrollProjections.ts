@@ -164,7 +164,9 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
     }
 
     const entries: (Omit<CashFlowEntry, "user_id" | "organization_id"> & { dp_sub_category?: string })[] = [];
-    const activeEmployees = employees.filter((e) => e.status === "ativo");
+    // Inclui ativos, em férias e afastados — todos ainda integram folha/benefícios.
+    // Apenas "desligado" é excluído (já tratado por dismissal_date).
+    const activeEmployees = employees.filter((e) => e.status !== "desligado");
     const now = new Date().toISOString();
 
     let cursor = startOfMonth(rangeFrom);
@@ -192,6 +194,19 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
       let totalIrrf = 0;
       let countInssEmployees = 0;
       let countFgtsEmployees = 0;
+
+      // Acumuladores de benefícios consolidados por categoria (guia única por empresa).
+      // VR / VA / Plano de Saúde / Outros → 1 guia por empresa somando todos os colaboradores.
+      // VT permanece individual (cada colaborador recebe sua própria recarga).
+      const benefitsAggregate = new Map<string, { total: number; count: number; details: string[] }>();
+      const addBenefitToAggregate = (sub: string, empName: string, value: number) => {
+        if (value <= 0) return;
+        const cur = benefitsAggregate.get(sub) ?? { total: 0, count: 0, details: [] };
+        cur.total += value;
+        cur.count += 1;
+        cur.details.push(`${empName}: R$${value.toFixed(2)}`);
+        benefitsAggregate.set(sub, cur);
+      };
 
       for (const emp of activeEmployees) {
         const admDate = new Date(emp.admission_date);
@@ -230,6 +245,13 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
             created_at: now,
             updated_at: now,
           } as any);
+          // PJs também podem ter benefícios vinculados (raro, mas suportado).
+          const pjBenefits = benefitsByEmployee.get(emp.id);
+          if (pjBenefits) {
+            for (const [sub, total] of pjBenefits.entries()) {
+              addBenefitToAggregate(sub, emp.name, total);
+            }
+          }
           continue;
         }
 
@@ -340,33 +362,11 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           }
         }
 
-        // 4. Benefícios — segregados por categoria contábil.
-        // VR/VA são antecipados no mês N-1 (CLT/PAT). Plano de saúde é fatura no mês de competência.
+        // 4. Benefícios — agregados por categoria em guia única por empresa (exceto VT).
         const empBenefitsBySub = benefitsByEmployee.get(emp.id);
         if (empBenefitsBySub) {
           for (const [sub, total] of empBenefitsBySub.entries()) {
-            if (total <= 0) continue;
-            const isAntecipado = sub !== "beneficios_saude";
-            const dt = sub === "beneficios_saude" ? dtSaude : dtBeneficios;
-            const label =
-              sub === "beneficios_vr" ? "VR"
-              : sub === "beneficios_va" ? "VA"
-              : sub === "beneficios_saude" ? "Saúde"
-              : "Benefícios";
-            const noteText = isAntecipado
-              ? `Crédito antecipado em ${dt} para uso ao longo de ${competencyLong} (CLT/PAT — pago no mês anterior à competência).`
-              : `Fatura referente à competência ${competencyLong}, com vencimento em ${dt}.`;
-            entries.push({
-              ...baseEmp,
-              id: `proj-dp-${sub}-${emp.id}-${monthKey}`,
-              descricao: `${label} — ${emp.name} (competência ${monthLabel})`,
-              valor_previsto: round2(total),
-              data_prevista: dt,
-              account_id: acctBeneficios,
-              notes: noteText,
-              dp_sub_category: sub,
-              source_ref: projectionKey.payroll(emp.id, sub, monthKey),
-            } as any);
+            addBenefitToAggregate(sub, emp.name, total);
           }
         }
 
@@ -445,6 +445,37 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           notes: `Guia única — IRRF retido na fonte (código 0561)`,
           dp_sub_category: "encargos_irrf",
           source_ref: `darf-irrf:${currentOrg!.id}:${monthKey}`,
+        } as any);
+      }
+
+      // ===== Guias consolidadas de Benefícios (uma por categoria, por empresa, por mês) =====
+      // VR / VA / Plano de Saúde / Outros: 1 guia única somando todos os colaboradores da empresa.
+      // (VT permanece individual e é emitido por colaborador no loop acima — futuramente.)
+      const baseGuiaBeneficio = {
+        ...baseGuia,
+        account_id: acctBeneficios,
+      };
+      for (const [sub, agg] of benefitsAggregate.entries()) {
+        if (agg.total <= 0) continue;
+        const isAntecipado = sub !== "beneficios_saude";
+        const dt = sub === "beneficios_saude" ? dtSaude : dtBeneficios;
+        const label =
+          sub === "beneficios_vr" ? "Vale Refeição"
+          : sub === "beneficios_va" ? "Vale Alimentação"
+          : sub === "beneficios_saude" ? "Plano de Saúde"
+          : "Benefícios (Outros)";
+        const noteText = isAntecipado
+          ? `Guia única da empresa — ${agg.count} colaborador(es). Crédito antecipado em ${dt} para uso ao longo de ${competencyLong} (CLT/PAT — pago no mês anterior à competência). Detalhes: ${agg.details.slice(0, 20).join("; ")}${agg.details.length > 20 ? "; ..." : ""}`
+          : `Guia única da empresa — ${agg.count} colaborador(es). Fatura referente à competência ${competencyLong}, com vencimento em ${dt}. Detalhes: ${agg.details.slice(0, 20).join("; ")}${agg.details.length > 20 ? "; ..." : ""}`;
+        entries.push({
+          ...baseGuiaBeneficio,
+          id: `proj-dp-${sub}-${currentOrg!.id}-${monthKey}`,
+          descricao: `${label} — competência ${monthLabel}`,
+          valor_previsto: round2(agg.total),
+          data_prevista: dt,
+          notes: noteText,
+          dp_sub_category: sub,
+          source_ref: `${sub}:${currentOrg!.id}:${monthKey}`,
         } as any);
       }
 
