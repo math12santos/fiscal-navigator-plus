@@ -3,10 +3,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Pencil, Trash2, QrCode } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, QrCode, ArrowLeftRight, Eye } from "lucide-react";
 import { useITEquipment } from "@/hooks/useITEquipment";
 import { EquipmentFormDialog } from "./EquipmentFormDialog";
 import { EquipmentQRDialog } from "./EquipmentQRDialog";
+import { MovementDialog } from "./MovementDialog";
+import { EquipmentDetailDialog } from "./EquipmentDetailDialog";
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
