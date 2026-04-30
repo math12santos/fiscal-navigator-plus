@@ -199,5 +199,7 @@ export function useConciliacao(filters: ConciliacaoFilters = {}) {
     unreconcile,
     updateStatus,
     removeEntry,
+    autoReconcileBatch,
+    snapshotBalances,
   };
 }
