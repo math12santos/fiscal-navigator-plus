@@ -179,6 +179,7 @@ function ProtectedRoutes() {
           <Route path="/relatorios/kpi/:metric" element={<RouteShell skeleton={<RelatorioKpiSkeleton />}><ModuleMaintenanceGuard moduleKey="dashboard"><RelatorioKpi /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/relatorios/distribuicao" element={<RouteShell skeleton={<GenericPageSkeleton title="Distribuição de Relatórios" />}><ModuleMaintenanceGuard moduleKey="relatorios-out"><RelatoriosDistribuicao /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/perfil" element={<RouteShell skeleton={<GenericPageSkeleton title="Meu Perfil" />}><Perfil /></RouteShell>} />
+          <Route path="/ti" element={<RouteShell skeleton={<GenericPageSkeleton title="TI & Ativos" />}><ModuleMaintenanceGuard moduleKey="ti"><TI /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="*" element={<RouteShell skeleton={<GenericPageSkeleton />}><NotFound /></RouteShell>} />
         </Routes>
       </AppLayout>
