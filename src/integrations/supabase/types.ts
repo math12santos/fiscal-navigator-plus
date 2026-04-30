@@ -5178,16 +5178,21 @@ export type Database = {
           equipment_id: string | null
           first_response_at: string | null
           id: string
+          mtta_minutes: number | null
+          mttr_minutes: number | null
           opened_at: string
           organization_id: string
           priority: Database["public"]["Enums"]["it_ticket_priority"]
           requester_id: string
           resolved_at: string | null
           root_cause: string | null
+          sla_policy_id: string | null
           sla_resolution_breach: boolean | null
           sla_resolution_due: string | null
+          sla_resolution_due_at: string | null
           sla_response_breach: boolean | null
           sla_response_due: string | null
+          sla_response_due_at: string | null
           solution: string | null
           status: Database["public"]["Enums"]["it_ticket_status"]
           system_id: string | null
@@ -5207,16 +5212,21 @@ export type Database = {
           equipment_id?: string | null
           first_response_at?: string | null
           id?: string
+          mtta_minutes?: number | null
+          mttr_minutes?: number | null
           opened_at?: string
           organization_id: string
           priority?: Database["public"]["Enums"]["it_ticket_priority"]
           requester_id: string
           resolved_at?: string | null
           root_cause?: string | null
+          sla_policy_id?: string | null
           sla_resolution_breach?: boolean | null
           sla_resolution_due?: string | null
+          sla_resolution_due_at?: string | null
           sla_response_breach?: boolean | null
           sla_response_due?: string | null
+          sla_response_due_at?: string | null
           solution?: string | null
           status?: Database["public"]["Enums"]["it_ticket_status"]
           system_id?: string | null
@@ -5236,16 +5246,21 @@ export type Database = {
           equipment_id?: string | null
           first_response_at?: string | null
           id?: string
+          mtta_minutes?: number | null
+          mttr_minutes?: number | null
           opened_at?: string
           organization_id?: string
           priority?: Database["public"]["Enums"]["it_ticket_priority"]
           requester_id?: string
           resolved_at?: string | null
           root_cause?: string | null
+          sla_policy_id?: string | null
           sla_resolution_breach?: boolean | null
           sla_resolution_due?: string | null
+          sla_resolution_due_at?: string | null
           sla_response_breach?: boolean | null
           sla_response_due?: string | null
+          sla_response_due_at?: string | null
           solution?: string | null
           status?: Database["public"]["Enums"]["it_ticket_status"]
           system_id?: string | null
@@ -5267,6 +5282,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_tickets_sla_policy_id_fkey"
+            columns: ["sla_policy_id"]
+            isOneToOne: false
+            referencedRelation: "it_sla_policies"
             referencedColumns: ["id"]
           },
           {
