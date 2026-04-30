@@ -9128,6 +9128,7 @@ export type Database = {
         Returns: Json
       }
       get_dashboard_kpis: { Args: { _organization_id: string }; Returns: Json }
+      get_saas_kpis: { Args: never; Returns: Json }
       get_user_org_ids: { Args: { p_user_id: string }; Returns: string[] }
       has_backoffice_org_access: { Args: { _org_id: string }; Returns: boolean }
       has_backoffice_role: { Args: { _roles: string[] }; Returns: boolean }
