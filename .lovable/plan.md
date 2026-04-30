@@ -1,177 +1,136 @@
+## Fase 4-5 — Módulo de TI: Alertas Proativos, TCO e Auditoria
 
-# Evolução do Módulo TI — Além do MVP
-
-## Diagnóstico do MVP atual
-
-O MVP entrega cadastros sólidos (Equipamentos, Sistemas, Telecom, Chamados, Sinistros, Depreciação) com numeração automática, RLS por org e dashboard de KPIs. Pontos a evoluir:
-
-1. **Sem integração real com Cashflow** — `generates_recurring_cost`, `generates_future_installments`, `generates_replacement_forecast` existem como flags, mas não materializam lançamentos no `cashflow_entries`. Sistemas/Telecom mensais não viram OPEX previsto.
-2. **Depreciação estática** — calcula valor contábil mas não gera cronograma mensal nem aparece na DRE/EBITDA.
-3. **Ciclo de vida incompleto** — não há histórico de movimentação (entrega, devolução, transferência entre colaboradores), nem termos assinados.
-4. **Chamados sem SLA real** — campos existem, mas sem cálculo de breach, escalonamento, métricas MTTR/MTTA.
-5. **Sem alertas proativos** — renovações, garantias vencendo, equipamentos obsoletos não notificam.
-6. **Sem auditoria** — alterações sensíveis (status, responsável, baixa) não geram log.
-7. **KPIs sem drill-down** — cards do dashboard não abrem base de cálculo (princípio do produto exige).
-8. **Faltam visões executivas** — TCO por colaborador, custo por departamento, idade média do parque, % obsolescência.
+Encerra a evolução do módulo transformando-o em uma central de governança de TI: o sistema avisa antes do problema, mostra o custo total real de cada ativo/sistema e mantém trilha auditável de tudo que muda.
 
 ---
 
-## Plano de evolução (5 fases)
+### Fase 4 — Alertas Proativos (cron diário)
 
-### Fase 1 — Integração Financeira Real (núcleo do produto)
+**Edge Function `it-daily-alerts`** (executada 1x/dia via `pg_cron` + `pg_net`):
 
-**Objetivo:** TI deixa de ser cadastro isolado e passa a alimentar o Financeiro automaticamente, seguindo o princípio MECE.
+1. **Renovações de sistemas/SaaS** — varre `it_systems` com `renewal_date` em até 30/15/7 dias e cria notificação para o `responsible_employee_id` (e CFO/Head de TI). Severidade escala conforme proximidade.
+2. **SLA em risco** — busca `it_tickets` não resolvidos com `sla_resolution_due_at` nas próximas 4h ou já vencido (sem `sla_resolution_breach`) e notifica o `assignee_id` + gestor da fila.
+3. **Garantias e ciclo de vida** — `it_equipment` com garantia/vida útil expirando em 60 dias (warning) ou expirada (critical) → notifica o responsável e abre item em "Ações Recomendadas".
+4. **Telecom/links** — `it_telecom_links` com vencimento contratual ou SLA de uplink em risco.
+5. **Custo fora da curva** — sistemas cujo `monthly_value` cresceu >20% vs. último mês materializado em `cashflow_entries` → alerta financeiro para CFO.
 
-1. **Sistemas/Telecom recorrentes → Cashflow projetado**
-   - Trigger DB `it_materialize_recurring_costs(org_id, ref_month)` que, para cada sistema/link `ativo` com `monthly_value > 0`, gera `cashflow_entries` virtuais (`source='ti'`, `source_ref='it_system:<id>:YYYY-MM'`, `tipo='pagar'`, `status='previsto'`).
-   - Idempotente via UNIQUE em `(source, source_ref)`.
-   - Recalcula automaticamente quando `monthly_value`, `status`, `renewal_date` ou `cost_center_id` mudam.
-   - Conecta a `account_id` (plano de contas) e `cost_center_id` configurados no item.
+Idempotência: dedupe por `(user_id, reference_type, reference_id, dia)` no padrão já usado em `sector-maturity-alerts`. Retorna JSON com contadores por categoria.
 
-2. **Equipamentos parcelados → Parcelas futuras**
-   - Quando `acquisition_form='compra_parcelada'` + `installments_count` + `installment_value` + `first_installment_date`, gera N entradas em `cashflow_entries` (uma por parcela), referenciando `it_equipment.id`.
-   - Suporta antecipação/baixa: ao mudar status para `baixado/vendido`, cancela parcelas futuras (mantém histórico).
-
-3. **Previsão de substituição → CAPEX projetado**
-   - Equipamentos com `generates_replacement_forecast=true` + `replacement_forecast_date` + `replacement_estimated_value` geram entrada de CAPEX no mês previsto.
-   - Aparece no módulo Planejamento como item editável.
-
-4. **Depreciação mensal → DRE**
-   - Nova tabela `it_depreciation_schedule` (equipment_id, competencia, valor_mensal_contabil, valor_mensal_economico, acumulado).
-   - RPC `it_generate_depreciation_schedule(equipment_id)` gera o cronograma completo a partir dos parâmetros.
-   - Integra com DRE como linha de despesa não-caixa.
-
-### Fase 2 — Ciclo de Vida & Movimentação
-
-5. **Tabela `it_equipment_movements`**
-   - Tipos: `entrega`, `devolucao`, `transferencia`, `manutencao_envio`, `manutencao_retorno`, `baixa`, `venda`, `extravio`.
-   - Cada movimento: data, de_colaborador, para_colaborador, de_local, para_local, motivo, anexo (termo PDF), assinatura digital.
-   - Ao registrar movimento, atualiza `it_equipment.responsible_employee_id` e `status` automaticamente.
-   - Linha do tempo visual no detalhe do equipamento.
-
-6. **Geração de termos PDF**
-   - Edge Function `it-generate-term` cria PDF de Entrega/Devolução com dados do colaborador (nome, CPF, cargo), equipamento, condições, assinaturas.
-   - Salvo em Storage `it-documents/<org_id>/<equipment_id>/<movement_id>.pdf`.
-
-7. **QR Code funcional**
-   - QR aponta para rota pública assinada `/ti/equipamento/<token>` (token JWT curto) com ficha read-only do ativo.
-   - Útil para auditoria física, conferência de inventário.
-
-### Fase 3 — Chamados como Service Desk real
-
-8. **SLA automático**
-   - Tabela `it_sla_policies` (categoria + prioridade → tempo_resposta, tempo_resolucao em horas úteis).
-   - Trigger calcula `sla_response_due`, `sla_resolution_due` no insert.
-   - Campos derivados: `sla_response_breach`, `sla_resolution_breach`, `mtta`, `mttr`.
-
-9. **Workflow de status**
-   - Ações: assumir, transferir, pausar (com motivo), reabrir, resolver com causa raiz.
-   - Histórico em `it_ticket_events` (audit trail).
-
-10. **Comentários & anexos no chamado**
-    - Tabela `it_ticket_comments` com menções, visibilidade interna/cliente.
-    - Notificações em tempo real via Realtime + integração com módulo Notifications existente.
-
-11. **Métricas Service Desk**
-    - MTTA, MTTR, % SLA atingido, top categorias, top solicitantes, backlog por idade.
-
-### Fase 4 — Inteligência & Alertas
-
-12. **Maturidade TI (sector_onboarding)**
-    - Adicionar setor `ti` ao avaliador de maturidade existente (50% completeness, 25% freshness, 25% qualidade).
-    - Indicadores: % equipamentos com responsável, % com depreciação preenchida, % sistemas com renovação cadastrada, MTTR médio.
-
-13. **Alertas proativos** (cron diário via edge function)
-    - Renovações em 30/60/90 dias.
-    - Garantias vencendo.
-    - Equipamentos com idade > vida útil econômica.
-    - Chamados em risco de SLA breach.
-    - Sinistros não tratados há > 7 dias.
-    - Notificações via tabela `notifications` + e-mail opcional.
-
-14. **Sugestões via Lovable AI** (`google/gemini-2.5-flash`)
-    - "Plano de substituição sugerido para próximos 12 meses" baseado em idade + criticidade + budget.
-    - "Sistemas redundantes detectados" (mesma categoria, baixa utilização).
-    - "Anomalia de custo": sistemas/links com aumento > 20% mês a mês.
-
-### Fase 5 — Governança, KPIs e Drill-down
-
-15. **KPIs clicáveis com base de cálculo** (alinhado ao padrão financeiro do produto)
-    - Cada card do `TIDashboard` abre Dialog com:
-      - Fórmula aplicada
-      - Lista de itens que compuseram o número (auditável)
-      - Filtros temporais
-      - Export CSV
-    - Reusa o componente `KpiBreakdownDialog` (a criar/aproveitar do Financeiro).
-
-16. **Visões executivas**
-    - **TCO por colaborador**: equipamentos + sistemas atribuídos + rateio de telecom.
-    - **Custo TI por Centro de Custo**: visão para DRE gerencial.
-    - **Idade média do parque** por tipo de equipamento.
-    - **% obsolescência** (equipamentos em `substituicao_recomendada` ou `obsoleto` / total).
-    - **Heatmap de criticidade** (sistemas críticos sem redundância, links sem backup).
-
-17. **Auditoria (`it_audit_log`)**
-    - Trigger genérico para log de mudanças em equipment, system, telecom, ticket, incident.
-    - Captura before/after, user, timestamp.
-    - Visível em Configurações para owner/admin.
-
-18. **Permissões granulares por aba**
-    - Reusa `useUserPermissions` + `MODULE_DEFINITIONS` (padrão do projeto).
-    - Permite "TI Operacional" (vê tudo exceto Depreciação) vs "TI + Financeiro" (vê tudo).
+**Agendamento:** cron diário às 07:00 (BRT) chamando a função via `net.http_post` (registrado via tool `insert`, não migration, pois usa anon key + URL).
 
 ---
 
-## Mudanças técnicas resumidas
+### Fase 5 — TCO e Auditoria
 
-```text
-Banco (migration):
-  + it_depreciation_schedule
-  + it_equipment_movements
-  + it_ticket_comments
-  + it_ticket_events
-  + it_sla_policies
-  + it_audit_log
-  + RPCs: it_materialize_recurring_costs, it_generate_depreciation_schedule,
-          it_register_movement, it_compute_sla
-  + Trigger genérico de auditoria
-  + Trigger pós-update em it_systems/it_telecom para regerar projeções
+**1. TCO (Total Cost of Ownership) consolidado**
 
-Edge Functions:
-  + it-generate-term (PDF termos)
-  + it-daily-alerts (cron diário)
-  + it-ai-insights (sugestões IA)
+Nova RPC `it_compute_tco(p_org, p_from, p_to)` que para cada `it_systems` e `it_equipment` retorna:
+- Custo direto (mensalidades materializadas em `cashflow_entries` com `source='ti'`)
+- Depreciação acumulada do período (de `it_depreciation_schedule`)
+- Custo de incidentes/tickets ligados ao ativo (horas técnico × custo/hora configurável em `it_config`)
+- Custo de movimentações (logística) registrado em `it_equipment_movements.cost`
+- TCO total + TCO/usuário (usa `users_count` para sistemas; nº de responsáveis distintos para equipamentos)
 
-Front-end:
-  + src/hooks/useITMovements.ts
-  + src/hooks/useITSchedule.ts
-  + src/hooks/useITSLA.ts
-  + src/hooks/useITInsights.ts
-  + src/components/ti/EquipmentTimeline.tsx
-  + src/components/ti/MovementDialog.tsx
-  + src/components/ti/TicketDetailDrawer.tsx (workflow + comentários + SLA)
-  + src/components/ti/KpiBreakdownDialog.tsx
-  + src/components/ti/TCOReport.tsx
-  + src/components/ti/ITMaturityCard.tsx
-  + Atualiza TIDashboard (cards clicáveis) e TIConfigTab (SLA, alertas)
-  + Sidebar de notificações TI
+Nova aba **"TCO"** no `TIDashboard.tsx`:
+- Tabela ranqueada por TCO descendente (top 20 com filtros por categoria/cost center)
+- Card com TCO consolidado do período + breakdown (sistemas vs equipamentos vs incidentes)
+- Cada linha clicável abre `KpiBreakdownDialog` mostrando os componentes do TCO daquele ativo
+- Botão "Exportar PDF" gera relatório executivo (jspdf + autotable, padrão já usado no projeto)
+
+**2. Trilha de Auditoria completa**
+
+Triggers `AFTER INSERT/UPDATE/DELETE` gravando em `it_audit_log` (já existe a tabela) para:
+- `it_systems`, `it_equipment`, `it_telecom_links`, `it_tickets`, `it_sla_policies`, `it_equipment_movements`
+
+Cada registro guarda: `actor_id` (auth.uid()), `action`, `entity`, `entity_id`, `before` (jsonb), `after` (jsonb), `diff` (jsonb com chaves alteradas), `created_at`.
+
+Nova aba **"Auditoria"** em `TIConfigTab.tsx` (visível apenas para roles admin/master):
+- Filtros: entidade, ator, intervalo de datas, ação
+- Linha expansível mostra o diff em formato chave/antes/depois
+- Paginação 50/pg, ordem desc
+- Hook novo: `useITAuditLog(filters)`
+
+**3. Centro de Notificações de TI no Dashboard**
+
+Painel lateral em `TIDashboard.tsx` listando os alertas gerados pelo cron das últimas 30 dias, agrupados por severidade (critical/warning/info), com link para a entidade origem e botão "marcar como resolvido".
+
+---
+
+### Detalhes técnicos
+
+**Migração SQL** (`..._it_phase45.sql`):
+- Trigger `it_log_changes()` genérico parametrizado (uma função, vários triggers)
+- RPC `it_compute_tco(p_org uuid, p_from date, p_to date)` retornando `setof` com colunas: `entity_type`, `entity_id`, `name`, `direct_cost`, `depreciation`, `incident_cost`, `movement_cost`, `tco_total`, `tco_per_user`
+- Coluna `cost` em `it_equipment_movements` (se ainda não existir) e `hours_spent` em `it_tickets`
+- Índices em `it_audit_log(organization_id, entity, created_at desc)`
+
+**Edge Function**:
+- `supabase/functions/it-daily-alerts/index.ts` — segue padrão CORS + service role de `sector-maturity-alerts`
+- Insere em `notifications` com `category='ti'` e `reference_type` apropriado (sistema/equipamento/ticket)
+
+**Cron** (registrado via insert tool, não migration):
+```sql
+select cron.schedule(
+  'it-daily-alerts',
+  '0 10 * * *', -- 07:00 BRT
+  $$ select net.http_post(
+       url:='https://<ref>.supabase.co/functions/v1/it-daily-alerts',
+       headers:='{"Content-Type":"application/json","apikey":"<anon>"}'::jsonb,
+       body:='{}'::jsonb
+     ); $$
+);
 ```
 
-## Princípios respeitados
-
-- **MECE financeiro**: cada lançamento gerado pelo TI tem `source` + `source_ref` únicos; nunca duplica com Contratos/RH.
-- **Auditável**: tudo que afeta caixa pode ser rastreado até o item de origem.
-- **Reproducível**: KPIs com drill-down mostram a base de cálculo.
-- **CFO-first**: visões executivas (TCO, % obsolescência, CAPEX projetado) priorizadas sobre operacional.
-- **Sem mágica**: cálculos visíveis, projeções com `proj-`-style virtual entries materializáveis.
-
-## Fora de escopo (V2 futura)
-
-- Integração com MDM (Intune/JAMF) para inventário automático.
-- Discovery de rede (descobrir ativos automaticamente).
-- Integração com Service Desk externos (Jira, Zendesk).
-- Compliance LGPD/ISO27001 detalhado (apenas estrutura básica nesta fase).
+**Frontend**:
+- `src/hooks/useITTCO.ts` — chama RPC e devolve `data` para tabela e cards
+- `src/hooks/useITAuditLog.ts` — query paginada
+- `src/components/ti/TCOTab.tsx` — nova aba
+- `src/components/ti/AuditLogSection.tsx` — seção dentro de `TIConfigTab`
+- `src/lib/itTCOReportPDF.ts` — exportação PDF executivo
+- Atualiza `TIDashboard.tsx` com painel de alertas + nova aba TCO
 
 ---
 
-Posso iniciar pela **Fase 1 (integração financeira real)**, que entrega o maior valor imediato e conecta o módulo ao restante do produto. Aprovas seguir nesta ordem ou queres priorizar outra fase primeiro?
+### Arquivos previstos
+
+Criados:
+- `supabase/migrations/..._it_phase45.sql`
+- `supabase/functions/it-daily-alerts/index.ts`
+- `src/hooks/useITTCO.ts`, `useITAuditLog.ts`
+- `src/components/ti/TCOTab.tsx`, `AuditLogSection.tsx`, `ITAlertsPanel.tsx`
+- `src/lib/itTCOReportPDF.ts`
+
+Editados:
+- `src/components/ti/TIDashboard.tsx` (aba TCO + painel alertas)
+- `src/components/ti/TIConfigTab.tsx` (seção auditoria)
+- `src/integrations/supabase/types.ts` (auto)
+- `.lovable/plan.md`
+
+---
+
+### Resultado esperado
+
+Após esta fase, o módulo de TI entrega ao CFO/CIO:
+- Visibilidade antecipada de renovações, SLAs em risco e custos crescentes
+- Custo real (TCO) por sistema/equipamento, exportável para o board
+- Trilha auditável de toda mudança estrutural ou operacional — pronto para due diligence/auditoria externa
+
+---
+
+### ✅ Fase 4-5 — Implementado em 2026-04-30
+
+**Migração aplicada:**
+- Triggers `it_log_changes` em `it_systems`, `it_equipment`, `it_telecom_links`, `it_tickets`, `it_sla_policies`, `it_equipment_movements` → escreve em `it_audit_log`
+- Colunas: `it_equipment_movements.cost`, `it_tickets.hours_spent`, `it_config.technician_hourly_cost`
+- RPC `it_compute_tco(p_org, p_from, p_to)` + `it_tco_summary` (com totais e tco/usuário)
+- Índice de dedupe em `notifications`
+
+**Edge Function `it-daily-alerts`:** renovações de sistemas (30/15/7/3/1d), SLAs em risco (≤4h ou vencido), vida útil de equipamentos (≤60d), telecom (60/30/15/7d). Idempotente por `(user_id, reference_type, reference_id, dia)`.
+
+**Cron `it-daily-alerts`:** 10:00 UTC diário (jobid 3) via `pg_net`.
+
+**UI:**
+- Nova aba **TCO** em `/ti?tab=tco` — ranking, breakdown por componente, exportação PDF executivo
+- Seção **Trilha de auditoria** em Configurações (filtros + diff antes/depois)
+- Botão **"Rodar alertas agora"** no Dashboard
+- Campo **Custo/hora do técnico** em Configurações

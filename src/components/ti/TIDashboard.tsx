@@ -184,7 +184,24 @@ export function TIDashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={async () => {
+            const { supabase } = await import("@/integrations/supabase/client");
+            const { toast } = await import("sonner");
+            const { data, error } = await supabase.functions.invoke("it-daily-alerts", { body: {} });
+            if (error) toast.error("Falha ao rodar alertas: " + error.message);
+            else {
+              const c = (data as any)?.counters ?? {};
+              const total = (c.renewals || 0) + (c.sla || 0) + (c.warranty || 0) + (c.telecom || 0);
+              toast.success(`${total} alerta(s) gerado(s).`);
+            }
+          }}
+        >
+          <AlertTriangle className="h-4 w-4 mr-2" /> Rodar alertas agora
+        </Button>
         <Button
           size="sm"
           variant="outline"

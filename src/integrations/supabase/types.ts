@@ -4235,6 +4235,7 @@ export type Database = {
           sla_baixa_hours: number | null
           sla_critica_hours: number | null
           sla_media_hours: number | null
+          technician_hourly_cost: number | null
           updated_at: string
         }
         Insert: {
@@ -4253,6 +4254,7 @@ export type Database = {
           sla_baixa_hours?: number | null
           sla_critica_hours?: number | null
           sla_media_hours?: number | null
+          technician_hourly_cost?: number | null
           updated_at?: string
         }
         Update: {
@@ -4271,6 +4273,7 @@ export type Database = {
           sla_baixa_hours?: number | null
           sla_critica_hours?: number | null
           sla_media_hours?: number | null
+          technician_hourly_cost?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -4645,6 +4648,7 @@ export type Database = {
       }
       it_equipment_movements: {
         Row: {
+          cost: number | null
           created_at: string
           document_path: string | null
           document_signed_at: string | null
@@ -4664,6 +4668,7 @@ export type Database = {
           to_status: Database["public"]["Enums"]["it_equipment_status"] | null
         }
         Insert: {
+          cost?: number | null
           created_at?: string
           document_path?: string | null
           document_signed_at?: string | null
@@ -4685,6 +4690,7 @@ export type Database = {
           to_status?: Database["public"]["Enums"]["it_equipment_status"] | null
         }
         Update: {
+          cost?: number | null
           created_at?: string
           document_path?: string | null
           document_signed_at?: string | null
@@ -5177,6 +5183,7 @@ export type Database = {
           due_at: string | null
           equipment_id: string | null
           first_response_at: string | null
+          hours_spent: number | null
           id: string
           mtta_minutes: number | null
           mttr_minutes: number | null
@@ -5211,6 +5218,7 @@ export type Database = {
           due_at?: string | null
           equipment_id?: string | null
           first_response_at?: string | null
+          hours_spent?: number | null
           id?: string
           mtta_minutes?: number | null
           mttr_minutes?: number | null
@@ -5245,6 +5253,7 @@ export type Database = {
           due_at?: string | null
           equipment_id?: string | null
           first_response_at?: string | null
+          hours_spent?: number | null
           id?: string
           mtta_minutes?: number | null
           mttr_minutes?: number | null
@@ -7837,6 +7846,22 @@ export type Database = {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean
       }
+      it_compute_tco: {
+        Args: { p_from: string; p_org: string; p_to: string }
+        Returns: {
+          category: string
+          depreciation: number
+          direct_cost: number
+          entity_id: string
+          entity_type: string
+          incident_cost: number
+          movement_cost: number
+          name: string
+          tco_per_user: number
+          tco_total: number
+          users_count: number
+        }[]
+      }
       it_generate_depreciation_schedule: {
         Args: { p_equipment_id: string }
         Returns: Json
@@ -7848,6 +7873,22 @@ export type Database = {
       it_materialize_recurring_costs: {
         Args: { p_months_ahead?: number; p_org_id: string }
         Returns: Json
+      }
+      it_tco_summary: {
+        Args: { p_from: string; p_org: string; p_to: string }
+        Returns: {
+          category: string
+          depreciation: number
+          direct_cost: number
+          entity_id: string
+          entity_type: string
+          incident_cost: number
+          movement_cost: number
+          name: string
+          tco_per_user: number
+          tco_total: number
+          users_count: number
+        }[]
       }
       match_statement_to_cashflow: {
         Args: { p_statement_id: string }
