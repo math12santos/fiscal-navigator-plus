@@ -21,6 +21,7 @@ const ALL_TABS = [
   { key: "contas-bancarias", label: "Contas Bancárias" },
   { key: "fluxo-caixa", label: "Fluxo de Caixa" },
   { key: "conciliacao", label: "Conciliação" },
+  { key: "integracoes", label: "Integrações" },
   { key: "importacoes", label: "Importações" },
 ];
 
