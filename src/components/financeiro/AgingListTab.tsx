@@ -487,20 +487,23 @@ export function AgingListTab() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <KPICard
           title="Saldo em Contas"
-          value={fmt(bankTotals.saldoTotal)}
+          value={fmtAcc(bankTotals.saldoTotal)}
+          valueClassName={bankTotals.saldoTotal < 0 ? "text-destructive" : ""}
           icon={<Landmark size={20} />}
           subtitle={`${bankAccounts.length} conta(s)`}
           onClick={() => setCashDetailOpen(true)}
         />
         <KPICard
           title="Limite de Crédito"
-          value={fmt(bankTotals.limiteTotal)}
+          value={fmtAcc(bankTotals.limiteTotal)}
+          valueClassName={bankTotals.limiteTotal < 0 ? "text-destructive" : ""}
           icon={<ShieldCheck size={20} />}
           onClick={() => setCashDetailOpen(true)}
         />
         <KPICard
           title="Disponibilidade Total"
-          value={fmt(bankTotals.disponibilidadeTotal)}
+          value={fmtAcc(bankTotals.disponibilidadeTotal)}
+          valueClassName={bankTotals.disponibilidadeTotal < 0 ? "text-destructive" : ""}
           icon={<Wallet size={20} />}
           subtitle="Saldo + Limite"
           onClick={() => setCashDetailOpen(true)}
