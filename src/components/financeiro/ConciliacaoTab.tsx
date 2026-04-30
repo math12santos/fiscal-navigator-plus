@@ -46,7 +46,27 @@ export function ConciliacaoTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => snapshotBalances.mutate()}
+          disabled={snapshotBalances.isPending}
+          title="Registrar saldo atual de todas as contas como snapshot do dia"
+        >
+          {snapshotBalances.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Camera className="h-3.5 w-3.5 mr-1.5" />}
+          Snapshot de Saldos
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => autoReconcileBatch.mutate(0.95)}
+          disabled={autoReconcileBatch.isPending || stats.pendentes === 0}
+          title="Concilia automaticamente linhas com score ≥ 95%"
+        >
+          {autoReconcileBatch.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 mr-1.5" />}
+          Auto-conciliar
+        </Button>
         <Button size="sm" onClick={() => setImportOpen(true)}>
           <Upload className="h-3.5 w-3.5 mr-1.5" /> Importar Extrato
         </Button>
