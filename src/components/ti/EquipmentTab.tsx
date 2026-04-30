@@ -30,6 +30,9 @@ export function EquipmentTab() {
   const [open, setOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrEq, setQrEq] = useState<any>(null);
+  const [movOpen, setMovOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [activeEq, setActiveEq] = useState<any>(null);
 
   const rows = useMemo(() => {
     const t = q.toLowerCase().trim();
@@ -59,7 +62,7 @@ export function EquipmentTab() {
                   <th className="p-3">Tipo</th>
                   <th className="p-3">Status</th>
                   <th className="p-3">Valor aquisição</th>
-                  <th className="p-3 w-32 text-right">Ações</th>
+                  <th className="p-3 w-48 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -77,9 +80,11 @@ export function EquipmentTab() {
                     <td className="p-3">{fmt(Number(e.acquisition_value || 0))}</td>
                     <td className="p-3">
                       <div className="flex justify-end gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => { setQrEq(e); setQrOpen(true); }}><QrCode className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => { setEditing(e); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => { if (confirm("Excluir este equipamento?")) remove.mutate(e.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        <Button size="sm" variant="ghost" title="Detalhes / Histórico" onClick={() => { setActiveEq(e); setDetailOpen(true); }}><Eye className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" title="Nova movimentação" onClick={() => { setActiveEq(e); setMovOpen(true); }}><ArrowLeftRight className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" title="QR Code" onClick={() => { setQrEq(e); setQrOpen(true); }}><QrCode className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" title="Editar" onClick={() => { setEditing(e); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" title="Excluir" onClick={() => { if (confirm("Excluir este equipamento?")) remove.mutate(e.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </td>
                   </tr>
