@@ -155,10 +155,6 @@ export default function EtlOps() {
 
   return (
     <div className="p-6 space-y-6">
-      <Helmet>
-        <title>ETL Ops — Pipelines de dados | FinCore</title>
-        <meta name="description" content="Painel operacional dos pipelines ETL/ELT do FinCore: status de jobs, fila de processamento, DLQ e reprocessamento seguro." />
-      </Helmet>
 
       <header className="flex items-center justify-between">
         <div>
