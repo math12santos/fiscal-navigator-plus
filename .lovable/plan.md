@@ -134,3 +134,17 @@ export async function createAutoRequest(opts: {
 Posso executar **Fase 1 inteira em uma rodada** (fecha o ciclo financeiro: CRM→Contrato, Jurídico→Caixa, TI→Caixa). Fases 2/3/4 em rodadas seguintes.
 
 Diga **"executar fase 1"** para começar, ou **"executar tudo em sequência"** se preferir o pacote completo.
+
+---
+
+## ✅ Fase 1 IMPLEMENTADA (2026-04-30)
+
+**Migration:** índice único `cashflow_entries(organization_id, source, source_ref)` + 5 funções/triggers.
+
+1. **CRM Won → Contrato automático**: RPC `crm_generate_contract_from_opportunity` chamada em `useCRM.moveToStage`. Cria contrato em rascunho idempotente, vincula `crm_opportunities.contract_id`. Toast com link.
+2. **TI → Cashflow (CAPEX)**: trigger `trg_it_equipment_cashflow` materializa aquisições com `source='ti'`, `source_ref='equipment:<id>'`, propaga `cost_center_id`.
+3. **TI → Cashflow (Sinistros)**: trigger `trg_it_incident_cashflow` materializa perda líquida (`estimated_loss_value - recovered_value`).
+4. **Jurídico**: botões "Aprovar e lançar no caixa" (acordos) e "Lançar" (despesas) já existiam — mantida UI com badge "Lançado/Pendente".
+5. **Invalidação de cache**: `useITEquipment` e `useITIncidents` agora invalidam `cashflow`/`financeiro`.
+
+**Próximo:** Fase 2 (auto-tarefas + notificações cross-módulo).
