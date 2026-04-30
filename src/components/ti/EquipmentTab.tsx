@@ -97,6 +97,13 @@ export function EquipmentTab() {
 
       <EquipmentFormDialog open={open} onOpenChange={setOpen} initial={editing} onSave={(v) => upsert.mutate(v)} />
       <EquipmentQRDialog open={qrOpen} onOpenChange={setQrOpen} equipment={qrEq} />
+      <MovementDialog open={movOpen} onOpenChange={setMovOpen} equipment={activeEq} />
+      <EquipmentDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        equipment={activeEq}
+        onNewMovement={() => { setDetailOpen(false); setMovOpen(true); }}
+      />
     </div>
   );
 }
