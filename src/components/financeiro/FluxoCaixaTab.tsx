@@ -91,7 +91,7 @@ export function FluxoCaixaTab() {
   const openingBalance = useMemo(
     () =>
       bankAccounts
-        .filter((a) => a.ativo !== false)
+        .filter((a) => a.active !== false)
         .reduce((s, a) => s + Number(a.saldo_atual ?? 0), 0),
     [bankAccounts],
   );
