@@ -8,6 +8,7 @@ import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationCo
 import { HoldingProvider } from "@/contexts/HoldingContext";
 import { lazy, Suspense, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentRole } from "@/hooks/useCurrentRole";
 import { GenericPageSkeleton } from "@/components/skeletons/GenericPageSkeleton";
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
@@ -213,20 +214,9 @@ function OnboardingRoute() {
 
 function BackofficeRoutes() {
   const { user, loading: authLoading } = useAuth();
-  const [isMaster, setIsMaster] = useState<boolean | null>(null);
+  const { isMaster, loading: roleLoading } = useCurrentRole();
 
-  useEffect(() => {
-    if (!user) { setIsMaster(false); return; }
-    supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "master")
-      .maybeSingle()
-      .then(({ data }) => setIsMaster(!!data));
-  }, [user]);
-
-  if (authLoading || isMaster === null) return <FullScreenLoader />;
+  if (authLoading || (user && roleLoading)) return <FullScreenLoader />;
   if (!user) return <Navigate to="/auth" replace />;
   if (!isMaster) return <Navigate to="/" replace />;
 
@@ -263,21 +253,10 @@ function GuidedOnboardingRoute() {
 
 function AuthRoute() {
   const { user, loading } = useAuth();
-  const [isMaster, setIsMaster] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!user) { setIsMaster(null); return; }
-    supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "master")
-      .maybeSingle()
-      .then(({ data }) => setIsMaster(!!data));
-  }, [user]);
+  const { isMaster, loading: roleLoading } = useCurrentRole();
 
   if (loading) return null;
-  if (user && isMaster === null) return null;
+  if (user && roleLoading) return null;
   if (user && isMaster) return <Navigate to="/backoffice" replace />;
   if (user) return <Navigate to="/" replace />;
 
