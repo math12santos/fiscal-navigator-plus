@@ -1790,6 +1790,36 @@ export type Database = {
           },
         ]
       }
+      dashboard_kpi_preferences: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          kpi_id: string
+          organization_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kpi_id: string
+          organization_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kpi_id?: string
+          organization_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       data_import_rows: {
         Row: {
           created_at: string | null

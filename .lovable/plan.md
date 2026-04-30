@@ -1,147 +1,131 @@
-# Análise & Plano — Módulo Financeiro
 
-Posiciono o módulo como **hub centralizador**: ingestão por importação + webhooks de ERPs, com motor próprio de classificação, conciliação e governança. Não é bookkeeping; é cockpit auditável.
+# Dashboard Financeiro — KPIs Executivos (CFO/Board)
 
-## Diagnóstico por aba
-
-### 1. Contas a Pagar / Contas a Receber
-
-- KPIs do `useFinanceiro.totals` somam **previsto + realizado**, gerando dupla contagem em parcelas pagas (a paga ainda entra em `total_previsto`).
-- Geração de parcelas (`create`) usa `Math.round((valor/n)*100)/100` — última parcela não recebe o resíduo, gerando diferença de centavos.
-- `data_prevista`, `data_vencimento`, `data_prevista_pagamento` são 3 campos sobrepostos com regras implícitas — fonte recorrente de bug.
-- AR não tem painel de pendências/triagem nem botão de importar de webhook (CA Pagar tem `PendenciasPanel`, `ExpenseRequestButton`).
-- Status livre em `text` (sem enum) → "paga"/"pago", "pendente"/"previsto" coexistem.
-
-### 2. Aging List
-
-- Buckets corretos, mas `differenceInDays` recalculado a cada render (today novo a cada chamada → invalida memos).
-- Faltam **filtros** (empresa, fornecedor, faixa de valor) e **ações em lote** (marcar pago, lançar transferência).
-- Auditoria saldo×conciliados foi adicionada; precisa virar **card destacado** no topo quando divergência > X%.
-- Posição de caixa por empresa abre Dialog — bom; falta **drill-down por conta** dentro do Dialog.
-
-### 3. Fluxo de Caixa
-
-- KPIs do "Realizado" usam `valor_realizado ?? valor_previsto` — quando o pago veio com valor menor, o card mistura previsto+realizado para o mesmo registro nas outras subabas.
-- Sem **saldo acumulado** (running balance) por dia/mês — peça-chave para CFO ver runway.
-- Sem comparativo Previsto vs Realizado nem variação MoM.
-- Não há export (CSV/PDF) do fluxo.
-
-### 4. Conciliação
-
-- Algoritmo de match (`match_statement_to_cashflow` RPC) usa ±10% e ±7d; precisa **sugerir múltiplos** com peso de descrição (não só valor+data).
-- Sem **conciliação em lote** (auto-match score > 95%).
-- Sem **regras persistidas** ("descrição X sempre vai para conta Y") — toda conciliação é manual.
-- Falta visão de **divergências saldo banco vs livro** (já calculado no Aging — duplicar/centralizar aqui).
-- Sem mecanismo de import de arquivo OFX 
-
-### 5. Contas Bancárias
-
-- 683 linhas em um componente, vários Dialogs inline — refatorar em subcomponentes.
-- Saldo manual é "fonte da verdade" (memória), mas não há **histórico de saldos** (snapshots) para auditoria temporal.
-- Cheque especial bem modelado, mas sem **alerta proativo** quando consumo > 70% do limite.
-- Gestão de limites de crédito e capital de giro confusa
-
-### 6. Importações
-
-- Bom: histórico, períodos fiscais, undo. Faltam:
-  - **Detecção de duplicatas pré-import** (já existe `useDuplicateDetection` mas só pós-import).
-  - **Templates salvos** por ERP (Omie, Conta Azul, Bling, etc.) para mapeamento 1-clique.
-  - **Agendamento de import recorrente** (drop em pasta / endpoint).
-- Hoje **não há ingestão por webhook** — gap principal vs. visão de hub.
-
-### 7. Transversal
-
-- `cashflow_entries.status` e `tipo` em `text` → criar enums.
-- `conciliacao_id` é `text` (deveria ser uuid).
-- Sem **trilha de auditoria** (`cashflow_audit_log`) — quem mudou valor, quando.
-- 1356 lançamentos pagos **sem conta bancária** vinculada — distorce a auditoria de saldo.
-- Sem rate limit / validação Zod nas Edge Functions de import.
+Adicionar nova aba **"Dashboard"** como primeira aba de `/financeiro`, agregando 7 blocos de KPIs do nível CFO/Conselho. Cada KPI é **calculado quando há dados**, ou exibe um **estado vazio explicativo + CTA** apontando para onde cadastrar a informação que falta. O usuário pode **ligar/desligar cada KPI** (preferência por organização, persistida).
 
 ---
 
-## Plano de melhorias (4 fases)
+## 1. Estrutura de arquivos
 
-### Fase 1 — Correções de cálculo & integridade (quick wins)
+**Novos:**
+- `src/components/financeiro/dashboard/FinancialDashboardTab.tsx` — orquestrador, renderiza as 7 seções.
+- `src/components/financeiro/dashboard/KpiSection.tsx` — wrapper colapsável de seção (título + grid de cards).
+- `src/components/financeiro/dashboard/KpiTile.tsx` — card individual: valor, hint, badge de saúde, estado "sem dados" com CTA, botão de toggle on/off.
+- `src/components/financeiro/dashboard/KpiPreferencesDialog.tsx` — modal global "Configurar KPIs" para ativar/desativar em massa por seção.
+- `src/components/financeiro/dashboard/kpiRegistry.ts` — registro central declarativo de cada KPI: id, seção, label, fórmula, dependências de dados, CTA (rota + texto).
+- `src/hooks/useFinancialDashboardKPIs.ts` — agrega dados de `useCashFlow`, `useBankAccounts`, `useContracts`, `useLiabilities`, `useFinanceiroAvgTerms`, `usePayrollProjections`, `useCRMOpportunities`, `useEmployees` e produz um objeto `{ [kpiId]: { value, status: 'ok'|'partial'|'missing', missingReason, ctaRoute } }`.
+- `src/hooks/useKpiPreferences.ts` — CRUD da tabela `dashboard_kpi_preferences` (enabled/disabled por usuário+org).
 
-1. **Totais corretos em `useFinanceiro**`: separar `previsto_pendente` (só status previsto/confirmado) de `realizado` (só pago/recebido). Eliminar dupla contagem.
-2. **Parcelamento sem resíduo**: última parcela recebe `valor - sum(parcelas anteriores)`.
-3. **Unificar datas**: usar `data_vencimento` como única fonte; `data_prevista` é derivada (= vencimento se vazio). Migration backfill.
-4. **Backfill `conta_bancaria_id**` nos 1356 lançamentos pagos: tentar via conciliação; restantes ficam em "Conta indefinida" sinalizada.
-5. **Enums Postgres** para `cashflow_entries.status` e `tipo` (com migration de normalização).
-6. **Tabela `cashflow_audit_log**` + trigger AFTER UPDATE/DELETE em `cashflow_entries`.
+**Modificados:**
+- `src/pages/Financeiro.tsx` — adicionar `{ key: "dashboard", label: "Dashboard" }` como primeiro item de `ALL_TABS`; default tab passa a ser `dashboard`.
 
-### Fase 2 — Conciliação & governança
-
-7. **Tabela `reconciliation_rules**` (org_id, padrão_descricao regex, account_id, cost_center_id, entity_id, conta_bancaria_id) aplicada automaticamente no import e na conciliação.
-8. **Auto-match em lote** na aba Conciliação: botão "Conciliar automaticamente score ≥ 95%" + log do que casou.
-9. **RPC `match_statement_to_cashflow` v2**: pesos = 50% valor, 30% data, 20% similaridade descrição (Jaro-Winkler).
-10. **Card "Divergência de saldo"** no topo do Aging quando |saldo_atual - reconciled| > 1% por conta.
-11. **Snapshot diário de saldos** (`bank_balance_snapshots`) via cron pg_cron — base para gráfico runway.
-
-### Fase 3 — Hub: webhooks + ingestão
-
-12. **Tabela `integration_endpoints**` (org_id, provider, secret_hash, target='cashflow_entry'|'bank_statement'|'invoice', mapping_template).
-13. **Edge Function `webhook-ingest**` pública, autenticada por secret no header, com validação Zod, idempotência por `external_id`, gravação em `data_imports` + materialização opcional. Suporte para Omie/Conta Azul/Bling/genérico JSON.
-14. **Página "Integrações" dentro do Financeiro** (nova aba): listar endpoints, copiar URL+secret, ver últimas 50 chamadas, status, últimos erros.
-15. **Templates de mapeamento por ERP** salvos (`import_templates`) — escolhe-se no ImportDialog para pular o passo de mapeamento.
-16. **Detecção de duplicata pré-import** no preview do `ImportDialog`, usando `dedup_hash` + `useDuplicateDetection`.
-
-### Fase 4 — UX & cockpit CFO
-
-17. **Fluxo de Caixa: saldo acumulado** (linha + área) com previsto vs realizado e marca de runway (saldo zero).
-18. **Filtros globais no Financeiro** (empresa, período, conta bancária, centro de custo) persistidos em URL.
-19. **Refator `ContasBancariasTab**` em 4 subcomponentes (lista, dialog saldo, dialog limite, dialog PIX).
-20. **AR ganha PendenciasPanel** equivalente ao do AP (cobrança/baixa de recebíveis projetados).
-21. **Padronizar nº contábil**: aplicar `fmtAcc` (negativos em parênteses + vermelho) em todas as tabelas do módulo (FluxoCaixa, Conciliação, ContasBancárias).
-22. **Export CSV/PDF** do Fluxo de Caixa (mesma lib do PDF de posição de caixa).
+**Migração nova:** tabela `dashboard_kpi_preferences (user_id, organization_id, kpi_id, enabled, created_at)` com RLS por `is_org_member` + unique `(user_id, organization_id, kpi_id)`.
 
 ---
 
-## Estrutura técnica
+## 2. Seções e KPIs (35 indicadores)
+
+Cada KPI declara `requires: string[]` — uma lista de "capacidades" de dados. Se faltar qualquer uma, o card vai para estado `missing` e mostra **por que** + **link de ação**.
+
+### 2.1 Receita e Crescimento
+| KPI | Cálculo | Requisitos | CTA quando faltar |
+|---|---|---|---|
+| Faturamento (Receita Bruta) | Σ `cashflow_entries.tipo='entrada'` realizado no período | entradas realizadas | "Importe ou registre recebimentos" → /financeiro?tab=receber |
+| Receita Líquida | Bruta − impostos sobre vendas (subgrupo "tributos s/ vendas") | classificação por subgrupo | "Configure subgrupos de tributos" → /configuracoes?tab=aglutinacao |
+| Crescimento da Receita | (Receita mês N − N-1) / N-1 | ≥ 2 meses de receita | "Aguardando histórico mínimo (2 meses)" |
+| Ticket Médio | Receita / nº de transações de entrada | nº transações > 0 | "Sem transações no período" |
+| MRR | Σ contratos ativos com `tipo_recorrencia` em {mensal, bimestral, …} normalizados/mês e `impacto_resultado='receita'` | contratos recorrentes ativos | "Cadastre contratos recorrentes" → /contratos |
+| ARR | MRR × 12 | idem MRR | idem |
+
+### 2.2 Lucratividade
+| KPI | Cálculo | Requisitos |
+|---|---|---|
+| Lucro Bruto | Receita Líquida − CMV/CSP | classificação CMV no plano de contas |
+| Margem Bruta | Lucro Bruto / Receita Líquida | idem |
+| Margem Operacional | (Receita Líq − CMV − OPEX) / Receita Líq | OPEX classificada |
+| EBITDA | Op. + Depreciação + Amortização | depreciação registrada |
+| Margem EBITDA | EBITDA / Receita Líquida | idem |
+| Margem Líquida | (Op. − Juros − IR) / Receita Líquida | juros e IR identificados |
+
+CTA padrão para faltas de classificação: **"Classifique despesas em CMV/OPEX/Financeiras"** → `/configuracoes?tab=plano-contas`.
+
+### 2.3 Caixa e Liquidez
+| KPI | Cálculo |
+|---|---|
+| Saldo de Caixa | Σ `contas_bancarias.saldo_atual` (ativas) |
+| Fluxo de Caixa Operacional | Recebimentos op. − pagamentos op. (exclui financiamentos/investimentos) no período |
+| Burn Rate | Σ saídas / nº meses no período |
+| Runway | Saldo / Burn Rate (∞ se burn ≤ 0) — usa o helper já existente |
+| Capital de Giro Necessário | (PMR + Estoque − PMP) × custo diário operacional |
+| Liquidez Corrente | Ativos circulantes / Passivos circulantes (de `liabilities` + recebíveis em aberto) |
+
+### 2.4 Contas a Receber
+PMR, Aging (já tem `useFinanceiroAvgTerms` com buckets 0-30/31-60/61-90/90+), DSO, Inadimplência ABC, Taxa de Recuperação (recebido em atraso / total vencido), Concentração (% top 5 clientes em recebíveis).
+
+### 2.5 Contas a Pagar e Endividamento
+PMP, Endividamento Geral (passivos/ativos), Dívida Líquida (passivos onerosos − caixa), Dívida Líquida/EBITDA, Cobertura de Juros (EBITDA/juros), Custo da Dívida — separado por categoria (`fiscal`, `clientes`, `bancos`) lendo `liabilities.tipo`/`categoria`, mais Custo Ponderado Total.
+
+### 2.6 Eficiência Operacional
+OPEX/Receita, Custo Fixo Mensal (média móvel 3m de despesas com `recorrencia` ≠ pontual), Ponto de Equilíbrio (CF / margem contribuição %), Produtividade por Colaborador (Receita / headcount de `useEmployees`), Custo por Cliente Atendido (OPEX / nº clientes ativos CRM), Margem de Contribuição.
+
+### 2.7 Indicadores Comerciais Financeiros
+CAC (custo total marketing+vendas / nº novos clientes ganhos no CRM), LTV (ticket médio × margem bruta × tempo médio retenção), LTV/CAC, Payback CAC (CAC / lucro mensal por cliente), Churn (perdas/base inicial do período), Expansion Revenue (upsell em contratos existentes).
+
+---
+
+## 3. Sistema de "Dados Faltando" + CTAs
+
+Cada `KpiTile` tem 4 estados visuais:
 
 ```text
-supabase/migrations/
-  - cashflow_status_enum.sql            (Fase 1)
-  - cashflow_audit_log.sql              (Fase 1)
-  - reconciliation_rules.sql            (Fase 2)
-  - bank_balance_snapshots.sql          (Fase 2)
-  - integration_endpoints.sql           (Fase 3)
-  - import_templates.sql                (Fase 3)
-
-supabase/functions/
-  - webhook-ingest/index.ts             (Fase 3, novo)
-  - reconcile-auto/index.ts             (Fase 2, novo)
-  - bank-balance-snapshot/index.ts      (Fase 2, cron)
-
-src/components/financeiro/
-  - IntegrationsTab.tsx                 (Fase 3, novo)
-  - ReconciliationRulesDialog.tsx       (Fase 2, novo)
-  - BalanceDivergenceCard.tsx           (Fase 2, novo)
-  - BalanceHistoryChart.tsx             (Fase 4, novo)
-  - bank/{BankAccountList,BalanceDialog,LimitDialog,PixDialog}.tsx  (Fase 4, refactor)
-
-src/hooks/
-  - useFinanceiro.ts                    (Fase 1, fix totals + parcelas)
-  - useReconciliationRules.ts           (Fase 2, novo)
-  - useBankBalanceHistory.ts            (Fase 2, novo)
-  - useIntegrationEndpoints.ts          (Fase 3, novo)
-
-src/lib/
-  - financialMath.ts                    (Fase 1, novo — splitInstallments, accBalance)
+ok        → valor + delta + sparkline (quando há série)
+partial   → valor + badge âmbar "X% de cobertura — clique para melhorar"
+missing   → ícone ⓘ + frase explicando o que falta + botão "Configurar"
+disabled  → card minimizado em cinza com toggle pra reativar
 ```
 
-## Impactos & cuidados
+Exemplo de payload no `kpiRegistry`:
+```ts
+{
+  id: "ebitda",
+  section: "lucratividade",
+  label: "EBITDA",
+  requires: ["receita_liquida", "opex_classificada", "depreciacao"],
+  cta: { label: "Configurar plano de contas", route: "/configuracoes?tab=plano-contas" },
+  format: "currency",
+}
+```
 
-- Mudanças de schema (enums) exigem normalização prévia de dados existentes — incluído em cada migration.
-- Webhook público requer rate limit (in-memory por org+IP) + secret rotacionável + log de auditoria.
-- Backfill de `conta_bancaria_id` tem risco de associar errado: marcar `notes` com prefixo `[backfill-auto]` para reversão.
-- Audit log infla rapidamente — incluir TTL/partição por mês.
+O hook `useFinancialDashboardKPIs` retorna, para cada `requires`, se a capacidade está atendida. O Tile junta o motivo: *"EBITDA indisponível: nenhuma despesa de Depreciação registrada nos últimos 12 meses."*
 
-## Fora de escopo (futuro)
+---
 
-- Emissão fiscal (NFe/NFSe).
-- Conciliação Open Finance via Belvo/Pluggy.
-- Multi-moeda.
-- Razão contábil completo (DRE/Balanço já existem em outro módulo; aqui só feed).
+## 4. Configuração on/off de KPIs
 
-Aprovando este plano, executo em ordem (Fase 1 → 4) com confirmação no final de cada fase.
+- Cada Tile tem menu `⋮` → "Ocultar este KPI". Persiste em `dashboard_kpi_preferences`.
+- Botão **"Configurar Dashboard"** no header da aba abre `KpiPreferencesDialog`: lista dos 35 KPIs agrupados por seção com switches; preset "Essencial PME" (subset enxuto) e "Completo".
+- Padrão (sem registro na tabela): todos habilitados **exceto** os marcados `defaultEnabled: false` no registry (ex.: LTV/CAC se não há CRM ativo).
+
+---
+
+## 5. Considerações técnicas
+
+- **Performance**: o hook agrega vários hooks já existentes; usa `useMemo` por seção para evitar recalcular tudo a cada toggle.
+- **Holding mode**: respeita `useHolding().activeOrgIds` automaticamente porque consome hooks que já tratam isso.
+- **Permissões**: aba só aparece se `getAllowedTabs("financeiro", ALL_TABS)` incluir `dashboard`. Preferências por usuário+org via RLS.
+- **Reuso**: aproveita `KPICard` existente (com `valueClassName` para negativos vermelhos no padrão contábil), `PMPMRKpiCard`, `useFinancialSummary` (runway, burn, alertas) e `useFinanceiroAvgTerms` (aging).
+- **MECE**: nenhum cálculo duplica entradas — todos derivam de `cashflow_entries` materializadas via os hooks centralizados, mantendo a fonte única de verdade.
+- **Sem dados ≠ zero**: nunca exibir "R$ 0,00" como sucesso. Sempre `missing` com motivo.
+
+---
+
+## 6. Entregáveis desta fase
+
+1. Migration: `dashboard_kpi_preferences` + RLS.
+2. Registry com os 35 KPIs.
+3. Hook agregador.
+4. UI: aba Dashboard, seções colapsáveis, tiles com 4 estados, dialog de preferências.
+5. Integração na rota `/financeiro` e atualização do `FinanceiroSkeleton` para incluir a nova aba.
+6. Memória do projeto atualizada (`features/financial-dashboard-kpis.md`) descrevendo o registry e o padrão de "missing data + CTA".
+
+Próximas iterações (não nesta entrega): sparklines históricos por KPI, exportação PDF do Dashboard, alertas configuráveis por KPI, comparativo período-a-período.
