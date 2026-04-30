@@ -551,17 +551,17 @@ export function AgingListTab() {
                       <TableCell className="text-center text-muted-foreground">
                         {org.accounts.length}
                       </TableCell>
-                      <TableCell className="text-right">{fmt(org.saldo)}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{fmt(org.limite)}</TableCell>
-                      <TableCell className="text-right font-bold text-primary">{fmt(org.disponibilidade)}</TableCell>
+                      <TableCell className="text-right"><AccVal v={org.saldo} /></TableCell>
+                      <TableCell className="text-right text-muted-foreground"><AccVal v={org.limite} /></TableCell>
+                      <TableCell className={`text-right font-bold ${org.disponibilidade < 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(org.disponibilidade)}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/50 font-bold">
                     <TableCell>Total</TableCell>
                     <TableCell className="text-center">{bankAccounts.length}</TableCell>
-                    <TableCell className="text-right">{fmt(bankTotals.saldoTotal)}</TableCell>
-                    <TableCell className="text-right">{fmt(bankTotals.limiteTotal)}</TableCell>
-                    <TableCell className="text-right text-primary">{fmt(bankTotals.disponibilidadeTotal)}</TableCell>
+                    <TableCell className="text-right"><AccVal v={bankTotals.saldoTotal} /></TableCell>
+                    <TableCell className="text-right"><AccVal v={bankTotals.limiteTotal} /></TableCell>
+                    <TableCell className={`text-right ${bankTotals.disponibilidadeTotal < 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(bankTotals.disponibilidadeTotal)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
