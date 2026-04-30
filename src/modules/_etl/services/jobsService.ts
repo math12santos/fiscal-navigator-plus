@@ -59,7 +59,7 @@ export async function createJob(input: CreateJobInput): Promise<string> {
       seq: idx,
       external_ref: it.externalRef ?? null,
       idempotency_key: it.idempotencyKey,
-      raw: it.raw,
+      raw: it.raw as never,
     }));
     // Insert em chunks de 500
     for (let i = 0; i < rows.length; i += 500) {
