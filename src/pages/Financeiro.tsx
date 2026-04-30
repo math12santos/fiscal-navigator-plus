@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUrlState } from "@/hooks/useUrlState";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
@@ -29,7 +29,10 @@ export default function Financeiro() {
   const navigate = useNavigate();
   const { getAllowedTabs } = useUserPermissions();
   const allowedTabs = getAllowedTabs("financeiro", ALL_TABS);
-  const [activeTab, setActiveTab] = useState(allowedTabs[0]?.key || "pagar");
+  const defaultTab = allowedTabs[0]?.key || "pagar";
+  const [urlTab, setUrlTab] = useUrlState("tab", defaultTab);
+  const activeTab = allowedTabs.some((t) => t.key === urlTab) ? urlTab : defaultTab;
+  const setActiveTab = setUrlTab;
 
   // Mapeia CTAs do checklist/trilha de maturidade para abas internas ou rotas externas.
   const handleMaturityTabChange = (tab: string) => {

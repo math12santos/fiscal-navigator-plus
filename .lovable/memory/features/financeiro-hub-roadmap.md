@@ -1,6 +1,6 @@
 ---
 name: Financeiro Hub Roadmap
-description: Plano em 4 fases para tornar o módulo Financeiro um hub centralizador (importações + webhooks) substituível a ERP. Fases 1-3 implementadas.
+description: Plano em 4 fases para tornar o módulo Financeiro um hub centralizador (importações + webhooks) substituível a ERP. Fases 1-4 implementadas.
 type: feature
 ---
 
@@ -31,10 +31,14 @@ Visão: o Financeiro NÃO é bookkeeping. É cockpit auditável que ingere dados
 - URL pública: `${VITE_SUPABASE_URL}/functions/v1/webhook-ingest?endpoint=<uuid>`.
 - Aba "Integrações" no Financeiro: CRUD de endpoints, rotação de secret, toggle ativo/pausado, log de eventos recentes (50 últimos com status processed/received/error).
 
-## Fases pendentes
-- **Fase 4** — UX cockpit: gráfico saldo acumulado/runway, filtros globais persistidos em URL, refator `ContasBancariasTab`, AR ganha PendenciasPanel, padronizar `fmtAcc` em todas as tabelas, export CSV/PDF do Fluxo, UI CRUD de `reconciliation_rules` e `import_templates`.
+## Fase 4 — Implementada
+- `src/hooks/useUrlState.ts` — hook genérico para sincronizar state ↔ URL (`?tab=`, `?view=`, `?ciclo=`). Persiste preferências do usuário entre reloads/links.
+- `Financeiro.tsx`: aba ativa persistida em `?tab=`. `FluxoCaixaTab`: subview e ciclo persistidos em `?view=` e `?ciclo=`.
+- `FluxoCaixaTab` ganhou 5 KPIs: Saldo Abertura, Entradas, Saídas, **Saldo Final Projetado** (= abertura + saldo do período), **Runway** (meses até o caixa zerar dado o burn projetado).
+- `src/lib/fluxoCaixaExport.ts`: `exportFluxoCaixaCSV` (BOM UTF-8, separador `;` Excel-PT) e `exportFluxoCaixaPDF` (resumo + tabela com **Saldo Acumulado** rodante por linha, padrão contábil `(xxx)` em vermelho).
+- `ReconciliationRulesDialog`: CRUD completo de `reconciliation_rules` (nome, padrão, modo contains/exact/regex, tipo, faixa de valor, prioridade, ativo) + botão "Aplicar regras agora" que chama RPC `apply_reconciliation_rules`. Acessível em `ConciliacaoTab` via botão "Regras".
 
-## Convenções
+## Convenções (mantidas)
 - Todo split de valores em N partes deve usar `splitInstallments` (não `Math.round(x/n)`).
 - Toda mudança de valor/status/conta em `cashflow_entries` é auditada automaticamente — não criar logs paralelos.
 - `[backfill-pendente]` em `notes` sinaliza linha para revisão manual de conta bancária.
