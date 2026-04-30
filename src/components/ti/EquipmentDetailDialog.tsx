@@ -32,7 +32,7 @@ export function EquipmentDetailDialog({ open, onOpenChange, equipment, onNewMove
     const emp = employees.find((e: any) => e.id === empId);
     await generateResponsibilityTermPDF({
       equipment,
-      employee: emp ? { name: emp.name, cpf: emp.cpf, position: emp.position } : null,
+      employee: emp ? { name: emp.name, cpf: emp.cpf } : null,
       movement: lastDelivery,
       organizationName: currentOrg?.name,
     });
