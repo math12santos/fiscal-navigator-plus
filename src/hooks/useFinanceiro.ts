@@ -206,20 +206,25 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
     return filterByScope(merged);
   }, [entriesQuery.data, installmentsQuery.data, contracts, tipo, orgId, filterByScope, payrollProjections]);
 
-  // Totals — provisões acumuladas (passivo trabalhista) NÃO entram no caixa
+  // Totais — MECE: cada lançamento conta em exatamente UM bucket (pendente OU realizado).
+  // Provisões acumuladas (passivo trabalhista) NÃO entram no caixa.
   const totals = useMemo(() => {
-    let total_previsto = 0;
-    let total_realizado = 0;
-    let pendente = 0;
+    let total_previsto = 0;     // soma de TUDO (referência), sem dupla contagem entre buckets
+    let total_realizado = 0;    // só pago/recebido (valor efetivamente movimentado)
+    let pendente = 0;           // só previsto/confirmado (a vencer ou em aberto)
     let count_pendente = 0;
 
     for (const e of allEntries) {
       if ((e as any).dp_sub_category === "provisao_acumulada") continue;
-      total_previsto += Number(e.valor_previsto);
-      if (e.valor_realizado != null) {
-        total_realizado += Number(e.valor_realizado);
-      }
-      if (e.status === "previsto" || e.status === "confirmado") {
+      const isRealized = e.status === "pago" || e.status === "recebido";
+      const isPending = e.status === "previsto" || e.status === "confirmado";
+      const valorRef = isRealized
+        ? Number(e.valor_realizado ?? e.valor_previsto)
+        : Number(e.valor_previsto);
+      total_previsto += valorRef;
+      if (isRealized) {
+        total_realizado += Number(e.valor_realizado ?? e.valor_previsto);
+      } else if (isPending) {
         pendente += Number(e.valor_previsto);
         count_pendente++;
       }
