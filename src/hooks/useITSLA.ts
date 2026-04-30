@@ -1,20 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
 import { toast } from "sonner";
 
 export function useITSLA() {
   const { currentOrg } = useOrganization();
+  const { holdingMode, activeOrgIds } = useHolding();
+  const orgIds =
+    holdingMode && activeOrgIds.length > 0
+      ? activeOrgIds
+      : currentOrg?.id
+        ? [currentOrg.id]
+        : [];
   const qc = useQueryClient();
 
   const list = useQuery({
-    queryKey: ["it_sla_policies", currentOrg?.id],
-    enabled: !!currentOrg?.id,
+    queryKey: ["it_sla_policies", orgIds],
+    enabled: orgIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("it_sla_policies" as any)
         .select("*")
-        .eq("organization_id", currentOrg!.id)
+        .in("organization_id", orgIds)
         .order("priority");
       if (error) throw error;
       return (data ?? []) as any[];

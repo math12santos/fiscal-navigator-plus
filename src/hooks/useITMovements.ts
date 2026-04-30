@@ -1,20 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
 import { toast } from "sonner";
 
 export function useITMovements(equipmentId?: string) {
   const { currentOrg } = useOrganization();
+  const { holdingMode, activeOrgIds } = useHolding();
+  const orgIds =
+    holdingMode && activeOrgIds.length > 0
+      ? activeOrgIds
+      : currentOrg?.id
+        ? [currentOrg.id]
+        : [];
   const qc = useQueryClient();
 
   const list = useQuery({
-    queryKey: ["it_movements", currentOrg?.id, equipmentId],
-    enabled: !!currentOrg?.id,
+    queryKey: ["it_movements", orgIds, equipmentId],
+    enabled: orgIds.length > 0,
     queryFn: async () => {
       let q = supabase
         .from("it_equipment_movements" as any)
         .select("*")
-        .eq("organization_id", currentOrg!.id)
+        .in("organization_id", orgIds)
         .order("movement_date", { ascending: false });
       if (equipmentId) q = q.eq("equipment_id", equipmentId);
       const { data, error } = await q;

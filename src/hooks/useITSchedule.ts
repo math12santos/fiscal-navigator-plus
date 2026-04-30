@@ -1,20 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
 import { toast } from "sonner";
 
 export function useITSchedule(equipmentId?: string) {
   const { currentOrg } = useOrganization();
+  const { holdingMode, activeOrgIds } = useHolding();
+  const orgIds =
+    holdingMode && activeOrgIds.length > 0
+      ? activeOrgIds
+      : currentOrg?.id
+        ? [currentOrg.id]
+        : [];
   const qc = useQueryClient();
 
   const list = useQuery({
-    queryKey: ["it_depreciation_schedule", currentOrg?.id, equipmentId],
-    enabled: !!currentOrg?.id,
+    queryKey: ["it_depreciation_schedule", orgIds, equipmentId],
+    enabled: orgIds.length > 0,
     queryFn: async () => {
       let q = supabase
         .from("it_depreciation_schedule" as any)
         .select("*")
-        .eq("organization_id", currentOrg!.id)
+        .in("organization_id", orgIds)
         .order("competencia", { ascending: true });
       if (equipmentId) q = q.eq("equipment_id", equipmentId);
       const { data, error } = await q;
