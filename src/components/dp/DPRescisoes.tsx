@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calculator } from "lucide-react";
+import { Calculator, Eye } from "lucide-react";
 import { useEmployees, useTerminations } from "@/hooks/useDP";
 import { format } from "date-fns";
 import TerminationSimulatorDialog, { TERM_TYPES, PJ_TERM_TYPES } from "./TerminationSimulatorDialog";
+import TerminationDetailsDialog from "./TerminationDetailsDialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { DPExportButton } from "./DPExportButton";
 import { generateDPExcelReport, generateDPPdfReport } from "@/lib/dpExports";
@@ -21,6 +22,13 @@ export default function DPRescisoes() {
   const { currentOrg } = useOrganization();
 
   const [simOpen, setSimOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedTermination, setSelectedTermination] = useState<any | null>(null);
+
+  const openDetails = (t: any) => {
+    setSelectedTermination(t);
+    setDetailsOpen(true);
+  };
 
   const empMap = useMemo(() => {
     const m: Record<string, any> = {};
