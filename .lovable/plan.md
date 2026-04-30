@@ -135,3 +135,29 @@ Faremos um benchmark com `browser--performance_profile` antes da Fase 1 e ao fim
 4. **Fase 4** (1 sessão) — depende de Realtime estar habilitado nas tabelas certas.
 
 Posso executar uma fase de cada vez. Diga **"executar fase 1 de performance"** para começar pelos quick wins, ou peça reordenação (por exemplo, priorizar Realtime primeiro se o problema multi-usuário for o mais urgente).
+---
+
+## ✅ Fase 3 (Performance) — Agregações no servidor (concluída)
+
+**Migration:** `20260430231844` — RPCs Postgres + índices.
+
+### RPCs criadas (SECURITY INVOKER, respeitam RLS existente)
+1. **`get_cashflow_summary_by_period(_organization_id, _from, _to)`** → JSON `{ totals, monthly[], by_category[] }`. Substitui 3 reduções no cliente (totais, gráfico mensal, breakdown por categoria) por 1 round-trip.
+2. **`get_dashboard_kpis(_organization_id)`** → JSON `{ contracts, liabilities, crm }`. Calcula contratos ativos, valor mensal normalizado, passivos agregados, CRM weighted_value/open/stale em 1 RPC.
+
+### Índices de suporte (idempotentes)
+- `idx_cashflow_org_dataprev` em `cashflow_entries(organization_id, data_prevista)`
+- `idx_contracts_org_status`, `idx_liabilities_org_status`
+- `idx_crm_opps_org_open` (parcial: `won_at IS NULL AND lost_at IS NULL`)
+
+### Hooks novos (prontos para consumo)
+- `useDashboardKPIs()` em `src/hooks/useDashboardKPIs.ts` — preset `operational`, `keepPreviousData`.
+- `useCashflowSummary(rangeFrom, rangeTo)` em `src/hooks/useCashflowSummary.ts` — preset `operational`, `keepPreviousData`.
+
+### Por que não troquei os consumidores ainda
+`useFinancialSummary` é importado por `Dashboard`, `RelatorioKpi`, `usePlanningPdfReport`, `PlanningCockpit` e `useCashFlow`. Ele aplica filtros operacionais (cost_center, subsidiary) sobre o array de entries. Substituir por RPC exige que as RPCs aceitem esses mesmos filtros — escopo de uma **Fase 3.5** dedicada (assinaturas das RPCs já estão preparadas para isso).
+
+**Como adotar gradualmente:** novos componentes de Dashboard (KPI cards, gráficos summary) devem usar `useDashboardKPIs`/`useCashflowSummary` direto; consumidores antigos migram quando passarem por refactor.
+
+### Próximo passo sugerido
+- **Fase 4 — Realtime**: habilitar canais Supabase em `cashflow_entries`, `contracts`, `notifications` para sincronização multi-usuário e *optimistic updates* via `useMutation`.

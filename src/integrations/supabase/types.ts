@@ -8555,6 +8555,11 @@ export type Database = {
         Args: { p_holding_id: string }
         Returns: string[]
       }
+      get_cashflow_summary_by_period: {
+        Args: { _from: string; _organization_id: string; _to: string }
+        Returns: Json
+      }
+      get_dashboard_kpis: { Args: { _organization_id: string }; Returns: Json }
       get_user_org_ids: { Args: { p_user_id: string }; Returns: string[] }
       has_backoffice_org_access: { Args: { _org_id: string }; Returns: boolean }
       has_backoffice_role: { Args: { _roles: string[] }; Returns: boolean }
