@@ -98,10 +98,12 @@ export function JuridicoSettlementsTab() {
                         <td>{new Date(s.data_primeira_parcela).toLocaleDateString("pt-BR")}</td>
                         <td><Badge variant="outline">{s.status}</Badge></td>
                         <td className="text-right">
-                          {s.status === "proposto" && (
-                            <Button size="sm" variant="outline" onClick={() => approve.mutate(s.id)}>
-                              <CheckCircle2 className="h-4 w-4 mr-1" /> Aprovar
+                          {s.status === "proposto" ? (
+                            <Button size="sm" variant="outline" onClick={() => approve.mutate(s.id)} disabled={approve.isPending}>
+                              <CheckCircle2 className="h-4 w-4 mr-1" /> Aprovar e lançar no caixa
                             </Button>
+                          ) : (
+                            <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">Lançado</Badge>
                           )}
                         </td>
                       </tr>
