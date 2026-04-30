@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useITConfig } from "@/hooks/useITConfig";
+import { SLAPoliciesSection } from "./SLAPoliciesSection";
 
 export function TIConfigTab() {
   const { config, save } = useITConfig();
@@ -13,9 +14,9 @@ export function TIConfigTab() {
   const set = (k: string, val: any) => setV((p: any) => ({ ...p, [k]: val }));
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4 max-w-4xl">
       <Card>
-        <CardHeader><CardTitle className="text-base">SLA por prioridade (horas)</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">SLA padrão por prioridade (horas) — fallback</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div><Label>Baixa</Label><Input type="number" value={v.sla_baixa_hours ?? 72} onChange={(e) => set("sla_baixa_hours", parseInt(e.target.value) || 0)} /></div>
           <div><Label>Média</Label><Input type="number" value={v.sla_media_hours ?? 24} onChange={(e) => set("sla_media_hours", parseInt(e.target.value) || 0)} /></div>
@@ -23,6 +24,8 @@ export function TIConfigTab() {
           <div><Label>Crítica</Label><Input type="number" value={v.sla_critica_hours ?? 2} onChange={(e) => set("sla_critica_hours", parseInt(e.target.value) || 0)} /></div>
         </CardContent>
       </Card>
+
+      <SLAPoliciesSection />
 
       <Card>
         <CardHeader><CardTitle className="text-base">Vida útil padrão (meses)</CardTitle></CardHeader>
