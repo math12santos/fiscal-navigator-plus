@@ -94,4 +94,19 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     ],
   },
   { key: "configuracoes", label: "Configurações" },
+  {
+    key: "ti",
+    label: "TI & Ativos",
+    tabs: [
+      { key: "dashboard", label: "Dashboard" },
+      { key: "equipamentos", label: "Equipamentos" },
+      { key: "sistemas", label: "Sistemas" },
+      { key: "telecom", label: "Links / Telecom" },
+      { key: "chamados", label: "Chamados" },
+      { key: "sinistros", label: "Sinistros" },
+      { key: "depreciacao", label: "Depreciação" },
+      { key: "tco", label: "TCO" },
+      { key: "config", label: "Configurações" },
+    ],
+  },
 ];
