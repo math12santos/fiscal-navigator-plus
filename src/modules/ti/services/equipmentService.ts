@@ -7,11 +7,12 @@ function sanitize<T extends Record<string, any>>(payload: T): T {
   return payload;
 }
 
-export async function listEquipment(orgId: string) {
+export async function listEquipment(orgIds: string[]) {
+  if (!orgIds.length) return [] as any[];
   const { data, error } = await supabase
     .from("it_equipment" as any)
     .select("*")
-    .eq("organization_id", orgId)
+    .in("organization_id", orgIds)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as any[];

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
 import { toast } from "sonner";
 import {
   listEquipment,
@@ -10,12 +11,19 @@ import type { ITEquipment } from "../domain/types";
 
 export function useITEquipment() {
   const { currentOrg } = useOrganization();
+  const { holdingMode, activeOrgIds } = useHolding();
+  const orgIds =
+    holdingMode && activeOrgIds.length > 0
+      ? activeOrgIds
+      : currentOrg?.id
+        ? [currentOrg.id]
+        : [];
   const qc = useQueryClient();
 
   const list = useQuery({
-    queryKey: ["it_equipment", currentOrg?.id],
-    enabled: !!currentOrg?.id,
-    queryFn: () => listEquipment(currentOrg!.id),
+    queryKey: ["it_equipment", orgIds],
+    enabled: orgIds.length > 0,
+    queryFn: () => listEquipment(orgIds),
   });
 
   const upsert = useMutation({
