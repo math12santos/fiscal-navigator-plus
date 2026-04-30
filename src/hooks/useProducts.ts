@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { cachePresets } from "@/lib/cachePresets";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -36,6 +37,7 @@ export function useProducts() {
   const { data: products = [], isLoading } = useQuery({
     queryKey: key,
     enabled: !!user && !!orgId,
+    ...cachePresets.reference,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")

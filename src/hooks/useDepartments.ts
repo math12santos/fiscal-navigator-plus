@@ -1,6 +1,7 @@
 // Hook de departamentos (RH).
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { cachePresets } from "@/lib/cachePresets";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -30,6 +31,7 @@ export function useDepartments() {
       return (data ?? []) as unknown as HrDepartment[];
     },
     enabled: !!currentOrg?.id,
+    ...cachePresets.reference,
   });
 }
 
