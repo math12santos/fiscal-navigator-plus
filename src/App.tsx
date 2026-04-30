@@ -55,6 +55,7 @@ export const pageFactories = {
   dpDesempenho: () => import("@/pages/DepartamentoPessoalDesempenho"),
   ti: () => import("@/pages/TI"),
   juridico: () => import("@/pages/Juridico"),
+  etlOps: () => import("@/pages/EtlOps"),
 } as const;
 
 // Lazy-loaded pages
