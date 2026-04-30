@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useITConfig } from "@/hooks/useITConfig";
 import { SLAPoliciesSection } from "./SLAPoliciesSection";
+import { AuditLogSection } from "./AuditLogSection";
 
 export function TIConfigTab() {
   const { config, save } = useITConfig();
-  const [v, setV] = useState<any>({ sla_baixa_hours: 72, sla_media_hours: 24, sla_alta_hours: 8, sla_critica_hours: 2, default_useful_life_notebook: 60, default_useful_life_desktop: 60, default_useful_life_monitor: 60, default_useful_life_celular: 36, default_useful_life_servidor: 84, default_useful_life_outro: 60 });
+  const [v, setV] = useState<any>({ sla_baixa_hours: 72, sla_media_hours: 24, sla_alta_hours: 8, sla_critica_hours: 2, default_useful_life_notebook: 60, default_useful_life_desktop: 60, default_useful_life_monitor: 60, default_useful_life_celular: 36, default_useful_life_servidor: 84, default_useful_life_outro: 60, technician_hourly_cost: 80 });
 
   useEffect(() => { if (config.data) setV(config.data); }, [config.data]);
   const set = (k: string, val: any) => setV((p: any) => ({ ...p, [k]: val }));
@@ -39,9 +40,22 @@ export function TIConfigTab() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader><CardTitle className="text-base">Custo de operação de TI</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <Label>Custo/hora do técnico (R$)</Label>
+            <Input type="number" step="0.01" value={v.technician_hourly_cost ?? 80} onChange={(e) => set("technician_hourly_cost", parseFloat(e.target.value) || 0)} />
+            <p className="text-xs text-muted-foreground mt-1">Usado no cálculo de TCO (incidentes × horas).</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex justify-end">
         <Button onClick={() => save.mutate(v)}>Salvar configurações</Button>
       </div>
+
+      <AuditLogSection />
     </div>
   );
 }

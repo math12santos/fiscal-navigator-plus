@@ -8,6 +8,7 @@ import { TicketsTab } from "@/components/ti/TicketsTab";
 import { IncidentsTab } from "@/components/ti/IncidentsTab";
 import { DepreciationTab } from "@/components/ti/DepreciationTab";
 import { TIConfigTab } from "@/components/ti/TIConfigTab";
+import { TCOTab } from "@/components/ti/TCOTab";
 import { useEffect } from "react";
 
 export default function TI() {
@@ -30,6 +31,7 @@ export default function TI() {
           <TabsTrigger value="chamados">Chamados</TabsTrigger>
           <TabsTrigger value="sinistros">Sinistros</TabsTrigger>
           <TabsTrigger value="depreciacao">Depreciação</TabsTrigger>
+          <TabsTrigger value="tco">TCO</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
 
@@ -40,6 +42,7 @@ export default function TI() {
         <TabsContent value="chamados"><TicketsTab /></TabsContent>
         <TabsContent value="sinistros"><IncidentsTab /></TabsContent>
         <TabsContent value="depreciacao"><DepreciationTab /></TabsContent>
+        <TabsContent value="tco"><TCOTab /></TabsContent>
         <TabsContent value="config"><TIConfigTab /></TabsContent>
       </Tabs>
     </div>
