@@ -198,6 +198,42 @@ export type Database = {
           },
         ]
       }
+      bank_balance_snapshots: {
+        Row: {
+          bank_account_id: string
+          created_at: string
+          id: string
+          organization_id: string
+          saldo: number
+          saldo_conciliado: number | null
+          saldo_previsto: number | null
+          snapshot_date: string
+          source: string
+        }
+        Insert: {
+          bank_account_id: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          saldo: number
+          saldo_conciliado?: number | null
+          saldo_previsto?: number | null
+          snapshot_date: string
+          source?: string
+        }
+        Update: {
+          bank_account_id?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          saldo?: number
+          saldo_conciliado?: number | null
+          saldo_previsto?: number | null
+          snapshot_date?: string
+          source?: string
+        }
+        Relationships: []
+      }
       bank_statement_entries: {
         Row: {
           bank_account_id: string
@@ -5305,6 +5341,72 @@ export type Database = {
         }
         Relationships: []
       }
+      reconciliation_rules: {
+        Row: {
+          account_id: string | null
+          active: boolean
+          conta_bancaria_id: string | null
+          cost_center_id: string | null
+          created_at: string
+          description_pattern: string
+          entity_id: string | null
+          hits: number
+          id: string
+          last_applied_at: string | null
+          match_mode: string
+          max_value: number | null
+          min_value: number | null
+          name: string
+          organization_id: string
+          priority: number
+          tipo: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          active?: boolean
+          conta_bancaria_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          description_pattern: string
+          entity_id?: string | null
+          hits?: number
+          id?: string
+          last_applied_at?: string | null
+          match_mode?: string
+          max_value?: number | null
+          min_value?: number | null
+          name: string
+          organization_id: string
+          priority?: number
+          tipo?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          active?: boolean
+          conta_bancaria_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          description_pattern?: string
+          entity_id?: string | null
+          hits?: number
+          id?: string
+          last_applied_at?: string | null
+          match_mode?: string
+          max_value?: number | null
+          min_value?: number | null
+          name?: string
+          organization_id?: string
+          priority?: number
+          tipo?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       report_deliveries: {
         Row: {
           channel: string
@@ -6368,9 +6470,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_reconciliation_rules: {
+        Args: { p_only_unclassified?: boolean; p_org_id: string }
+        Returns: Json
+      }
       assign_backoffice_operator_to_org: {
         Args: { _org_id: string; _target_user_id: string }
         Returns: undefined
+      }
+      auto_reconcile_statement_batch: {
+        Args: { p_limit?: number; p_min_score?: number; p_org_id: string }
+        Returns: Json
       }
       change_org_member_role: {
         Args: { _new_role: string; _org_id: string; _target_user_id: string }
@@ -6428,6 +6538,23 @@ export type Database = {
           valor_realizado: number
         }[]
       }
+      match_statement_to_cashflow_v2: {
+        Args: { p_statement_id: string }
+        Returns: {
+          cashflow_id: string
+          data_prevista: string
+          data_realizada: string
+          descricao: string
+          score: number
+          score_data: number
+          score_texto: number
+          score_valor: number
+          status: string
+          tipo: string
+          valor_previsto: number
+          valor_realizado: number
+        }[]
+      }
       propagate_benefit_to_subsidiaries: {
         Args: { p_benefit_id: string }
         Returns: Json
@@ -6447,6 +6574,12 @@ export type Database = {
       remove_org_member: {
         Args: { _org_id: string; _target_user_id: string }
         Returns: undefined
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      snapshot_bank_balances_daily: {
+        Args: { p_org_id: string; p_snapshot_date?: string }
+        Returns: Json
       }
       unreconcile_statement_entry: {
         Args: { p_statement_id: string }
