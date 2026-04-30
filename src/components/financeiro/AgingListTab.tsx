@@ -450,6 +450,10 @@ export function AgingListTab() {
     }
   };
 
+  if (isLoading) {
+    return <div className="flex justify-center py-12"><Loader2 className="animate-spin" /></div>;
+  }
+
   return (
     <div className="space-y-6">
       {/* ── Header actions ── */}
