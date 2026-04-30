@@ -18,7 +18,8 @@ import { cn } from "@/lib/utils";
 import { useGroupingRules } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
 import { buildHierarchy } from "@/lib/groupingHierarchy";
-import { generateCashPositionPdf, type CashPositionByOrg } from "@/lib/cashPositionPdf";
+import { generateCashPositionPdf, type CashPositionByOrg, type AuditDivergenceRow, type WeekPaymentRow } from "@/lib/cashPositionPdf";
+import { startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
