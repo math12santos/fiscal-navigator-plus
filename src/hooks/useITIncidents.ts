@@ -40,6 +40,8 @@ export function useITIncidents() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["it_incidents"] });
+      qc.invalidateQueries({ queryKey: ["cashflow"] });
+      qc.invalidateQueries({ queryKey: ["financeiro"] });
       toast.success("Incidente salvo");
     },
     onError: (e: any) => toast.error(e.message ?? "Erro ao salvar"),
