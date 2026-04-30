@@ -2735,6 +2735,204 @@ export type Database = {
           },
         ]
       }
+      etl_job_items: {
+        Row: {
+          attempts: number
+          created_at: string
+          external_ref: string | null
+          id: string
+          idempotency_key: string
+          job_id: string
+          last_error: string | null
+          mapped: Json | null
+          max_attempts: number
+          next_attempt_at: string
+          organization_id: string
+          processed_at: string | null
+          raw: Json
+          seq: number
+          status: string
+          target_id: string | null
+          target_table: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          idempotency_key: string
+          job_id: string
+          last_error?: string | null
+          mapped?: Json | null
+          max_attempts?: number
+          next_attempt_at?: string
+          organization_id: string
+          processed_at?: string | null
+          raw?: Json
+          seq: number
+          status?: string
+          target_id?: string | null
+          target_table?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          idempotency_key?: string
+          job_id?: string
+          last_error?: string | null
+          mapped?: Json | null
+          max_attempts?: number
+          next_attempt_at?: string
+          organization_id?: string
+          processed_at?: string | null
+          raw?: Json
+          seq?: number
+          status?: string
+          target_id?: string | null
+          target_table?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "etl_job_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "etl_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "etl_job_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      etl_jobs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          failed_count: number
+          finished_at: string | null
+          id: string
+          idempotency_key: string
+          module: string
+          ok_count: number
+          organization_id: string
+          params: Json
+          pipeline_key: string
+          skipped_count: number
+          source: string
+          started_at: string | null
+          status: string
+          total_count: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          failed_count?: number
+          finished_at?: string | null
+          id?: string
+          idempotency_key: string
+          module: string
+          ok_count?: number
+          organization_id: string
+          params?: Json
+          pipeline_key: string
+          skipped_count?: number
+          source: string
+          started_at?: string | null
+          status?: string
+          total_count?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          failed_count?: number
+          finished_at?: string | null
+          id?: string
+          idempotency_key?: string
+          module?: string
+          ok_count?: number
+          organization_id?: string
+          params?: Json
+          pipeline_key?: string
+          skipped_count?: number
+          source?: string
+          started_at?: string | null
+          status?: string
+          total_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "etl_jobs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "etl_jobs_pipeline_key_fkey"
+            columns: ["pipeline_key"]
+            isOneToOne: false
+            referencedRelation: "etl_pipelines"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      etl_pipelines: {
+        Row: {
+          active: boolean
+          batch_size: number
+          created_at: string
+          cron_expr: string | null
+          description: string | null
+          key: string
+          label: string
+          max_attempts: number
+          module: string
+          target_handler: string | null
+          updated_at: string
+          worker: string
+        }
+        Insert: {
+          active?: boolean
+          batch_size?: number
+          created_at?: string
+          cron_expr?: string | null
+          description?: string | null
+          key: string
+          label: string
+          max_attempts?: number
+          module: string
+          target_handler?: string | null
+          updated_at?: string
+          worker?: string
+        }
+        Update: {
+          active?: boolean
+          batch_size?: number
+          created_at?: string
+          cron_expr?: string | null
+          description?: string | null
+          key?: string
+          label?: string
+          max_attempts?: number
+          module?: string
+          target_handler?: string | null
+          updated_at?: string
+          worker?: string
+        }
+        Relationships: []
+      }
       expense_cost_center_splits: {
         Row: {
           cashflow_entry_id: string
@@ -8261,7 +8459,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      etl_jobs_unified: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          failed_count: number | null
+          finished_at: string | null
+          id: string | null
+          module: string | null
+          ok_count: number | null
+          organization_id: string | null
+          origin: string | null
+          pipeline_key: string | null
+          skipped_count: number | null
+          source: string | null
+          started_at: string | null
+          status: string | null
+          total_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       apply_reconciliation_rules: {
@@ -8285,6 +8502,55 @@ export type Database = {
         Args: { p_opportunity_id: string }
         Returns: string
       }
+      etl_cancel_job: { Args: { p_job_id: string }; Returns: undefined }
+      etl_claim_items: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          created_at: string
+          external_ref: string | null
+          id: string
+          idempotency_key: string
+          job_id: string
+          last_error: string | null
+          mapped: Json | null
+          max_attempts: number
+          next_attempt_at: string
+          organization_id: string
+          processed_at: string | null
+          raw: Json
+          seq: number
+          status: string
+          target_id: string | null
+          target_table: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "etl_job_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      etl_finalize_job: { Args: { p_job_id: string }; Returns: undefined }
+      etl_mark_item_failure: {
+        Args: { p_error: string; p_item_id: string }
+        Returns: undefined
+      }
+      etl_mark_item_skipped: {
+        Args: { p_item_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      etl_mark_item_success: {
+        Args: {
+          p_item_id: string
+          p_mapped?: Json
+          p_target_id?: string
+          p_target_table?: string
+        }
+        Returns: undefined
+      }
+      etl_retry_failed: { Args: { p_job_id: string }; Returns: number }
+      etl_retry_item: { Args: { p_item_id: string }; Returns: undefined }
       get_all_subsidiary_ids: {
         Args: { p_holding_id: string }
         Returns: string[]
