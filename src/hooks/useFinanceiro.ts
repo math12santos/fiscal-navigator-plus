@@ -12,6 +12,7 @@ import type { CashFlowEntry } from "@/hooks/useCashFlow";
 import { isRecurringCashflow, generateProjectionsFromContract } from "@/lib/contractProjections";
 import { usePayrollProjections } from "@/hooks/usePayrollProjections";
 import { projectionKey, extractSourceRef } from "@/lib/projectionRegistry";
+import { splitInstallments } from "@/lib/financialMath";
 
 export interface FinanceiroEntry extends CashFlowEntry {}
 
@@ -206,20 +207,25 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
     return filterByScope(merged);
   }, [entriesQuery.data, installmentsQuery.data, contracts, tipo, orgId, filterByScope, payrollProjections]);
 
-  // Totals — provisões acumuladas (passivo trabalhista) NÃO entram no caixa
+  // Totais — MECE: cada lançamento conta em exatamente UM bucket (pendente OU realizado).
+  // Provisões acumuladas (passivo trabalhista) NÃO entram no caixa.
   const totals = useMemo(() => {
-    let total_previsto = 0;
-    let total_realizado = 0;
-    let pendente = 0;
+    let total_previsto = 0;     // soma de TUDO (referência), sem dupla contagem entre buckets
+    let total_realizado = 0;    // só pago/recebido (valor efetivamente movimentado)
+    let pendente = 0;           // só previsto/confirmado (a vencer ou em aberto)
     let count_pendente = 0;
 
     for (const e of allEntries) {
       if ((e as any).dp_sub_category === "provisao_acumulada") continue;
-      total_previsto += Number(e.valor_previsto);
-      if (e.valor_realizado != null) {
-        total_realizado += Number(e.valor_realizado);
-      }
-      if (e.status === "previsto" || e.status === "confirmado") {
+      const isRealized = e.status === "pago" || e.status === "recebido";
+      const isPending = e.status === "previsto" || e.status === "confirmado";
+      const valorRef = isRealized
+        ? Number(e.valor_realizado ?? e.valor_previsto)
+        : Number(e.valor_previsto);
+      total_previsto += valorRef;
+      if (isRealized) {
+        total_realizado += Number(e.valor_realizado ?? e.valor_previsto);
+      } else if (isPending) {
         pendente += Number(e.valor_previsto);
         count_pendente++;
       }
@@ -249,21 +255,20 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
       // Handle installments: create N records
       const numParcelas = input.num_parcelas && input.num_parcelas > 1 ? input.num_parcelas : 1;
       if (numParcelas > 1 && dataPrevista) {
-        const valorParcela = Math.round((valorPrevisto / numParcelas) * 100) / 100;
-        const entries = [];
-        for (let i = 0; i < numParcelas; i++) {
+        const valores = splitInstallments(valorPrevisto, numParcelas);
+        const entries = valores.map((valor, i) => {
           const parcelaDate = format(addMonths(new Date(dataPrevista), i), "yyyy-MM-dd");
-          entries.push({
+          return {
             ...baseEntry,
             descricao: `${input.descricao} (${i + 1}/${numParcelas})`,
             data_prevista: parcelaDate,
             data_vencimento: parcelaDate,
             data_prevista_pagamento: parcelaDate,
-            valor_previsto: valorParcela,
-            valor_bruto: valorParcela,
+            valor_previsto: valor,
+            valor_bruto: valor,
             num_parcelas: numParcelas,
-          } as any);
-        }
+          } as any;
+        });
         const { error } = await supabase.from("cashflow_entries" as any).insert(entries);
         if (error) throw error;
       } else {

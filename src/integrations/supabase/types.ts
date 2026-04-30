@@ -411,6 +411,42 @@ export type Database = {
           },
         ]
       }
+      cashflow_audit_log: {
+        Row: {
+          action: string
+          after_data: Json | null
+          before_data: Json | null
+          cashflow_entry_id: string | null
+          changed_at: string
+          changed_by: string | null
+          changed_fields: string[] | null
+          id: string
+          organization_id: string | null
+        }
+        Insert: {
+          action: string
+          after_data?: Json | null
+          before_data?: Json | null
+          cashflow_entry_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          changed_fields?: string[] | null
+          id?: string
+          organization_id?: string | null
+        }
+        Update: {
+          action?: string
+          after_data?: Json | null
+          before_data?: Json | null
+          cashflow_entry_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          changed_fields?: string[] | null
+          id?: string
+          organization_id?: string | null
+        }
+        Relationships: []
+      }
       cashflow_entries: {
         Row: {
           account_id: string | null
