@@ -353,33 +353,11 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
           }
         }
 
-        // 4. Benefícios — segregados por categoria contábil.
-        // VR/VA são antecipados no mês N-1 (CLT/PAT). Plano de saúde é fatura no mês de competência.
+        // 4. Benefícios — agregados por categoria em guia única por empresa (exceto VT).
         const empBenefitsBySub = benefitsByEmployee.get(emp.id);
         if (empBenefitsBySub) {
           for (const [sub, total] of empBenefitsBySub.entries()) {
-            if (total <= 0) continue;
-            const isAntecipado = sub !== "beneficios_saude";
-            const dt = sub === "beneficios_saude" ? dtSaude : dtBeneficios;
-            const label =
-              sub === "beneficios_vr" ? "VR"
-              : sub === "beneficios_va" ? "VA"
-              : sub === "beneficios_saude" ? "Saúde"
-              : "Benefícios";
-            const noteText = isAntecipado
-              ? `Crédito antecipado em ${dt} para uso ao longo de ${competencyLong} (CLT/PAT — pago no mês anterior à competência).`
-              : `Fatura referente à competência ${competencyLong}, com vencimento em ${dt}.`;
-            entries.push({
-              ...baseEmp,
-              id: `proj-dp-${sub}-${emp.id}-${monthKey}`,
-              descricao: `${label} — ${emp.name} (competência ${monthLabel})`,
-              valor_previsto: round2(total),
-              data_prevista: dt,
-              account_id: acctBeneficios,
-              notes: noteText,
-              dp_sub_category: sub,
-              source_ref: projectionKey.payroll(emp.id, sub, monthKey),
-            } as any);
+            addBenefitToAggregate(sub, emp.name, total);
           }
         }
 
