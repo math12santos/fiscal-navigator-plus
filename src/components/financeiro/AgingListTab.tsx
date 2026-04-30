@@ -38,10 +38,14 @@ export function AgingListTab() {
   const { bankAccounts, isLoading: bankLoading } = useBankAccounts();
   const { getMatchingRule, getGroupLabel, getSubGroupLabel } = useGroupingRules();
   const { macrogroups, groups } = useGroupingMacrogroups();
-  const { holdingMode } = useHolding();
+  const { holdingMode, isHolding, subsidiaryOrgs } = useHolding();
+  const { currentOrg } = useOrganization();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [expandedMacrogroups, setExpandedMacrogroups] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedSubgroups, setExpandedSubgroups] = useState<Set<string>>(new Set());
+  const [cashDetailOpen, setCashDetailOpen] = useState(false);
   const today = new Date();
 
   const isLoading = saidaLoading || entradaLoading || bankLoading;
