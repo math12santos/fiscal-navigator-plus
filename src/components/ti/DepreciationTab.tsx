@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useITDepreciation } from "@/hooks/useITDepreciation";
 import { useITEquipment } from "@/hooks/useITEquipment";
-import { Pencil, AlertCircle } from "lucide-react";
+import { useITSchedule } from "@/hooks/useITSchedule";
+import { Pencil, AlertCircle, CalendarCog } from "lucide-react";
 
 const ECON_STATUS = ["novo","em_uso_saudavel","proximo_substituicao","substituicao_recomendada","obsoleto"];
 const labelize = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
@@ -16,6 +17,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 export function DepreciationTab() {
   const { list, update } = useITDepreciation();
+  const { generate } = useITSchedule();
   const equipments = useITEquipment().list.data ?? [];
   const eqMap = new Map(equipments.map((e: any) => [e.id, e]));
 
@@ -59,7 +61,10 @@ export function DepreciationTab() {
                       <td className="p-3">{d.manual_economic_status ? <Badge variant="outline">{labelize(d.manual_economic_status)}</Badge> : "—"}</td>
                       <td className="p-3">{d.requires_finance_input ? <Badge className="bg-warning/15 text-warning">Pendente Financeiro</Badge> : <Badge className="bg-success/15 text-success">OK</Badge>}</td>
                       <td className="p-3 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => { setV({ ...d }); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="ghost" title="Gerar cronograma" onClick={() => generate.mutate(d.equipment_id)} disabled={d.requires_finance_input}><CalendarCog className="h-4 w-4" /></Button>
+                          <Button size="sm" variant="ghost" title="Editar parâmetros" onClick={() => { setV({ ...d }); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                        </div>
                       </td>
                     </tr>
                   );
