@@ -446,6 +446,37 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
         } as any);
       }
 
+      // ===== Guias consolidadas de Benefícios (uma por categoria, por empresa, por mês) =====
+      // VR / VA / Plano de Saúde / Outros: 1 guia única somando todos os colaboradores da empresa.
+      // (VT permanece individual e é emitido por colaborador no loop acima — futuramente.)
+      const baseGuiaBeneficio = {
+        ...baseGuia,
+        account_id: acctBeneficios,
+      };
+      for (const [sub, agg] of benefitsAggregate.entries()) {
+        if (agg.total <= 0) continue;
+        const isAntecipado = sub !== "beneficios_saude";
+        const dt = sub === "beneficios_saude" ? dtSaude : dtBeneficios;
+        const label =
+          sub === "beneficios_vr" ? "Vale Refeição"
+          : sub === "beneficios_va" ? "Vale Alimentação"
+          : sub === "beneficios_saude" ? "Plano de Saúde"
+          : "Benefícios (Outros)";
+        const noteText = isAntecipado
+          ? `Guia única da empresa — ${agg.count} colaborador(es). Crédito antecipado em ${dt} para uso ao longo de ${competencyLong} (CLT/PAT — pago no mês anterior à competência). Detalhes: ${agg.details.slice(0, 20).join("; ")}${agg.details.length > 20 ? "; ..." : ""}`
+          : `Guia única da empresa — ${agg.count} colaborador(es). Fatura referente à competência ${competencyLong}, com vencimento em ${dt}. Detalhes: ${agg.details.slice(0, 20).join("; ")}${agg.details.length > 20 ? "; ..." : ""}`;
+        entries.push({
+          ...baseGuiaBeneficio,
+          id: `proj-dp-${sub}-${currentOrg!.id}-${monthKey}`,
+          descricao: `${label} — competência ${monthLabel}`,
+          valor_previsto: round2(agg.total),
+          data_prevista: dt,
+          notes: noteText,
+          dp_sub_category: sub,
+          source_ref: `${sub}:${currentOrg!.id}:${monthKey}`,
+        } as any);
+      }
+
       cursor = addMonths(cursor, 1);
     }
 
