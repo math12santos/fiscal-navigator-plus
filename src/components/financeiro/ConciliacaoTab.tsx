@@ -4,11 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2, Wand2, Camera } from "lucide-react";
+import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2, Wand2, Camera, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConciliacao, type StatementStatus, type CashflowCandidate } from "@/hooks/useConciliacao";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { BankStatementImportDialog } from "@/components/financeiro/BankStatementImportDialog";
+import { ReconciliationRulesDialog } from "@/components/financeiro/ReconciliationRulesDialog";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
@@ -27,6 +28,7 @@ export function ConciliacaoTab() {
   const [matchEntry, setMatchEntry] = useState<{ id: string; descricao: string; valor: number } | null>(null);
   const [candidates, setCandidates] = useState<CashflowCandidate[]>([]);
   const [loadingCands, setLoadingCands] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   const { bankAccounts } = useBankAccounts();
   const { entries, isLoading, stats, fetchCandidates, reconcile, unreconcile, updateStatus, autoReconcileBatch, snapshotBalances } = useConciliacao({
@@ -47,7 +49,9 @@ export function ConciliacaoTab() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap justify-end gap-2">
-        <Button
+        <Button size="sm" variant="outline" onClick={() => setRulesOpen(true)} title="Gerenciar regras de classificação automática">
+          <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Regras
+        </Button>
           size="sm"
           variant="outline"
           onClick={() => snapshotBalances.mutate()}
