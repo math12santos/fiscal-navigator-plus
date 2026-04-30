@@ -1,152 +1,177 @@
 
-# Módulo TI — Patrimônio Tech, Sistemas, Links, Chamados, Sinistros
+# Evolução do Módulo TI — Além do MVP
 
-Cockpit completo de TI integrado ao motor financeiro existente (cashflow_entries, contratos, planejamento). Tudo conversa com o "single source of truth" do FinCore: equipamentos viram CAPEX/parcelas, sistemas e links viram OPEX recorrente, sinistros geram impacto financeiro e depreciação alimenta visão patrimonial.
+## Diagnóstico do MVP atual
 
-## Escopo entregue (MVP completo + governança)
+O MVP entrega cadastros sólidos (Equipamentos, Sistemas, Telecom, Chamados, Sinistros, Depreciação) com numeração automática, RLS por org e dashboard de KPIs. Pontos a evoluir:
 
-### 1. Banco de dados (migration única)
+1. **Sem integração real com Cashflow** — `generates_recurring_cost`, `generates_future_installments`, `generates_replacement_forecast` existem como flags, mas não materializam lançamentos no `cashflow_entries`. Sistemas/Telecom mensais não viram OPEX previsto.
+2. **Depreciação estática** — calcula valor contábil mas não gera cronograma mensal nem aparece na DRE/EBITDA.
+3. **Ciclo de vida incompleto** — não há histórico de movimentação (entrega, devolução, transferência entre colaboradores), nem termos assinados.
+4. **Chamados sem SLA real** — campos existem, mas sem cálculo de breach, escalonamento, métricas MTTR/MTTA.
+5. **Sem alertas proativos** — renovações, garantias vencendo, equipamentos obsoletos não notificam.
+6. **Sem auditoria** — alterações sensíveis (status, responsável, baixa) não geram log.
+7. **KPIs sem drill-down** — cards do dashboard não abrem base de cálculo (princípio do produto exige).
+8. **Faltam visões executivas** — TCO por colaborador, custo por departamento, idade média do parque, % obsolescência.
 
-Tabelas novas (todas com `organization_id`, RLS por org, `created_by`, `updated_at`):
+---
 
-```text
-it_equipment              ← patrimônio tech (1 linha por ativo)
-it_equipment_attachments  ← NF, termos, fotos, laudos, garantias
-it_depreciation_params    ← preenchido pelo Financeiro (espelho TI→Fin)
-it_systems                ← SaaS / ERP / CRM / etc.
-it_telecom_links          ← internet, MPLS, telefonia, chips
-it_tickets                ← chamados com SLA
-it_ticket_events          ← timeline/interações
-it_incidents              ← sinistros e indisponibilidades
-it_config                 ← SLAs por prioridade, vidas úteis padrão, etiquetas
-```
+## Plano de evolução (5 fases)
 
-Enums: `it_equipment_type`, `it_equipment_status`, `it_acquisition_form`, `it_economic_status`, `it_system_category`, `it_billing_cycle`, `it_telecom_type`, `it_ticket_priority`, `it_ticket_status`, `it_ticket_category`, `it_incident_type`, `it_impact_level`, `it_incident_status`.
+### Fase 1 — Integração Financeira Real (núcleo do produto)
 
-Trigger `it_generate_patrimonial_code` gera código sequencial por org (`TI-000001`) — código rígido, demais campos flexíveis. Trigger valida que `it_equipment.id` referenciado em `it_depreciation_params` pertence à mesma org.
+**Objetivo:** TI deixa de ser cadastro isolado e passa a alimentar o Financeiro automaticamente, seguindo o princípio MECE.
 
-### 2. Integração financeira (MECE — sem duplicar)
+1. **Sistemas/Telecom recorrentes → Cashflow projetado**
+   - Trigger DB `it_materialize_recurring_costs(org_id, ref_month)` que, para cada sistema/link `ativo` com `monthly_value > 0`, gera `cashflow_entries` virtuais (`source='ti'`, `source_ref='it_system:<id>:YYYY-MM'`, `tipo='pagar'`, `status='previsto'`).
+   - Idempotente via UNIQUE em `(source, source_ref)`.
+   - Recalcula automaticamente quando `monthly_value`, `status`, `renewal_date` ou `cost_center_id` mudam.
+   - Conecta a `account_id` (plano de contas) e `cost_center_id` configurados no item.
 
-Padrão já consolidado no FinCore (`source` + `source_ref`):
+2. **Equipamentos parcelados → Parcelas futuras**
+   - Quando `acquisition_form='compra_parcelada'` + `installments_count` + `installment_value` + `first_installment_date`, gera N entradas em `cashflow_entries` (uma por parcela), referenciando `it_equipment.id`.
+   - Suporta antecipação/baixa: ao mudar status para `baixado/vendido`, cancela parcelas futuras (mantém histórico).
 
-| Origem TI | Vira em `cashflow_entries` | source / source_ref |
-|---|---|---|
-| Equipamento à vista | 1 lançamento CAPEX | `ti` / `equip:<id>` |
-| Equipamento parcelado / leasing | N parcelas | `ti` / `equip:<id>:p<n>` |
-| Substituição futura prevista | projeção CAPEX (`is_projected=true`) | `ti` / `equip:<id>:replace` |
-| Sistema contratado recorrente | OPEX mensal recorrente | `ti` / `system:<id>:<yyyy-mm>` |
-| Link/telecom recorrente | OPEX mensal recorrente | `ti` / `telecom:<id>:<yyyy-mm>` |
-| Sinistro c/ impacto | despesa pontual + receita de seguro | `ti` / `incident:<id>` |
+3. **Previsão de substituição → CAPEX projetado**
+   - Equipamentos com `generates_replacement_forecast=true` + `replacement_forecast_date` + `replacement_estimated_value` geram entrada de CAPEX no mês previsto.
+   - Aparece no módulo Planejamento como item editável.
 
-RPCs:
-- `materialize_it_equipment(equipment_id)` — gera parcelas/CAPEX (idempotente, upsert por source_ref)
-- `materialize_it_system(system_id, months_ahead)` — gera recorrências
-- `materialize_it_telecom(link_id, months_ahead)` — gera recorrências
-- `it_depreciation_monthly(equipment_id)` — calcula linha-reta (contábil + econômica)
+4. **Depreciação mensal → DRE**
+   - Nova tabela `it_depreciation_schedule` (equipment_id, competencia, valor_mensal_contabil, valor_mensal_economico, acumulado).
+   - RPC `it_generate_depreciation_schedule(equipment_id)` gera o cronograma completo a partir dos parâmetros.
+   - Integra com DRE como linha de despesa não-caixa.
 
-### 3. Páginas e rota
+### Fase 2 — Ciclo de Vida & Movimentação
 
-Nova rota `/ti` registrada em `App.tsx`, no `MODULE_DEFINITIONS` (`key: "ti"`) e na sidebar (`AppLayout.tsx`) entre Cadastros e Tarefas. Skeleton dedicado.
+5. **Tabela `it_equipment_movements`**
+   - Tipos: `entrega`, `devolucao`, `transferencia`, `manutencao_envio`, `manutencao_retorno`, `baixa`, `venda`, `extravio`.
+   - Cada movimento: data, de_colaborador, para_colaborador, de_local, para_local, motivo, anexo (termo PDF), assinatura digital.
+   - Ao registrar movimento, atualiza `it_equipment.responsible_employee_id` e `status` automaticamente.
+   - Linha do tempo visual no detalhe do equipamento.
 
-`src/pages/TI.tsx` com tabs (Tabs URL-persistidas via `useUrlState`):
+6. **Geração de termos PDF**
+   - Edge Function `it-generate-term` cria PDF de Entrega/Devolução com dados do colaborador (nome, CPF, cargo), equipamento, condições, assinaturas.
+   - Salvo em Storage `it-documents/<org_id>/<equipment_id>/<movement_id>.pdf`.
 
-```text
-Dashboard · Equipamentos · Sistemas · Links/Telecom · Chamados · Sinistros · Depreciação · Orçamento de TI · Configurações
-```
+7. **QR Code funcional**
+   - QR aponta para rota pública assinada `/ti/equipamento/<token>` (token JWT curto) com ficha read-only do ativo.
+   - Útil para auditoria física, conferência de inventário.
 
-### 4. Componentes
+### Fase 3 — Chamados como Service Desk real
 
-```text
-src/components/ti/
-  TIDashboard.tsx              KPIs + alertas + próximas renovações
-  EquipmentTab.tsx             tabela + filtros + drawer
-  EquipmentFormDialog.tsx      cadastro completo (campos do prompt)
-  EquipmentQRDialog.tsx        gera QR code da etiqueta (qrcode lib)
-  EquipmentAttachments.tsx     upload Storage (bucket isolado por org)
-  DepreciationTab.tsx          espelho — só Financeiro edita
-  DepreciationParamsDialog.tsx
-  SystemsTab.tsx + SystemFormDialog.tsx + SystemBudgetLinkDialog.tsx
-  TelecomTab.tsx + TelecomFormDialog.tsx + TelecomBudgetLinkDialog.tsx
-  TicketsTab.tsx + TicketFormDialog.tsx + TicketDetailDrawer.tsx
-  IncidentsTab.tsx + IncidentFormDialog.tsx + IncidentDetailDrawer.tsx
-  TIBudgetTab.tsx              consolidado: CAPEX + recorrentes + projeções
-  TIConfigTab.tsx              SLAs, vida útil padrão, categorias
-```
+8. **SLA automático**
+   - Tabela `it_sla_policies` (categoria + prioridade → tempo_resposta, tempo_resolucao em horas úteis).
+   - Trigger calcula `sla_response_due`, `sla_resolution_due` no insert.
+   - Campos derivados: `sla_response_breach`, `sla_resolution_breach`, `mtta`, `mttr`.
 
-### 5. Hooks
+9. **Workflow de status**
+   - Ações: assumir, transferir, pausar (com motivo), reabrir, resolver com causa raiz.
+   - Histórico em `it_ticket_events` (audit trail).
 
-```text
-src/hooks/useITEquipment.ts
-src/hooks/useITSystems.ts
-src/hooks/useITTelecom.ts
-src/hooks/useITTickets.ts
-src/hooks/useITIncidents.ts
-src/hooks/useITDepreciation.ts
-src/hooks/useITBudget.ts          agrega tudo p/ aba Orçamento de TI
-src/hooks/useITDashboardKPIs.ts
-```
+10. **Comentários & anexos no chamado**
+    - Tabela `it_ticket_comments` com menções, visibilidade interna/cliente.
+    - Notificações em tempo real via Realtime + integração com módulo Notifications existente.
 
-### 6. Permissões e fluxos
+11. **Métricas Service Desk**
+    - MTTA, MTTR, % SLA atingido, top categorias, top solicitantes, backlog por idade.
 
-- Reusa `useUserPermissions` + `MODULE_DEFINITIONS` (adicionar tabs do módulo TI).
-- Perfis lógicos via tabs/abas: Gestor TI = full; Financeiro = só Depreciação + Orçamento; Gestor de Departamento = Equipamentos (read seu CC) + Chamados; Colaborador = Chamados + seus equipamentos; Diretoria = Dashboard + Relatórios.
-- Fluxo TI→Financeiro: ao salvar equipamento, cria registro pendente em `it_depreciation_params` com flag `requires_finance_input=true` e dispara notificação (tabela `notifications` existente) para usuários com permissão financeiro.
+### Fase 4 — Inteligência & Alertas
 
-### 7. Storage
+12. **Maturidade TI (sector_onboarding)**
+    - Adicionar setor `ti` ao avaliador de maturidade existente (50% completeness, 25% freshness, 25% qualidade).
+    - Indicadores: % equipamentos com responsável, % com depreciação preenchida, % sistemas com renovação cadastrada, MTTR médio.
 
-Reusa o bucket org-isolado existente. Pasta `ti/<equipment_id>/` para anexos do patrimônio. Signed URLs respeitando padrão já validado (memória `storage-isolation`).
+13. **Alertas proativos** (cron diário via edge function)
+    - Renovações em 30/60/90 dias.
+    - Garantias vencendo.
+    - Equipamentos com idade > vida útil econômica.
+    - Chamados em risco de SLA breach.
+    - Sinistros não tratados há > 7 dias.
+    - Notificações via tabela `notifications` + e-mail opcional.
 
-### 8. Alertas automáticos
+14. **Sugestões via Lovable AI** (`google/gemini-2.5-flash`)
+    - "Plano de substituição sugerido para próximos 12 meses" baseado em idade + criticidade + budget.
+    - "Sistemas redundantes detectados" (mesma categoria, baixa utilização).
+    - "Anomalia de custo": sistemas/links com aumento > 20% mês a mês.
 
-Edge Function agendada `ti-daily-alerts` (cron diário) que cria notifications para:
-- Renovações de sistemas/links em 30/60/90 dias
-- Equipamentos próximos do fim da vida útil econômica
-- Chamados vencidos / críticos abertos
-- Incidentes críticos sem tratativa
-- Sistemas/links sem responsável / sem vínculo orçamentário
+### Fase 5 — Governança, KPIs e Drill-down
 
-### 9. Relatórios
+15. **KPIs clicáveis com base de cálculo** (alinhado ao padrão financeiro do produto)
+    - Cada card do `TIDashboard` abre Dialog com:
+      - Fórmula aplicada
+      - Lista de itens que compuseram o número (auditável)
+      - Filtros temporais
+      - Export CSV
+    - Reusa o componente `KpiBreakdownDialog` (a criar/aproveitar do Financeiro).
 
-Hook `useITReports` + diálogo `TIExportDialog`: CSV (Excel-PT, BOM + `;`) e PDF (jspdf/autotable, padrão já usado em Cash Position) — inventário, depreciação, custos por CC/depto, chamados, incidentes.
+16. **Visões executivas**
+    - **TCO por colaborador**: equipamentos + sistemas atribuídos + rateio de telecom.
+    - **Custo TI por Centro de Custo**: visão para DRE gerencial.
+    - **Idade média do parque** por tipo de equipamento.
+    - **% obsolescência** (equipamentos em `substituicao_recomendada` ou `obsoleto` / total).
+    - **Heatmap de criticidade** (sistemas críticos sem redundância, links sem backup).
 
-### 10. Memória do projeto
+17. **Auditoria (`it_audit_log`)**
+    - Trigger genérico para log de mudanças em equipment, system, telecom, ticket, incident.
+    - Captura before/after, user, timestamp.
+    - Visível em Configurações para owner/admin.
 
-Adicionar `mem://features/ti-patrimonio-tech` com regras:
-- Código patrimonial sequencial por org (`TI-XXXXXX`), imutável
-- Depreciação editada apenas por Financeiro (espelho)
-- Padrão `source='ti'` + `source_ref` para idempotência MECE
-- Materialização preserva edições manuais (`manually_edited=true` skip)
+18. **Permissões granulares por aba**
+    - Reusa `useUserPermissions` + `MODULE_DEFINITIONS` (padrão do projeto).
+    - Permite "TI Operacional" (vê tudo exceto Depreciação) vs "TI + Financeiro" (vê tudo).
 
-E atualizar `mem://index.md` referenciando.
+---
 
-## Detalhes técnicos relevantes
-
-- **Linear depreciation MVP**: `mensal = (valor_aquisicao - residual) / vida_util_meses`. Status econômico calculado por % de vida consumida (>100% obsoleto, >85% substituição recomendada, >70% próximo, senão saudável).
-- **Etiqueta QR**: lib `qrcode` (~30KB), gera SVG do código patrimonial; botão "Imprimir etiqueta" abre print-friendly com 1 ou 12 etiquetas por A4.
-- **Idempotência**: todo `materialize_*` faz `upsert ... on conflict (organization_id, source, source_ref)` — re-rodar não duplica.
-- **Filtros do dashboard**: empresa, depto, CC, responsável, tipo, status, período — via `useUrlState` para shareable URLs.
-- **Sem CHECK constraints temporais** — usa triggers de validação (regra do projeto).
-- **CORS edge**: whitelist via `ALLOWED_ORIGINS` (padrão do projeto).
-
-## Diagrama de integração
+## Mudanças técnicas resumidas
 
 ```text
-[Equipamento]──cria──▶[it_depreciation_params (pendente)]──notifica──▶[Financeiro]
-      │                                                                     │
-      │ materialize                                                         │ preenche
-      ▼                                                                     ▼
-[cashflow_entries source='ti']  ◀── depreciação mensal ── [it_depreciation_params]
+Banco (migration):
+  + it_depreciation_schedule
+  + it_equipment_movements
+  + it_ticket_comments
+  + it_ticket_events
+  + it_sla_policies
+  + it_audit_log
+  + RPCs: it_materialize_recurring_costs, it_generate_depreciation_schedule,
+          it_register_movement, it_compute_sla
+  + Trigger genérico de auditoria
+  + Trigger pós-update em it_systems/it_telecom para regerar projeções
 
-[Sistema/Link]──vincular ao orçamento──▶[cashflow_entries recorrente]
-[Sinistro]──impacto──▶[cashflow_entries source='ti' + recuperação seguro]
-[Chamado c/ compra]──gera──▶[expense_request existente]
+Edge Functions:
+  + it-generate-term (PDF termos)
+  + it-daily-alerts (cron diário)
+  + it-ai-insights (sugestões IA)
+
+Front-end:
+  + src/hooks/useITMovements.ts
+  + src/hooks/useITSchedule.ts
+  + src/hooks/useITSLA.ts
+  + src/hooks/useITInsights.ts
+  + src/components/ti/EquipmentTimeline.tsx
+  + src/components/ti/MovementDialog.tsx
+  + src/components/ti/TicketDetailDrawer.tsx (workflow + comentários + SLA)
+  + src/components/ti/KpiBreakdownDialog.tsx
+  + src/components/ti/TCOReport.tsx
+  + src/components/ti/ITMaturityCard.tsx
+  + Atualiza TIDashboard (cards clicáveis) e TIConfigTab (SLA, alertas)
+  + Sidebar de notificações TI
 ```
 
-## Fora do escopo deste MVP (roadmap futuro)
+## Princípios respeitados
 
-- Métodos de depreciação não-lineares (Saldo Decrescente, Soma dos Dígitos)
-- Integração com leitor de QR para conferência física em massa
-- Workflow de aprovação multi-nível para CAPEX
-- Sincronização automática com inventário de rede (SNMP/agentes)
+- **MECE financeiro**: cada lançamento gerado pelo TI tem `source` + `source_ref` únicos; nunca duplica com Contratos/RH.
+- **Auditável**: tudo que afeta caixa pode ser rastreado até o item de origem.
+- **Reproducível**: KPIs com drill-down mostram a base de cálculo.
+- **CFO-first**: visões executivas (TCO, % obsolescência, CAPEX projetado) priorizadas sobre operacional.
+- **Sem mágica**: cálculos visíveis, projeções com `proj-`-style virtual entries materializáveis.
 
-Esses ficam documentados na memória `ti-patrimonio-tech` como evolução planejada.
+## Fora de escopo (V2 futura)
+
+- Integração com MDM (Intune/JAMF) para inventário automático.
+- Discovery de rede (descobrir ativos automaticamente).
+- Integração com Service Desk externos (Jira, Zendesk).
+- Compliance LGPD/ISO27001 detalhado (apenas estrutura básica nesta fase).
+
+---
+
+Posso iniciar pela **Fase 1 (integração financeira real)**, que entrega o maior valor imediato e conecta o módulo ao restante do produto. Aprovas seguir nesta ordem ou queres priorizar outra fase primeiro?

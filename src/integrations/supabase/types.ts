@@ -4179,6 +4179,45 @@ export type Database = {
           },
         ]
       }
+      it_audit_log: {
+        Row: {
+          action: Database["public"]["Enums"]["it_audit_action"]
+          after_data: Json | null
+          before_data: Json | null
+          changed_by: string | null
+          changed_fields: string[] | null
+          created_at: string
+          id: string
+          organization_id: string
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["it_audit_action"]
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_by?: string | null
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: string
+          organization_id: string
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["it_audit_action"]
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_by?: string | null
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: string
+          organization_id?: string
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       it_config: {
         Row: {
           alert_renewal_days: number[] | null
@@ -4332,6 +4371,66 @@ export type Database = {
             columns: ["equipment_id"]
             isOneToOne: true
             referencedRelation: "it_equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_depreciation_schedule: {
+        Row: {
+          accumulated_accounting: number
+          accumulated_economic: number
+          competencia: string
+          equipment_id: string
+          generated_at: string
+          id: string
+          month_index: number
+          monthly_accounting: number
+          monthly_economic: number
+          organization_id: string
+          residual_accounting: number
+          residual_economic: number
+        }
+        Insert: {
+          accumulated_accounting?: number
+          accumulated_economic?: number
+          competencia: string
+          equipment_id: string
+          generated_at?: string
+          id?: string
+          month_index: number
+          monthly_accounting?: number
+          monthly_economic?: number
+          organization_id: string
+          residual_accounting?: number
+          residual_economic?: number
+        }
+        Update: {
+          accumulated_accounting?: number
+          accumulated_economic?: number
+          competencia?: string
+          equipment_id?: string
+          generated_at?: string
+          id?: string
+          month_index?: number
+          monthly_accounting?: number
+          monthly_economic?: number
+          organization_id?: string
+          residual_accounting?: number
+          residual_economic?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_depreciation_schedule_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "it_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_depreciation_schedule_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -4544,6 +4643,85 @@ export type Database = {
           },
         ]
       }
+      it_equipment_movements: {
+        Row: {
+          created_at: string
+          document_path: string | null
+          document_signed_at: string | null
+          equipment_id: string
+          from_employee_id: string | null
+          from_location: string | null
+          from_status: Database["public"]["Enums"]["it_equipment_status"] | null
+          id: string
+          movement_date: string
+          movement_type: Database["public"]["Enums"]["it_movement_type"]
+          notes: string | null
+          organization_id: string
+          performed_by: string
+          reason: string | null
+          to_employee_id: string | null
+          to_location: string | null
+          to_status: Database["public"]["Enums"]["it_equipment_status"] | null
+        }
+        Insert: {
+          created_at?: string
+          document_path?: string | null
+          document_signed_at?: string | null
+          equipment_id: string
+          from_employee_id?: string | null
+          from_location?: string | null
+          from_status?:
+            | Database["public"]["Enums"]["it_equipment_status"]
+            | null
+          id?: string
+          movement_date?: string
+          movement_type: Database["public"]["Enums"]["it_movement_type"]
+          notes?: string | null
+          organization_id: string
+          performed_by: string
+          reason?: string | null
+          to_employee_id?: string | null
+          to_location?: string | null
+          to_status?: Database["public"]["Enums"]["it_equipment_status"] | null
+        }
+        Update: {
+          created_at?: string
+          document_path?: string | null
+          document_signed_at?: string | null
+          equipment_id?: string
+          from_employee_id?: string | null
+          from_location?: string | null
+          from_status?:
+            | Database["public"]["Enums"]["it_equipment_status"]
+            | null
+          id?: string
+          movement_date?: string
+          movement_type?: Database["public"]["Enums"]["it_movement_type"]
+          notes?: string | null
+          organization_id?: string
+          performed_by?: string
+          reason?: string | null
+          to_employee_id?: string | null
+          to_location?: string | null
+          to_status?: Database["public"]["Enums"]["it_equipment_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_equipment_movements_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "it_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_equipment_movements_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       it_incidents: {
         Row: {
           analyst_id: string | null
@@ -4662,6 +4840,53 @@ export type Database = {
             columns: ["telecom_link_id"]
             isOneToOne: false
             referencedRelation: "it_telecom_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_sla_policies: {
+        Row: {
+          active: boolean
+          category: Database["public"]["Enums"]["it_ticket_category"] | null
+          created_at: string
+          created_by: string
+          id: string
+          organization_id: string
+          priority: Database["public"]["Enums"]["it_ticket_priority"]
+          resolution_hours: number
+          response_hours: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: Database["public"]["Enums"]["it_ticket_category"] | null
+          created_at?: string
+          created_by: string
+          id?: string
+          organization_id: string
+          priority: Database["public"]["Enums"]["it_ticket_priority"]
+          resolution_hours?: number
+          response_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: Database["public"]["Enums"]["it_ticket_category"] | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          organization_id?: string
+          priority?: Database["public"]["Enums"]["it_ticket_priority"]
+          resolution_hours?: number
+          response_hours?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_sla_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -4856,6 +5081,50 @@ export type Database = {
           },
         ]
       }
+      it_ticket_comments: {
+        Row: {
+          attachment_name: string | null
+          attachment_path: string | null
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          organization_id: string
+          ticket_id: string
+        }
+        Insert: {
+          attachment_name?: string | null
+          attachment_path?: string | null
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          organization_id: string
+          ticket_id: string
+        }
+        Update: {
+          attachment_name?: string | null
+          attachment_path?: string | null
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          organization_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "it_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       it_ticket_events: {
         Row: {
           author_id: string
@@ -4907,12 +5176,18 @@ export type Database = {
           description: string | null
           due_at: string | null
           equipment_id: string | null
+          first_response_at: string | null
           id: string
           opened_at: string
           organization_id: string
           priority: Database["public"]["Enums"]["it_ticket_priority"]
           requester_id: string
           resolved_at: string | null
+          root_cause: string | null
+          sla_resolution_breach: boolean | null
+          sla_resolution_due: string | null
+          sla_response_breach: boolean | null
+          sla_response_due: string | null
           solution: string | null
           status: Database["public"]["Enums"]["it_ticket_status"]
           system_id: string | null
@@ -4930,12 +5205,18 @@ export type Database = {
           description?: string | null
           due_at?: string | null
           equipment_id?: string | null
+          first_response_at?: string | null
           id?: string
           opened_at?: string
           organization_id: string
           priority?: Database["public"]["Enums"]["it_ticket_priority"]
           requester_id: string
           resolved_at?: string | null
+          root_cause?: string | null
+          sla_resolution_breach?: boolean | null
+          sla_resolution_due?: string | null
+          sla_response_breach?: boolean | null
+          sla_response_due?: string | null
           solution?: string | null
           status?: Database["public"]["Enums"]["it_ticket_status"]
           system_id?: string | null
@@ -4953,12 +5234,18 @@ export type Database = {
           description?: string | null
           due_at?: string | null
           equipment_id?: string | null
+          first_response_at?: string | null
           id?: string
           opened_at?: string
           organization_id?: string
           priority?: Database["public"]["Enums"]["it_ticket_priority"]
           requester_id?: string
           resolved_at?: string | null
+          root_cause?: string | null
+          sla_resolution_breach?: boolean | null
+          sla_resolution_due?: string | null
+          sla_response_breach?: boolean | null
+          sla_response_due?: string | null
           solution?: string | null
           status?: Database["public"]["Enums"]["it_ticket_status"]
           system_id?: string | null
@@ -7528,6 +7815,18 @@ export type Database = {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean
       }
+      it_generate_depreciation_schedule: {
+        Args: { p_equipment_id: string }
+        Returns: Json
+      }
+      it_materialize_equipment_installments: {
+        Args: { p_equipment_id: string }
+        Returns: Json
+      }
+      it_materialize_recurring_costs: {
+        Args: { p_months_ahead?: number; p_org_id: string }
+        Returns: Json
+      }
       match_statement_to_cashflow: {
         Args: { p_statement_id: string }
         Returns: {
@@ -7608,6 +7907,7 @@ export type Database = {
         | "comodato"
         | "locacao"
         | "outro"
+      it_audit_action: "insert" | "update" | "delete" | "status_change"
       it_billing_cycle:
         | "mensal"
         | "anual"
@@ -7665,6 +7965,17 @@ export type Database = {
         | "acesso_indevido"
         | "ataque_cibernetico"
         | "falha_operacional"
+        | "outro"
+      it_movement_type:
+        | "entrega"
+        | "devolucao"
+        | "transferencia"
+        | "manutencao_envio"
+        | "manutencao_retorno"
+        | "baixa"
+        | "venda"
+        | "extravio"
+        | "reativacao"
         | "outro"
       it_system_category:
         | "erp"
@@ -7897,6 +8208,7 @@ export const Constants = {
         "locacao",
         "outro",
       ],
+      it_audit_action: ["insert", "update", "delete", "status_change"],
       it_billing_cycle: [
         "mensal",
         "anual",
@@ -7959,6 +8271,18 @@ export const Constants = {
         "acesso_indevido",
         "ataque_cibernetico",
         "falha_operacional",
+        "outro",
+      ],
+      it_movement_type: [
+        "entrega",
+        "devolucao",
+        "transferencia",
+        "manutencao_envio",
+        "manutencao_retorno",
+        "baixa",
+        "venda",
+        "extravio",
+        "reativacao",
         "outro",
       ],
       it_system_category: [
