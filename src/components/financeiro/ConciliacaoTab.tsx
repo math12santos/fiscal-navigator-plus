@@ -29,7 +29,7 @@ export function ConciliacaoTab() {
   const [loadingCands, setLoadingCands] = useState(false);
 
   const { bankAccounts } = useBankAccounts();
-  const { entries, isLoading, stats, fetchCandidates, reconcile, unreconcile, updateStatus } = useConciliacao({
+  const { entries, isLoading, stats, fetchCandidates, reconcile, unreconcile, updateStatus, autoReconcileBatch, snapshotBalances } = useConciliacao({
     bankAccountId: bankFilter === "__all__" ? undefined : bankFilter,
     status: statusFilter,
   });
