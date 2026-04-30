@@ -56,8 +56,7 @@ export function useRealtimeSync(subs: ReadonlyArray<SubscriptionConfig>) {
       const channel = supabase
         .channel(channelName)
         .on(
-          // @ts-expect-error supabase-js typing for postgres_changes is loose
-          "postgres_changes",
+          "postgres_changes" as never,
           { event, schema: "public", table: cfg.table, filter },
           () => {
             for (const key of cfg.invalidateKeys) {
