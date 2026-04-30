@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2 } from "lucide-react";
+import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2, Wand2, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConciliacao, type StatementStatus, type CashflowCandidate } from "@/hooks/useConciliacao";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
