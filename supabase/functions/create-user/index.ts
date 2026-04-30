@@ -7,9 +7,21 @@ const ALLOWED_ORIGINS = [
   "http://localhost:8080",
 ];
 
+function isAllowedOrigin(origin: string): boolean {
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+    // Permite todos os subdomínios *.lovable.app e *.lovableproject.com (preview/sandbox dinâmicos)
+    if (host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com")) return true;
+    if (host === "localhost" || host === "127.0.0.1") return true;
+  } catch (_) {}
+  return false;
+}
+
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get("Origin") || "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
