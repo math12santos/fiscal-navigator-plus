@@ -1,206 +1,199 @@
-## Plano de Performance & Cache — FinCore
 
-**Status: Fases 1 e 2 concluídas.** Próximo: Fase 3 (RPCs Postgres de agregação para Dashboard/Financeiro).
+## Objetivo
 
-### Fase 2 entregue
-- `src/lib/routePrefetch.ts`: prefetchers de queries primárias por rota (dashboard, financeiro, contratos, dp, crm, cadastros, tarefas) com dedup por (rota × org).
-- `AppLayout` agora dispara `prefetchRouteQueries` no `onMouseEnter`/`onFocus` da sidebar, junto com o prefetch de chunk já existente.
-- `placeholderData: keepPreviousData` em `useCashFlow` (entries + installments) e `useGroupTotals`: trocar mês/range não pisca skeleton, mantém os dados anteriores enquanto o novo carrega.
-- Em RQ v5, isso também faz `isLoading` ficar `false` durante refetches — sem necessidade de trocar para `isInitialLoading` nos consumidores.
+Trazer os módulos **TI & Patrimônio Tech** e **Jurídico** para o mesmo padrão dos demais módulos do FinCore:
 
-### Fase 1 entregue
-- `src/lib/cachePresets.ts`: 4 tiers (reference 15min / operational 2min / realtime 10s / static 60min).
-- `QueryClient` default elevado de 60s para 5min stale (App.tsx).
-- `OrganizationContext` migrado para React Query (queryKey `organizationsBundle`, tier static).
-- `useCurrentRole` (novo): cache global compartilhado por AuthRoute + BackofficeRoutes (eliminou 2 fetches duplicados de `user_roles` por navegação).
-- `cachePresets.reference` aplicado em: useCostCenters, useChartOfAccounts, useEntities, useProducts, useDepartments, usePaymentMethods, useBankAccounts, useFiscalGroups.
-
-### Diagnóstico (o que encontrei)
-
-Mapeei `App.tsx`, contextos globais, 98 hooks (78 já usam React Query — bom) e as páginas mais pesadas (Dashboard 597 linhas / 25 hooks, Contratos 690, Financeiro consolida cashflow + contratos + projeções de folha).
-
-Pontos que causam a sensação de "tela carregando o tempo todo":
-
-1. `**staleTime: 60s**` global (App.tsx:101). Toda navegação entre módulos refaz dezenas de queries que mudaram pouco (cost centers, chart of accounts, entidades, posições). Para uma cockpit financeira, dados estruturais (cadastros, configs) podem ficar **10–15 min** em cache, e fatos (cashflow) **5–10 min** com revalidação inteligente.
-2. `**OrganizationContext` não usa React Query** — refaz a busca de orgs a cada montagem do provider e não compartilha cache. Mesma coisa em `AuthRoute`, `BackofficeRoutes` e `useNeedsOnboarding` (3 queries `user_roles` independentes a cada navegação).
-3. `**select("*")` em 101 lugares**, incluindo `cashflow_entries` (tabela maior do sistema). Trazemos colunas grandes (`metadata jsonb`, `notes`, etc.) que o front não usa em listas.
-4. **Cascata de queries dependentes** em `useCashFlow`/`useFinanceiro`: 1) busca contratos → 2) calcula `nonRecurringContractIds` → 3) busca installments → 4) busca payroll projections → 5) recalcula projeções no cliente. Cada passo é um round-trip serial.
-5. **Sem prefetch** entre rotas. O `lazyRetry` faz code-split (bom), mas o usuário só vê o skeleton porque a query inicial só dispara **depois** que o componente monta. Já temos a infra (`pageFactories`) para prefetch on-hover, mas as **queries** não são pré-aquecidas.
-6. **Projeções financeiras recalculadas a cada render** com inputs grandes (todos os contratos × todo o range). `useMemo` existe, mas a chave inclui arrays inteiros — qualquer refetch invalida tudo.
-7. **Sem agregação no banco**: KPIs do Dashboard (saldo, contas a pagar, runway) somam no cliente arrays grandes vindos de `select *`. Deveriam ser RPCs (`get_dashboard_kpis(org_id, ref_month)`) que retornam números prontos e podem ser cacheados agressivamente.
-8. **Sem Realtime cirúrgico**: hoje, mutations invalidam queries inteiras. Outro usuário fazendo lançamento não atualiza a tela do colega — usuários acabam apertando F5 (e culpam a "lentidão").
+1. **Modo Holding**: respeitar `useHolding()` (consolidado / por empresa) em todas as listagens.
+2. **Trilha de Maturidade**: criar avaliadores próprios e plugar a `SectorOnboardingBar` em ambos os módulos, alimentando também o card de maturidade consolidada do Dashboard.
 
 ---
 
-### Fase 1 — Quick wins (impacto alto, baixo risco)
+## Parte 1 — Modo Holding em TI e Jurídico
 
-**1.1 Tunar defaults do `QueryClient**` com classes de cache por tipo de dado:
+### Estado atual
 
-- `staleTime: 5min`, `gcTime: 30min` como novo default.
-- Helper `cachePresets` em `src/lib/cachePresets.ts`:
-  - `reference` (cadastros, COA, cost centers, posições): `staleTime: 15min`
-  - `operational` (cashflow, contratos, tarefas): `staleTime: 2min`
-  - `realtime` (notificações, ETL ops): `staleTime: 10s`
-  - `static` (configs do sistema, módulos): `staleTime: 60min`
-- Aplicar nos hooks principais via spread: `useQuery({ ...cachePresets.reference, queryKey, queryFn })`.
+- Os módulos hoje usam apenas `useOrganization()` e filtram por `currentOrg.id`.
+- Páginas `Juridico.tsx` e `TI.tsx` usam um `<header>` próprio (não o `PageHeader`), então não exibem `HoldingToggle` nem `HoldingCompanyTabs`.
 
-**1.2 Migrar `OrganizationContext` para React Query** — chave global `["organizations", userId]` compartilhada com `useNeedsOnboarding`, `AuthRoute`, `BackofficeRoutes` (elimina 3 fetches duplicados de `user_roles`).
+### Mudanças
 
-**1.3 Substituir `select("*")` por listas explícitas** nas 5 tabelas mais "gordas":
+**1.1 Trocar `<header>` por `<PageHeader>`**
+- `src/pages/Juridico.tsx` e `src/pages/TI.tsx`: usar `<PageHeader title="..." description="..." />` para herdar automaticamente o toggle Holding e as abas por empresa.
 
-- `cashflow_entries` (omit `metadata`, `notes` em listas)
-- `contracts` (omit `terms`, `attachments_meta`)
-- `payroll_items`, `employees`, `dp_config`
-- Criar `select` específico por uso (lista vs detalhe). Estimativa: −40% no payload das telas.
+**1.2 Hooks Jurídico — aplicar padrão `activeOrgIds`**
 
-**1.4 Deduplicar queries em providers globais**: `AuthContext` já tem user; criar `useCurrentRole()` único (cache global) consumido por `AuthRoute`, `BackofficeRoutes`, navegação.
-
----
-
-### Fase 2 — Prefetch e percepção de fluidez
-
-**2.1 Prefetch de query on-hover** — `AppLayout` já tem prefetch de chunk via `pageFactories`. Adicionar prefetch das **queries primárias** de cada rota:
+Padrão já consolidado em `useContracts`/`useCRM`/`useCashFlow`:
 
 ```ts
-onMouseEnter={() => {
-  pageFactories.financeiro();
-  queryClient.prefetchQuery({ queryKey: ["cashflow_entries", orgId, ...], queryFn: ... });
-}}
+const { holdingMode, activeOrgIds } = useHolding();
+const orgIds = holdingMode && activeOrgIds.length > 0
+  ? activeOrgIds
+  : currentOrg?.id ? [currentOrg.id] : [];
+// queryKey inclui orgIds; .in("organization_id", orgIds)
 ```
 
-Mapa de queries críticas por rota em `src/lib/routePrefetch.ts`.
+Aplicar em:
+- `src/modules/juridico/hooks/useJuridicoProcesses.ts`
+- `src/modules/juridico/hooks/useJuridicoSettlements.ts`
+- `src/modules/juridico/hooks/useJuridicoExpenses.ts`
+- `src/modules/juridico/hooks/useJuridicoConfig.ts` (config permanece por org da seleção; em modo consolidado usa `currentOrg`)
 
-**2.2 `placeholderData: keepPreviousData**` em queries paginadas/com filtros (Financeiro por mês, KPIs por período). Trocar de mês/filtro deixa de mostrar skeleton — usa o anterior enquanto carrega o novo.
+Os respectivos services (`processesService`, `settlementsService`, `expensesService`) ganham uma sobrecarga `listX(orgIds: string[], filters?)` usando `.in("organization_id", orgIds)`. Mutations continuam escrevendo em `currentOrg.id` (escrita sempre na empresa selecionada — em modo consolidado bloqueia/usa holding).
 
-**2.3 Skeletons mais leves** — manter os atuais mas garantir que `Suspense` só engatilha em mudança de **rota**, não em refetch. Substituir `if (loading) return <Skeleton/>` por `isInitialLoading` (não dispara em refetch em background).
+**1.3 Hooks TI — mesmo padrão**
 
-**2.4 LCP estático já aplicado** (`mem://architecture/lcp-static-skeleton`). Estender para Dashboard com placeholder de KPIs sem JS.
+Aplicar em:
+- `src/modules/ti/hooks/useITEquipment.ts` + `equipmentService.listEquipment`
+- `src/hooks/useITSystems.ts`
+- `src/hooks/useITTelecom.ts`
+- `src/hooks/useITTickets.ts`
+- `src/hooks/useITIncidents.ts`
+- `src/hooks/useITDepreciation.ts`
+- `src/hooks/useITMovements.ts`
+- `src/hooks/useITAuditLog.ts`
+- `src/hooks/useITSLA.ts`
+- `src/hooks/useITSchedule.ts`
+- `src/hooks/useITTCO.ts`
+- `src/hooks/useITConfig.ts` (config: usa `currentOrg`)
 
----
+Cada query passa a:
+- incluir `holdingMode ? activeOrgIds : currentOrg?.id` no `queryKey`
+- usar `.in("organization_id", orgIds)` quando `holdingMode && activeOrgIds.length > 0`, senão `.eq("organization_id", currentOrg.id)`
 
-### Fase 3 — Agregação no servidor (matar over-fetch estrutural)
-
-Mover cálculos do cliente para RPCs Postgres com `STABLE` + cache via React Query:
-
-**3.1 `get_dashboard_kpis(p_org_id uuid, p_ref_month date)**` retorna saldo, runway, AP/AR, margem operacional já agregados. Hoje o Dashboard busca cashflow inteiro e soma no cliente.
-
-**3.2 `get_cashflow_summary_by_period(...)**` com agregação por mês/categoria/grupo — substitui várias chamadas em `useGroupTotals`/`useFinancialSummary`.
-
-**3.3 `get_contract_projections(p_org_id, p_from, p_to)**` consolida contratos recorrentes + parcelas + projeções de folha em **uma view materializável**. Elimina a cascata cliente de `useCashFlow` (4 round-trips → 1).
-
-**3.4 Índices auxiliares** em `cashflow_entries (organization_id, data_prevista)`, `contract_installments (contract_id, data_vencimento)`, `payroll_items (run_id)` se não existirem.
-
-**3.5 Materialized view opcional** `mv_dashboard_daily` refrescada por trigger nas tabelas-fonte (apenas se a Fase 3.1 não bastar).
-
----
-
-### Fase 4 — Realtime cirúrgico e colaboração multi-usuário
-
-Resolve o "outro usuário lançou e eu não vejo":
-
-**4.1 Canal Realtime por organização**: `supabase.channel('org:'+orgId).on('postgres_changes', { table: 'cashflow_entries', filter: 'organization_id=eq.'+orgId }, ...)`.
-
-- Em vez de invalidar a query inteira, **patchar** o cache do React Query (`queryClient.setQueryData`) com o registro alterado.
-- Hook utilitário `useRealtimeSync(table, queryKeyBuilder)`.
-
-**4.2 Tabelas com realtime** (priorizadas): `cashflow_entries`, `tasks`, `notifications`, `contracts`, `etl_jobs`. Habilitar via `ALTER PUBLICATION supabase_realtime ADD TABLE ...`.
-
-**4.3 Indicador de "atualizado agora"** discreto no header — reforça percepção de sistema vivo.
-
-**4.4 Otimistic updates** em mutations frequentes (criar tarefa, marcar lançamento como pago). Hoje o usuário vê spinner — passa a ver a mudança imediata + rollback se falhar.
+**1.4 Dashboards consolidados**
+- `TIDashboard.tsx` e `JuridicoDashboard.tsx` continuam funcionando — apenas passam a receber arrays já consolidados quando o usuário ativa Holding/Consolidado, ou filtrados quando escolhe uma empresa nas abas.
+- Adicionar um pequeno indicador (badge) no topo do dashboard quando `holdingMode` está ativo, replicando o padrão visto em outros módulos (opcional — se o `PageHeader` já mostra, dispensável).
 
 ---
 
-### Métricas de sucesso
+## Parte 2 — Trilha de Maturidade do Jurídico
 
+### Critérios (100 pts: 50 completude / 25 atualização / 25 rotinas)
 
-| Métrica                                   | Hoje (estimado) | Meta                         |
-| ----------------------------------------- | --------------- | ---------------------------- |
-| Tempo até KPIs do Dashboard visíveis      | 2–4s            | <800ms (cache quente <100ms) |
-| Round-trips na carga do Financeiro        | 8–12            | 2–3                          |
-| Payload médio `cashflow_entries` (lista)  | ~3KB/linha      | <800B/linha                  |
-| Refetches por navegação (3 trocas de aba) | 30–50           | <10                          |
-| Queries duplicadas (org/role) por carga   | 4–6             | 1                            |
+**Completude (50)**
+- Configuração jurídica preenchida (responsável, escritório padrão, política de provisão) — 8
+- Pelo menos 1 processo cadastrado — 4
+- % de processos com `numero_cnj` válido + `parte_contraria` + `valor_causa` — 8
+- % de processos com `probabilidade` definida (provável/possível/remota) — 8
+- % de processos com `valor_provisionado` coerente com a probabilidade — 6
+- % de processos com advogado/escritório responsável — 6
+- Documentos anexados em ≥ 80% dos processos ativos — 6
+- Cadastro de tipos de despesa jurídica (`juridico_expenses` por categoria) — 4
 
+**Atualização (25)**
+- % de processos ativos com movimento (`juridico_movements`) nos últimos 90 dias — 10
+- Nenhuma audiência vencida sem atualização — 5
+- Acordos ativos com `juridico_settlement_installments` em dia — 5
+- Provisão recalculada nos últimos 30 dias (compara `updated_at`) — 5
 
-Faremos um benchmark com `browser--performance_profile` antes da Fase 1 e ao fim de cada fase.
+**Rotinas (25)**
+- Rotinas jurídicas registradas em `requests` (`type in ('rotina_juridico','juridico')`) para a competência — geradas/concluídas/atrasadas — 15
+- Reconciliação financeira: despesas jurídicas do mês têm contrapartida em `cashflow_entries` (via `source='juridico'`) — 10
 
----
-
-### Sequência sugerida
-
-1. **Fase 1** primeiro (1 sessão) — usuário já sente diferença no mesmo dia.
-2. **Fase 2** logo em seguida (1 sessão) — fluidez de navegação.
-3. **Fase 3** (1–2 sessões) — exige migration SQL + ajuste dos hooks de Dashboard/Financeiro.
-4. **Fase 4** (1 sessão) — depende de Realtime estar habilitado nas tabelas certas.
-
-Posso executar uma fase de cada vez. Diga **"executar fase 1 de performance"** para começar pelos quick wins, ou peça reordenação (por exemplo, priorizar Realtime primeiro se o problema multi-usuário for o mais urgente).
----
-
-## ✅ Fase 3 (Performance) — Agregações no servidor (concluída)
-
-**Migration:** `20260430231844` — RPCs Postgres + índices.
-
-### RPCs criadas (SECURITY INVOKER, respeitam RLS existente)
-1. **`get_cashflow_summary_by_period(_organization_id, _from, _to)`** → JSON `{ totals, monthly[], by_category[] }`. Substitui 3 reduções no cliente (totais, gráfico mensal, breakdown por categoria) por 1 round-trip.
-2. **`get_dashboard_kpis(_organization_id)`** → JSON `{ contracts, liabilities, crm }`. Calcula contratos ativos, valor mensal normalizado, passivos agregados, CRM weighted_value/open/stale em 1 RPC.
-
-### Índices de suporte (idempotentes)
-- `idx_cashflow_org_dataprev` em `cashflow_entries(organization_id, data_prevista)`
-- `idx_contracts_org_status`, `idx_liabilities_org_status`
-- `idx_crm_opps_org_open` (parcial: `won_at IS NULL AND lost_at IS NULL`)
-
-### Hooks novos (prontos para consumo)
-- `useDashboardKPIs()` em `src/hooks/useDashboardKPIs.ts` — preset `operational`, `keepPreviousData`.
-- `useCashflowSummary(rangeFrom, rangeTo)` em `src/hooks/useCashflowSummary.ts` — preset `operational`, `keepPreviousData`.
-
-### Por que não troquei os consumidores ainda
-`useFinancialSummary` é importado por `Dashboard`, `RelatorioKpi`, `usePlanningPdfReport`, `PlanningCockpit` e `useCashFlow`. Ele aplica filtros operacionais (cost_center, subsidiary) sobre o array de entries. Substituir por RPC exige que as RPCs aceitem esses mesmos filtros — escopo de uma **Fase 3.5** dedicada (assinaturas das RPCs já estão preparadas para isso).
-
-**Como adotar gradualmente:** novos componentes de Dashboard (KPI cards, gráficos summary) devem usar `useDashboardKPIs`/`useCashflowSummary` direto; consumidores antigos migram quando passarem por refactor.
-
-### Próximo passo sugerido
-- **Fase 4 — Realtime**: habilitar canais Supabase em `cashflow_entries`, `contracts`, `notifications` para sincronização multi-usuário e *optimistic updates* via `useMutation`.
+### Arquivos
+- `src/lib/sectorMaturity/juridico.ts` — `evaluateJuridico(input)` retornando `SectorMaturityResult`.
+- Estender `SectorKey` em `types.ts` com `"juridico"` e adicionar entrada em `SECTOR_META` (`label: "Jurídico"`, `route: "/juridico"`).
+- Estender `targets.ts` com campos específicos (ex.: `movement_freshness_days`, `provision_required_for_provavel`) e ajustar `fieldsForSector("juridico")`.
+- Plugar avaliador em `useSectorOnboarding.ts`: novo bloco `isJur` com queries para `juridico_processes`, `juridico_movements`, `juridico_settlements`, `juridico_settlement_installments`, `juridico_documents`, `juridico_expenses`, `juridico_config`, `requests` (tipo jurídico).
+- Renderizar `<SectorOnboardingBar sector="juridico" />` no topo de `Juridico.tsx` (logo após o `PageHeader`).
 
 ---
 
-## ✅ Fase 4 (Performance) — Realtime + Optimistic updates (concluída)
+## Parte 3 — Trilha de Maturidade do TI
 
-**Migration:** `20260430232200` — `REPLICA IDENTITY FULL` + adição à publicação `supabase_realtime`.
+### Critérios (100 pts: 50 / 25 / 25)
 
-### Tabelas habilitadas em realtime
-- `cashflow_entries`, `contracts`, `contract_installments`, `request_tasks` (somam-se às já existentes: `notifications`, `hr_*`).
+**Completude (50)**
+- Configuração TI preenchida (`it_config`: política de garantia, dias úteis, alertas) — 6
+- Pelo menos 1 equipamento cadastrado — 4
+- % de equipamentos com `patrimonial_code` + `acquisition_value` + `acquisition_date` — 8
+- % de equipamentos ativos com `responsible_employee_id` — 8
+- % de equipamentos com parâmetros de depreciação (`it_depreciation_params`) — 6
+- Cadastro de sistemas (≥ 1 ativo) e links de telecom (≥ 1 ativo) — 6
+- Políticas de SLA cadastradas (`it_sla_policies` ≥ 1 por prioridade) — 6
+- Documentos/contratos anexados em ≥ 80% dos sistemas/links ativos — 6
 
-### Hooks novos
-- **`useRealtimeSync(subs)`** — assina N tabelas, filtra por `organization_id` automaticamente, invalida React Query keys quando eventos chegam, cleanup no unmount.
-- **`useOptimisticUpdates()`** — wrappers para `useMutation`: `optimisticUpdate/Insert/Delete` + `rollback`.
+**Atualização (25)**
+- Nenhum equipamento com garantia vencida não tratada — 5
+- Nenhum sistema/link com `renewal_date` vencido — 6
+- Depreciação calculada (`it_depreciation_schedule` para o mês corrente) — 5
+- Saldo contábil consolidado calculado nos últimos 30 dias — 4
+- Inventário sem movimentos pendentes (`it_equipment_movements` em `pendente`) — 5
 
-### Plugado no Dashboard
-`src/pages/Dashboard.tsx` agora assina `cashflow_entries`, `contracts`, `contract_installments` e invalida automaticamente `cashflow`, `cashflow-summary`, `dashboard-kpis`, `contracts`, `contract-installments`. Quando outro usuário mutaciona qualquer dessas tabelas, o Dashboard atualiza em background — sem flash visual graças ao `keepPreviousData` da Fase 2.
+**Rotinas (25)**
+- % de chamados (`it_tickets`) abertos dentro do SLA — 10
+- Chamados resolvidos no mês ÷ chamados abertos no mês — 8
+- Incidentes (`it_incidents`) com tratativa registrada — 7
 
-### Como adotar em outros módulos
+### Arquivos
+- `src/lib/sectorMaturity/ti.ts` — `evaluateTI(input)`.
+- `SectorKey` += `"ti"`; `SECTOR_META.ti = { label: "TI & Patrimônio", route: "/ti" }`.
+- `targets.ts`: campos específicos (`sla_target_pct`, `renewal_alert_days`, `warranty_alert_days`).
+- Plugar em `useSectorOnboarding.ts` com queries para todas as tabelas `it_*` e `requests` (`rotina_ti`).
+- Renderizar `<SectorOnboardingBar sector="ti" />` em `TI.tsx`.
+
+---
+
+## Parte 4 — Integração com o Dashboard Geral
+
+- `src/components/dashboard/MaturityOverviewSection.tsx`: `SUPPORTED_SECTORS` passa de `["dp", "financeiro"]` para `["dp", "financeiro", "juridico", "ti"]`.
+- O grid sobe para 2 colunas em md / mantendo layout responsivo (já é `md:grid-cols-2`).
+- O `useMaturityMonthlyBackfill` já é genérico — vai gravar histórico mensal automaticamente para os novos setores em `sector_onboarding_history`.
+
+---
+
+## Parte 5 — Backoffice e alertas
+
+- `sector-maturity-snapshot` e `sector-maturity-alerts` (edge functions) já são genéricas por `sector` na tabela `sector_onboarding`. Nenhuma migração obrigatória — basta os novos snapshots começarem a ser gravados.
+- Backoffice de metas (`SectorMaturityTargetsDialog`) passa a oferecer `juridico` e `ti` a partir do `fieldsForSector(sector)`.
+
+---
+
+## Detalhes técnicos
+
+### Padrão de query Holding-aware (referência)
 ```ts
-useRealtimeSync([
-  { table: "cashflow_entries", invalidateKeys: [["cashflow"], ["dashboard-kpis"]] },
-]);
+const { currentOrg } = useOrganization();
+const { holdingMode, activeOrgIds } = useHolding();
+const orgIds = holdingMode && activeOrgIds.length > 0
+  ? activeOrgIds
+  : currentOrg?.id ? [currentOrg.id] : [];
+
+const list = useQuery({
+  queryKey: ["it_equipment", orgIds],
+  enabled: orgIds.length > 0,
+  queryFn: () => listEquipment(orgIds),
+});
 ```
 
-### Segurança
-`SECURITY INVOKER` nas RPCs (Fase 3) e RLS nativa do Supabase Realtime garantem que cada usuário só recebe eventos das linhas que já pode ler.
+### Migrações de banco
+Nenhuma migração de schema é necessária:
+- `sector_onboarding`, `sector_onboarding_history` e `sector_maturity_targets` já aceitam qualquer string em `sector`.
+- Tabelas `it_*` e `juridico_*` já têm `organization_id` + RLS por organização.
+
+### RLS
+RLS atual já permite `SELECT` em qualquer `organization_id` que o usuário pertença — ou seja, modo Holding "consolidado" funciona sem alteração de policies (mesma estratégia já usada por Contratos/CRM/Cashflow).
+
+### Memória de projeto (a registrar após implementação)
+- `mem://features/maturity-juridico` — critérios e pesos da trilha jurídica
+- `mem://features/maturity-ti` — critérios e pesos da trilha de TI
+- Atualizar Core para registrar que TI e Jurídico agora seguem o padrão Holding.
 
 ---
 
-## 🎯 Roadmap de Performance — concluído
+## Resumo de arquivos
 
-| Fase   | Status | Entrega principal                                                            |
-| ------ | ------ | ---------------------------------------------------------------------------- |
-| Fase 1 | ✅      | `cachePresets` (4 tiers) + dedup `OrganizationContext`/`useCurrentRole`     |
-| Fase 2 | ✅      | Prefetch on-hover + `keepPreviousData` em filtros                            |
-| Fase 3 | ✅      | RPCs `get_dashboard_kpis` / `get_cashflow_summary_by_period` + índices       |
-| Fase 4 | ✅      | Realtime em `cashflow_entries`/`contracts`/`request_tasks` + optimistic API |
+**Criar**
+- `src/lib/sectorMaturity/juridico.ts`
+- `src/lib/sectorMaturity/ti.ts`
 
-### Próximos passos opcionais (Fase 3.5 — backlog)
-1. Estender RPCs com filtros operacionais (`_cost_center_ids uuid[]`).
-2. Migrar `Dashboard`, `RelatorioKpi`, `PlanningCockpit` para consumir `useDashboardKPIs`/`useCashflowSummary`.
-3. Aplicar `useOptimisticUpdates` em mutations críticas (criar/editar entrada, status de contrato).
-4. Realtime em `request_tasks` e `notifications` plugados em layout raiz para badges globais.
+**Editar**
+- `src/lib/sectorMaturity/types.ts` (SectorKey + SECTOR_META)
+- `src/lib/sectorMaturity/targets.ts` (campos + fieldsForSector)
+- `src/hooks/useSectorOnboarding.ts` (blocos `isJur` e `isTi` + cálculo)
+- `src/components/dashboard/MaturityOverviewSection.tsx` (SUPPORTED_SECTORS)
+- `src/pages/Juridico.tsx` e `src/pages/TI.tsx` (PageHeader + SectorOnboardingBar)
+- Hooks Jurídico (4 arquivos) e Services (3 arquivos)
+- Hooks TI (12 arquivos) + `equipmentService` (services dos demais já estão inline nos hooks)
+
+**Sem migração de banco.**

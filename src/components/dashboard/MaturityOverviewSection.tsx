@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 // Setores com avaliador implementado. Estender quando CRM/Contratos/
 // Planejamento ganharem seus `evaluate*`.
-const SUPPORTED_SECTORS: SectorKey[] = ["dp", "financeiro"];
+const SUPPORTED_SECTORS: SectorKey[] = ["dp", "financeiro", "juridico", "ti"];
 
 export default function MaturityOverviewSection() {
   const [results, setResults] = useState<Partial<Record<SectorKey, SectorMaturityResult | null>>>({});

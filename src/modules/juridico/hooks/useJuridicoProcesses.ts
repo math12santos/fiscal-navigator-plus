@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
 import { toast } from "sonner";
 import {
   listProcesses,
@@ -10,12 +11,19 @@ import {
 
 export function useJuridicoProcesses(filters?: ProcessFilters) {
   const { currentOrg } = useOrganization();
+  const { holdingMode, activeOrgIds } = useHolding();
+  const orgIds =
+    holdingMode && activeOrgIds.length > 0
+      ? activeOrgIds
+      : currentOrg?.id
+        ? [currentOrg.id]
+        : [];
   const qc = useQueryClient();
 
   const list = useQuery({
-    queryKey: ["juridico_processes", currentOrg?.id, filters],
-    enabled: !!currentOrg?.id,
-    queryFn: () => listProcesses(currentOrg!.id, filters),
+    queryKey: ["juridico_processes", orgIds, filters],
+    enabled: orgIds.length > 0,
+    queryFn: () => listProcesses(orgIds, filters),
   });
 
   const upsert = useMutation({

@@ -15,8 +15,9 @@ export interface CreateSettlementInput {
   [k: string]: any;
 }
 
-export async function listSettlements(orgId: string, processId?: string) {
-  let q = supabase.from("juridico_settlements" as any).select("*").eq("organization_id", orgId);
+export async function listSettlements(orgIds: string[], processId?: string) {
+  if (!orgIds.length) return [] as any[];
+  let q = supabase.from("juridico_settlements" as any).select("*").in("organization_id", orgIds);
   if (processId) q = q.eq("process_id", processId);
   const { data, error } = await q.order("created_at", { ascending: false });
   if (error) throw error;

@@ -2,7 +2,7 @@
 // Cada setor (DP, Financeiro, CRM, ...) define seus próprios checks
 // e a forma de avaliação, mas todos retornam um SectorMaturityResult.
 
-export type SectorKey = "dp" | "financeiro" | "crm" | "contratos" | "planejamento";
+export type SectorKey = "dp" | "financeiro" | "crm" | "contratos" | "planejamento" | "juridico" | "ti";
 
 export type MaturityCategory = "completude" | "atualizacao" | "rotinas";
 
@@ -65,4 +65,6 @@ export const SECTOR_META: Record<SectorKey, { label: string; route: string }> = 
   crm: { label: "CRM Comercial", route: "/crm" },
   contratos: { label: "Contratos", route: "/contratos" },
   planejamento: { label: "Planejamento", route: "/planejamento" },
+  juridico: { label: "Jurídico", route: "/juridico" },
+  ti: { label: "TI & Patrimônio", route: "/ti" },
 };

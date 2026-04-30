@@ -1,8 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeIdFields } from "./sanitize";
 
-export async function listExpenses(orgId: string, processId?: string) {
-  let q = supabase.from("juridico_expenses" as any).select("*").eq("organization_id", orgId);
+export async function listExpenses(orgIds: string[], processId?: string) {
+  if (!orgIds.length) return [] as any[];
+  let q = supabase.from("juridico_expenses" as any).select("*").in("organization_id", orgIds);
   if (processId) q = q.eq("process_id", processId);
   const { data, error } = await q.order("data_despesa", { ascending: false });
   if (error) throw error;

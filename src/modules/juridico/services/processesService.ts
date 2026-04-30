@@ -6,8 +6,9 @@ export interface ProcessFilters {
   probabilidade?: string;
 }
 
-export async function listProcesses(orgId: string, filters?: ProcessFilters) {
-  let q = supabase.from("juridico_processes" as any).select("*").eq("organization_id", orgId);
+export async function listProcesses(orgIds: string[], filters?: ProcessFilters) {
+  if (!orgIds.length) return [] as any[];
+  let q = supabase.from("juridico_processes" as any).select("*").in("organization_id", orgIds);
   if (filters?.status) q = q.eq("status", filters.status);
   if (filters?.probabilidade) q = q.eq("probabilidade", filters.probabilidade);
   const { data, error } = await q.order("created_at", { ascending: false });
