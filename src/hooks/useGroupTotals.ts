@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -45,6 +45,7 @@ export function useGroupTotals(rangeFrom: Date, rangeTo: Date) {
     },
     enabled: !!user && isPerCompany && allOrgIds.length > 1,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 
   // Group contracts totals
