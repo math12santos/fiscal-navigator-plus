@@ -87,6 +87,7 @@ const BackofficeAudit = lazyRetry(() => import("@/pages/BackofficeAudit"));
 const BackofficeConfig = lazyRetry(() => import("@/pages/BackofficeConfig"));
 const BackofficeSystem = lazyRetry(() => import("@/pages/BackofficeSystem"));
 const BackofficeOnboarding = lazyRetry(() => import("@/pages/BackofficeOnboarding"));
+const BackofficeBilling = lazyRetry(() => import("@/pages/BackofficeBilling"));
 const Auth = lazyRetry(() => import("@/pages/Auth"));
 const ResetPassword = lazyRetry(() => import("@/pages/ResetPassword"));
 const Perfil = lazyRetry(() => import("@/pages/Perfil"));
@@ -232,6 +233,7 @@ function BackofficeRoutes() {
             <Route path="/config" element={<BackofficeConfig />} />
             <Route path="/empresa/:orgId" element={<BackofficeCompany />} />
             <Route path="/onboarding" element={<BackofficeOnboarding />} />
+            <Route path="/faturamento" element={<BackofficeBilling />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
