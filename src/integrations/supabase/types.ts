@@ -3994,6 +3994,161 @@ export type Database = {
           },
         ]
       }
+      import_templates: {
+        Row: {
+          active: boolean
+          column_mapping: Json
+          created_at: string
+          date_format: string | null
+          decimal_separator: string | null
+          default_values: Json | null
+          delimiter: string | null
+          id: string
+          name: string
+          organization_id: string
+          provider: string | null
+          source_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          column_mapping: Json
+          created_at?: string
+          date_format?: string | null
+          decimal_separator?: string | null
+          default_values?: Json | null
+          delimiter?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          provider?: string | null
+          source_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          column_mapping?: Json
+          created_at?: string
+          date_format?: string | null
+          decimal_separator?: string | null
+          default_values?: Json | null
+          delimiter?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          provider?: string | null
+          source_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      integration_endpoints: {
+        Row: {
+          active: boolean
+          created_at: string
+          default_account_id: string | null
+          default_bank_account_id: string | null
+          default_cost_center_id: string | null
+          events_count: number
+          id: string
+          last_received_at: string | null
+          mapping: Json
+          name: string
+          organization_id: string
+          provider: string
+          secret_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          default_account_id?: string | null
+          default_bank_account_id?: string | null
+          default_cost_center_id?: string | null
+          events_count?: number
+          id?: string
+          last_received_at?: string | null
+          mapping?: Json
+          name: string
+          organization_id: string
+          provider: string
+          secret_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          default_account_id?: string | null
+          default_bank_account_id?: string | null
+          default_cost_center_id?: string | null
+          events_count?: number
+          id?: string
+          last_received_at?: string | null
+          mapping?: Json
+          name?: string
+          organization_id?: string
+          provider?: string
+          secret_hash?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      integration_events: {
+        Row: {
+          cashflow_entry_id: string | null
+          endpoint_id: string
+          error_message: string | null
+          event_type: string | null
+          external_id: string
+          id: string
+          organization_id: string
+          processed_at: string | null
+          raw_payload: Json
+          received_at: string
+          status: string
+        }
+        Insert: {
+          cashflow_entry_id?: string | null
+          endpoint_id: string
+          error_message?: string | null
+          event_type?: string | null
+          external_id: string
+          id?: string
+          organization_id: string
+          processed_at?: string | null
+          raw_payload: Json
+          received_at?: string
+          status?: string
+        }
+        Update: {
+          cashflow_entry_id?: string | null
+          endpoint_id?: string
+          error_message?: string | null
+          event_type?: string | null
+          external_id?: string
+          id?: string
+          organization_id?: string
+          processed_at?: string | null
+          raw_payload?: Json
+          received_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_events_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "integration_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kpi_period_presets: {
         Row: {
           created_at: string
@@ -6574,6 +6729,10 @@ export type Database = {
       remove_org_member: {
         Args: { _org_id: string; _target_user_id: string }
         Returns: undefined
+      }
+      rotate_endpoint_secret: {
+        Args: { p_endpoint_id: string }
+        Returns: string
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }

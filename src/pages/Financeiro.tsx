@@ -11,6 +11,7 @@ import { AgingListTab } from "@/components/financeiro/AgingListTab";
 import { ImportacoesTab } from "@/components/financeiro/ImportacoesTab";
 import { FluxoCaixaTab } from "@/components/financeiro/FluxoCaixaTab";
 import { ConciliacaoTab } from "@/components/financeiro/ConciliacaoTab";
+import { IntegracoesTab } from "@/components/financeiro/IntegracoesTab";
 import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
 
 const ALL_TABS = [
@@ -20,6 +21,7 @@ const ALL_TABS = [
   { key: "contas-bancarias", label: "Contas Bancárias" },
   { key: "fluxo-caixa", label: "Fluxo de Caixa" },
   { key: "conciliacao", label: "Conciliação" },
+  { key: "integracoes", label: "Integrações" },
   { key: "importacoes", label: "Importações" },
 ];
 
@@ -88,6 +90,9 @@ export default function Financeiro() {
         )}
         {allowedTabs.some((t) => t.key === "conciliacao") && (
           <TabsContent value="conciliacao"><ConciliacaoTab /></TabsContent>
+        )}
+        {allowedTabs.some((t) => t.key === "integracoes") && (
+          <TabsContent value="integracoes"><IntegracoesTab /></TabsContent>
         )}
         {allowedTabs.some((t) => t.key === "importacoes") && (
           <TabsContent value="importacoes"><ImportacoesTab /></TabsContent>
