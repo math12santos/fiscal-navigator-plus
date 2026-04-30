@@ -1,150 +1,172 @@
-# Plano de Melhorias de Integrações Entre Módulos
 
-## Diagnóstico
+## Diagnóstico da estrutura atual
 
-Mapa atual de integrações no FinCore (origens em `cashflow_entries` no banco):
+O FinCore cresceu como uma aplicação React+Supabase **achatada em 2 camadas** (UI ↔ hooks que falam direto com o Supabase). Hoje:
+
+- **124 arquivos** importam o cliente Supabase diretamente — incluindo páginas e componentes.
+- **Hooks "deus"**: `useDP.ts` (846 linhas), `useFinanceiroImport.ts` (782), `useDPCockpit`, `usePayrollProjections` (517), `useCommercialPlanning` (466), `useBackoffice` (437) misturam fetch, regras de negócio, mutations e formatação.
+- **Páginas Backoffice** chamam `supabase.from()` em **44 / 22 lugares** — não há fronteira de serviço.
+- **Não existem pastas `domain/`, `services/`, `api/`, `modules/`** — só `lib/` (utilitários puros) e `hooks/` (acesso a dados).
+- **Integrações cross-módulo** estão dispersas: `projectionRegistry.ts` é o único ponto canônico (MECE de projeções), mas a materialização DP→Caixa, Contratos→Caixa, CRM→Contratos, Jurídico→Caixa, TI→Caixa vivem espalhadas em hooks/triggers SQL sem um contrato comum.
+- **Sem contratos de API internos**: cada módulo expõe o que quer; quem consome importa hook alheio e acopla a sua estrutura interna.
+
+A "regra-mãe" do FinCore (separar UI / cadastros / regras / integrações internas / persistência / logs / impacto financeiro) **não está refletida na árvore de pastas**.
+
+## Objetivo
+
+Implantar uma arquitetura modular em **4 camadas** com contratos internos explícitos, sem reescrever tudo: migração incremental, módulo a módulo, mantendo o app funcionando.
 
 ```text
-importacao : 1.476  (importação CSV/OFX)
-contrato   :    32  (Contratos → Cashflow ✅)
-manual     :    30  (Lançamento manual)
-dp         :     0  (cód. existe, sem dados ainda)
-crm        :     0  (cód. registry existe, sem materialização)
-juridico   :     0  (RPC existe, sem uso)
-ti         :     0  (RPC existe, sem uso)
+┌─────────────────────────────────────────────────────────┐
+│  UI Layer        src/components/<modulo>/, src/pages/   │  React puro, sem supabase.from()
+├─────────────────────────────────────────────────────────┤
+│  Orchestration   src/modules/<modulo>/hooks/            │  React Query, cache, toast, invalidation
+├─────────────────────────────────────────────────────────┤
+│  Domain          src/modules/<modulo>/domain/           │  Regras puras, tipos, cálculos, validações
+├─────────────────────────────────────────────────────────┤
+│  Persistence     src/modules/<modulo>/services/         │  Único ponto que toca Supabase / Edge Functions
+└─────────────────────────────────────────────────────────┘
+                            ↕
+        src/modules/_contracts/   ← Contratos internos entre módulos
+        src/modules/_integrations/ ← Orquestradores cross-módulo (DP→Caixa, CRM→Contrato, etc.)
 ```
 
-**Conclusão:** o esqueleto MECE está pronto (`source` + `source_ref` + `projectionRegistry`), mas várias rotas de integração estão **definidas no código e não percorridas pelo usuário** ou **não existem ainda**. 12 lacunas detectadas.
+## Estrutura-alvo por módulo
 
----
+Exemplo `src/modules/juridico/`:
 
-## Lacunas Identificadas
-
-### 🔴 Crítico — quebra a promessa "fonte única da verdade"
-
-1. **CRM Won → Contratos**: existe `projectionRegistry.crmWon()` mas o `useCRM.updateOpportunityStage` não dispara criação automática de contrato/projeção quando muda para "Ganho".
-2. **Jurídico → Fluxo de Caixa**: RPCs `juridico_approve_settlement` e `juridico_post_expense_to_cashflow` existem, mas **nenhuma tela exibe os botões** de aprovar/lançar — usuário não consegue acionar.
-3. **TI → Fluxo de Caixa**: depreciação mensal e custos de chamados/incidentes não geram entradas em `cashflow_entries` (a query da migration espera `source='ti'` mas nada grava com esse source).
-4. **Tarefas (Requests) órfãs**: DP cria requests para rotinas, mas Jurídico (audiências, prazos), TI (manutenção, garantia vencendo) e Contratos (vencimento, reajuste) **não criam tarefas automáticas**.
-
-### 🟡 Importante — perda de eficiência operacional
-
-5. **Notificações fragmentadas**: `useNotifications` existe mas não é chamado pelos hooks de Jurídico, TI, Contratos e CRM em eventos-chave (acordo aprovado, chamado SLA estourado, contrato vencendo, oportunidade parada >30d).
-6. **Centro de Custo ausente em TI/Jurídico**: lançamentos desses módulos vão para o cashflow sem `cost_center_id`, impossibilitando rateio em DRE por unidade.
-7. **Planejamento × Realizado sem TI/Jurídico**: comparativo Plan × Real só considera DP e Contratos. CAPEX de TI e provisões jurídicas ficam fora.
-8. **Conciliação bancária não cobre TI/Jurídico/CRM**: extrato bancário só é cruzado com `source IN ('contrato','dp','manual')`.
-
-### 🟢 Estratégico — visão executiva incompleta
-
-9. **Dashboard executivo sem riscos jurídicos**: provisão consolidada (probable + possible) não aparece no Dashboard CFO/Board.
-10. **Runway/Liquidez sem CAPEX TI**: aquisições programadas de equipamentos e renovações de licenças não entram na projeção de liquidez.
-11. **Relatórios para Conselho sem narrativa cross-módulo**: `RelatoriosDistribuicao` não tem template "Pacote Conselho" agregando Financeiro + Contratos + DP + Jurídico (riscos) + TI (CAPEX).
-12. **Auditoria fragmentada**: cada módulo tem seu `*_audit_log` (juridico_audit_log, it_audit_log, audit_log financeiro) — não há visão unificada para o Backoffice/Master.
-
----
-
-## Plano em 4 Fases
-
-### Fase 1 — Fechar o ciclo financeiro (crítico)
-
-1.1 **CRM → Contrato automático ao "Ganho"**
-- Em `useCRM.updateOpportunityStage`, quando o estágio destino tem flag `is_won`, criar contrato em rascunho com cliente, valor e parcelas da oportunidade + `crm_opportunity_id` no contrato.
-- Toast com link "Abrir contrato gerado".
-
-1.2 **UI Jurídico → Cashflow**
-- Botão **"Aprovar e lançar no caixa"** em `JuridicoSettlementsTab` chamando `juridico_approve_settlement` (RPC já existe).
-- Botão **"Lançar despesa no caixa"** em `JuridicoExpensesTab` chamando `juridico_post_expense_to_cashflow`.
-- Badge "Lançado" / "Pendente" em cada linha.
-
-1.3 **TI → Cashflow** (3 sub-fluxos)
-- **Aquisição**: ao registrar `it_equipment` com `valor_aquisicao`, criar `cashflow_entry` com `source='ti'`, `source_ref='equipment:<id>'`, tipo `saida`, categoria `capex_ti`.
-- **Depreciação mensal**: cron edge function `it-monthly-depreciation` que materializa parcela mensal por equipamento usando `it_depreciation_schedule`.
-- **Chamados/Incidentes pagos**: campo `custo_real` em incidents → cashflow `source='ti'`, `source_ref='incident:<id>'`.
-- Adicionar `cost_center_id` opcional em `it_equipment` e `juridico_processes` (propaga ao cashflow).
-
-### Fase 2 — Alertas e tarefas automáticas
-
-2.1 **Tarefas automáticas cross-módulo** (uma helper `createAutoRequest({module, source_id, due_date, ...})`):
-- **Jurídico**: 7 dias antes de audiência (`data_audiencia`), 3 dias antes de prazo processual.
-- **Contratos**: 30/15/7 dias antes de vencimento, 60 dias antes de reajuste anual.
-- **TI**: 30 dias antes de fim de garantia, 30 dias antes de vencimento de licença, chamado SLA com >80% do tempo decorrido.
-- **CRM**: oportunidade sem atividade há >30 dias (auto-cria task "Reaquecer lead").
-
-2.2 **NotificationCenter unificado**
-- Estender `useNotifications` para receber eventos de todos os módulos via tabela `notifications` com `category` (`juridico|ti|contratos|crm|dp|financeiro`).
-- Triggers SQL: novo acordo, novo chamado crítico, contrato vencendo, oportunidade ganha, rescisão calculada.
-- Filtro por categoria no sino.
-
-### Fase 3 — Consolidação financeira completa
-
-3.1 **Conciliação cobre todos os sources**
-- `useConciliacao` matcher passa a aceitar `source IN ('contrato','dp','manual','importacao','crm','juridico','ti')`.
-- Filtros visuais por módulo na tela de conciliação.
-
-3.2 **Plan × Real inclui TI e Jurídico**
-- Em `useFinanceiro` agregar realizado por `source` para cruzar com linhas de orçamento `categoria IN ('capex_ti', 'provisoes_juridicas')`.
-- Adicionar abas "TI" e "Jurídico" em `Planejamento → Plan × Real`.
-
-3.3 **Liquidez/Runway com CAPEX TI**
-- `useFinancialDashboardKPIs.runway` passa a subtrair CAPEX TI projetado (entradas futuras `source='ti'` tipo saída).
-
-### Fase 4 — Visão executiva (Board / Investor)
-
-4.1 **Card "Riscos Jurídicos" no Dashboard**
-- Soma de `valor_provisionado` por probabilidade (provável/possível/remota) com semáforo.
-- Drill-down para `/juridico?tab=processos&prob=provavel`.
-
-4.2 **Pacote Conselho** em `RelatoriosDistribuicao`
-- Novo template multi-seção: Resumo Financeiro + Contratos ativos + Folha + Provisões Jurídicas + CAPEX TI + Comparativo Plan×Real + Cenários.
-- Saída PDF + envio Slack/Email/Telegram.
-
-4.3 **Auditoria unificada (Backoffice)**
-- Nova aba `BackofficeAudit` "Trilha consolidada" que faz `UNION ALL` de `audit_log`, `juridico_audit_log`, `it_audit_log` com filtro por usuário/módulo/data.
-
----
-
-## Detalhes Técnicos
-
-**Padrão MECE preservado:** todo lançamento que materializa em `cashflow_entries` usa `source` + `source_ref` único e `ON CONFLICT DO UPDATE` (idempotente), seguindo o padrão já adotado em DP/Contratos.
-
-**Helper de auto-tarefas:**
-```ts
-// src/lib/autoRequests.ts
-export async function createAutoRequest(opts: {
-  module: 'juridico'|'ti'|'contratos'|'crm';
-  source_table: string;
-  source_id: string;
-  title: string;
-  due_date: string;
-  assigned_to?: string;
-  priority?: 'low'|'medium'|'high';
-})
+```text
+juridico/
+├── index.ts                  ← API pública do módulo (re-exporta hooks + contratos)
+├── domain/
+│   ├── types.ts              ← JuridicoProcess, RiskLevel, etc.
+│   ├── riskMatrix.ts         ← cálculo puro de exposição
+│   └── settlementRules.ts    ← regras de acordo (puras, testáveis)
+├── services/
+│   ├── processesService.ts   ← list/get/create/update/delete (Supabase)
+│   ├── settlementsService.ts
+│   └── expensesService.ts
+├── hooks/
+│   ├── useProcesses.ts       ← React Query wrappers (orquestração)
+│   └── useSettlements.ts
+└── components/               ← (opcional) componentes específicos do domínio
 ```
-- Idempotente via `unique(source_table, source_id, title)`.
-- Chamado em hooks de upsert de cada módulo + cron edge function diária para olhar janelas (vencimentos).
 
-**Migrations envolvidas:** ~6 migrations adicionando colunas (`cost_center_id` em it/juridico, `crm_opportunity_id` em contracts), índices e triggers de notificação.
+## Contratos internos (`src/modules/_contracts/`)
 
-**Edge functions novas:** `it-monthly-depreciation`, `auto-tasks-scanner` (cron diário que varre vencimentos).
+Tipos versionados que módulos usam para conversar **sem importar uns aos outros**:
+
+```text
+_contracts/
+├── cashflow.ts        ← CashflowEntryInput, postToCashflow(payload)
+├── tasks.ts           ← AutoTaskRequest (já planejado na Fase 2)
+├── notifications.ts   ← NotificationPayload
+├── projections.ts     ← (move projectionRegistry.ts pra cá)
+└── audit.ts           ← AuditEvent
+```
+
+Regra: **um módulo só pode importar de `_contracts/` ou da própria pasta**. Nunca de outro módulo.
+
+## Orquestradores cross-módulo (`src/modules/_integrations/`)
+
+Onde vivem as integrações entre módulos hoje espalhadas:
+
+```text
+_integrations/
+├── dpToCashflow.ts        ← materializa folha → cashflow_entries
+├── contractToCashflow.ts  ← parcelas → caixa
+├── crmToContract.ts       ← oportunidade ganha → contrato
+├── juridicoToCashflow.ts  ← acordos/sinistros → caixa
+├── tiToCashflow.ts        ← compras/incidentes → caixa
+└── autoTaskDispatcher.ts  ← criação de tarefas automáticas
+```
+
+Cada orquestrador consome `services/` dos dois lados e respeita `_contracts/`.
+
+## Plano de migração (incremental, 5 fases)
+
+### Fase 1 — Fundação (sem refatorar nada ainda)
+- Criar pastas `src/modules/`, `src/modules/_contracts/`, `src/modules/_integrations/`.
+- Mover `src/lib/projectionRegistry.ts` → `src/modules/_contracts/projections.ts` (re-export para não quebrar imports).
+- Definir contratos: `cashflow.ts`, `tasks.ts`, `audit.ts`, `notifications.ts`.
+- Adicionar **ESLint rule** (`no-restricted-imports`) que bloqueia: 
+  - componentes/páginas importando `@/integrations/supabase/client` diretamente (warning, não error, durante a migração);
+  - módulos importando uns aos outros fora de `_contracts/`.
+- Criar `docs/architecture.md` com o diagrama e as regras.
+
+### Fase 2 — Migrar módulos pequenos (piloto)
+Converter primeiro **Jurídico** e **TI** (são novos e pequenos):
+- Mover `src/hooks/useJuridico.ts` → quebrar em `src/modules/juridico/services/*` + `hooks/*` + `domain/*`.
+- Mesmo para `useITEquipment`, `useITIncidents`, `useITTickets`, etc.
+- Componentes em `src/components/juridico/` e `src/components/ti/` passam a importar via `@/modules/juridico` e `@/modules/ti`.
+- Validar: testes manuais + `tsc` limpo.
+
+### Fase 3 — Quebrar god-hooks
+Refatorar os hooks gigantes em ordem de dor:
+1. `useDP.ts` (846) → `modules/dp/{services,domain,hooks}` separando employees, benefits, payroll, vacations, terminations.
+2. `useFinanceiroImport.ts` (782) → `modules/financeiro/import/`.
+3. `useCRM.ts` + `useCRMIntelligence.ts` → `modules/crm/`.
+4. `useContracts.ts` + `useContractInstallments.ts` + `useContractAdjustments.ts` → `modules/contratos/`.
+5. `useFinanceiro.ts` + `useCashFlow.ts` + `useFinancialDashboardKPIs.ts` → `modules/financeiro/`.
+
+### Fase 4 — Consolidar integrações cross-módulo
+- Mover toda a Fase 1 do plano anterior (DP→Caixa, Contratos→Caixa, CRM→Contrato, Jurídico→Caixa, TI→Caixa) para `src/modules/_integrations/`.
+- Cada orquestrador exporta uma função única: `postPayrollToCashflow(runId)`, `postSettlementToCashflow(settlementId)`, etc.
+- Botões na UI chamam o orquestrador, não o service direto.
+
+### Fase 5 — Endurecer fronteiras
+- Remover **todos** os `supabase.from()` de `src/components/` e `src/pages/` (44 em BackofficeDashboard, 22 em BackofficeCompany são os principais).
+- Promover a ESLint rule de `warn` para `error`.
+- Adicionar documentação de cada módulo (`README.md` em cada pasta).
+- Sessão de testes: cobrir `domain/` (lógica pura) com Vitest — alvo 70% nos cálculos críticos.
+
+## Convenções obrigatórias
+
+- **Services**: funções, não classes. Recebem cliente já tipado, retornam dados já tipados. Sem React, sem toast.
+- **Domain**: 100% puro (sem I/O, sem React, sem Supabase). Testável com Vitest.
+- **Hooks**: só React Query + invalidation + side-effects de UI (toast).
+- **Contratos**: tipos versionados; mudança quebra-fronteira exige bump de versão e busca no consumidor.
+- **Logs/auditoria**: orquestradores em `_integrations/` são responsáveis por gravar `audit_log` via contrato `audit.ts`.
+
+## Detalhes técnicos relevantes
+
+- Aliases já configurados (`@/`) — basta adicionar `@/modules/*` ao `tsconfig.json` e `vite.config.ts`.
+- Mantemos React Query como camada de cache; nada muda no consumo do React.
+- Migração não exige migração SQL; é puramente reorganização de TS + ESLint.
+- Re-exports temporários em `src/hooks/use*.ts` apontando para `@/modules/*` para não quebrar imports antigos durante as fases 2–4.
+
+## Entregáveis desta fase de aprovação
+
+Se aprovado, executo **apenas a Fase 1** (fundação) primeiro:
+1. Criar estrutura de pastas + `_contracts/` + `_integrations/` (vazio).
+2. Mover `projectionRegistry` com re-export compatível.
+3. Adicionar ESLint rule em modo `warn`.
+4. Criar `docs/architecture.md`.
+5. Migrar **Jurídico** e **TI** como piloto (Fase 2 mini).
+
+Depois pausamos para você validar o piloto antes de atacar os god-hooks (Fase 3+). Isso evita um big-bang que arrisca a estabilidade.
+
+Diga **"executar fase 1 da arquitetura"** para começar, ou peça ajustes no plano.
 
 ---
 
-## Entrega Sugerida
+## Atualização (Fase 1 da Arquitetura Modular — concluída)
 
-Posso executar **Fase 1 inteira em uma rodada** (fecha o ciclo financeiro: CRM→Contrato, Jurídico→Caixa, TI→Caixa). Fases 2/3/4 em rodadas seguintes.
+Estrutura criada em `src/modules/`:
 
-Diga **"executar fase 1"** para começar, ou **"executar tudo em sequência"** se preferir o pacote completo.
+- `_contracts/` — `cashflow.ts`, `projections.ts`, `tasks.ts`, `notifications.ts`, `audit.ts` + barrel `index.ts`.
+- `_integrations/` — pasta criada (vazia, com README); orquestradores virão na Fase 4.
+- `juridico/` — piloto migrado: `domain/{types,riskMatrix}` + `services/{processes,settlements,expenses,config,sanitize}` + `hooks/use*` + `index.ts`.
+- `ti/` — piloto inicial: `domain/types` + `services/equipmentService` + `hooks/useITEquipment` + `index.ts`. (Demais hooks de TI — incidents, tickets, depreciation, SLA, etc. — migrarão na Fase 3.)
 
----
+Compatibilidade:
+- `src/hooks/useJuridico.ts` e `src/hooks/useITEquipment.ts` viraram re-exports finos apontando para `@/modules/*`. Nenhum componente precisa ser tocado nesta fase.
 
-## ✅ Fase 1 IMPLEMENTADA (2026-04-30)
+ESLint (warnings, não errors — promoveremos a `error` na Fase 5):
+- `src/components/**` e `src/pages/**` proibidos de importar `@/integrations/supabase/client` direto.
+- `modules/*/domain/**` proibido de importar Supabase, React, React Query e toast.
+- `modules/*/services/**` proibido de importar React, React Query e toast.
 
-**Migration:** índice único `cashflow_entries(organization_id, source, source_ref)` + 5 funções/triggers.
+Documentação: `docs/architecture.md` + `src/modules/README.md` + `src/modules/_integrations/README.md`.
 
-1. **CRM Won → Contrato automático**: RPC `crm_generate_contract_from_opportunity` chamada em `useCRM.moveToStage`. Cria contrato em rascunho idempotente, vincula `crm_opportunities.contract_id`. Toast com link.
-2. **TI → Cashflow (CAPEX)**: trigger `trg_it_equipment_cashflow` materializa aquisições com `source='ti'`, `source_ref='equipment:<id>'`, propaga `cost_center_id`.
-3. **TI → Cashflow (Sinistros)**: trigger `trg_it_incident_cashflow` materializa perda líquida (`estimated_loss_value - recovered_value`).
-4. **Jurídico**: botões "Aprovar e lançar no caixa" (acordos) e "Lançar" (despesas) já existiam — mantida UI com badge "Lançado/Pendente".
-5. **Invalidação de cache**: `useITEquipment` e `useITIncidents` agora invalidam `cashflow`/`financeiro`.
-
-**Próximo:** Fase 2 (auto-tarefas + notificações cross-módulo).
+Próximo passo sugerido: validar o piloto (Jurídico e TI) e então iniciar Fase 3 quebrando `useDP.ts` (846 linhas) em `modules/dp/`.
