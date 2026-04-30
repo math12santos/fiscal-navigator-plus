@@ -8281,6 +8281,10 @@ export type Database = {
         Returns: undefined
       }
       check_linked_transactions: { Args: { p_user_id: string }; Returns: Json }
+      crm_generate_contract_from_opportunity: {
+        Args: { p_opportunity_id: string }
+        Returns: string
+      }
       get_all_subsidiary_ids: {
         Args: { p_holding_id: string }
         Returns: string[]
@@ -8366,9 +8370,20 @@ export type Database = {
         Args: { p_settlement_id: string }
         Returns: Json
       }
+      juridico_expense_is_posted: {
+        Args: { p_expense_id: string }
+        Returns: boolean
+      }
       juridico_post_expense_to_cashflow: {
         Args: { p_expense_id: string }
         Returns: string
+      }
+      juridico_settlement_cashflow_status: {
+        Args: { p_settlement_id: string }
+        Returns: {
+          parcelas_lancadas: number
+          parcelas_total: number
+        }[]
       }
       match_statement_to_cashflow: {
         Args: { p_statement_id: string }

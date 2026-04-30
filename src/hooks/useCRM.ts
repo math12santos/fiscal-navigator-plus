@@ -338,12 +338,31 @@ export function useCRMOpportunities() {
             notes: `Gerado a partir de oportunidade CRM ganha. opp:${id}`,
           } as any, { onConflict: "organization_id,source,source_ref" } as any);
         }
+
+        // Gerar contrato em rascunho automaticamente (idempotente via RPC)
+        try {
+          const { data: contractId } = await supabase.rpc(
+            "crm_generate_contract_from_opportunity" as any,
+            { p_opportunity_id: id }
+          );
+          return { contractId } as { contractId?: string };
+        } catch (_) {
+          // Falha silenciosa: cashflow já foi gerado; contrato pode ser gerado depois
+        }
       }
+      return {};
     },
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["crm_opportunities", orgId] });
       qc.invalidateQueries({ queryKey: ["financeiro"] });
       qc.invalidateQueries({ queryKey: ["cashflow"] });
+      qc.invalidateQueries({ queryKey: ["contracts"] });
+      if (res?.contractId) {
+        toast({
+          title: "Oportunidade ganha",
+          description: "Contrato em rascunho gerado automaticamente. Acesse Contratos para revisar.",
+        });
+      }
     },
     onError: (e: any) => toast({ title: "Erro ao mover", description: e.message, variant: "destructive" }),
   });
