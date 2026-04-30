@@ -193,6 +193,19 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
       let countInssEmployees = 0;
       let countFgtsEmployees = 0;
 
+      // Acumuladores de benefícios consolidados por categoria (guia única por empresa).
+      // VR / VA / Plano de Saúde / Outros → 1 guia por empresa somando todos os colaboradores.
+      // VT permanece individual (cada colaborador recebe sua própria recarga).
+      const benefitsAggregate = new Map<string, { total: number; count: number; details: string[] }>();
+      const addBenefitToAggregate = (sub: string, empName: string, value: number) => {
+        if (value <= 0) return;
+        const cur = benefitsAggregate.get(sub) ?? { total: 0, count: 0, details: [] };
+        cur.total += value;
+        cur.count += 1;
+        cur.details.push(`${empName}: R$${value.toFixed(2)}`);
+        benefitsAggregate.set(sub, cur);
+      };
+
       for (const emp of activeEmployees) {
         const admDate = new Date(emp.admission_date);
         if (isAfter(startOfMonth(admDate), cursor)) continue;
