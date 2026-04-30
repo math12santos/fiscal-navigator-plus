@@ -52,6 +52,7 @@ export function ConciliacaoTab() {
         <Button size="sm" variant="outline" onClick={() => setRulesOpen(true)} title="Gerenciar regras de classificação automática">
           <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Regras
         </Button>
+        <Button
           size="sm"
           variant="outline"
           onClick={() => snapshotBalances.mutate()}
@@ -244,6 +245,8 @@ export function ConciliacaoTab() {
         onOpenChange={setImportOpen}
         defaultBankAccountId={bankFilter !== "__all__" ? bankFilter : null}
       />
+
+      <ReconciliationRulesDialog open={rulesOpen} onOpenChange={setRulesOpen} />
     </div>
   );
 }
