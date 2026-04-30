@@ -164,7 +164,9 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
     }
 
     const entries: (Omit<CashFlowEntry, "user_id" | "organization_id"> & { dp_sub_category?: string })[] = [];
-    const activeEmployees = employees.filter((e) => e.status === "ativo");
+    // Inclui ativos, em férias e afastados — todos ainda integram folha/benefícios.
+    // Apenas "desligado" é excluído (já tratado por dismissal_date).
+    const activeEmployees = employees.filter((e) => e.status !== "desligado");
     const now = new Date().toISOString();
 
     let cursor = startOfMonth(rangeFrom);
