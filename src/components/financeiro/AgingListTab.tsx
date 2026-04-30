@@ -97,6 +97,46 @@ export function AgingListTab() {
     return { saldoTotal, limiteTotal, disponibilidadeTotal: saldoTotal + limiteTotal };
   }, [bankAccounts]);
 
+  // ── Cash position grouped per organization (for clickable cards & PDF) ──
+  const perOrgPosition = useMemo<CashPositionByOrg[]>(() => {
+    // Build a map orgId → orgName from current org + subsidiaries
+    const orgNames = new Map<string, string>();
+    if (currentOrg?.id) orgNames.set(currentOrg.id, currentOrg.name);
+    for (const s of subsidiaryOrgs ?? []) orgNames.set(s.id, s.name);
+
+    // Group accounts by organization_id
+    const byOrg = new Map<string, typeof bankAccounts>();
+    for (const ba of bankAccounts) {
+      const k = ba.organization_id || currentOrg?.id || "—";
+      const arr = byOrg.get(k) ?? [];
+      arr.push(ba);
+      byOrg.set(k, arr);
+    }
+
+    const result: CashPositionByOrg[] = [];
+    for (const [orgId, accounts] of byOrg.entries()) {
+      const saldo = accounts.reduce((s, b) => s + Number(b.saldo_atual ?? 0), 0);
+      const limite = accounts.reduce((s, b) => s + Number(b.limite_credito ?? 0), 0);
+      result.push({
+        orgId,
+        orgName: orgNames.get(orgId) ?? "Organização",
+        accounts: accounts.map((a) => ({
+          nome: a.nome,
+          banco: a.banco,
+          tipo_conta: a.tipo_conta,
+          saldo_atual: Number(a.saldo_atual ?? 0),
+          limite_credito: Number(a.limite_credito ?? 0),
+          organization_id: a.organization_id,
+        })),
+        saldo,
+        limite,
+        disponibilidade: saldo + limite,
+      });
+    }
+    return result.sort((a, b) => a.orgName.localeCompare(b.orgName, "pt-BR"));
+  }, [bankAccounts, currentOrg, subsidiaryOrgs]);
+
+
   // ── AP Aging buckets ──
   const buckets = useMemo<AgingBucket[]>(() => {
     const pending = saidaEntries.filter(
