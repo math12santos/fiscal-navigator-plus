@@ -53,6 +53,7 @@ export const pageFactories = {
   relatoriosDistribuicao: () => import("@/pages/RelatoriosDistribuicao"),
   onboardingGuiado: () => import("@/pages/OnboardingGuiado"),
   dpDesempenho: () => import("@/pages/DepartamentoPessoalDesempenho"),
+  ti: () => import("@/pages/TI"),
 } as const;
 
 // Lazy-loaded pages
