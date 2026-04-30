@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -77,6 +77,7 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
       return (data ?? []) as unknown as CashFlowEntry[];
     },
     enabled: !!user && !!orgId,
+    placeholderData: keepPreviousData,
   });
 
   // Contract projections (virtual) — recurrent contracts
@@ -101,6 +102,7 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
       return (data ?? []) as unknown as import("@/hooks/useContractInstallments").ContractInstallment[];
     },
     enabled: !!user && !!orgId && nonRecurringContractIds.length > 0,
+    placeholderData: keepPreviousData,
   });
 
   const projectedEntries = useMemo(() => {
