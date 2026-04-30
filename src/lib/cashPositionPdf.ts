@@ -165,6 +165,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [36, 214, 196], textColor: 0 },
       columnStyles: { 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
+      didParseCell: colorNegatives,
     });
     cursorY = (doc as any).lastAutoTable.finalY + 8;
   }
