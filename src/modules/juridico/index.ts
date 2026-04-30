@@ -16,6 +16,5 @@ export type {
   JuridicoExpense,
   ProcessStatus,
   ProcessProbability,
-  RiskExposure,
 } from "./domain/types";
-export type { RiskExposure as JuridicoRiskExposure } from "./domain/riskMatrix";
+export type { RiskExposure } from "./domain/riskMatrix";
