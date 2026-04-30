@@ -5316,6 +5316,478 @@ export type Database = {
           },
         ]
       }
+      juridico_audit_log: {
+        Row: {
+          action: string
+          after_data: Json | null
+          before_data: Json | null
+          changed_by: string | null
+          changed_fields: string[] | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          organization_id: string
+          process_id: string | null
+        }
+        Insert: {
+          action: string
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_by?: string | null
+          changed_fields?: string[] | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          organization_id: string
+          process_id?: string | null
+        }
+        Update: {
+          action?: string
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_by?: string | null
+          changed_fields?: string[] | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          organization_id?: string
+          process_id?: string | null
+        }
+        Relationships: []
+      }
+      juridico_config: {
+        Row: {
+          account_id_acordos: string | null
+          account_id_custas: string | null
+          account_id_honorarios: string | null
+          account_id_provisao: string | null
+          alert_days_before_audiencia: number | null
+          alert_days_before_prazo: number | null
+          cost_center_id_default: string | null
+          created_at: string
+          id: string
+          organization_id: string
+          pct_provisao_possivel: number
+          pct_provisao_provavel: number
+          pct_provisao_remota: number
+          updated_at: string
+        }
+        Insert: {
+          account_id_acordos?: string | null
+          account_id_custas?: string | null
+          account_id_honorarios?: string | null
+          account_id_provisao?: string | null
+          alert_days_before_audiencia?: number | null
+          alert_days_before_prazo?: number | null
+          cost_center_id_default?: string | null
+          created_at?: string
+          id?: string
+          organization_id: string
+          pct_provisao_possivel?: number
+          pct_provisao_provavel?: number
+          pct_provisao_remota?: number
+          updated_at?: string
+        }
+        Update: {
+          account_id_acordos?: string | null
+          account_id_custas?: string | null
+          account_id_honorarios?: string | null
+          account_id_provisao?: string | null
+          alert_days_before_audiencia?: number | null
+          alert_days_before_prazo?: number | null
+          cost_center_id_default?: string | null
+          created_at?: string
+          id?: string
+          organization_id?: string
+          pct_provisao_possivel?: number
+          pct_provisao_provavel?: number
+          pct_provisao_remota?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      juridico_documents: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          organization_id: string
+          process_id: string
+          size_bytes: number | null
+          storage_path: string
+          tipo: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          organization_id: string
+          process_id: string
+          size_bytes?: number | null
+          storage_path: string
+          tipo?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          organization_id?: string
+          process_id?: string
+          size_bytes?: number | null
+          storage_path?: string
+          tipo?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "juridico_documents_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "juridico_processes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      juridico_expenses: {
+        Row: {
+          cashflow_entry_id: string | null
+          created_at: string
+          data_despesa: string
+          data_vencimento: string | null
+          descricao: string | null
+          fornecedor_id: string | null
+          id: string
+          observacoes: string | null
+          organization_id: string
+          posted_to_cashflow: boolean
+          process_id: string
+          tipo: Database["public"]["Enums"]["juridico_expense_type"]
+          updated_at: string
+          user_id: string | null
+          valor: number
+        }
+        Insert: {
+          cashflow_entry_id?: string | null
+          created_at?: string
+          data_despesa?: string
+          data_vencimento?: string | null
+          descricao?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          observacoes?: string | null
+          organization_id: string
+          posted_to_cashflow?: boolean
+          process_id: string
+          tipo: Database["public"]["Enums"]["juridico_expense_type"]
+          updated_at?: string
+          user_id?: string | null
+          valor: number
+        }
+        Update: {
+          cashflow_entry_id?: string | null
+          created_at?: string
+          data_despesa?: string
+          data_vencimento?: string | null
+          descricao?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          observacoes?: string | null
+          organization_id?: string
+          posted_to_cashflow?: boolean
+          process_id?: string
+          tipo?: Database["public"]["Enums"]["juridico_expense_type"]
+          updated_at?: string
+          user_id?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "juridico_expenses_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "juridico_processes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      juridico_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          cumprido: boolean
+          data_movimento: string
+          data_prazo: string | null
+          descricao: string
+          id: string
+          organization_id: string
+          prazo_dias: number | null
+          process_id: string
+          tipo: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          cumprido?: boolean
+          data_movimento?: string
+          data_prazo?: string | null
+          descricao: string
+          id?: string
+          organization_id: string
+          prazo_dias?: number | null
+          process_id: string
+          tipo?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          cumprido?: boolean
+          data_movimento?: string
+          data_prazo?: string | null
+          descricao?: string
+          id?: string
+          organization_id?: string
+          prazo_dias?: number | null
+          process_id?: string
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "juridico_movements_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "juridico_processes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      juridico_processes: {
+        Row: {
+          advogado_responsavel: string | null
+          assunto: string | null
+          classe: string | null
+          comarca: string | null
+          contract_id: string | null
+          cost_center_id: string | null
+          created_at: string
+          data_citacao: string | null
+          data_distribuicao: string | null
+          data_proxima_audiencia: string | null
+          data_proximo_prazo: string | null
+          escritorio_externo: string | null
+          fase: string | null
+          id: string
+          instancia: Database["public"]["Enums"]["juridico_instancia"] | null
+          natureza: Database["public"]["Enums"]["juridico_natureza"]
+          numero_cnj: string | null
+          numero_interno: string | null
+          observacoes: string | null
+          organization_id: string
+          parte_contraria: string | null
+          parte_contraria_documento: string | null
+          polo: Database["public"]["Enums"]["juridico_polo"]
+          probabilidade: Database["public"]["Enums"]["juridico_probabilidade"]
+          risco_observacao: string | null
+          status: Database["public"]["Enums"]["juridico_status"]
+          tags: string[] | null
+          tribunal: string | null
+          uf: string | null
+          updated_at: string
+          user_id: string | null
+          valor_causa: number | null
+          valor_depositado: number | null
+          valor_estimado_perda: number | null
+          valor_provisionado: number | null
+          vara: string | null
+        }
+        Insert: {
+          advogado_responsavel?: string | null
+          assunto?: string | null
+          classe?: string | null
+          comarca?: string | null
+          contract_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          data_citacao?: string | null
+          data_distribuicao?: string | null
+          data_proxima_audiencia?: string | null
+          data_proximo_prazo?: string | null
+          escritorio_externo?: string | null
+          fase?: string | null
+          id?: string
+          instancia?: Database["public"]["Enums"]["juridico_instancia"] | null
+          natureza?: Database["public"]["Enums"]["juridico_natureza"]
+          numero_cnj?: string | null
+          numero_interno?: string | null
+          observacoes?: string | null
+          organization_id: string
+          parte_contraria?: string | null
+          parte_contraria_documento?: string | null
+          polo?: Database["public"]["Enums"]["juridico_polo"]
+          probabilidade?: Database["public"]["Enums"]["juridico_probabilidade"]
+          risco_observacao?: string | null
+          status?: Database["public"]["Enums"]["juridico_status"]
+          tags?: string[] | null
+          tribunal?: string | null
+          uf?: string | null
+          updated_at?: string
+          user_id?: string | null
+          valor_causa?: number | null
+          valor_depositado?: number | null
+          valor_estimado_perda?: number | null
+          valor_provisionado?: number | null
+          vara?: string | null
+        }
+        Update: {
+          advogado_responsavel?: string | null
+          assunto?: string | null
+          classe?: string | null
+          comarca?: string | null
+          contract_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          data_citacao?: string | null
+          data_distribuicao?: string | null
+          data_proxima_audiencia?: string | null
+          data_proximo_prazo?: string | null
+          escritorio_externo?: string | null
+          fase?: string | null
+          id?: string
+          instancia?: Database["public"]["Enums"]["juridico_instancia"] | null
+          natureza?: Database["public"]["Enums"]["juridico_natureza"]
+          numero_cnj?: string | null
+          numero_interno?: string | null
+          observacoes?: string | null
+          organization_id?: string
+          parte_contraria?: string | null
+          parte_contraria_documento?: string | null
+          polo?: Database["public"]["Enums"]["juridico_polo"]
+          probabilidade?: Database["public"]["Enums"]["juridico_probabilidade"]
+          risco_observacao?: string | null
+          status?: Database["public"]["Enums"]["juridico_status"]
+          tags?: string[] | null
+          tribunal?: string | null
+          uf?: string | null
+          updated_at?: string
+          user_id?: string | null
+          valor_causa?: number | null
+          valor_depositado?: number | null
+          valor_estimado_perda?: number | null
+          valor_provisionado?: number | null
+          vara?: string | null
+        }
+        Relationships: []
+      }
+      juridico_settlement_installments: {
+        Row: {
+          cashflow_entry_id: string | null
+          created_at: string
+          data_pagamento: string | null
+          data_vencimento: string
+          id: string
+          numero_parcela: number
+          organization_id: string
+          settlement_id: string
+          status: string
+          valor: number
+        }
+        Insert: {
+          cashflow_entry_id?: string | null
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento: string
+          id?: string
+          numero_parcela: number
+          organization_id: string
+          settlement_id: string
+          status?: string
+          valor: number
+        }
+        Update: {
+          cashflow_entry_id?: string | null
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento?: string
+          id?: string
+          numero_parcela?: number
+          organization_id?: string
+          settlement_id?: string
+          status?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "juridico_settlement_installments_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "juridico_settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      juridico_settlements: {
+        Row: {
+          aprovado_por: string | null
+          created_at: string
+          data_aprovacao: string | null
+          data_primeira_parcela: string
+          id: string
+          numero_acordo: string | null
+          observacoes: string | null
+          organization_id: string
+          process_id: string
+          qtd_parcelas: number
+          status: Database["public"]["Enums"]["juridico_settlement_status"]
+          updated_at: string
+          user_id: string | null
+          valor_total: number
+        }
+        Insert: {
+          aprovado_por?: string | null
+          created_at?: string
+          data_aprovacao?: string | null
+          data_primeira_parcela: string
+          id?: string
+          numero_acordo?: string | null
+          observacoes?: string | null
+          organization_id: string
+          process_id: string
+          qtd_parcelas?: number
+          status?: Database["public"]["Enums"]["juridico_settlement_status"]
+          updated_at?: string
+          user_id?: string | null
+          valor_total?: number
+        }
+        Update: {
+          aprovado_por?: string | null
+          created_at?: string
+          data_aprovacao?: string | null
+          data_primeira_parcela?: string
+          id?: string
+          numero_acordo?: string | null
+          observacoes?: string | null
+          organization_id?: string
+          process_id?: string
+          qtd_parcelas?: number
+          status?: Database["public"]["Enums"]["juridico_settlement_status"]
+          updated_at?: string
+          user_id?: string | null
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "juridico_settlements_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "juridico_processes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kpi_period_presets: {
         Row: {
           created_at: string
@@ -7890,6 +8362,14 @@ export type Database = {
           users_count: number
         }[]
       }
+      juridico_approve_settlement: {
+        Args: { p_settlement_id: string }
+        Returns: Json
+      }
+      juridico_post_expense_to_cashflow: {
+        Args: { p_expense_id: string }
+        Returns: string
+      }
       match_statement_to_cashflow: {
         Args: { p_statement_id: string }
         Returns: {
@@ -8097,6 +8577,39 @@ export type Database = {
         | "aguardando_solicitante"
         | "resolvido"
         | "cancelado"
+      juridico_expense_type:
+        | "honorario"
+        | "custas"
+        | "deposito_judicial"
+        | "pericia"
+        | "preposto"
+        | "viagem"
+        | "outros"
+      juridico_instancia: "primeira" | "segunda" | "superior" | "extraordinaria"
+      juridico_natureza:
+        | "civel"
+        | "trabalhista"
+        | "tributario"
+        | "criminal"
+        | "administrativo"
+        | "familia"
+        | "consumidor"
+        | "outros"
+      juridico_polo: "ativo" | "passivo" | "terceiro_interessado"
+      juridico_probabilidade: "remota" | "possivel" | "provavel"
+      juridico_settlement_status:
+        | "proposto"
+        | "aprovado"
+        | "em_pagamento"
+        | "concluido"
+        | "cancelado"
+        | "inadimplente"
+      juridico_status:
+        | "ativo"
+        | "suspenso"
+        | "arquivado"
+        | "extinto"
+        | "transitado_julgado"
       nine_box_dimension: "desempenho" | "potencial"
       nine_box_recomendacao:
         | "manter"
@@ -8410,6 +8923,43 @@ export const Constants = {
         "aguardando_solicitante",
         "resolvido",
         "cancelado",
+      ],
+      juridico_expense_type: [
+        "honorario",
+        "custas",
+        "deposito_judicial",
+        "pericia",
+        "preposto",
+        "viagem",
+        "outros",
+      ],
+      juridico_instancia: ["primeira", "segunda", "superior", "extraordinaria"],
+      juridico_natureza: [
+        "civel",
+        "trabalhista",
+        "tributario",
+        "criminal",
+        "administrativo",
+        "familia",
+        "consumidor",
+        "outros",
+      ],
+      juridico_polo: ["ativo", "passivo", "terceiro_interessado"],
+      juridico_probabilidade: ["remota", "possivel", "provavel"],
+      juridico_settlement_status: [
+        "proposto",
+        "aprovado",
+        "em_pagamento",
+        "concluido",
+        "cancelado",
+        "inadimplente",
+      ],
+      juridico_status: [
+        "ativo",
+        "suspenso",
+        "arquivado",
+        "extinto",
+        "transitado_julgado",
       ],
       nine_box_dimension: ["desempenho", "potencial"],
       nine_box_recomendacao: [

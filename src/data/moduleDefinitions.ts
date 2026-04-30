@@ -109,4 +109,16 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
       { key: "config", label: "Configurações" },
     ],
   },
+  {
+    key: "juridico",
+    label: "Jurídico",
+    tabs: [
+      { key: "dashboard", label: "Dashboard" },
+      { key: "processos", label: "Processos" },
+      { key: "acordos", label: "Acordos" },
+      { key: "despesas", label: "Despesas" },
+      { key: "risco", label: "Matriz de Risco" },
+      { key: "config", label: "Configurações" },
+    ],
+  },
 ];
