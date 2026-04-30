@@ -25,7 +25,20 @@ export default function MaturityOverviewSection() {
   const handleResult = useCallback(
     (sector: SectorKey, result: SectorMaturityResult | null) => {
       setResults((prev) => {
-        if (prev[sector] === result) return prev;
+        const cur = prev[sector];
+        // Compara por conteúdo: refs novas a cada render do hook causariam loop.
+        if (cur === result) return prev;
+        if (
+          (cur ?? null) === null && result === null
+        ) return prev;
+        if (
+          cur && result &&
+          cur.score === result.score &&
+          cur.label === result.label &&
+          cur.completeness === result.completeness &&
+          cur.freshness === result.freshness &&
+          cur.routines === result.routines
+        ) return prev;
         return { ...prev, [sector]: result };
       });
     },
