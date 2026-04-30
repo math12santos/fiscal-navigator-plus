@@ -1,6 +1,12 @@
 ## Plano de Performance & Cache — FinCore
 
-**Status: Fase 1 concluída.** Próximo: Fase 2 (prefetch on-hover, keepPreviousData, isInitialLoading).
+**Status: Fases 1 e 2 concluídas.** Próximo: Fase 3 (RPCs Postgres de agregação para Dashboard/Financeiro).
+
+### Fase 2 entregue
+- `src/lib/routePrefetch.ts`: prefetchers de queries primárias por rota (dashboard, financeiro, contratos, dp, crm, cadastros, tarefas) com dedup por (rota × org).
+- `AppLayout` agora dispara `prefetchRouteQueries` no `onMouseEnter`/`onFocus` da sidebar, junto com o prefetch de chunk já existente.
+- `placeholderData: keepPreviousData` em `useCashFlow` (entries + installments) e `useGroupTotals`: trocar mês/range não pisca skeleton, mantém os dados anteriores enquanto o novo carrega.
+- Em RQ v5, isso também faz `isLoading` ficar `false` durante refetches — sem necessidade de trocar para `isInitialLoading` nos consumidores.
 
 ### Fase 1 entregue
 - `src/lib/cachePresets.ts`: 4 tiers (reference 15min / operational 2min / realtime 10s / static 60min).

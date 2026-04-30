@@ -36,6 +36,10 @@ import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useThemePreference } from "@/hooks/useThemePreference";
 import { ThemePreferenceDialog } from "@/components/ThemePreferenceDialog";
 import { pageFactories } from "@/App";
+import { useQueryClient } from "@tanstack/react-query";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
+import { prefetchRouteQueries } from "@/lib/routePrefetch";
 
 type PageFactoryKey = keyof typeof pageFactories;
 
@@ -81,6 +85,21 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const { showDialog: showThemeDialog, dismissDialog: dismissThemeDialog } = useThemePreference();
   const showOnboardingLink = !onboardingLoading && (!onboardingProgress || onboardingProgress.status !== "concluido");
 
+  const qc = useQueryClient();
+  const { currentOrg } = useOrganization();
+  const { holdingMode, activeOrgIds } = useHolding();
+  const prefetchCtx = {
+    qc,
+    orgId: currentOrg?.id ?? null,
+    activeOrgIds,
+    holdingMode,
+    userId: user?.id ?? null,
+  };
+  const handleHover = (chunkKey?: PageFactoryKey, routeKey?: string) => {
+    prefetchPage(chunkKey);
+    if (routeKey) prefetchRouteQueries(routeKey, prefetchCtx);
+  };
+
   const visibleNavItems = navItems.filter((item) => canAccessModule(item.module));
 
   return (
@@ -119,8 +138,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.path}
                 to={item.path}
-                onMouseEnter={() => prefetchPage(item.prefetch)}
-                onFocus={() => prefetchPage(item.prefetch)}
+                onMouseEnter={() => handleHover(item.prefetch, item.prefetch)}
+                onFocus={() => handleHover(item.prefetch, item.prefetch)}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive
