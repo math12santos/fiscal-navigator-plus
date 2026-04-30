@@ -1,16 +1,7 @@
 project_id = "pkvsqkilfodfduohwtpy"
 
-[functions.suggest-grouping-rules]
+[functions.etl-worker]
 verify_jwt = false
 
-[functions.detect-import-mapping]
-verify_jwt = false
-
-[functions.telegram-feedback]
-verify_jwt = false
-
-[functions.report-link]
-verify_jwt = false
-
-[functions.webhook-ingest]
+[functions.etl-scheduler]
 verify_jwt = false
