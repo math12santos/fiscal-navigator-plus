@@ -85,6 +85,7 @@ export function useCostCenters() {
       })) as CostCenter[];
     },
     enabled: !!user && !!orgId,
+    ...cachePresets.reference,
   });
 
   const create = useMutation({

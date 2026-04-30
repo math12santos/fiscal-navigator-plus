@@ -32,6 +32,7 @@ export function useFiscalGroups() {
       if (error) throw error;
       return data as FiscalGroup[];
     },
+    ...cachePresets.reference,
   });
 
   const create = useMutation({

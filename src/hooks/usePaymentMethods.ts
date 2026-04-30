@@ -27,6 +27,7 @@ export function usePaymentMethods() {
   const { data: methods = [], isLoading } = useQuery({
     queryKey: key,
     enabled: !!user && !!orgId,
+    ...cachePresets.reference,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payment_methods" as any)

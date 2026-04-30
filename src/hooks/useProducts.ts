@@ -36,6 +36,7 @@ export function useProducts() {
   const { data: products = [], isLoading } = useQuery({
     queryKey: key,
     enabled: !!user && !!orgId,
+    ...cachePresets.reference,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")

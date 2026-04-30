@@ -41,6 +41,7 @@ export function useBankAccounts() {
   const { data: bankAccounts = [], isLoading } = useQuery({
     queryKey: key,
     enabled: !!user && !!orgId,
+    ...cachePresets.reference,
     queryFn: async () => {
       let q = supabase
         .from("bank_accounts" as any)

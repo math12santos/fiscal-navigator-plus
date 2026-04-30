@@ -48,6 +48,7 @@ export function useEntities() {
   const { data: entities = [], isLoading } = useQuery({
     queryKey: key,
     enabled: !!user && !!orgId,
+    ...cachePresets.reference,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("entities")

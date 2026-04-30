@@ -30,6 +30,7 @@ export function useDepartments() {
       return (data ?? []) as unknown as HrDepartment[];
     },
     enabled: !!currentOrg?.id,
+    ...cachePresets.reference,
   });
 }
 

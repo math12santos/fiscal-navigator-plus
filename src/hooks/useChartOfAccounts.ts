@@ -48,6 +48,7 @@ export function useChartOfAccounts() {
       return data as unknown as ChartAccount[];
     },
     enabled: !!user && !!orgId,
+    ...cachePresets.reference,
   });
 
   const create = useMutation({
