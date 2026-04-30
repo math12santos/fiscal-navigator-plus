@@ -1,6 +1,8 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useUrlState } from "@/hooks/useUrlState";
 import { useEffect } from "react";
+import { PageHeader } from "@/components/PageHeader";
+import { SectorOnboardingBar } from "@/components/sector-onboarding/SectorOnboardingBar";
 import { JuridicoDashboard } from "@/components/juridico/JuridicoDashboard";
 import { JuridicoProcessesTab } from "@/components/juridico/JuridicoProcessesTab";
 import { JuridicoSettlementsTab } from "@/components/juridico/JuridicoSettlementsTab";
@@ -16,12 +18,12 @@ export default function Juridico() {
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-4">
-      <header>
-        <h1 className="text-2xl font-bold">Jurídico</h1>
-        <p className="text-sm text-muted-foreground">
-          Gestão de processos, riscos, provisões e impacto financeiro de contingências.
-        </p>
-      </header>
+      <PageHeader
+        title="Jurídico"
+        description="Gestão de processos, riscos, provisões e impacto financeiro de contingências."
+      />
+
+      <SectorOnboardingBar sector="juridico" onTabChange={setTab} />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex flex-wrap h-auto">

@@ -1,5 +1,7 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useUrlState } from "@/hooks/useUrlState";
+import { PageHeader } from "@/components/PageHeader";
+import { SectorOnboardingBar } from "@/components/sector-onboarding/SectorOnboardingBar";
 import { TIDashboard } from "@/components/ti/TIDashboard";
 import { EquipmentTab } from "@/components/ti/EquipmentTab";
 import { SystemsTab } from "@/components/ti/SystemsTab";
@@ -17,10 +19,12 @@ export default function TI() {
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-4">
-      <header>
-        <h1 className="text-2xl font-bold">TI & Patrimônio Tech</h1>
-        <p className="text-sm text-muted-foreground">Equipamentos, sistemas, links, chamados, sinistros e integração financeira.</p>
-      </header>
+      <PageHeader
+        title="TI & Patrimônio Tech"
+        description="Equipamentos, sistemas, links, chamados, sinistros e integração financeira."
+      />
+
+      <SectorOnboardingBar sector="ti" onTabChange={setTab} />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex flex-wrap h-auto">
