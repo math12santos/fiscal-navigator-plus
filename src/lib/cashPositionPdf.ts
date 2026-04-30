@@ -9,6 +9,16 @@ const fmt = (v: number) => {
   return n < 0 ? `(${abs})` : abs;
 };
 
+/** didParseCell hook: paints accounting-format negatives "(xxx)" in red. */
+const colorNegatives = (data: any) => {
+  if (data.section === "head") return;
+  const raw = data.cell.raw;
+  const text = typeof raw === "string" ? raw : raw && typeof raw === "object" ? raw.content : "";
+  if (typeof text === "string" && /^\(.*\)$/.test(text.trim())) {
+    data.cell.styles.textColor = [200, 40, 40];
+  }
+};
+
 export interface CashPositionAccount {
   nome: string;
   banco: string | null;
