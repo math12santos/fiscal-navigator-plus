@@ -161,3 +161,46 @@ Posso executar uma fase de cada vez. Diga **"executar fase 1 de performance"** p
 
 ### Próximo passo sugerido
 - **Fase 4 — Realtime**: habilitar canais Supabase em `cashflow_entries`, `contracts`, `notifications` para sincronização multi-usuário e *optimistic updates* via `useMutation`.
+
+---
+
+## ✅ Fase 4 (Performance) — Realtime + Optimistic updates (concluída)
+
+**Migration:** `20260430232200` — `REPLICA IDENTITY FULL` + adição à publicação `supabase_realtime`.
+
+### Tabelas habilitadas em realtime
+- `cashflow_entries`, `contracts`, `contract_installments`, `request_tasks` (somam-se às já existentes: `notifications`, `hr_*`).
+
+### Hooks novos
+- **`useRealtimeSync(subs)`** — assina N tabelas, filtra por `organization_id` automaticamente, invalida React Query keys quando eventos chegam, cleanup no unmount.
+- **`useOptimisticUpdates()`** — wrappers para `useMutation`: `optimisticUpdate/Insert/Delete` + `rollback`.
+
+### Plugado no Dashboard
+`src/pages/Dashboard.tsx` agora assina `cashflow_entries`, `contracts`, `contract_installments` e invalida automaticamente `cashflow`, `cashflow-summary`, `dashboard-kpis`, `contracts`, `contract-installments`. Quando outro usuário mutaciona qualquer dessas tabelas, o Dashboard atualiza em background — sem flash visual graças ao `keepPreviousData` da Fase 2.
+
+### Como adotar em outros módulos
+```ts
+useRealtimeSync([
+  { table: "cashflow_entries", invalidateKeys: [["cashflow"], ["dashboard-kpis"]] },
+]);
+```
+
+### Segurança
+`SECURITY INVOKER` nas RPCs (Fase 3) e RLS nativa do Supabase Realtime garantem que cada usuário só recebe eventos das linhas que já pode ler.
+
+---
+
+## 🎯 Roadmap de Performance — concluído
+
+| Fase   | Status | Entrega principal                                                            |
+| ------ | ------ | ---------------------------------------------------------------------------- |
+| Fase 1 | ✅      | `cachePresets` (4 tiers) + dedup `OrganizationContext`/`useCurrentRole`     |
+| Fase 2 | ✅      | Prefetch on-hover + `keepPreviousData` em filtros                            |
+| Fase 3 | ✅      | RPCs `get_dashboard_kpis` / `get_cashflow_summary_by_period` + índices       |
+| Fase 4 | ✅      | Realtime em `cashflow_entries`/`contracts`/`request_tasks` + optimistic API |
+
+### Próximos passos opcionais (Fase 3.5 — backlog)
+1. Estender RPCs com filtros operacionais (`_cost_center_ids uuid[]`).
+2. Migrar `Dashboard`, `RelatorioKpi`, `PlanningCockpit` para consumir `useDashboardKPIs`/`useCashflowSummary`.
+3. Aplicar `useOptimisticUpdates` em mutations críticas (criar/editar entrada, status de contrato).
+4. Realtime em `request_tasks` e `notifications` plugados em layout raiz para badges globais.
