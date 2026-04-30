@@ -10,7 +10,7 @@ export interface SettlementInstallmentInput {
 export interface CreateSettlementInput {
   process_id?: string | null;
   valor_total: number;
-  data_acordo: string;
+  data_acordo?: string;
   installments: SettlementInstallmentInput[];
   [k: string]: any;
 }

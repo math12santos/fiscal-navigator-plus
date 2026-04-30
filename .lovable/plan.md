@@ -147,3 +147,26 @@ Se aprovado, executo **apenas a Fase 1** (fundação) primeiro:
 Depois pausamos para você validar o piloto antes de atacar os god-hooks (Fase 3+). Isso evita um big-bang que arrisca a estabilidade.
 
 Diga **"executar fase 1 da arquitetura"** para começar, ou peça ajustes no plano.
+
+---
+
+## Atualização (Fase 1 da Arquitetura Modular — concluída)
+
+Estrutura criada em `src/modules/`:
+
+- `_contracts/` — `cashflow.ts`, `projections.ts`, `tasks.ts`, `notifications.ts`, `audit.ts` + barrel `index.ts`.
+- `_integrations/` — pasta criada (vazia, com README); orquestradores virão na Fase 4.
+- `juridico/` — piloto migrado: `domain/{types,riskMatrix}` + `services/{processes,settlements,expenses,config,sanitize}` + `hooks/use*` + `index.ts`.
+- `ti/` — piloto inicial: `domain/types` + `services/equipmentService` + `hooks/useITEquipment` + `index.ts`. (Demais hooks de TI — incidents, tickets, depreciation, SLA, etc. — migrarão na Fase 3.)
+
+Compatibilidade:
+- `src/hooks/useJuridico.ts` e `src/hooks/useITEquipment.ts` viraram re-exports finos apontando para `@/modules/*`. Nenhum componente precisa ser tocado nesta fase.
+
+ESLint (warnings, não errors — promoveremos a `error` na Fase 5):
+- `src/components/**` e `src/pages/**` proibidos de importar `@/integrations/supabase/client` direto.
+- `modules/*/domain/**` proibido de importar Supabase, React, React Query e toast.
+- `modules/*/services/**` proibido de importar React, React Query e toast.
+
+Documentação: `docs/architecture.md` + `src/modules/README.md` + `src/modules/_integrations/README.md`.
+
+Próximo passo sugerido: validar o piloto (Jurídico e TI) e então iniciar Fase 3 quebrando `useDP.ts` (846 linhas) em `modules/dp/`.
