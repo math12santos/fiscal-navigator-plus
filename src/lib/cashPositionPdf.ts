@@ -131,6 +131,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
       ["Contas a Receber — Próx. 30 dias", fmt(input.totals.arNext30)],
     ],
     columnStyles: { 0: { cellWidth: 100 }, 1: { halign: "right" } },
+    didParseCell: colorNegatives,
   });
 
   let cursorY = (doc as any).lastAutoTable.finalY + 8;
