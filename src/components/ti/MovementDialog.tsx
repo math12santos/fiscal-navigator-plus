@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useITMovements } from "@/hooks/useITMovements";
+import { useEmployees } from "@/hooks/useDP";
 
 const TYPES = [
   { v: "entrega", l: "Entrega ao colaborador", to_status: "em_uso" },
@@ -28,6 +29,7 @@ interface Props {
 
 export function MovementDialog({ open, onOpenChange, equipment }: Props) {
   const { create } = useITMovements();
+  const { data: employees = [] } = useEmployees();
   const [v, setV] = useState<any>({});
 
   useEffect(() => {
@@ -71,8 +73,16 @@ export function MovementDialog({ open, onOpenChange, equipment }: Props) {
             <Input type="date" value={v.movement_date ?? ""} onChange={(e) => set("movement_date", e.target.value)} />
           </div>
           <div>
-            <Label>Para colaborador (ID)</Label>
-            <Input value={v.to_employee_id ?? ""} onChange={(e) => set("to_employee_id", e.target.value)} placeholder="UUID do colaborador" />
+            <Label>Para colaborador</Label>
+            <Select value={v.to_employee_id ?? "__none__"} onValueChange={(val) => set("to_employee_id", val === "__none__" ? null : val)}>
+              <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— Nenhum —</SelectItem>
+                {employees.map((emp: any) => (
+                  <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label>Para local</Label>
