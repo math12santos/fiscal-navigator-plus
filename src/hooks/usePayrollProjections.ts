@@ -243,6 +243,13 @@ export function usePayrollProjections(rangeFrom?: Date, rangeTo?: Date) {
             created_at: now,
             updated_at: now,
           } as any);
+          // PJs também podem ter benefícios vinculados (raro, mas suportado).
+          const pjBenefits = benefitsByEmployee.get(emp.id);
+          if (pjBenefits) {
+            for (const [sub, total] of pjBenefits.entries()) {
+              addBenefitToAggregate(sub, emp.name, total);
+            }
+          }
           continue;
         }
 
