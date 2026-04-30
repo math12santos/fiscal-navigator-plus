@@ -91,6 +91,9 @@ export default function Financeiro() {
         {allowedTabs.some((t) => t.key === "conciliacao") && (
           <TabsContent value="conciliacao"><ConciliacaoTab /></TabsContent>
         )}
+        {allowedTabs.some((t) => t.key === "integracoes") && (
+          <TabsContent value="integracoes"><IntegracoesTab /></TabsContent>
+        )}
         {allowedTabs.some((t) => t.key === "importacoes") && (
           <TabsContent value="importacoes"><ImportacoesTab /></TabsContent>
         )}
