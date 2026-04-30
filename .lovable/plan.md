@@ -1,5 +1,14 @@
 ## Plano de Performance & Cache — FinCore
 
+**Status: Fase 1 concluída.** Próximo: Fase 2 (prefetch on-hover, keepPreviousData, isInitialLoading).
+
+### Fase 1 entregue
+- `src/lib/cachePresets.ts`: 4 tiers (reference 15min / operational 2min / realtime 10s / static 60min).
+- `QueryClient` default elevado de 60s para 5min stale (App.tsx).
+- `OrganizationContext` migrado para React Query (queryKey `organizationsBundle`, tier static).
+- `useCurrentRole` (novo): cache global compartilhado por AuthRoute + BackofficeRoutes (eliminou 2 fetches duplicados de `user_roles` por navegação).
+- `cachePresets.reference` aplicado em: useCostCenters, useChartOfAccounts, useEntities, useProducts, useDepartments, usePaymentMethods, useBankAccounts, useFiscalGroups.
+
 ### Diagnóstico (o que encontrei)
 
 Mapeei `App.tsx`, contextos globais, 98 hooks (78 já usam React Query — bom) e as páginas mais pesadas (Dashboard 597 linhas / 25 hooks, Contratos 690, Financeiro consolida cashflow + contratos + projeções de folha).
