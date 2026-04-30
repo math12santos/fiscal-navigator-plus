@@ -79,12 +79,54 @@ export function useConciliacao(filters: ConciliacaoFilters = {}) {
   })();
 
   const fetchCandidates = async (statementId: string): Promise<CashflowCandidate[]> => {
+    // Tenta v2 (com similaridade textual); cai para v1 se indisponível.
+    const v2 = await supabase.rpc("match_statement_to_cashflow_v2" as any, {
+      p_statement_id: statementId,
+    });
+    if (!v2.error) return (v2.data || []) as CashflowCandidate[];
     const { data, error } = await supabase.rpc("match_statement_to_cashflow", {
       p_statement_id: statementId,
     });
     if (error) throw error;
     return (data || []) as CashflowCandidate[];
   };
+
+  const autoReconcileBatch = useMutation({
+    mutationFn: async (minScore: number = 0.95) => {
+      if (!orgId) throw new Error("Organização não selecionada");
+      const { data, error } = await supabase.rpc("auto_reconcile_statement_batch" as any, {
+        p_org_id: orgId,
+        p_min_score: minScore,
+        p_limit: 200,
+      });
+      if (error) throw error;
+      return data as { processed: number; matched: number; skipped: number; min_score: number };
+    },
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ["bank-statement-entries", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["cashflow-entries"] });
+      toast({
+        title: "Auto-conciliação concluída",
+        description: `${r.matched} de ${r.processed} linhas conciliadas (score ≥ ${(r.min_score * 100).toFixed(0)}%).`,
+      });
+    },
+    onError: (e: Error) => toast({ title: "Erro na auto-conciliação", description: e.message, variant: "destructive" }),
+  });
+
+  const snapshotBalances = useMutation({
+    mutationFn: async () => {
+      if (!orgId) throw new Error("Organização não selecionada");
+      const { data, error } = await supabase.rpc("snapshot_bank_balances_daily" as any, {
+        p_org_id: orgId,
+      });
+      if (error) throw error;
+      return data as { snapshots_created: number; snapshot_date: string };
+    },
+    onSuccess: (r) => {
+      toast({ title: "Snapshot gerado", description: `${r.snapshots_created} contas registradas em ${r.snapshot_date}.` });
+    },
+    onError: (e: Error) => toast({ title: "Erro ao gerar snapshot", description: e.message, variant: "destructive" }),
+  });
 
   const reconcile = useMutation({
     mutationFn: async ({ statementId, cashflowId }: { statementId: string; cashflowId: string }) => {
@@ -157,5 +199,7 @@ export function useConciliacao(filters: ConciliacaoFilters = {}) {
     unreconcile,
     updateStatus,
     removeEntry,
+    autoReconcileBatch,
+    snapshotBalances,
   };
 }
