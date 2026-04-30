@@ -5,14 +5,20 @@ import { KPICard } from "@/components/KPICard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Clock, AlertTriangle, CalendarClock, CheckCircle, ChevronRight, ChevronDown, Layers, TrendingUp, Landmark, Wallet, ShieldCheck, FolderOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Loader2, Clock, AlertTriangle, CalendarClock, CheckCircle, ChevronRight, ChevronDown, Layers, TrendingUp, Landmark, Wallet, ShieldCheck, FolderOpen, FileDown } from "lucide-react";
 import { differenceInDays, format, parseISO } from "date-fns";
 import { useHolding } from "@/contexts/HoldingContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGroupingRules } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
 import { buildHierarchy } from "@/lib/groupingHierarchy";
+import { generateCashPositionPdf, type CashPositionByOrg } from "@/lib/cashPositionPdf";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
