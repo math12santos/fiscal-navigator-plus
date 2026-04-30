@@ -353,15 +353,141 @@ export function AgingListTab() {
     return rows;
   };
 
+  const handleEmitPdf = () => {
+    try {
+      const issuerName =
+        (user?.user_metadata as any)?.full_name?.toString().trim() ||
+        user?.email?.split("@")[0] ||
+        "Usuário";
+      const issuerEmail = user?.email ?? "—";
+
+      generateCashPositionPdf({
+        contextName: currentOrg?.name ?? "Organização",
+        isConsolidated: holdingMode && isHolding,
+        perOrg: perOrgPosition,
+        totals: {
+          saldo: bankTotals.saldoTotal,
+          limite: bankTotals.limiteTotal,
+          disponibilidade: bankTotals.disponibilidadeTotal,
+          apOverdue: totalOverdue,
+          apDue30: totalDue,
+          arNext30: arBuckets.ar7.total + arBuckets.ar15.total + arBuckets.ar30.total,
+        },
+        issuer: { name: issuerName, email: issuerEmail },
+      });
+      toast({ title: "Relatório emitido", description: "PDF de Posição de Caixa gerado com sucesso." });
+    } catch (err: any) {
+      toast({
+        title: "Falha ao emitir PDF",
+        description: err?.message || "Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* ── Header actions ── */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Posição de Caixa & Aging</h2>
+          <p className="text-xs text-muted-foreground">
+            Clique nos cards de caixa para ver a posição por empresa.
+          </p>
+        </div>
+        <Button onClick={handleEmitPdf} variant="outline" size="sm" className="gap-2">
+          <FileDown className="h-4 w-4" />
+          Emitir PDF de Posição de Caixa
+        </Button>
+      </div>
+
       {/* ── Cash Position & Availability ── */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <KPICard title="Saldo em Contas" value={fmt(bankTotals.saldoTotal)} icon={<Landmark size={20} />} subtitle={`${bankAccounts.length} conta(s)`} />
-        <KPICard title="Limite de Crédito" value={fmt(bankTotals.limiteTotal)} icon={<ShieldCheck size={20} />} />
-        <KPICard title="Disponibilidade Total" value={fmt(bankTotals.disponibilidadeTotal)} icon={<Wallet size={20} />} subtitle="Saldo + Limite" />
+        <KPICard
+          title="Saldo em Contas"
+          value={fmt(bankTotals.saldoTotal)}
+          icon={<Landmark size={20} />}
+          subtitle={`${bankAccounts.length} conta(s)`}
+          onClick={() => setCashDetailOpen(true)}
+        />
+        <KPICard
+          title="Limite de Crédito"
+          value={fmt(bankTotals.limiteTotal)}
+          icon={<ShieldCheck size={20} />}
+          onClick={() => setCashDetailOpen(true)}
+        />
+        <KPICard
+          title="Disponibilidade Total"
+          value={fmt(bankTotals.disponibilidadeTotal)}
+          icon={<Wallet size={20} />}
+          subtitle="Saldo + Limite"
+          onClick={() => setCashDetailOpen(true)}
+        />
         <KPICard title="Entradas Previstas" value={fmt(arBuckets.totalAR)} icon={<TrendingUp size={20} />} subtitle={`${entradaEntries.filter(e => (e.status === "previsto" || e.status === "confirmado") && differenceInDays(parseISO((e as any).data_vencimento || e.data_prevista), today) >= 0).length} título(s)`} />
       </div>
+
+      {/* ── Cash position by organization (Dialog) ── */}
+      <Dialog open={cashDetailOpen} onOpenChange={setCashDetailOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-primary" />
+              Posição de Caixa por Empresa
+            </DialogTitle>
+            <DialogDescription>
+              Saldo disponível em contas bancárias por organização. Os valores refletem a última atualização manual de cada conta.
+            </DialogDescription>
+          </DialogHeader>
+          {perOrgPosition.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Nenhuma conta bancária cadastrada.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead className="text-center">Contas</TableHead>
+                    <TableHead className="text-right">Saldo</TableHead>
+                    <TableHead className="text-right">Limite</TableHead>
+                    <TableHead className="text-right">Disponível</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {perOrgPosition.map((org) => (
+                    <TableRow key={org.orgId}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          {org.orgName}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center text-muted-foreground">
+                        {org.accounts.length}
+                      </TableCell>
+                      <TableCell className="text-right">{fmt(org.saldo)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{fmt(org.limite)}</TableCell>
+                      <TableCell className="text-right font-bold text-primary">{fmt(org.disponibilidade)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/50 font-bold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-center">{bankAccounts.length}</TableCell>
+                    <TableCell className="text-right">{fmt(bankTotals.saldoTotal)}</TableCell>
+                    <TableCell className="text-right">{fmt(bankTotals.limiteTotal)}</TableCell>
+                    <TableCell className="text-right text-primary">{fmt(bankTotals.disponibilidadeTotal)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+              <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                ⚠️ Os saldos exibidos são manualmente atualizados em <strong>Contas Bancárias</strong> e podem não refletir
+                lançamentos pagos/recebidos ainda não conciliados. Para uma posição de caixa precisa, faça a conciliação bancária na aba <strong>Conciliação</strong>.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── AR Receivables Forecast ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
