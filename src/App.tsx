@@ -95,11 +95,13 @@ const DashboardOrEffectiveHome = lazyRetry(() =>
   import("@/components/DashboardOrEffectiveHome").then((m) => ({ default: m.DashboardOrEffectiveHome }))
 );
 
+// New defaults — see src/lib/cachePresets.ts for category-specific overrides.
+// Default = "operational" tier: balances freshness vs. backend load.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,
-      gcTime: 5 * 60_000,
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
       retry: 1,
