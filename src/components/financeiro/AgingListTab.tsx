@@ -354,7 +354,72 @@ export function AgingListTab() {
     return rows;
   };
 
-  const handleEmitPdf = () => {
+  // ── Audit: saldo_atual vs reconciled cashflow ──
+  const auditRows = useMemo<AuditDivergenceRow[]>(() => {
+    const orgNameById = new Map<string, string>();
+    if (currentOrg?.id) orgNameById.set(currentOrg.id, currentOrg.name);
+    for (const s of subsidiaryOrgs ?? []) orgNameById.set(s.id, s.name);
+
+    // Sum reconciled impact per bank account (entradas +, saidas -)
+    const impactByAccount = new Map<string, number>();
+    const addImpact = (acctId: string | null | undefined, val: number) => {
+      if (!acctId) return;
+      impactByAccount.set(acctId, (impactByAccount.get(acctId) ?? 0) + val);
+    };
+    for (const e of entradaEntries as any[]) {
+      if (e.status === "recebido" || e.status === "pago") {
+        addImpact(e.conta_bancaria_id, Math.abs(Number(e.valor_realizado ?? e.valor_previsto ?? 0)));
+      }
+    }
+    for (const e of saidaEntries as any[]) {
+      if (e.status === "pago" || e.status === "recebido") {
+        addImpact(e.conta_bancaria_id, -Math.abs(Number(e.valor_realizado ?? e.valor_previsto ?? 0)));
+      }
+    }
+
+    return bankAccounts.map((a) => {
+      const reconciled = impactByAccount.get(a.id) ?? 0;
+      const saldo = Number(a.saldo_atual ?? 0);
+      return {
+        orgName: orgNameById.get(a.organization_id ?? "") ?? "Organização",
+        accountName: a.nome,
+        saldoAtual: saldo,
+        reconciledImpact: reconciled,
+        divergence: saldo - reconciled,
+      };
+    }).sort((a, b) => Math.abs(b.divergence) - Math.abs(a.divergence));
+  }, [bankAccounts, entradaEntries, saidaEntries, currentOrg, subsidiaryOrgs]);
+
+  // ── Pagamentos realizados na semana corrente ──
+  const weekPayments = useMemo<WeekPaymentRow[]>(() => {
+    const orgNameById = new Map<string, string>();
+    if (currentOrg?.id) orgNameById.set(currentOrg.id, currentOrg.name);
+    for (const s of subsidiaryOrgs ?? []) orgNameById.set(s.id, s.name);
+
+    const wkStart = startOfWeek(today, { weekStartsOn: 1 });
+    const wkEnd = endOfWeek(today, { weekStartsOn: 1 });
+    const inWeek = (iso: string | null) => {
+      if (!iso) return false;
+      const d = parseISO(iso);
+      return isWithinInterval(d, { start: wkStart, end: wkEnd });
+    };
+
+    const rows: WeekPaymentRow[] = [];
+    for (const e of saidaEntries as any[]) {
+      if (e.status !== "pago") continue;
+      const dt = e.data_realizada || e.data_prevista;
+      if (!inWeek(dt)) continue;
+      rows.push({
+        date: dt,
+        payee: e.descricao || "—",
+        orgName: orgNameById.get(e.organization_id ?? "") ?? "—",
+        amount: Math.abs(Number(e.valor_realizado ?? e.valor_previsto ?? 0)),
+      });
+    }
+    return rows.sort((a, b) => a.date.localeCompare(b.date));
+  }, [saidaEntries, currentOrg, subsidiaryOrgs, today]);
+
+  const handleEmitPdf = async () => {
     try {
       const issuerName =
         (user?.user_metadata as any)?.full_name?.toString().trim() ||
@@ -362,7 +427,7 @@ export function AgingListTab() {
         "Usuário";
       const issuerEmail = user?.email ?? "—";
 
-      generateCashPositionPdf({
+      await generateCashPositionPdf({
         contextName: currentOrg?.name ?? "Organização",
         isConsolidated: holdingMode && isHolding,
         perOrg: perOrgPosition,
@@ -374,7 +439,9 @@ export function AgingListTab() {
           apDue30: totalDue,
           arNext30: arBuckets.ar7.total + arBuckets.ar15.total + arBuckets.ar30.total,
         },
-        issuer: { name: issuerName, email: issuerEmail },
+        issuer: { name: issuerName, email: issuerEmail, id: user?.id },
+        audit: auditRows,
+        weekPayments,
       });
       toast({ title: "Relatório emitido", description: "PDF de Posição de Caixa gerado com sucesso." });
     } catch (err: any) {
