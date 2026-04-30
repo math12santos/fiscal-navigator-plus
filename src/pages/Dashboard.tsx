@@ -25,6 +25,7 @@ import MaturityOverviewSection from "@/components/dashboard/MaturityOverviewSect
 import { MonthPicker } from "@/components/MonthPicker";
 import { useReferenceMonth } from "@/hooks/useReferenceMonth";
 import { Badge } from "@/components/ui/badge";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -78,6 +79,22 @@ export default function Dashboard() {
     alerts,
     isLoading,
   } = useFinancialSummary(rangeFrom, rangeTo);
+
+  // Realtime: refresh KPIs/charts whenever another user mutates these tables.
+  useRealtimeSync([
+    {
+      table: "cashflow_entries",
+      invalidateKeys: [["cashflow"], ["cashflow-summary"], ["dashboard-kpis"]],
+    },
+    {
+      table: "contracts",
+      invalidateKeys: [["contracts"], ["dashboard-kpis"]],
+    },
+    {
+      table: "contract_installments",
+      invalidateKeys: [["contracts"], ["contract-installments"]],
+    },
+  ]);
 
   const { isPerCompany, groupTotals } = useGroupTotals(rangeFrom, rangeTo);
 
