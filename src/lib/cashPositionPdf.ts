@@ -3,8 +3,11 @@ import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-const fmt = (v: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(v);
+const fmt = (v: number) => {
+  const n = Number(v) || 0;
+  const abs = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(Math.abs(n));
+  return n < 0 ? `(${abs})` : abs;
+};
 
 export interface CashPositionAccount {
   nome: string;
