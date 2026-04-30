@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useBackofficeOrgs, useBackofficeOrgMemberCounts } from "@/hooks/useBackoffice";
+import { SaasOverviewPanel } from "@/components/backoffice/SaasOverviewPanel";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreateOrgDialog } from "@/components/CreateOrgDialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -188,9 +189,12 @@ export default function BackofficeDashboard() {
   }, [orgs, search, statusFilter, planoFilter]);
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-8">
+      {/* Painel executivo SaaS */}
+      <SaasOverviewPanel />
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between border-t border-border pt-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Empresas Cadastradas</h1>
           <p className="text-sm text-muted-foreground">
