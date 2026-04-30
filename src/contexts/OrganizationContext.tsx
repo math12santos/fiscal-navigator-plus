@@ -1,6 +1,8 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { cachePresets } from "@/lib/cachePresets";
 
 export interface Organization {
   id: string;
@@ -44,88 +46,82 @@ export const useOrganization = () => useContext(OrganizationContext);
 
 const STORAGE_KEY = "fincore_current_org";
 
+interface OrgsBundle {
+  orgs: Organization[];
+  membershipsByOrg: Record<string, string>; // org_id -> role
+}
+
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [currentOrg, setCurrentOrgState] = useState<Organization | null>(null);
-  const [currentRole, setCurrentRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+  const [currentOrgId, setCurrentOrgId] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null
+  );
 
-  const fetchOrgs = async () => {
-    if (!user) {
-      setOrganizations([]);
-      setCurrentOrgState(null);
-      setCurrentRole(null);
-      setLoading(false);
-      return;
-    }
+  const query = useQuery({
+    queryKey: ["organizationsBundle", user?.id],
+    queryFn: async (): Promise<OrgsBundle> => {
+      if (!user) return { orgs: [], membershipsByOrg: {} };
 
-    try {
-      // Get memberships
       const { data: memberships, error: memErr } = await supabase
         .from("organization_members" as any)
         .select("organization_id, role")
         .eq("user_id", user.id);
-
       if (memErr) throw memErr;
-      const mems = memberships as unknown as { organization_id: string; role: string }[];
 
-      if (mems.length === 0) {
-        setOrganizations([]);
-        setCurrentOrgState(null);
-        setCurrentRole(null);
-        setLoading(false);
-        return;
-      }
+      const mems = (memberships as unknown as { organization_id: string; role: string }[]) ?? [];
+      if (mems.length === 0) return { orgs: [], membershipsByOrg: {} };
 
       const orgIds = mems.map((m) => m.organization_id);
       const { data: orgs, error: orgErr } = await supabase
         .from("organizations" as any)
-        .select("*")
+        .select("id,name,document_type,document_number,logo_url,created_by,created_at,updated_at,onboarding_completed")
         .in("id", orgIds)
         .order("name");
-
       if (orgErr) throw orgErr;
-      const orgList = orgs as unknown as Organization[];
-      setOrganizations(orgList);
 
-      // Restore last selected org
-      const savedOrgId = localStorage.getItem(STORAGE_KEY);
-      const savedOrg = orgList.find((o) => o.id === savedOrgId);
-      const selected = savedOrg || orgList[0];
-
-      if (selected) {
-        setCurrentOrgState(selected);
-        const mem = mems.find((m) => m.organization_id === selected.id);
-        setCurrentRole(mem?.role ?? null);
-      }
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        console.error("Error fetching organizations:", err);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrgs();
-  }, [user]);
-
-  const setCurrentOrg = (org: Organization) => {
-    setCurrentOrgState(org);
-    localStorage.setItem(STORAGE_KEY, org.id);
-    // Update role
-    supabase
-      .from("organization_members" as any)
-      .select("role")
-      .eq("organization_id", org.id)
-      .eq("user_id", user?.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        setCurrentRole((data as any)?.role ?? null);
+      const membershipsByOrg: Record<string, string> = {};
+      mems.forEach((m) => {
+        membershipsByOrg[m.organization_id] = m.role;
       });
-  };
+
+      return {
+        orgs: (orgs as unknown as Organization[]) ?? [],
+        membershipsByOrg,
+      };
+    },
+    enabled: !!user,
+    ...cachePresets.static,
+  });
+
+  const organizations = query.data?.orgs ?? [];
+  const membershipsByOrg = query.data?.membershipsByOrg ?? {};
+
+  // Auto-select current org once data arrives
+  useEffect(() => {
+    if (!organizations.length) return;
+    if (currentOrgId && organizations.some((o) => o.id === currentOrgId)) return;
+    const fallback = organizations[0]?.id ?? null;
+    if (fallback) {
+      setCurrentOrgId(fallback);
+      localStorage.setItem(STORAGE_KEY, fallback);
+    }
+  }, [organizations, currentOrgId]);
+
+  const currentOrg = useMemo(
+    () => organizations.find((o) => o.id === currentOrgId) ?? null,
+    [organizations, currentOrgId]
+  );
+  const currentRole = currentOrgId ? membershipsByOrg[currentOrgId] ?? null : null;
+
+  const setCurrentOrg = useCallback((org: Organization) => {
+    setCurrentOrgId(org.id);
+    localStorage.setItem(STORAGE_KEY, org.id);
+  }, []);
+
+  const refetch = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey: ["organizationsBundle", user?.id] });
+  }, [qc, user?.id]);
 
   return (
     <OrganizationContext.Provider
@@ -133,9 +129,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         organizations,
         currentOrg,
         currentRole,
-        loading,
+        loading: query.isLoading,
         setCurrentOrg,
-        refetch: fetchOrgs,
+        refetch,
       }}
     >
       {children}
