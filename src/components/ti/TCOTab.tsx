@@ -158,12 +158,12 @@ export function TCOTab() {
           onOpenChange={(o) => !o && setBreakdown(null)}
           title={`TCO — ${breakdown.name}`}
           formula="TCO = Custo direto + Depreciação + Custo de incidentes (horas × R$/h técnico) + Custo de movimentações"
-          total={breakdown.tco_total}
+          total={fmt(breakdown.tco_total)}
           items={[
-            { label: "Custo direto (cashflow)", value: Number(breakdown.direct_cost) },
-            { label: "Depreciação no período", value: Number(breakdown.depreciation) },
-            { label: "Incidentes/tickets", value: Number(breakdown.incident_cost) },
-            { label: "Movimentações logísticas", value: Number(breakdown.movement_cost) },
+            { label: "Custo direto (cashflow)", value: fmt(Number(breakdown.direct_cost)) },
+            { label: "Depreciação no período", value: fmt(Number(breakdown.depreciation)) },
+            { label: "Incidentes/tickets", value: fmt(Number(breakdown.incident_cost)) },
+            { label: "Movimentações logísticas", value: fmt(Number(breakdown.movement_cost)) },
           ]}
         />
       )}
