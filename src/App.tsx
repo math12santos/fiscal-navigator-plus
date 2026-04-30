@@ -76,6 +76,7 @@ const RelatoriosDistribuicao = lazyRetry(pageFactories.relatoriosDistribuicao);
 const OnboardingGuiado = lazyRetry(pageFactories.onboardingGuiado);
 const TI = lazyRetry(pageFactories.ti);
 const Juridico = lazyRetry(pageFactories.juridico);
+const EtlOps = lazyRetry(pageFactories.etlOps);
 const CreateOrganization = lazyRetry(() => import("@/pages/CreateOrganization"));
 const Onboarding = lazyRetry(() => import("@/pages/Onboarding"));
 const BackofficeDashboard = lazyRetry(() => import("@/pages/BackofficeDashboard"));
@@ -184,6 +185,7 @@ function ProtectedRoutes() {
           <Route path="/perfil" element={<RouteShell skeleton={<GenericPageSkeleton title="Meu Perfil" />}><Perfil /></RouteShell>} />
           <Route path="/ti" element={<RouteShell skeleton={<GenericPageSkeleton title="TI & Ativos" />}><ModuleMaintenanceGuard moduleKey="ti"><TI /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/juridico" element={<RouteShell skeleton={<GenericPageSkeleton title="Jurídico" />}><ModuleMaintenanceGuard moduleKey="juridico"><Juridico /></ModuleMaintenanceGuard></RouteShell>} />
+          <Route path="/etl-ops" element={<RouteShell skeleton={<GenericPageSkeleton title="ETL Ops" />}><EtlOps /></RouteShell>} />
           <Route path="*" element={<RouteShell skeleton={<GenericPageSkeleton />}><NotFound /></RouteShell>} />
         </Routes>
       </AppLayout>
