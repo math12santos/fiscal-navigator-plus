@@ -36,15 +36,17 @@ export async function getJob(jobId: string): Promise<EtlJob | null> {
 export async function createJob(input: CreateJobInput): Promise<string> {
   const { data: job, error: jobErr } = await supabase
     .from("etl_jobs")
-    .insert({
-      organization_id: input.organizationId,
-      pipeline_key: input.pipelineKey,
-      module: input.module,
-      source: input.source,
-      idempotency_key: input.idempotencyKey,
-      params: input.params ?? {},
-      total_count: input.items.length,
-    })
+    .insert([
+      {
+        organization_id: input.organizationId,
+        pipeline_key: input.pipelineKey,
+        module: input.module,
+        source: input.source,
+        idempotency_key: input.idempotencyKey,
+        params: (input.params ?? {}) as never,
+        total_count: input.items.length,
+      },
+    ])
     .select("id")
     .single();
   if (jobErr) throw jobErr;
