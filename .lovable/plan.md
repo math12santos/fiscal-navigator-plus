@@ -114,3 +114,23 @@ Após esta fase, o módulo de TI entrega ao CFO/CIO:
 - Visibilidade antecipada de renovações, SLAs em risco e custos crescentes
 - Custo real (TCO) por sistema/equipamento, exportável para o board
 - Trilha auditável de toda mudança estrutural ou operacional — pronto para due diligence/auditoria externa
+
+---
+
+### ✅ Fase 4-5 — Implementado em 2026-04-30
+
+**Migração aplicada:**
+- Triggers `it_log_changes` em `it_systems`, `it_equipment`, `it_telecom_links`, `it_tickets`, `it_sla_policies`, `it_equipment_movements` → escreve em `it_audit_log`
+- Colunas: `it_equipment_movements.cost`, `it_tickets.hours_spent`, `it_config.technician_hourly_cost`
+- RPC `it_compute_tco(p_org, p_from, p_to)` + `it_tco_summary` (com totais e tco/usuário)
+- Índice de dedupe em `notifications`
+
+**Edge Function `it-daily-alerts`:** renovações de sistemas (30/15/7/3/1d), SLAs em risco (≤4h ou vencido), vida útil de equipamentos (≤60d), telecom (60/30/15/7d). Idempotente por `(user_id, reference_type, reference_id, dia)`.
+
+**Cron `it-daily-alerts`:** 10:00 UTC diário (jobid 3) via `pg_net`.
+
+**UI:**
+- Nova aba **TCO** em `/ti?tab=tco` — ranking, breakdown por componente, exportação PDF executivo
+- Seção **Trilha de auditoria** em Configurações (filtros + diff antes/depois)
+- Botão **"Rodar alertas agora"** no Dashboard
+- Campo **Custo/hora do técnico** em Configurações
