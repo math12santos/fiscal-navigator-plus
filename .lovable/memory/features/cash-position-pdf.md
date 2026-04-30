@@ -1,27 +1,29 @@
 ---
 name: Cash Position PDF Report
-description: Aging List tem cards clicáveis (Dialog com posição por empresa) e botão "Emitir PDF de Posição de Caixa" com timestamp+emissor
+description: PDF Posição de Caixa com auditoria saldo×conciliado, pagamentos da semana e carimbo SHA-256
 type: feature
 ---
 
-## Posição de Caixa no Aging List
+## UI (`src/components/financeiro/AgingListTab.tsx`)
 
-`src/components/financeiro/AgingListTab.tsx`:
+- Cards (Saldo / Limite / Disponibilidade) abrem Dialog `perOrgPosition` (posição por empresa).
+- Botão "Emitir PDF de Posição de Caixa" no header → `handleEmitPdf` (async).
 
-- **Cards clicáveis** (Saldo em Contas / Limite / Disponibilidade Total): abrem `Dialog` mostrando posição agrupada por empresa (`perOrgPosition`). Cada linha = 1 organização com saldo, limite e disponível.
-- **Aviso explícito** dentro do dialog: saldos refletem a última atualização manual em "Contas Bancárias"; podem divergir de lançamentos pagos não conciliados → orienta usar a aba Conciliação.
-- **Botão "Emitir PDF de Posição de Caixa"** no header da aba.
+## PDF (`src/lib/cashPositionPdf.ts`)
 
-## Geração do PDF
+`generateCashPositionPdf` é **async** (usa `crypto.subtle.digest`). Seções:
 
-`src/lib/cashPositionPdf.ts` usa `jspdf` + `jspdf-autotable`:
+1. Header com timestamp + emissor (nome/e-mail).
+2. Resumo Financeiro (Saldo, Limite, Disponibilidade, AP vencido/30d, AR 30d).
+3. Posição por empresa (uma seção por org com tabela de contas).
+4. **Auditoria — Saldo × Conciliado**: para cada conta bancária compara `saldo_atual` com Σ(`valor_realizado`) dos lançamentos pagos/recebidos vinculados (`conta_bancaria_id`). Linhas com divergência ≥ R$0,01 ficam vermelhas + bold. Inclui total e nota explicativa.
+5. **Pagamentos da Semana Corrente**: filtra `saidaEntries` com `status='pago'` e `data_realizada` dentro de `[startOfWeek(seg), endOfWeek(dom)]`. Colunas: Data / Empresa / Favorecido (descrição) / Valor.
+6. **Carimbo de Rastreabilidade** (caixa em rodapé direito de TODA página): emissor + ID curto (`user.id[:8]`) + SHA-256 truncado (16 chars) do payload JSON. Hash íntegro completo no rodapé da última página.
 
-- Header com timestamp (`dd/MM/yyyy 'às' HH:mm:ss`) e emissor (`user.user_metadata.full_name` ou e-mail).
-- Bloco "Resumo Financeiro": Saldo, Limite, Disponibilidade, AP Vencido, AP Próx. 30d, AR Próx. 30d.
-- Uma seção por empresa com tabela de contas (Conta / Banco / Tipo / Saldo / Limite / Disponível) + linha de total.
-- Footer paginado com nota de origem dos saldos.
-- Nome do arquivo: `posicao-caixa-YYYYMMDD-HHmm.pdf`.
+## Hash
 
-## Próximos passos planejados
+`sha256Hex` digere JSON com: contextName, isConsolidated, generatedAt, issuer, totals, perOrg, audit, weekPayments — exclui o próprio hash. Permite re-cálculo manual para validação.
 
-- Incluir lista de pagamentos realizados na semana corrente (a fazer em iteração futura).
+## Arquivo
+
+`posicao-caixa-YYYYMMDD-HHmm.pdf` — `doc.save` retorna `{ fileName, hash }`.
