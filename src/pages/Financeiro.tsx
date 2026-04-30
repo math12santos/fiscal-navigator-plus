@@ -12,9 +12,11 @@ import { ImportacoesTab } from "@/components/financeiro/ImportacoesTab";
 import { FluxoCaixaTab } from "@/components/financeiro/FluxoCaixaTab";
 import { ConciliacaoTab } from "@/components/financeiro/ConciliacaoTab";
 import { IntegracoesTab } from "@/components/financeiro/IntegracoesTab";
+import { FinancialDashboardTab } from "@/components/financeiro/dashboard/FinancialDashboardTab";
 import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
 
 const ALL_TABS = [
+  { key: "dashboard", label: "Dashboard" },
   { key: "pagar", label: "Contas a Pagar" },
   { key: "receber", label: "Contas a Receber" },
   { key: "aging", label: "Aging List" },
@@ -76,6 +78,9 @@ export default function Financeiro() {
             <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
           ))}
         </TabsList>
+        {allowedTabs.some((t) => t.key === "dashboard") && (
+          <TabsContent value="dashboard"><FinancialDashboardTab /></TabsContent>
+        )}
         {allowedTabs.some((t) => t.key === "pagar") && (
           <TabsContent value="pagar"><ContasAPagar /></TabsContent>
         )}
