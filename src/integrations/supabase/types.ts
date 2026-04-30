@@ -4179,6 +4179,825 @@ export type Database = {
           },
         ]
       }
+      it_config: {
+        Row: {
+          alert_renewal_days: number[] | null
+          created_at: string
+          default_useful_life_celular: number | null
+          default_useful_life_desktop: number | null
+          default_useful_life_monitor: number | null
+          default_useful_life_notebook: number | null
+          default_useful_life_outro: number | null
+          default_useful_life_servidor: number | null
+          id: string
+          notes: string | null
+          organization_id: string
+          sla_alta_hours: number | null
+          sla_baixa_hours: number | null
+          sla_critica_hours: number | null
+          sla_media_hours: number | null
+          updated_at: string
+        }
+        Insert: {
+          alert_renewal_days?: number[] | null
+          created_at?: string
+          default_useful_life_celular?: number | null
+          default_useful_life_desktop?: number | null
+          default_useful_life_monitor?: number | null
+          default_useful_life_notebook?: number | null
+          default_useful_life_outro?: number | null
+          default_useful_life_servidor?: number | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          sla_alta_hours?: number | null
+          sla_baixa_hours?: number | null
+          sla_critica_hours?: number | null
+          sla_media_hours?: number | null
+          updated_at?: string
+        }
+        Update: {
+          alert_renewal_days?: number[] | null
+          created_at?: string
+          default_useful_life_celular?: number | null
+          default_useful_life_desktop?: number | null
+          default_useful_life_monitor?: number | null
+          default_useful_life_notebook?: number | null
+          default_useful_life_outro?: number | null
+          default_useful_life_servidor?: number | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          sla_alta_hours?: number | null
+          sla_baixa_hours?: number | null
+          sla_critica_hours?: number | null
+          sla_media_hours?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_depreciation_params: {
+        Row: {
+          accounting_residual_value: number | null
+          accounting_useful_life_months: number | null
+          accounting_value: number | null
+          created_at: string
+          current_economic_value: number | null
+          depreciable_base: number | null
+          discounts: number | null
+          economic_residual_value: number | null
+          economic_useful_life_months: number | null
+          equipment_id: string
+          finance_completed_at: string | null
+          finance_completed_by: string | null
+          freight_install_setup: number | null
+          id: string
+          invoice_gross_value: number | null
+          manual_economic_status:
+            | Database["public"]["Enums"]["it_economic_status"]
+            | null
+          manually_edited: boolean | null
+          monthly_economic_depreciation: number | null
+          non_recoverable_taxes: number | null
+          organization_id: string
+          recoverable_taxes: number | null
+          requires_finance_input: boolean
+          updated_at: string
+        }
+        Insert: {
+          accounting_residual_value?: number | null
+          accounting_useful_life_months?: number | null
+          accounting_value?: number | null
+          created_at?: string
+          current_economic_value?: number | null
+          depreciable_base?: number | null
+          discounts?: number | null
+          economic_residual_value?: number | null
+          economic_useful_life_months?: number | null
+          equipment_id: string
+          finance_completed_at?: string | null
+          finance_completed_by?: string | null
+          freight_install_setup?: number | null
+          id?: string
+          invoice_gross_value?: number | null
+          manual_economic_status?:
+            | Database["public"]["Enums"]["it_economic_status"]
+            | null
+          manually_edited?: boolean | null
+          monthly_economic_depreciation?: number | null
+          non_recoverable_taxes?: number | null
+          organization_id: string
+          recoverable_taxes?: number | null
+          requires_finance_input?: boolean
+          updated_at?: string
+        }
+        Update: {
+          accounting_residual_value?: number | null
+          accounting_useful_life_months?: number | null
+          accounting_value?: number | null
+          created_at?: string
+          current_economic_value?: number | null
+          depreciable_base?: number | null
+          discounts?: number | null
+          economic_residual_value?: number | null
+          economic_useful_life_months?: number | null
+          equipment_id?: string
+          finance_completed_at?: string | null
+          finance_completed_by?: string | null
+          freight_install_setup?: number | null
+          id?: string
+          invoice_gross_value?: number | null
+          manual_economic_status?:
+            | Database["public"]["Enums"]["it_economic_status"]
+            | null
+          manually_edited?: boolean | null
+          monthly_economic_depreciation?: number | null
+          non_recoverable_taxes?: number | null
+          organization_id?: string
+          recoverable_taxes?: number | null
+          requires_finance_input?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_depreciation_params_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: true
+            referencedRelation: "it_equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_equipment: {
+        Row: {
+          account_id: string | null
+          acquisition_date: string | null
+          acquisition_form:
+            | Database["public"]["Enums"]["it_acquisition_form"]
+            | null
+          acquisition_value: number | null
+          brand: string | null
+          conservation_state:
+            | Database["public"]["Enums"]["it_conservation_state"]
+            | null
+          contract_id: string | null
+          cost_center_id: string | null
+          created_at: string
+          created_by: string
+          department_id: string | null
+          economic_status:
+            | Database["public"]["Enums"]["it_economic_status"]
+            | null
+          enters_patrimonial_planning: boolean | null
+          equipment_type: Database["public"]["Enums"]["it_equipment_type"]
+          first_installment_date: string | null
+          generates_future_installments: boolean | null
+          generates_recurring_cost: boolean | null
+          generates_replacement_forecast: boolean | null
+          id: string
+          installment_value: number | null
+          installments_count: number | null
+          invoice_number: string | null
+          location: string | null
+          model: string | null
+          name: string
+          notes: string | null
+          organization_id: string
+          patrimonial_code: string
+          replacement_estimated_value: number | null
+          replacement_forecast_date: string | null
+          replacement_justification: string | null
+          replacement_priority:
+            | Database["public"]["Enums"]["it_criticality"]
+            | null
+          residual_value: number | null
+          responsible_employee_id: string | null
+          serial_number: string | null
+          status: Database["public"]["Enums"]["it_equipment_status"]
+          supplier_entity_id: string | null
+          updated_at: string
+          useful_life_accounting_months: number | null
+          useful_life_economic_months: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          acquisition_date?: string | null
+          acquisition_form?:
+            | Database["public"]["Enums"]["it_acquisition_form"]
+            | null
+          acquisition_value?: number | null
+          brand?: string | null
+          conservation_state?:
+            | Database["public"]["Enums"]["it_conservation_state"]
+            | null
+          contract_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by: string
+          department_id?: string | null
+          economic_status?:
+            | Database["public"]["Enums"]["it_economic_status"]
+            | null
+          enters_patrimonial_planning?: boolean | null
+          equipment_type: Database["public"]["Enums"]["it_equipment_type"]
+          first_installment_date?: string | null
+          generates_future_installments?: boolean | null
+          generates_recurring_cost?: boolean | null
+          generates_replacement_forecast?: boolean | null
+          id?: string
+          installment_value?: number | null
+          installments_count?: number | null
+          invoice_number?: string | null
+          location?: string | null
+          model?: string | null
+          name: string
+          notes?: string | null
+          organization_id: string
+          patrimonial_code: string
+          replacement_estimated_value?: number | null
+          replacement_forecast_date?: string | null
+          replacement_justification?: string | null
+          replacement_priority?:
+            | Database["public"]["Enums"]["it_criticality"]
+            | null
+          residual_value?: number | null
+          responsible_employee_id?: string | null
+          serial_number?: string | null
+          status?: Database["public"]["Enums"]["it_equipment_status"]
+          supplier_entity_id?: string | null
+          updated_at?: string
+          useful_life_accounting_months?: number | null
+          useful_life_economic_months?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          acquisition_date?: string | null
+          acquisition_form?:
+            | Database["public"]["Enums"]["it_acquisition_form"]
+            | null
+          acquisition_value?: number | null
+          brand?: string | null
+          conservation_state?:
+            | Database["public"]["Enums"]["it_conservation_state"]
+            | null
+          contract_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string
+          department_id?: string | null
+          economic_status?:
+            | Database["public"]["Enums"]["it_economic_status"]
+            | null
+          enters_patrimonial_planning?: boolean | null
+          equipment_type?: Database["public"]["Enums"]["it_equipment_type"]
+          first_installment_date?: string | null
+          generates_future_installments?: boolean | null
+          generates_recurring_cost?: boolean | null
+          generates_replacement_forecast?: boolean | null
+          id?: string
+          installment_value?: number | null
+          installments_count?: number | null
+          invoice_number?: string | null
+          location?: string | null
+          model?: string | null
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          patrimonial_code?: string
+          replacement_estimated_value?: number | null
+          replacement_forecast_date?: string | null
+          replacement_justification?: string | null
+          replacement_priority?:
+            | Database["public"]["Enums"]["it_criticality"]
+            | null
+          residual_value?: number | null
+          responsible_employee_id?: string | null
+          serial_number?: string | null
+          status?: Database["public"]["Enums"]["it_equipment_status"]
+          supplier_entity_id?: string | null
+          updated_at?: string
+          useful_life_accounting_months?: number | null
+          useful_life_economic_months?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_equipment_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_equipment_attachments: {
+        Row: {
+          category: string
+          created_at: string
+          equipment_id: string
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          organization_id: string
+          size_bytes: number | null
+          uploaded_by: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          equipment_id: string
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          organization_id: string
+          size_bytes?: number | null
+          uploaded_by: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          equipment_id?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          organization_id?: string
+          size_bytes?: number | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_equipment_attachments_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "it_equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_incidents: {
+        Row: {
+          analyst_id: string | null
+          caused_outage: boolean | null
+          corrective_action: string | null
+          cost_center_id: string | null
+          created_at: string
+          created_by: string
+          department_id: string | null
+          description: string | null
+          equipment_id: string | null
+          estimated_financial_impact: number | null
+          estimated_loss_value: number | null
+          id: string
+          incident_number: string
+          incident_type: Database["public"]["Enums"]["it_incident_type"]
+          insurance_claim_number: string | null
+          insurance_triggered: boolean | null
+          occurred_at: string
+          operational_impact: Database["public"]["Enums"]["it_impact_level"]
+          organization_id: string
+          outage_duration_minutes: number | null
+          police_report_number: string | null
+          preventive_action: string | null
+          recovered_value: number | null
+          registered_at: string
+          status: Database["public"]["Enums"]["it_incident_status"]
+          system_id: string | null
+          telecom_link_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          analyst_id?: string | null
+          caused_outage?: boolean | null
+          corrective_action?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by: string
+          department_id?: string | null
+          description?: string | null
+          equipment_id?: string | null
+          estimated_financial_impact?: number | null
+          estimated_loss_value?: number | null
+          id?: string
+          incident_number: string
+          incident_type: Database["public"]["Enums"]["it_incident_type"]
+          insurance_claim_number?: string | null
+          insurance_triggered?: boolean | null
+          occurred_at: string
+          operational_impact?: Database["public"]["Enums"]["it_impact_level"]
+          organization_id: string
+          outage_duration_minutes?: number | null
+          police_report_number?: string | null
+          preventive_action?: string | null
+          recovered_value?: number | null
+          registered_at?: string
+          status?: Database["public"]["Enums"]["it_incident_status"]
+          system_id?: string | null
+          telecom_link_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          analyst_id?: string | null
+          caused_outage?: boolean | null
+          corrective_action?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string
+          department_id?: string | null
+          description?: string | null
+          equipment_id?: string | null
+          estimated_financial_impact?: number | null
+          estimated_loss_value?: number | null
+          id?: string
+          incident_number?: string
+          incident_type?: Database["public"]["Enums"]["it_incident_type"]
+          insurance_claim_number?: string | null
+          insurance_triggered?: boolean | null
+          occurred_at?: string
+          operational_impact?: Database["public"]["Enums"]["it_impact_level"]
+          organization_id?: string
+          outage_duration_minutes?: number | null
+          police_report_number?: string | null
+          preventive_action?: string | null
+          recovered_value?: number | null
+          registered_at?: string
+          status?: Database["public"]["Enums"]["it_incident_status"]
+          system_id?: string | null
+          telecom_link_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_incidents_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "it_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_incidents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_incidents_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "it_systems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_incidents_telecom_link_id_fkey"
+            columns: ["telecom_link_id"]
+            isOneToOne: false
+            referencedRelation: "it_telecom_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_systems: {
+        Row: {
+          account_id: string | null
+          admin_login: string | null
+          annual_value: number | null
+          billing_cycle: Database["public"]["Enums"]["it_billing_cycle"]
+          category: Database["public"]["Enums"]["it_system_category"]
+          contract_id: string | null
+          contracted_at: string | null
+          cost_center_id: string | null
+          created_at: string
+          created_by: string
+          criticality: Database["public"]["Enums"]["it_criticality"] | null
+          data_integrated: boolean | null
+          department_id: string | null
+          has_redundancy: boolean | null
+          id: string
+          is_essential: boolean | null
+          linked_to_budget: boolean | null
+          monthly_value: number | null
+          name: string
+          notes: string | null
+          organization_id: string
+          payment_method: string | null
+          renewal_date: string | null
+          responsible_employee_id: string | null
+          status: Database["public"]["Enums"]["it_system_status"]
+          supplier_entity_id: string | null
+          updated_at: string
+          url: string | null
+          users_count: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          admin_login?: string | null
+          annual_value?: number | null
+          billing_cycle?: Database["public"]["Enums"]["it_billing_cycle"]
+          category: Database["public"]["Enums"]["it_system_category"]
+          contract_id?: string | null
+          contracted_at?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by: string
+          criticality?: Database["public"]["Enums"]["it_criticality"] | null
+          data_integrated?: boolean | null
+          department_id?: string | null
+          has_redundancy?: boolean | null
+          id?: string
+          is_essential?: boolean | null
+          linked_to_budget?: boolean | null
+          monthly_value?: number | null
+          name: string
+          notes?: string | null
+          organization_id: string
+          payment_method?: string | null
+          renewal_date?: string | null
+          responsible_employee_id?: string | null
+          status?: Database["public"]["Enums"]["it_system_status"]
+          supplier_entity_id?: string | null
+          updated_at?: string
+          url?: string | null
+          users_count?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          admin_login?: string | null
+          annual_value?: number | null
+          billing_cycle?: Database["public"]["Enums"]["it_billing_cycle"]
+          category?: Database["public"]["Enums"]["it_system_category"]
+          contract_id?: string | null
+          contracted_at?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string
+          criticality?: Database["public"]["Enums"]["it_criticality"] | null
+          data_integrated?: boolean | null
+          department_id?: string | null
+          has_redundancy?: boolean | null
+          id?: string
+          is_essential?: boolean | null
+          linked_to_budget?: boolean | null
+          monthly_value?: number | null
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          payment_method?: string | null
+          renewal_date?: string | null
+          responsible_employee_id?: string | null
+          status?: Database["public"]["Enums"]["it_system_status"]
+          supplier_entity_id?: string | null
+          updated_at?: string
+          url?: string | null
+          users_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_systems_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_telecom_links: {
+        Row: {
+          account_id: string | null
+          contract_id: string | null
+          contracted_at: string | null
+          cost_center_id: string | null
+          created_at: string
+          created_by: string
+          fixed_ip: boolean | null
+          id: string
+          invoice_due_day: number | null
+          link_type: Database["public"]["Enums"]["it_telecom_type"]
+          linked_to_budget: boolean | null
+          monthly_value: number | null
+          name: string
+          notes: string | null
+          organization_id: string
+          renewal_date: string | null
+          responsible_employee_id: string | null
+          sla: string | null
+          speed: string | null
+          status: Database["public"]["Enums"]["it_telecom_status"]
+          supplier_entity_id: string | null
+          unit_location: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          contract_id?: string | null
+          contracted_at?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by: string
+          fixed_ip?: boolean | null
+          id?: string
+          invoice_due_day?: number | null
+          link_type: Database["public"]["Enums"]["it_telecom_type"]
+          linked_to_budget?: boolean | null
+          monthly_value?: number | null
+          name: string
+          notes?: string | null
+          organization_id: string
+          renewal_date?: string | null
+          responsible_employee_id?: string | null
+          sla?: string | null
+          speed?: string | null
+          status?: Database["public"]["Enums"]["it_telecom_status"]
+          supplier_entity_id?: string | null
+          unit_location?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          contract_id?: string | null
+          contracted_at?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string
+          fixed_ip?: boolean | null
+          id?: string
+          invoice_due_day?: number | null
+          link_type?: Database["public"]["Enums"]["it_telecom_type"]
+          linked_to_budget?: boolean | null
+          monthly_value?: number | null
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          renewal_date?: string | null
+          responsible_employee_id?: string | null
+          sla?: string | null
+          speed?: string | null
+          status?: Database["public"]["Enums"]["it_telecom_status"]
+          supplier_entity_id?: string | null
+          unit_location?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_telecom_links_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_ticket_events: {
+        Row: {
+          author_id: string
+          content: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          organization_id: string
+          ticket_id: string
+        }
+        Insert: {
+          author_id: string
+          content?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          organization_id: string
+          ticket_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_ticket_events_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "it_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_tickets: {
+        Row: {
+          assignee_id: string | null
+          category: Database["public"]["Enums"]["it_ticket_category"]
+          cost_center_id: string | null
+          created_at: string
+          department_id: string | null
+          description: string | null
+          due_at: string | null
+          equipment_id: string | null
+          id: string
+          opened_at: string
+          organization_id: string
+          priority: Database["public"]["Enums"]["it_ticket_priority"]
+          requester_id: string
+          resolved_at: string | null
+          solution: string | null
+          status: Database["public"]["Enums"]["it_ticket_status"]
+          system_id: string | null
+          telecom_link_id: string | null
+          ticket_number: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          category?: Database["public"]["Enums"]["it_ticket_category"]
+          cost_center_id?: string | null
+          created_at?: string
+          department_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          equipment_id?: string | null
+          id?: string
+          opened_at?: string
+          organization_id: string
+          priority?: Database["public"]["Enums"]["it_ticket_priority"]
+          requester_id: string
+          resolved_at?: string | null
+          solution?: string | null
+          status?: Database["public"]["Enums"]["it_ticket_status"]
+          system_id?: string | null
+          telecom_link_id?: string | null
+          ticket_number: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          category?: Database["public"]["Enums"]["it_ticket_category"]
+          cost_center_id?: string | null
+          created_at?: string
+          department_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          equipment_id?: string | null
+          id?: string
+          opened_at?: string
+          organization_id?: string
+          priority?: Database["public"]["Enums"]["it_ticket_priority"]
+          requester_id?: string
+          resolved_at?: string | null
+          solution?: string | null
+          status?: Database["public"]["Enums"]["it_ticket_status"]
+          system_id?: string | null
+          telecom_link_id?: string | null
+          ticket_number?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_tickets_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "it_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_tickets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_tickets_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "it_systems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_tickets_telecom_link_id_fkey"
+            columns: ["telecom_link_id"]
+            isOneToOne: false
+            referencedRelation: "it_telecom_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kpi_period_presets: {
         Row: {
           created_at: string
@@ -6782,6 +7601,128 @@ export type Database = {
       bsc_perspectiva: "financeira" | "clientes" | "processos" | "aprendizado"
       bsc_status: "em_elaboracao" | "ativo" | "encerrado"
       bsc_tipo: "individual" | "departamento" | "empresa"
+      it_acquisition_form:
+        | "compra_a_vista"
+        | "compra_parcelada"
+        | "leasing"
+        | "comodato"
+        | "locacao"
+        | "outro"
+      it_billing_cycle:
+        | "mensal"
+        | "anual"
+        | "por_usuario"
+        | "por_volume"
+        | "por_consumo"
+        | "vitalicio"
+        | "outro"
+      it_conservation_state: "novo" | "bom" | "regular" | "ruim" | "sucata"
+      it_criticality: "baixa" | "media" | "alta" | "critica"
+      it_economic_status:
+        | "novo"
+        | "em_uso_saudavel"
+        | "proximo_substituicao"
+        | "substituicao_recomendada"
+        | "obsoleto"
+      it_equipment_status:
+        | "ativo"
+        | "disponivel"
+        | "em_uso"
+        | "em_manutencao"
+        | "extraviado"
+        | "baixado"
+        | "vendido"
+        | "inativo"
+      it_equipment_type:
+        | "notebook"
+        | "desktop"
+        | "monitor"
+        | "celular"
+        | "tablet"
+        | "impressora"
+        | "roteador"
+        | "servidor"
+        | "nobreak"
+        | "periferico"
+        | "outro"
+      it_impact_level: "baixo" | "medio" | "alto" | "critico"
+      it_incident_status:
+        | "registrado"
+        | "em_analise"
+        | "em_tratativa"
+        | "resolvido"
+        | "encerrado"
+      it_incident_type:
+        | "quebra_equipamento"
+        | "furto"
+        | "roubo"
+        | "perda"
+        | "dano_eletrico"
+        | "dano_mau_uso"
+        | "indisponibilidade_sistema"
+        | "indisponibilidade_internet"
+        | "vazamento_dados"
+        | "acesso_indevido"
+        | "ataque_cibernetico"
+        | "falha_operacional"
+        | "outro"
+      it_system_category:
+        | "erp"
+        | "crm"
+        | "financeiro"
+        | "rh"
+        | "contabilidade"
+        | "marketing"
+        | "vendas"
+        | "comunicacao"
+        | "armazenamento"
+        | "seguranca"
+        | "bi"
+        | "automacao"
+        | "outro"
+      it_system_status:
+        | "ativo"
+        | "em_teste"
+        | "cancelado"
+        | "suspenso"
+        | "em_implantacao"
+      it_telecom_status:
+        | "ativo"
+        | "suspenso"
+        | "cancelado"
+        | "em_implantacao"
+        | "em_analise"
+      it_telecom_type:
+        | "banda_larga"
+        | "link_dedicado"
+        | "telefonia_fixa"
+        | "telefonia_movel"
+        | "chip_corporativo"
+        | "vpn"
+        | "mpls"
+        | "outro"
+      it_ticket_category:
+        | "suporte_tecnico"
+        | "manutencao_equipamento"
+        | "solicitacao_acesso"
+        | "bloqueio_acesso"
+        | "instalacao_sistema"
+        | "problema_sistema"
+        | "problema_internet"
+        | "problema_email"
+        | "solicitacao_compra"
+        | "solicitacao_troca"
+        | "seguranca_informacao"
+        | "outro"
+      it_ticket_priority: "baixa" | "media" | "alta" | "critica"
+      it_ticket_status:
+        | "aberto"
+        | "em_analise"
+        | "em_atendimento"
+        | "aguardando_terceiro"
+        | "aguardando_solicitante"
+        | "resolvido"
+        | "cancelado"
       nine_box_dimension: "desempenho" | "potencial"
       nine_box_recomendacao:
         | "manter"
@@ -6948,6 +7889,141 @@ export const Constants = {
       bsc_perspectiva: ["financeira", "clientes", "processos", "aprendizado"],
       bsc_status: ["em_elaboracao", "ativo", "encerrado"],
       bsc_tipo: ["individual", "departamento", "empresa"],
+      it_acquisition_form: [
+        "compra_a_vista",
+        "compra_parcelada",
+        "leasing",
+        "comodato",
+        "locacao",
+        "outro",
+      ],
+      it_billing_cycle: [
+        "mensal",
+        "anual",
+        "por_usuario",
+        "por_volume",
+        "por_consumo",
+        "vitalicio",
+        "outro",
+      ],
+      it_conservation_state: ["novo", "bom", "regular", "ruim", "sucata"],
+      it_criticality: ["baixa", "media", "alta", "critica"],
+      it_economic_status: [
+        "novo",
+        "em_uso_saudavel",
+        "proximo_substituicao",
+        "substituicao_recomendada",
+        "obsoleto",
+      ],
+      it_equipment_status: [
+        "ativo",
+        "disponivel",
+        "em_uso",
+        "em_manutencao",
+        "extraviado",
+        "baixado",
+        "vendido",
+        "inativo",
+      ],
+      it_equipment_type: [
+        "notebook",
+        "desktop",
+        "monitor",
+        "celular",
+        "tablet",
+        "impressora",
+        "roteador",
+        "servidor",
+        "nobreak",
+        "periferico",
+        "outro",
+      ],
+      it_impact_level: ["baixo", "medio", "alto", "critico"],
+      it_incident_status: [
+        "registrado",
+        "em_analise",
+        "em_tratativa",
+        "resolvido",
+        "encerrado",
+      ],
+      it_incident_type: [
+        "quebra_equipamento",
+        "furto",
+        "roubo",
+        "perda",
+        "dano_eletrico",
+        "dano_mau_uso",
+        "indisponibilidade_sistema",
+        "indisponibilidade_internet",
+        "vazamento_dados",
+        "acesso_indevido",
+        "ataque_cibernetico",
+        "falha_operacional",
+        "outro",
+      ],
+      it_system_category: [
+        "erp",
+        "crm",
+        "financeiro",
+        "rh",
+        "contabilidade",
+        "marketing",
+        "vendas",
+        "comunicacao",
+        "armazenamento",
+        "seguranca",
+        "bi",
+        "automacao",
+        "outro",
+      ],
+      it_system_status: [
+        "ativo",
+        "em_teste",
+        "cancelado",
+        "suspenso",
+        "em_implantacao",
+      ],
+      it_telecom_status: [
+        "ativo",
+        "suspenso",
+        "cancelado",
+        "em_implantacao",
+        "em_analise",
+      ],
+      it_telecom_type: [
+        "banda_larga",
+        "link_dedicado",
+        "telefonia_fixa",
+        "telefonia_movel",
+        "chip_corporativo",
+        "vpn",
+        "mpls",
+        "outro",
+      ],
+      it_ticket_category: [
+        "suporte_tecnico",
+        "manutencao_equipamento",
+        "solicitacao_acesso",
+        "bloqueio_acesso",
+        "instalacao_sistema",
+        "problema_sistema",
+        "problema_internet",
+        "problema_email",
+        "solicitacao_compra",
+        "solicitacao_troca",
+        "seguranca_informacao",
+        "outro",
+      ],
+      it_ticket_priority: ["baixa", "media", "alta", "critica"],
+      it_ticket_status: [
+        "aberto",
+        "em_analise",
+        "em_atendimento",
+        "aguardando_terceiro",
+        "aguardando_solicitante",
+        "resolvido",
+        "cancelado",
+      ],
       nine_box_dimension: ["desempenho", "potencial"],
       nine_box_recomendacao: [
         "manter",
