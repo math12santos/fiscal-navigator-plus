@@ -131,11 +131,12 @@ export default function DPRescisoes() {
                   <TableHead>Total Rescisão</TableHead>
                   <TableHead>Multa FGTS</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-[60px] text-right">Cálculo</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {terminations.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma rescisão registrada</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhuma rescisão registrada</TableCell></TableRow>
                 ) : (
                   terminations.map((t: any) => {
                     const emp = empMap[t.employee_id];
@@ -143,7 +144,11 @@ export default function DPRescisoes() {
                     const regime = t.contract_type || emp?.contract_type || "—";
                     const regimeMudou = t.contract_type && emp?.contract_type && t.contract_type !== emp.contract_type;
                     return (
-                      <TableRow key={t.id}>
+                      <TableRow
+                        key={t.id}
+                        className="cursor-pointer hover:bg-muted/40 transition-colors"
+                        onClick={() => openDetails(t)}
+                      >
                         <TableCell className="font-medium text-foreground">{emp?.name || "—"}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="text-[10px]">{regime}</Badge>
@@ -176,6 +181,17 @@ export default function DPRescisoes() {
                           {regime === "PJ" || regime === "estagio" ? <span className="text-muted-foreground">—</span> : fmt(t.multa_fgts)}
                         </TableCell>
                         <TableCell><Badge variant={t.status === "simulacao" ? "secondary" : "default"}>{t.status}</Badge></TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2"
+                            onClick={(e) => { e.stopPropagation(); openDetails(t); }}
+                            aria-label="Ver memória de cálculo"
+                          >
+                            <Eye size={14} />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })
@@ -187,6 +203,12 @@ export default function DPRescisoes() {
       </Card>
 
       <TerminationSimulatorDialog open={simOpen} onOpenChange={setSimOpen} />
+      <TerminationDetailsDialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        termination={selectedTermination}
+        employee={selectedTermination ? empMap[selectedTermination.employee_id] : null}
+      />
     </div>
   );
 }
