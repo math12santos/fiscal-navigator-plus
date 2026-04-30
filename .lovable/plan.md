@@ -1,199 +1,144 @@
 
-## Objetivo
+# Evolução do BackOffice — Análise + Plano
 
-Trazer os módulos **TI & Patrimônio Tech** e **Jurídico** para o mesmo padrão dos demais módulos do FinCore:
+## 1. Diagnóstico do que existe hoje
 
-1. **Modo Holding**: respeitar `useHolding()` (consolidado / por empresa) em todas as listagens.
-2. **Trilha de Maturidade**: criar avaliadores próprios e plugar a `SectorOnboardingBar` em ambos os módulos, alimentando também o card de maturidade consolidada do Dashboard.
+O BackOffice atual cobre o básico, mas está **operacional, não estratégico**:
+
+| Área | Situação |
+|---|---|
+| Empresas | Lista, cria, exclui, "Acessar como" (impersonation) — funcional, mas sem indicadores de saúde, MRR, uso |
+| Usuários | CRUD + multi-org membership + permissions BO — bom |
+| Sistema (módulos) | Liga/desliga módulos globalmente com mensagem de manutenção — bom |
+| Auditoria | Audit log + eventos de segurança — bom |
+| Onboarding | Acompanhamento + maturidade setorial + config — bom |
+| **Configurações** | **Vazio (3 cards "em breve")** |
+| **Billing / Cobrança** | **Inexistente**. `organizations.plano` é texto livre, sem preço, ciclo, fatura, limite, trial, churn |
+| **Gestão do SaaS** | Inexistente: sem health score, sem feature flags, sem comunicações, sem suporte, sem métricas de produto |
+
+`organizations` tem só: `id, name, doc, logo, status, plano (text), onboarding_completed`. Sem `trial_ends_at`, `mrr`, `seats`, `last_active_at`, `health_score`.
 
 ---
 
-## Parte 1 — Modo Holding em TI e Jurídico
+## 2. Visão proposta — BackOffice como Cockpit do SaaS
 
-### Estado atual
+Reorganizar a navegação em 4 grandes áreas, mantendo o que existe e adicionando 3 áreas novas:
 
-- Os módulos hoje usam apenas `useOrganization()` e filtram por `currentOrg.id`.
-- Páginas `Juridico.tsx` e `TI.tsx` usam um `<header>` próprio (não o `PageHeader`), então não exibem `HoldingToggle` nem `HoldingCompanyTabs`.
-
-### Mudanças
-
-**1.1 Trocar `<header>` por `<PageHeader>`**
-- `src/pages/Juridico.tsx` e `src/pages/TI.tsx`: usar `<PageHeader title="..." description="..." />` para herdar automaticamente o toggle Holding e as abas por empresa.
-
-**1.2 Hooks Jurídico — aplicar padrão `activeOrgIds`**
-
-Padrão já consolidado em `useContracts`/`useCRM`/`useCashFlow`:
-
-```ts
-const { holdingMode, activeOrgIds } = useHolding();
-const orgIds = holdingMode && activeOrgIds.length > 0
-  ? activeOrgIds
-  : currentOrg?.id ? [currentOrg.id] : [];
-// queryKey inclui orgIds; .in("organization_id", orgIds)
+```text
+BackOffice
+├── Visão Geral (NOVO)        → KPIs do SaaS: MRR, ARR, churn, ativos, trials, NRR
+├── Empresas (existe)         + colunas de saúde, MRR, último acesso, plano real
+├── Usuários (existe)
+├── Faturamento (NOVO)        → Planos, assinaturas, faturas, cobrança, inadimplência
+├── Produto (NOVO)            → Módulos + Feature Flags + Releases/Anúncios
+├── Operação (renomear Sistema)
+│   ├── Módulos globais (existe)
+│   ├── Banner / Status Page
+│   └── Jobs / Filas (Edge Functions, ETL)
+├── Suporte (NOVO)            → Tickets, impersonation log, "ajuda solicitada"
+├── Auditoria (existe)
+├── Onboarding (existe)
+└── Configurações (preencher) → Políticas globais, integrações master, branding
 ```
 
-Aplicar em:
-- `src/modules/juridico/hooks/useJuridicoProcesses.ts`
-- `src/modules/juridico/hooks/useJuridicoSettlements.ts`
-- `src/modules/juridico/hooks/useJuridicoExpenses.ts`
-- `src/modules/juridico/hooks/useJuridicoConfig.ts` (config permanece por org da seleção; em modo consolidado usa `currentOrg`)
+---
 
-Os respectivos services (`processesService`, `settlementsService`, `expensesService`) ganham uma sobrecarga `listX(orgIds: string[], filters?)` usando `.in("organization_id", orgIds)`. Mutations continuam escrevendo em `currentOrg.id` (escrita sempre na empresa selecionada — em modo consolidado bloqueia/usa holding).
+## 3. Plano de execução em 4 fases
 
-**1.3 Hooks TI — mesmo padrão**
+### Fase 1 — Fundação de Billing (núcleo do que falta)
 
-Aplicar em:
-- `src/modules/ti/hooks/useITEquipment.ts` + `equipmentService.listEquipment`
-- `src/hooks/useITSystems.ts`
-- `src/hooks/useITTelecom.ts`
-- `src/hooks/useITTickets.ts`
-- `src/hooks/useITIncidents.ts`
-- `src/hooks/useITDepreciation.ts`
-- `src/hooks/useITMovements.ts`
-- `src/hooks/useITAuditLog.ts`
-- `src/hooks/useITSLA.ts`
-- `src/hooks/useITSchedule.ts`
-- `src/hooks/useITTCO.ts`
-- `src/hooks/useITConfig.ts` (config: usa `currentOrg`)
+**Modelo de dados (migrations):**
 
-Cada query passa a:
-- incluir `holdingMode ? activeOrgIds : currentOrg?.id` no `queryKey`
-- usar `.in("organization_id", orgIds)` quando `holdingMode && activeOrgIds.length > 0`, senão `.eq("organization_id", currentOrg.id)`
+- `billing_plans` — catálogo de planos do SaaS
+  - `code, name, description, price_monthly, price_yearly, currency, trial_days, is_public, is_active, sort_order`
+  - `limits jsonb` → `{ max_users, max_orgs_holding, max_employees, max_contracts, ai_credits_month, modules: ["dp","financeiro",...] }`
+- `subscriptions` — assinatura por organização
+  - `organization_id, plan_id, status (trialing|active|past_due|canceled|paused), billing_cycle (monthly|yearly), current_period_start/end, trial_ends_at, canceled_at, cancel_reason, seats, custom_price, discount_pct, payment_method (manual|pix|boleto|card|stripe), external_ref`
+- `invoices` — faturas
+  - `organization_id, subscription_id, number, period_start/end, issued_at, due_at, paid_at, amount, status (draft|open|paid|overdue|void), pdf_url, payment_link, notes`
+- `invoice_items` — linhas (assinatura, add-ons, créditos AI, descontos)
+- `usage_metrics` — snapshot diário por org (`users_count, employees_count, ai_credits_used, contracts_count, storage_mb`) → base para overage e health
+- `feature_flags` — flags globais e por org (`key, scope: global|org, org_id?, enabled, rollout_pct, value jsonb`)
+- `support_tickets` — tickets de suporte (`org_id, opened_by, subject, body, status, priority, assigned_to, channel`)
+- `support_ticket_messages` — thread
+- `platform_announcements` — banners/changelog (`title, body, severity, audience: all|plan|org, starts_at, ends_at, dismissible`)
+- `impersonation_log` — quem-mestre acessou-qual-org-quando-por-quanto-tempo (já existe parcialmente em audit_log; criar view dedicada)
 
-**1.4 Dashboards consolidados**
-- `TIDashboard.tsx` e `JuridicoDashboard.tsx` continuam funcionando — apenas passam a receber arrays já consolidados quando o usuário ativa Holding/Consolidado, ou filtrados quando escolhe uma empresa nas abas.
-- Adicionar um pequeno indicador (badge) no topo do dashboard quando `holdingMode` está ativo, replicando o padrão visto em outros módulos (opcional — se o `PageHeader` já mostra, dispensável).
+**Em `organizations` (ALTER):**
+- `last_active_at timestamp` (atualizado por trigger leve no login)
+- `health_score smallint` (calculado: ver Fase 4)
+
+RLS: tudo restrito a master (BO) via `is_backoffice_master()`. `subscriptions` e `invoices` legíveis pelos `owner/admin` da própria org (para o cliente ver suas faturas dentro do app, futuramente).
+
+**UI Fase 1:**
+- Página **`/backoffice/faturamento`** com 4 abas:
+  1. **Planos** — CRUD do catálogo (nome, preço, ciclo, limites, módulos inclusos, trial)
+  2. **Assinaturas** — tabela por empresa: plano, status, MRR, próximo vencimento, dias de trial restantes, ações (alterar plano, pausar, cancelar, aplicar desconto, prorrogar trial)
+  3. **Faturas** — emitir manualmente, marcar como paga, gerar PDF (jspdf), enviar link (e-mail futuro), lista por status (em aberto, vencidas, pagas)
+  4. **Inadimplência** — empresas com fatura vencida, dias em atraso, ação rápida "suspender acesso"
+
+### Fase 2 — Visão Geral / Dashboard do SaaS
+
+Página **`/backoffice`** (renomear o atual "Empresas" para `/backoffice/empresas`) com cockpit executivo:
+
+- **KPIs**: MRR, ARR, # clientes ativos, # em trial, # inadimplentes, churn 30d, NRR, ticket médio
+- **Gráficos** (recharts):
+  - MRR mensal últimos 12 meses (área)
+  - Novos vs cancelados por mês (barra)
+  - Distribuição por plano (pizza)
+  - Cohort de retenção por mês de signup (heatmap simples)
+- **Listas rápidas**: Top 5 maiores clientes (MRR), 5 mais inativos (sem acesso há X dias), 5 mais próximos do limite do plano, 5 trials expirando em ≤7 dias
+- **Health alerts**: empresas com queda de uso, sem login há 14d, ou onboarding travado há 30d
+
+Hook `useSaasMetrics` calculando tudo via RPC SQL `get_saas_kpis(period_start, period_end)` — agregação server-side (alinhada com a memória `server-side-aggregations`).
+
+### Fase 3 — Produto, Operação e Suporte
+
+**Produto:**
+- **Feature Flags UI** (`/backoffice/produto/flags`): liga/desliga features experimentais por org ou rollout %, com histórico de mudanças
+- **Releases / Anúncios** (`/backoffice/produto/anuncios`): cria banners no app dos clientes (alvo: todos, plano X, org Y), changelog público
+
+**Operação (renomeia "Sistema"):**
+- Mantém Módulos Globais
+- **Status Page interna**: latência média das edge functions, % erro, fila ETL (`etl_jobs`), saúde do realtime — usar `supabase--analytics_query` / logs
+- **Jobs**: lista de cron jobs / edge functions com último run, status, botão "rodar agora"
+
+**Suporte:**
+- **Tickets** (`/backoffice/suporte`): inbox de tickets vindos do cliente (botão "Pedir ajuda" no perfil do cliente envia tudo), responde inline, marca resolvido
+- **Impersonation Log**: quem entrou em qual empresa, quando, por quanto tempo (compliance LGPD: "auditoria do master")
+- **Notas internas** por empresa (CRM-like): "esta empresa está negociando upgrade", "implantação concluída em X" — tabela `org_notes`
+
+### Fase 4 — Governança, Health Score e Configurações
+
+**Health Score por empresa** (job diário):
+- 100 pts = (uso ativo 30d) + (% módulos ativos usados) + (onboarding %) + (pagamento em dia) + (sem tickets críticos abertos)
+- Cores: verde ≥80, amarelo 50-79, vermelho <50 — usado na lista de empresas e em alertas
+
+**Configurações reais** (preenche a página vazia):
+- **Segurança global**: política de senha mínima, 2FA obrigatório por plano, expiração de sessão, IP allowlist por org
+- **E-mails transacionais**: templates editáveis (boas-vindas, fatura emitida, fatura vencida, trial expirando, suspensão)
+- **Branding white-label**: logo padrão, cor primária default, e por org se plano permitir
+- **Integrações master**: chaves globais (Lovable AI já automático), endpoints de webhook do SaaS (ex: notificar Slack interno em novo signup/cancelamento)
+- **Política de retenção**: dias para soft-delete de orgs canceladas, dias para purgar audit_log antigo
+- **LGPD**: gerador de relatório de dados pessoais por usuário/org, fluxo de "esquecer-me"
+
+**Cobrança automatizada (futuro próximo, opcional):**
+- Integração com **Stripe** (ou Pagar.me/Asaas para PIX/boleto BR) via Lovable Payments — sugerir após Fase 1 estar madura. Por enquanto: cobrança manual com PDF + link.
 
 ---
 
-## Parte 2 — Trilha de Maturidade do Jurídico
+## 4. Detalhes técnicos relevantes
 
-### Critérios (100 pts: 50 completude / 25 atualização / 25 rotinas)
-
-**Completude (50)**
-- Configuração jurídica preenchida (responsável, escritório padrão, política de provisão) — 8
-- Pelo menos 1 processo cadastrado — 4
-- % de processos com `numero_cnj` válido + `parte_contraria` + `valor_causa` — 8
-- % de processos com `probabilidade` definida (provável/possível/remota) — 8
-- % de processos com `valor_provisionado` coerente com a probabilidade — 6
-- % de processos com advogado/escritório responsável — 6
-- Documentos anexados em ≥ 80% dos processos ativos — 6
-- Cadastro de tipos de despesa jurídica (`juridico_expenses` por categoria) — 4
-
-**Atualização (25)**
-- % de processos ativos com movimento (`juridico_movements`) nos últimos 90 dias — 10
-- Nenhuma audiência vencida sem atualização — 5
-- Acordos ativos com `juridico_settlement_installments` em dia — 5
-- Provisão recalculada nos últimos 30 dias (compara `updated_at`) — 5
-
-**Rotinas (25)**
-- Rotinas jurídicas registradas em `requests` (`type in ('rotina_juridico','juridico')`) para a competência — geradas/concluídas/atrasadas — 15
-- Reconciliação financeira: despesas jurídicas do mês têm contrapartida em `cashflow_entries` (via `source='juridico'`) — 10
-
-### Arquivos
-- `src/lib/sectorMaturity/juridico.ts` — `evaluateJuridico(input)` retornando `SectorMaturityResult`.
-- Estender `SectorKey` em `types.ts` com `"juridico"` e adicionar entrada em `SECTOR_META` (`label: "Jurídico"`, `route: "/juridico"`).
-- Estender `targets.ts` com campos específicos (ex.: `movement_freshness_days`, `provision_required_for_provavel`) e ajustar `fieldsForSector("juridico")`.
-- Plugar avaliador em `useSectorOnboarding.ts`: novo bloco `isJur` com queries para `juridico_processes`, `juridico_movements`, `juridico_settlements`, `juridico_settlement_installments`, `juridico_documents`, `juridico_expenses`, `juridico_config`, `requests` (tipo jurídico).
-- Renderizar `<SectorOnboardingBar sector="juridico" />` no topo de `Juridico.tsx` (logo após o `PageHeader`).
+- **Stack**: segue padrão atual (React + TS, shadcn, React Query com `cachePresets`, Edge Functions para emissão de fatura/PDF, jspdf+autotable já em uso para Cash Position PDF — reaproveitar)
+- **RLS**: novas tabelas restritas a master via `is_backoffice_master()`; `subscriptions/invoices` também legíveis pelos owners/admins da própria org
+- **Realtime**: `subscriptions`, `invoices`, `support_tickets` entram no `useRealtimeSync` (memória `realtime-sync`)
+- **Dependências**: nenhuma nova lib obrigatória na Fase 1 (jspdf já existe). Pagamento real depende de habilitar Stripe/Paddle depois
+- **Memórias** a criar/atualizar: `features/saas-billing`, `features/saas-health-score`, `features/feature-flags-system`, `features/support-tickets`, atualizar `index.md`
 
 ---
 
-## Parte 3 — Trilha de Maturidade do TI
+## 5. O que entregar primeiro (recomendação)
 
-### Critérios (100 pts: 50 / 25 / 25)
+Sugiro executar **Fase 1 inteira** (fundação de billing) na próxima rodada — é o maior buraco hoje e destrava tudo o mais (health score, dashboard SaaS, suspensão por inadimplência). Fases 2-4 podem vir em sequência, uma por vez.
 
-**Completude (50)**
-- Configuração TI preenchida (`it_config`: política de garantia, dias úteis, alertas) — 6
-- Pelo menos 1 equipamento cadastrado — 4
-- % de equipamentos com `patrimonial_code` + `acquisition_value` + `acquisition_date` — 8
-- % de equipamentos ativos com `responsible_employee_id` — 8
-- % de equipamentos com parâmetros de depreciação (`it_depreciation_params`) — 6
-- Cadastro de sistemas (≥ 1 ativo) e links de telecom (≥ 1 ativo) — 6
-- Políticas de SLA cadastradas (`it_sla_policies` ≥ 1 por prioridade) — 6
-- Documentos/contratos anexados em ≥ 80% dos sistemas/links ativos — 6
-
-**Atualização (25)**
-- Nenhum equipamento com garantia vencida não tratada — 5
-- Nenhum sistema/link com `renewal_date` vencido — 6
-- Depreciação calculada (`it_depreciation_schedule` para o mês corrente) — 5
-- Saldo contábil consolidado calculado nos últimos 30 dias — 4
-- Inventário sem movimentos pendentes (`it_equipment_movements` em `pendente`) — 5
-
-**Rotinas (25)**
-- % de chamados (`it_tickets`) abertos dentro do SLA — 10
-- Chamados resolvidos no mês ÷ chamados abertos no mês — 8
-- Incidentes (`it_incidents`) com tratativa registrada — 7
-
-### Arquivos
-- `src/lib/sectorMaturity/ti.ts` — `evaluateTI(input)`.
-- `SectorKey` += `"ti"`; `SECTOR_META.ti = { label: "TI & Patrimônio", route: "/ti" }`.
-- `targets.ts`: campos específicos (`sla_target_pct`, `renewal_alert_days`, `warranty_alert_days`).
-- Plugar em `useSectorOnboarding.ts` com queries para todas as tabelas `it_*` e `requests` (`rotina_ti`).
-- Renderizar `<SectorOnboardingBar sector="ti" />` em `TI.tsx`.
-
----
-
-## Parte 4 — Integração com o Dashboard Geral
-
-- `src/components/dashboard/MaturityOverviewSection.tsx`: `SUPPORTED_SECTORS` passa de `["dp", "financeiro"]` para `["dp", "financeiro", "juridico", "ti"]`.
-- O grid sobe para 2 colunas em md / mantendo layout responsivo (já é `md:grid-cols-2`).
-- O `useMaturityMonthlyBackfill` já é genérico — vai gravar histórico mensal automaticamente para os novos setores em `sector_onboarding_history`.
-
----
-
-## Parte 5 — Backoffice e alertas
-
-- `sector-maturity-snapshot` e `sector-maturity-alerts` (edge functions) já são genéricas por `sector` na tabela `sector_onboarding`. Nenhuma migração obrigatória — basta os novos snapshots começarem a ser gravados.
-- Backoffice de metas (`SectorMaturityTargetsDialog`) passa a oferecer `juridico` e `ti` a partir do `fieldsForSector(sector)`.
-
----
-
-## Detalhes técnicos
-
-### Padrão de query Holding-aware (referência)
-```ts
-const { currentOrg } = useOrganization();
-const { holdingMode, activeOrgIds } = useHolding();
-const orgIds = holdingMode && activeOrgIds.length > 0
-  ? activeOrgIds
-  : currentOrg?.id ? [currentOrg.id] : [];
-
-const list = useQuery({
-  queryKey: ["it_equipment", orgIds],
-  enabled: orgIds.length > 0,
-  queryFn: () => listEquipment(orgIds),
-});
-```
-
-### Migrações de banco
-Nenhuma migração de schema é necessária:
-- `sector_onboarding`, `sector_onboarding_history` e `sector_maturity_targets` já aceitam qualquer string em `sector`.
-- Tabelas `it_*` e `juridico_*` já têm `organization_id` + RLS por organização.
-
-### RLS
-RLS atual já permite `SELECT` em qualquer `organization_id` que o usuário pertença — ou seja, modo Holding "consolidado" funciona sem alteração de policies (mesma estratégia já usada por Contratos/CRM/Cashflow).
-
-### Memória de projeto (a registrar após implementação)
-- `mem://features/maturity-juridico` — critérios e pesos da trilha jurídica
-- `mem://features/maturity-ti` — critérios e pesos da trilha de TI
-- Atualizar Core para registrar que TI e Jurídico agora seguem o padrão Holding.
-
----
-
-## Resumo de arquivos
-
-**Criar**
-- `src/lib/sectorMaturity/juridico.ts`
-- `src/lib/sectorMaturity/ti.ts`
-
-**Editar**
-- `src/lib/sectorMaturity/types.ts` (SectorKey + SECTOR_META)
-- `src/lib/sectorMaturity/targets.ts` (campos + fieldsForSector)
-- `src/hooks/useSectorOnboarding.ts` (blocos `isJur` e `isTi` + cálculo)
-- `src/components/dashboard/MaturityOverviewSection.tsx` (SUPPORTED_SECTORS)
-- `src/pages/Juridico.tsx` e `src/pages/TI.tsx` (PageHeader + SectorOnboardingBar)
-- Hooks Jurídico (4 arquivos) e Services (3 arquivos)
-- Hooks TI (12 arquivos) + `equipmentService` (services dos demais já estão inline nos hooks)
-
-**Sem migração de banco.**
+Posso começar pela **Fase 1** assim que aprovar — ou, se preferir, executar primeiro só o **Dashboard do SaaS (Fase 2)** com dados mockados de plano/MRR para você validar a visão antes do esforço de billing.
