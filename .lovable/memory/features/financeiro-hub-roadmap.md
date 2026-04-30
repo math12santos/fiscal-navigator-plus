@@ -1,6 +1,6 @@
 ---
 name: Financeiro Hub Roadmap
-description: Plano em 4 fases para tornar o módulo Financeiro um hub centralizador (importações + webhooks) substituível a ERP. Fase 1 (cálculos + audit) implementada.
+description: Plano em 4 fases para tornar o módulo Financeiro um hub centralizador (importações + webhooks) substituível a ERP. Fases 1 e 2 implementadas.
 type: feature
 ---
 
