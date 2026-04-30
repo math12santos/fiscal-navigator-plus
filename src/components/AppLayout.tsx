@@ -36,6 +36,10 @@ import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useThemePreference } from "@/hooks/useThemePreference";
 import { ThemePreferenceDialog } from "@/components/ThemePreferenceDialog";
 import { pageFactories } from "@/App";
+import { useQueryClient } from "@tanstack/react-query";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { useHolding } from "@/contexts/HoldingContext";
+import { prefetchRouteQueries } from "@/lib/routePrefetch";
 
 type PageFactoryKey = keyof typeof pageFactories;
 
