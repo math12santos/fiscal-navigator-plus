@@ -24,6 +24,19 @@ import { startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
 
+/** Formato contábil: negativos como (xxx). */
+const fmtAcc = (v: number) => {
+  const n = Number(v) || 0;
+  const abs = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(Math.abs(n));
+  return n < 0 ? `(${abs})` : abs;
+};
+
+/** Renderiza valor em formato contábil, vermelho quando negativo. */
+const AccVal = ({ v, className = "" }: { v: number; className?: string }) => {
+  const neg = (Number(v) || 0) < 0;
+  return <span className={`${neg ? "text-destructive" : ""} ${className}`.trim()}>{fmtAcc(v)}</span>;
+};
+
 interface AgingBucket {
   label: string;
   range: string;
@@ -474,20 +487,23 @@ export function AgingListTab() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <KPICard
           title="Saldo em Contas"
-          value={fmt(bankTotals.saldoTotal)}
+          value={fmtAcc(bankTotals.saldoTotal)}
+          valueClassName={bankTotals.saldoTotal < 0 ? "text-destructive" : ""}
           icon={<Landmark size={20} />}
           subtitle={`${bankAccounts.length} conta(s)`}
           onClick={() => setCashDetailOpen(true)}
         />
         <KPICard
           title="Limite de Crédito"
-          value={fmt(bankTotals.limiteTotal)}
+          value={fmtAcc(bankTotals.limiteTotal)}
+          valueClassName={bankTotals.limiteTotal < 0 ? "text-destructive" : ""}
           icon={<ShieldCheck size={20} />}
           onClick={() => setCashDetailOpen(true)}
         />
         <KPICard
           title="Disponibilidade Total"
-          value={fmt(bankTotals.disponibilidadeTotal)}
+          value={fmtAcc(bankTotals.disponibilidadeTotal)}
+          valueClassName={bankTotals.disponibilidadeTotal < 0 ? "text-destructive" : ""}
           icon={<Wallet size={20} />}
           subtitle="Saldo + Limite"
           onClick={() => setCashDetailOpen(true)}
@@ -535,17 +551,17 @@ export function AgingListTab() {
                       <TableCell className="text-center text-muted-foreground">
                         {org.accounts.length}
                       </TableCell>
-                      <TableCell className="text-right">{fmt(org.saldo)}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{fmt(org.limite)}</TableCell>
-                      <TableCell className="text-right font-bold text-primary">{fmt(org.disponibilidade)}</TableCell>
+                      <TableCell className="text-right"><AccVal v={org.saldo} /></TableCell>
+                      <TableCell className="text-right text-muted-foreground"><AccVal v={org.limite} /></TableCell>
+                      <TableCell className={`text-right font-bold ${org.disponibilidade < 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(org.disponibilidade)}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/50 font-bold">
                     <TableCell>Total</TableCell>
                     <TableCell className="text-center">{bankAccounts.length}</TableCell>
-                    <TableCell className="text-right">{fmt(bankTotals.saldoTotal)}</TableCell>
-                    <TableCell className="text-right">{fmt(bankTotals.limiteTotal)}</TableCell>
-                    <TableCell className="text-right text-primary">{fmt(bankTotals.disponibilidadeTotal)}</TableCell>
+                    <TableCell className="text-right"><AccVal v={bankTotals.saldoTotal} /></TableCell>
+                    <TableCell className="text-right"><AccVal v={bankTotals.limiteTotal} /></TableCell>
+                    <TableCell className={`text-right ${bankTotals.disponibilidadeTotal < 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(bankTotals.disponibilidadeTotal)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -629,16 +645,16 @@ export function AgingListTab() {
                     <TableCell className="font-medium">{ba.nome}</TableCell>
                     <TableCell>{ba.banco ?? "—"}</TableCell>
                     <TableCell><Badge variant="secondary" className="text-xs capitalize">{ba.tipo_conta}</Badge></TableCell>
-                    <TableCell className="text-right font-medium">{fmt(Number(ba.saldo_atual ?? 0))}</TableCell>
-                    <TableCell className="text-right">{fmt(Number(ba.limite_credito ?? 0))}</TableCell>
-                    <TableCell className="text-right font-bold">{fmt(Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0))}</TableCell>
+                    <TableCell className="text-right font-medium"><AccVal v={Number(ba.saldo_atual ?? 0)} /></TableCell>
+                    <TableCell className="text-right"><AccVal v={Number(ba.limite_credito ?? 0)} /></TableCell>
+                    <TableCell className={`text-right font-bold ${Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0) < 0 ? "text-destructive" : ""}`}>{fmtAcc(Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0))}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/50 font-bold">
                   <TableCell colSpan={3}>Total</TableCell>
-                  <TableCell className="text-right">{fmt(bankTotals.saldoTotal)}</TableCell>
-                  <TableCell className="text-right">{fmt(bankTotals.limiteTotal)}</TableCell>
-                  <TableCell className="text-right">{fmt(bankTotals.disponibilidadeTotal)}</TableCell>
+                  <TableCell className="text-right"><AccVal v={bankTotals.saldoTotal} /></TableCell>
+                  <TableCell className="text-right"><AccVal v={bankTotals.limiteTotal} /></TableCell>
+                  <TableCell className="text-right"><AccVal v={bankTotals.disponibilidadeTotal} /></TableCell>
                 </TableRow>
               </TableBody>
             </Table>

@@ -12,9 +12,11 @@ interface KPICardProps {
   groupShare?: number | null;
   /** Quando definido, o card vira clicável e leva ao relatório de composição. */
   onClick?: () => void;
+  /** Classe extra aplicada ao texto do valor (ex.: text-destructive para negativos). */
+  valueClassName?: string;
 }
 
-export function KPICard({ title, value, change, subtitle, icon, groupShare, onClick }: KPICardProps) {
+export function KPICard({ title, value, change, subtitle, icon, groupShare, onClick, valueClassName }: KPICardProps) {
   const clickable = typeof onClick === "function";
   return (
     <div
@@ -50,7 +52,7 @@ export function KPICard({ title, value, change, subtitle, icon, groupShare, onCl
               </span>
             )}
           </div>
-          <p className="text-2xl font-bold text-foreground animate-count">{value}</p>
+          <p className={cn("text-2xl font-bold text-foreground animate-count", valueClassName)}>{value}</p>
           {change !== undefined && (
             <div className="flex items-center gap-1">
               {change >= 0 ? (

@@ -3,8 +3,21 @@ import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-const fmt = (v: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(v);
+const fmt = (v: number) => {
+  const n = Number(v) || 0;
+  const abs = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(Math.abs(n));
+  return n < 0 ? `(${abs})` : abs;
+};
+
+/** didParseCell hook: paints accounting-format negatives "(xxx)" in red. */
+const colorNegatives = (data: any) => {
+  if (data.section === "head") return;
+  const raw = data.cell.raw;
+  const text = typeof raw === "string" ? raw : raw && typeof raw === "object" ? raw.content : "";
+  if (typeof text === "string" && /^\(.*\)$/.test(text.trim())) {
+    data.cell.styles.textColor = [200, 40, 40];
+  }
+};
 
 export interface CashPositionAccount {
   nome: string;
@@ -118,6 +131,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
       ["Contas a Receber — Próx. 30 dias", fmt(input.totals.arNext30)],
     ],
     columnStyles: { 0: { cellWidth: 100 }, 1: { halign: "right" } },
+    didParseCell: colorNegatives,
   });
 
   let cursorY = (doc as any).lastAutoTable.finalY + 8;
@@ -151,6 +165,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [36, 214, 196], textColor: 0 },
       columnStyles: { 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
+      didParseCell: colorNegatives,
     });
     cursorY = (doc as any).lastAutoTable.finalY + 8;
   }
@@ -192,6 +207,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [36, 214, 196], textColor: 0 },
       columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+      didParseCell: colorNegatives,
     });
     cursorY = (doc as any).lastAutoTable.finalY + 4;
     doc.setFont("helvetica", "italic");
@@ -234,6 +250,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [36, 214, 196], textColor: 0 },
       columnStyles: { 3: { halign: "right" } },
+      didParseCell: colorNegatives,
     });
     cursorY = (doc as any).lastAutoTable.finalY + 8;
   }
