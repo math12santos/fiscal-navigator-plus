@@ -12,6 +12,8 @@ import { useEmployees, usePayrollRuns, useDPConfig } from "@/hooks/useDP";
 import { useDPBenefits, useEmployeeBenefits } from "@/hooks/useDPBenefits";
 import { evaluateDP } from "@/lib/sectorMaturity/dp";
 import { evaluateFinanceiro } from "@/lib/sectorMaturity/financeiro";
+import { evaluateJuridico } from "@/lib/sectorMaturity/juridico";
+import { evaluateTI } from "@/lib/sectorMaturity/ti";
 import { SectorKey, SectorMaturityResult } from "@/lib/sectorMaturity/types";
 import { useSectorMaturityTargets } from "@/hooks/useSectorMaturityTargets";
 
@@ -33,6 +35,8 @@ export function useSectorOnboarding(
   const competencia = format(today, "yyyy-MM");
   const isDP = sector === "dp";
   const isFin = sector === "financeiro";
+  const isJur = sector === "juridico";
+  const isTi = sector === "ti";
 
   // Metas configuráveis (com fallback aos defaults quando não houver registro)
   const { targets } = useSectorMaturityTargets(sector);
