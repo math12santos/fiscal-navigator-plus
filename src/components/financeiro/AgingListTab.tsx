@@ -24,6 +24,19 @@ import { startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
 
+/** Formato contábil: negativos como (xxx). */
+const fmtAcc = (v: number) => {
+  const n = Number(v) || 0;
+  const abs = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(Math.abs(n));
+  return n < 0 ? `(${abs})` : abs;
+};
+
+/** Renderiza valor em formato contábil, vermelho quando negativo. */
+const AccVal = ({ v, className = "" }: { v: number; className?: string }) => {
+  const neg = (Number(v) || 0) < 0;
+  return <span className={`${neg ? "text-destructive" : ""} ${className}`.trim()}>{fmtAcc(v)}</span>;
+};
+
 interface AgingBucket {
   label: string;
   range: string;
