@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useBackofficeOrgs, useBackofficeOrgMemberCounts } from "@/hooks/useBackoffice";
 import { SaasOverviewPanel } from "@/components/backoffice/SaasOverviewPanel";
+import { HealthScoreBadge } from "@/components/backoffice/HealthScoreBadge";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreateOrgDialog } from "@/components/CreateOrgDialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -286,6 +287,7 @@ export default function BackofficeDashboard() {
                       </div>
                     </div>
                     <Badge variant={st.variant} className="text-xs">{st.label}</Badge>
+                    <HealthScoreBadge score={(org as any).health_score} />
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
