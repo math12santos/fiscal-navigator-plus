@@ -286,8 +286,10 @@ export default function BackofficeDashboard() {
                         <p className="text-xs text-muted-foreground font-mono">{org.document_number}</p>
                       </div>
                     </div>
-                    <Badge variant={st.variant} className="text-xs">{st.label}</Badge>
-                    <HealthScoreBadge score={(org as any).health_score} />
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant={st.variant} className="text-xs">{st.label}</Badge>
+                      <HealthScoreBadge score={(org as any).health_score} />
+                    </div>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
