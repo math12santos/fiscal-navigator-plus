@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, CheckCircle2 } from "lucide-react";
+import { Plus, CheckCircle2, Handshake } from "lucide-react";
 import { useJuridicoProcesses, useJuridicoSettlements } from "@/hooks/useJuridico";
+import { SectionCard } from "@/components/SectionCard";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v ?? 0);
@@ -61,60 +61,61 @@ export function JuridicoSettlementsTab() {
   const data = list.data ?? [];
 
   return (
-    <div className="space-y-4 mt-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Acordos</CardTitle>
+    <div className="space-y-4">
+      <SectionCard
+        icon={Handshake}
+        title="Acordos"
+        description="Acordos negociados com cronograma de parcelas e lançamento no caixa após aprovação."
+        actions={
           <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Acordo
           </Button>
-        </CardHeader>
-        <CardContent>
-          {data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum acordo cadastrado.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="py-2">Acordo</th>
-                    <th>Processo</th>
-                    <th className="text-right">Valor</th>
-                    <th className="text-center">Parcelas</th>
-                    <th>1ª Parcela</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((s) => {
-                    const proc = procMap.get(s.process_id);
-                    return (
-                      <tr key={s.id} className="border-b last:border-0">
-                        <td className="py-2">{s.numero_acordo || s.id.slice(0, 8)}</td>
-                        <td>{proc?.numero_cnj || proc?.numero_interno || "—"}</td>
-                        <td className="text-right">{fmt(Number(s.valor_total))}</td>
-                        <td className="text-center">{s.qtd_parcelas}</td>
-                        <td>{new Date(s.data_primeira_parcela).toLocaleDateString("pt-BR")}</td>
-                        <td><Badge variant="outline">{s.status}</Badge></td>
-                        <td className="text-right">
-                          {s.status === "proposto" ? (
-                            <Button size="sm" variant="outline" onClick={() => approve.mutate(s.id)} disabled={approve.isPending}>
-                              <CheckCircle2 className="h-4 w-4 mr-1" /> Aprovar e lançar no caixa
-                            </Button>
-                          ) : (
-                            <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">Lançado</Badge>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        }
+      >
+        {data.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum acordo cadastrado.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="py-2">Acordo</th>
+                  <th>Processo</th>
+                  <th className="text-right">Valor</th>
+                  <th className="text-center">Parcelas</th>
+                  <th>1ª Parcela</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((s) => {
+                  const proc = procMap.get(s.process_id);
+                  return (
+                    <tr key={s.id} className="border-b last:border-0">
+                      <td className="py-2">{s.numero_acordo || s.id.slice(0, 8)}</td>
+                      <td>{proc?.numero_cnj || proc?.numero_interno || "—"}</td>
+                      <td className="text-right">{fmt(Number(s.valor_total))}</td>
+                      <td className="text-center">{s.qtd_parcelas}</td>
+                      <td>{new Date(s.data_primeira_parcela).toLocaleDateString("pt-BR")}</td>
+                      <td><Badge variant="outline">{s.status}</Badge></td>
+                      <td className="text-right">
+                        {s.status === "proposto" ? (
+                          <Button size="sm" variant="outline" onClick={() => approve.mutate(s.id)} disabled={approve.isPending}>
+                            <CheckCircle2 className="h-4 w-4 mr-1" /> Aprovar e lançar no caixa
+                          </Button>
+                        ) : (
+                          <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">Lançado</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

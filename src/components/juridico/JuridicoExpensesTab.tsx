@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Send } from "lucide-react";
+import { Plus, Send, Receipt } from "lucide-react";
 import { useJuridicoExpenses, useJuridicoProcesses } from "@/hooks/useJuridico";
+import { SectionCard } from "@/components/SectionCard";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v ?? 0);
@@ -41,64 +41,65 @@ export function JuridicoExpensesTab() {
   const data = list.data ?? [];
 
   return (
-    <div className="space-y-4 mt-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Despesas Processuais</CardTitle>
+    <div className="space-y-4">
+      <SectionCard
+        icon={Receipt}
+        title="Despesas Processuais"
+        description="Honorários, custas, depósitos judiciais e demais gastos com processos."
+        actions={
           <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Nova Despesa
           </Button>
-        </CardHeader>
-        <CardContent>
-          {data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma despesa registrada.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="py-2">Data</th>
-                    <th>Processo</th>
-                    <th>Tipo</th>
-                    <th>Descrição</th>
-                    <th className="text-right">Valor</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((e) => {
-                    const proc = procMap.get(e.process_id);
-                    return (
-                      <tr key={e.id} className="border-b last:border-0">
-                        <td className="py-2">{new Date(e.data_despesa).toLocaleDateString("pt-BR")}</td>
-                        <td>{proc?.numero_cnj || proc?.numero_interno || "—"}</td>
-                        <td className="capitalize">{e.tipo}</td>
-                        <td>{e.descricao}</td>
-                        <td className="text-right">{fmt(Number(e.valor))}</td>
-                        <td>
-                          {e.posted_to_cashflow ? (
-                            <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">No fluxo</Badge>
-                          ) : (
-                            <Badge variant="outline">Pendente</Badge>
-                          )}
-                        </td>
-                        <td className="text-right">
-                          {!e.posted_to_cashflow && (
-                            <Button size="sm" variant="outline" onClick={() => postToCashflow.mutate(e.id)}>
-                              <Send className="h-3 w-3 mr-1" /> Lançar
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        }
+      >
+        {data.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhuma despesa registrada.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="py-2">Data</th>
+                  <th>Processo</th>
+                  <th>Tipo</th>
+                  <th>Descrição</th>
+                  <th className="text-right">Valor</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((e) => {
+                  const proc = procMap.get(e.process_id);
+                  return (
+                    <tr key={e.id} className="border-b last:border-0">
+                      <td className="py-2">{new Date(e.data_despesa).toLocaleDateString("pt-BR")}</td>
+                      <td>{proc?.numero_cnj || proc?.numero_interno || "—"}</td>
+                      <td className="capitalize">{e.tipo}</td>
+                      <td>{e.descricao}</td>
+                      <td className="text-right">{fmt(Number(e.valor))}</td>
+                      <td>
+                        {e.posted_to_cashflow ? (
+                          <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">No fluxo</Badge>
+                        ) : (
+                          <Badge variant="outline">Pendente</Badge>
+                        )}
+                      </td>
+                      <td className="text-right">
+                        {!e.posted_to_cashflow && (
+                          <Button size="sm" variant="outline" onClick={() => postToCashflow.mutate(e.id)}>
+                            <Send className="h-3 w-3 mr-1" /> Lançar
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
