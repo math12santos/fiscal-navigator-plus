@@ -142,3 +142,25 @@ Hook `useSaasMetrics` calculando tudo via RPC SQL `get_saas_kpis(period_start, p
 Sugiro executar **Fase 1 inteira** (fundação de billing) na próxima rodada — é o maior buraco hoje e destrava tudo o mais (health score, dashboard SaaS, suspensão por inadimplência). Fases 2-4 podem vir em sequência, uma por vez.
 
 Posso começar pela **Fase 1** assim que aprovar — ou, se preferir, executar primeiro só o **Dashboard do SaaS (Fase 2)** com dados mockados de plano/MRR para você validar a visão antes do esforço de billing.
+
+---
+
+## ✅ Execução — Fase 2 (Dashboard SaaS Executivo)
+
+**Concluído em 2026-04-30:**
+
+- **RPC `get_saas_kpis()`** (SECURITY DEFINER, BackOffice-only via `is_backoffice()`):
+  - MRR/ARR/ARPU normalizados (mensal/anual + `custom_price` + `discount_pct` + `seats`)
+  - Counts: `active`, `trialing`, `past_due`, `canceled`, `total_orgs`
+  - Receita 12m (paga), valor em aberto e em atraso
+  - Série 12m de crescimento (novas vs canceladas, líquido)
+  - Série 12m de receita (faturado vs recebido)
+  - Top 5 clientes por receita 12m e Top 5 inadimplentes
+  - Mix de planos (subscribers + MRR por plano)
+- **Hook `useSaasKpis`** — React Query com cache 5min/30min (preset `operational`)
+- **Componente `SaasOverviewPanel`** — KpiCards (8 KPIs), gráficos Recharts (BarChart crescimento, LineChart receita), 3 listas (mix de planos com barra %, top receita, top em risco)
+- **Integração** no topo de `/backoffice` (BackofficeDashboard.tsx), preservando a listagem de empresas existente abaixo
+
+**Métrica de churn** calculada client-side: `canceled / (active + canceled + past_due)`. Cores semafóricas: verde <2%, amarelo 2-5%, vermelho >5%.
+
+**Próximo passo natural:** Fase 3 (Suporte + Feature Flags + Anúncios) ou Fase 4 (Health Score + Governança).
