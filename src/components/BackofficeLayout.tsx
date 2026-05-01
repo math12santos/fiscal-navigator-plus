@@ -13,6 +13,8 @@ import {
   LayoutDashboard,
   Rocket,
   CreditCard,
+  LifeBuoy,
+  Megaphone,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -23,6 +25,8 @@ import { GlobalFetchingIndicator } from "@/components/GlobalFetchingIndicator";
 const navItems = [
   { path: "/backoffice", label: "Empresas", icon: Building2 },
   { path: "/backoffice/faturamento", label: "Faturamento", icon: CreditCard },
+  { path: "/backoffice/suporte", label: "Suporte", icon: LifeBuoy },
+  { path: "/backoffice/produto", label: "Produto", icon: Megaphone },
   { path: "/backoffice/usuarios", label: "Usuários", icon: Users },
   { path: "/backoffice/sistema", label: "Sistema", icon: Wrench },
   { path: "/backoffice/auditoria", label: "Auditoria", icon: Activity },
