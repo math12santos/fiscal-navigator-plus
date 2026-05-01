@@ -2185,6 +2185,45 @@ export type Database = {
           },
         ]
       }
+      email_templates: {
+        Row: {
+          body_html: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          subject: string
+          template_key: string
+          updated_at: string
+          updated_by: string | null
+          variables: Json
+        }
+        Insert: {
+          body_html: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          subject: string
+          template_key: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: Json
+        }
+        Update: {
+          body_html?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          subject?: string
+          template_key?: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: Json
+        }
+        Relationships: []
+      }
       employee_benefits: {
         Row: {
           active: boolean
@@ -7389,6 +7428,30 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       position_routines: {
         Row: {
           active: boolean
@@ -9066,6 +9129,7 @@ export type Database = {
         Returns: undefined
       }
       check_linked_transactions: { Args: { p_user_id: string }; Returns: Json }
+      compute_health_score: { Args: { _org_id: string }; Returns: number }
       crm_generate_contract_from_opportunity: {
         Args: { p_opportunity_id: string }
         Returns: string
@@ -9260,6 +9324,8 @@ export type Database = {
         Args: { p_benefit_id: string }
         Returns: Json
       }
+      purge_old_audit_logs: { Args: { _days?: number }; Returns: number }
+      recompute_all_health_scores: { Args: never; Returns: number }
       recompute_payroll_item_from_events: {
         Args: { p_employee_id: string; p_run_id: string }
         Returns: undefined
