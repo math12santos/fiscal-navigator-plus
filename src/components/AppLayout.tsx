@@ -40,6 +40,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useHolding } from "@/contexts/HoldingContext";
 import { prefetchRouteQueries } from "@/lib/routePrefetch";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 
 type PageFactoryKey = keyof typeof pageFactories;
 
@@ -222,6 +223,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <ThemeToggle />
           <NotificationCenter />
         </div>
+        <AnnouncementBanner />
         <div className="p-6 lg:p-8 pt-2">{children}</div>
       </main>
       <ThemePreferenceDialog open={showThemeDialog} onChosen={dismissThemeDialog} />
