@@ -199,3 +199,38 @@ Posso começar pela **Fase 1** assim que aprovar — ou, se preferir, executar p
 - 2 novos itens: **Suporte** (LifeBuoy) e **Produto** (Megaphone)
 
 **Próximo passo natural:** Fase 4 (Health Score automático + Governança + LGPD).
+
+---
+
+## ✅ Execução — Fase 4 (Health Score + Governança + LGPD)
+
+**Concluído em 2026-05-01:**
+
+### Health Score (0-100)
+- **RPC `compute_health_score(org_id)`** SECURITY DEFINER. Composição:
+  - Pagamento em dia: 30 pts (sem faturas vencidas) → 15 (até 2) → 0
+  - Uso recente: 25 pts (≤7d) → 15 (≤30d) → 5 (≤90d) → 0
+  - Onboarding concluído: 20 pts
+  - Adoção de módulos: até 15 pts (% de `organization_modules.status='active'`)
+  - Suporte: 10 pts (sem urgentes abertos) → 5 (1 urgente) → 0
+- **RPC `recompute_all_health_scores()`** — batch para BackOffice; persiste em `organizations.health_score`
+- **`HealthScoreBadge`** integrado nos cards e na tabela do `BackofficeDashboard` (semáforo verde ≥80, amarelo 50-79, vermelho <50)
+- Hook `useHealthScore(orgId)` para uso pontual
+
+### Governança (`/backoffice/config`)
+- Tabela **`platform_settings`** (key/value JSON) com 8 seeds: retenção (canceled_org_days, audit_log_days), segurança (min_password_length, require_2fa_plans, session_max_hours), webhooks (signup_url, cancellation_url) e LGPD (dpo_email)
+- UI agrupada por prefixo (`security.`, `retention.`, `webhooks.`) com inputs adaptáveis por tipo (number/string/array CSV)
+
+### Templates de e-mail
+- Tabela **`email_templates`** com 5 seeds: welcome, invoice_issued, invoice_overdue, trial_expiring, suspension
+- UI editável (subject + body_html + ativo) com lista de variáveis disponíveis
+
+### LGPD & Manutenção
+- Botão "Recalcular tudo" → `recompute_all_health_scores()`
+- Purga configurável de `audit_log` via RPC `purge_old_audit_logs(_days)`
+- Checklist LGPD com status do que já está implementado vs pendente
+
+### Sub-tarefa adiada
+- Edge Function `lgpd-export` (ZIP de dados pessoais por usuário) — listada como ⏳ no checklist; quando o usuário pedir, é só implementar.
+
+**Roadmap SaaS BackOffice — concluído:** Fases 1 (Billing) ✅, 2 (Dashboard) ✅, 3 (Suporte/Flags/Anúncios) ✅, 4 (Health/Governança/LGPD) ✅.
