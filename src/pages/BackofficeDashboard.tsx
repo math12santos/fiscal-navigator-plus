@@ -335,6 +335,7 @@ export default function BackofficeDashboard() {
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Plano</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Saúde</TableHead>
                 <TableHead>Usuários</TableHead>
                 <TableHead>Última Atividade</TableHead>
                 <TableHead className="w-48">Ações</TableHead>
@@ -349,6 +350,7 @@ export default function BackofficeDashboard() {
                     <TableCell className="font-mono text-xs text-muted-foreground">{org.document_number}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{org.plano}</Badge></TableCell>
                     <TableCell><Badge variant={st.variant}>{st.label}</Badge></TableCell>
+                    <TableCell><HealthScoreBadge score={(org as any).health_score} /></TableCell>
                     <TableCell className="text-muted-foreground">{memberCounts[org.id] ?? 0}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {format(new Date(org.updated_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
