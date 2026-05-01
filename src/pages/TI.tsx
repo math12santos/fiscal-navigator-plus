@@ -18,7 +18,7 @@ export default function TI() {
   useEffect(() => { document.title = "TI & Patrimônio Tech | FinCore"; }, []);
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-4">
+    <div className="animate-fade-in space-y-6">
       <PageHeader
         title="TI & Patrimônio Tech"
         description="Equipamentos, sistemas, links, chamados, sinistros e integração financeira."
@@ -26,17 +26,17 @@ export default function TI() {
 
       <SectorOnboardingBar sector="ti" onTabChange={setTab} />
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex flex-wrap h-auto">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="equipamentos">Equipamentos</TabsTrigger>
-          <TabsTrigger value="sistemas">Sistemas</TabsTrigger>
-          <TabsTrigger value="telecom">Links / Telecom</TabsTrigger>
-          <TabsTrigger value="chamados">Chamados</TabsTrigger>
-          <TabsTrigger value="sinistros">Sinistros</TabsTrigger>
-          <TabsTrigger value="depreciacao">Depreciação</TabsTrigger>
-          <TabsTrigger value="tco">TCO</TabsTrigger>
-          <TabsTrigger value="config">Configurações</TabsTrigger>
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
+          <TabsTrigger value="dashboard" className="text-xs">Dashboard</TabsTrigger>
+          <TabsTrigger value="equipamentos" className="text-xs">Equipamentos</TabsTrigger>
+          <TabsTrigger value="sistemas" className="text-xs">Sistemas</TabsTrigger>
+          <TabsTrigger value="telecom" className="text-xs">Links / Telecom</TabsTrigger>
+          <TabsTrigger value="chamados" className="text-xs">Chamados</TabsTrigger>
+          <TabsTrigger value="sinistros" className="text-xs">Sinistros</TabsTrigger>
+          <TabsTrigger value="depreciacao" className="text-xs">Depreciação</TabsTrigger>
+          <TabsTrigger value="tco" className="text-xs">TCO</TabsTrigger>
+          <TabsTrigger value="config" className="text-xs">Configurações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard"><TIDashboard /></TabsContent>

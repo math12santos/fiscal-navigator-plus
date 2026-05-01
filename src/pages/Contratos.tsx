@@ -583,12 +583,12 @@ export default function Contratos() {
       </div>
 
       {/* Tabbed Table */}
-      <Tabs defaultValue="todos" className="space-y-0">
-        <TabsList className="mb-4">
-          <TabsTrigger value="todos">Todos ({filtered.length})</TabsTrigger>
-          <TabsTrigger value="gastos">Gastos ({filtered.filter(c => c.impacto_resultado && ["custo", "despesa"].includes(c.impacto_resultado)).length})</TabsTrigger>
-          <TabsTrigger value="receita">Receita ({filtered.filter(c => c.impacto_resultado === "receita").length})</TabsTrigger>
-          <TabsTrigger value="investimentos">Investimentos ({filtered.filter(c => c.impacto_resultado && ["investimento", "ativo_imobilizado"].includes(c.impacto_resultado)).length})</TabsTrigger>
+      <Tabs defaultValue="todos" className="space-y-4">
+        <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
+          <TabsTrigger value="todos" className="text-xs">Todos ({filtered.length})</TabsTrigger>
+          <TabsTrigger value="gastos" className="text-xs">Gastos ({filtered.filter(c => c.impacto_resultado && ["custo", "despesa"].includes(c.impacto_resultado)).length})</TabsTrigger>
+          <TabsTrigger value="receita" className="text-xs">Receita ({filtered.filter(c => c.impacto_resultado === "receita").length})</TabsTrigger>
+          <TabsTrigger value="investimentos" className="text-xs">Investimentos ({filtered.filter(c => c.impacto_resultado && ["investimento", "ativo_imobilizado"].includes(c.impacto_resultado)).length})</TabsTrigger>
         </TabsList>
         {(["todos", "gastos", "receita", "investimentos"] as const).map((tab) => {
           const tabData = tab === "todos" ? filtered

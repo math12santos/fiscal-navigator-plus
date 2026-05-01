@@ -121,10 +121,10 @@ export default function CRM() {
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground animate-pulse">Carregando...</div>
       ) : (
-        <Tabs defaultValue={allowedTabs[0]?.key || "carteira"}>
-          <TabsList>
+        <Tabs defaultValue={allowedTabs[0]?.key || "carteira"} className="space-y-4">
+          <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
             {allowedTabs.map((t) => (
-              <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
+              <TabsTrigger key={t.key} value={t.key} className="text-xs">{t.label}</TabsTrigger>
             ))}
           </TabsList>
 
