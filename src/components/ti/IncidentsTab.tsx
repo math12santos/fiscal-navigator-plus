@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,8 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ShieldAlert } from "lucide-react";
 import { useITIncidents } from "@/hooks/useITIncidents";
+import { SectionCard } from "@/components/SectionCard";
 
 const TYPES = ["quebra_equipamento","furto","roubo","perda","dano_eletrico","dano_mau_uso","indisponibilidade_sistema","indisponibilidade_internet","vazamento_dados","acesso_indevido","ataque_cibernetico","falha_operacional","outro"];
 const IMPACTS = ["baixo","medio","alto","critico"];
@@ -36,48 +36,51 @@ export function IncidentsTab() {
   }, [list.data, q]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex justify-between gap-2">
-        <div className="relative max-w-sm flex-1">
-          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar incidente..." value={q} onChange={(e) => setQ(e.target.value)} />
+    <div className="space-y-4">
+      <SectionCard
+        icon={ShieldAlert}
+        title="Sinistros / Incidentes"
+        description="Quebras, furtos, indisponibilidades e demais ocorrências com prejuízo estimado."
+        actions={
+          <>
+            <div className="relative w-64">
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Buscar incidente..." value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            <Button onClick={() => { setV({ incident_type: "quebra_equipamento", operational_impact: "baixo", status: "registrado", occurred_at: new Date().toISOString() }); setOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" />Novo incidente
+            </Button>
+          </>
+        }
+      >
+        <div className="overflow-x-auto -mx-1">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50"><tr className="text-left">
+              <th className="p-3">Nº</th><th className="p-3">Tipo</th><th className="p-3">Ocorrência</th>
+              <th className="p-3">Impacto</th><th className="p-3">Prejuízo</th><th className="p-3">Status</th>
+              <th className="p-3 text-right w-28">Ações</th>
+            </tr></thead>
+            <tbody>
+              {list.isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Carregando...</td></tr>}
+              {!list.isLoading && rows.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Nenhum incidente.</td></tr>}
+              {rows.map((s: any) => (
+                <tr key={s.id} className="border-t hover:bg-muted/30">
+                  <td className="p-3 font-mono text-xs">{s.incident_number}</td>
+                  <td className="p-3 capitalize">{s.incident_type?.replace(/_/g, " ")}</td>
+                  <td className="p-3">{new Date(s.occurred_at).toLocaleDateString("pt-BR")}</td>
+                  <td className="p-3"><Badge className={IMPACT_TONE[s.operational_impact]}>{labelize(s.operational_impact)}</Badge></td>
+                  <td className="p-3">{fmt(Number(s.estimated_loss_value || 0))}</td>
+                  <td className="p-3"><Badge variant="outline">{labelize(s.status)}</Badge></td>
+                  <td className="p-3 text-right">
+                    <Button size="sm" variant="ghost" onClick={() => { setV(s); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => { if (confirm("Excluir?")) remove.mutate(s.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <Button onClick={() => { setV({ incident_type: "quebra_equipamento", operational_impact: "baixo", status: "registrado", occurred_at: new Date().toISOString() }); setOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" />Novo incidente
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50"><tr className="text-left">
-                <th className="p-3">Nº</th><th className="p-3">Tipo</th><th className="p-3">Ocorrência</th>
-                <th className="p-3">Impacto</th><th className="p-3">Prejuízo</th><th className="p-3">Status</th>
-                <th className="p-3 text-right w-28">Ações</th>
-              </tr></thead>
-              <tbody>
-                {list.isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Carregando...</td></tr>}
-                {!list.isLoading && rows.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Nenhum incidente.</td></tr>}
-                {rows.map((s: any) => (
-                  <tr key={s.id} className="border-t hover:bg-muted/30">
-                    <td className="p-3 font-mono text-xs">{s.incident_number}</td>
-                    <td className="p-3 capitalize">{s.incident_type?.replace(/_/g, " ")}</td>
-                    <td className="p-3">{new Date(s.occurred_at).toLocaleDateString("pt-BR")}</td>
-                    <td className="p-3"><Badge className={IMPACT_TONE[s.operational_impact]}>{labelize(s.operational_impact)}</Badge></td>
-                    <td className="p-3">{fmt(Number(s.estimated_loss_value || 0))}</td>
-                    <td className="p-3"><Badge variant="outline">{labelize(s.status)}</Badge></td>
-                    <td className="p-3 text-right">
-                      <Button size="sm" variant="ghost" onClick={() => { setV(s); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => { if (confirm("Excluir?")) remove.mutate(s.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      </SectionCard>
 
       {v && (
         <Dialog open={open} onOpenChange={setOpen}>

@@ -1,6 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ShieldAlert } from "lucide-react";
 import { useJuridicoProcesses } from "@/hooks/useJuridico";
 import { useMemo } from "react";
+import { SectionCard } from "@/components/SectionCard";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v ?? 0);
@@ -44,47 +45,46 @@ export function JuridicoRiskMatrix() {
   };
 
   return (
-    <div className="space-y-4 mt-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Matriz de Risco (Probabilidade × Impacto)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr>
-                  <th className="text-left p-2 text-sm">Impacto ↓ / Probabilidade →</th>
-                  {probs.map((p) => (
-                    <th key={p} className="p-2 text-sm capitalize text-center">{p}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {ranges.slice().reverse().map((r) => (
-                  <tr key={r.key}>
-                    <td className="p-2 text-sm font-medium">{r.label}</td>
-                    {probs.map((p) => {
-                      const cell = matrix[r.key][p];
-                      return (
-                        <td key={p} className="p-1">
-                          <div className={`border rounded-md p-3 text-center ${cellColor(p, r.key)}`}>
-                            <div className="text-2xl font-bold">{cell.count}</div>
-                            <div className="text-xs">{fmt(cell.total)}</div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+    <div className="space-y-4">
+      <SectionCard
+        icon={ShieldAlert}
+        title="Matriz de Risco"
+        description="Probabilidade × Impacto. Cada célula mostra a quantidade de processos e o total provisionado."
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="text-left p-2 text-sm">Impacto ↓ / Probabilidade →</th>
+                {probs.map((p) => (
+                  <th key={p} className="p-2 text-sm capitalize text-center">{p}</th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-xs text-muted-foreground mt-3">
-            Cada célula mostra a quantidade de processos e o total provisionado. Cor reflete prioridade de atenção.
-          </p>
-        </CardContent>
-      </Card>
+              </tr>
+            </thead>
+            <tbody>
+              {ranges.slice().reverse().map((r) => (
+                <tr key={r.key}>
+                  <td className="p-2 text-sm font-medium">{r.label}</td>
+                  {probs.map((p) => {
+                    const cell = matrix[r.key][p];
+                    return (
+                      <td key={p} className="p-1">
+                        <div className={`border rounded-md p-3 text-center ${cellColor(p, r.key)}`}>
+                          <div className="text-2xl font-bold">{cell.count}</div>
+                          <div className="text-xs">{fmt(cell.total)}</div>
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          A cor da célula reflete a prioridade de atenção (verde = baixo, âmbar = médio, vermelho = alto).
+        </p>
+      </SectionCard>
     </div>
   );
 }

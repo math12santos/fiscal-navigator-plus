@@ -72,10 +72,10 @@ export default function Financeiro() {
 
       <SectorOnboardingBar sector="financeiro" onTabChange={handleMaturityTabChange} />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
           {allowedTabs.map((t) => (
-            <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
+            <TabsTrigger key={t.key} value={t.key} className="text-xs">{t.label}</TabsTrigger>
           ))}
         </TabsList>
         {allowedTabs.some((t) => t.key === "dashboard") && (

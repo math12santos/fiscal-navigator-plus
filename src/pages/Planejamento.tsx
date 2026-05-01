@@ -879,9 +879,9 @@ export default function Planejamento() {
 
       {/* Tabs — 4 main areas */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="flex w-full flex-wrap">
+        <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
           {allowedTabs.map((t) => (
-            <TabsTrigger key={t.key} value={t.key} className="flex-1 min-w-[140px]">
+            <TabsTrigger key={t.key} value={t.key} className="text-xs">
               {t.label}
             </TabsTrigger>
           ))}

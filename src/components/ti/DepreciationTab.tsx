@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useITDepreciation } from "@/hooks/useITDepreciation";
 import { useITEquipment } from "@/hooks/useITEquipment";
 import { useITSchedule } from "@/hooks/useITSchedule";
-import { Pencil, AlertCircle, CalendarCog } from "lucide-react";
+import { Pencil, AlertCircle, CalendarCog, Calculator } from "lucide-react";
+import { SectionCard } from "@/components/SectionCard";
 
 const ECON_STATUS = ["novo","em_uso_saudavel","proximo_substituicao","substituicao_recomendada","obsoleto"];
 const labelize = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
@@ -28,7 +28,7 @@ export function DepreciationTab() {
   const rows = list.data ?? [];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="bg-warning/10 border border-warning/30 text-sm p-3 rounded-md flex gap-2">
         <AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
         <div>
@@ -37,43 +37,45 @@ export function DepreciationTab() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50"><tr className="text-left">
-                <th className="p-3">Equipamento</th><th className="p-3">NF Bruto</th><th className="p-3">Valor contábil</th>
-                <th className="p-3">Base depreciável</th><th className="p-3">Vida (meses)</th><th className="p-3">Status econômico</th>
-                <th className="p-3">Pendência</th><th className="p-3 text-right w-20">Ação</th>
-              </tr></thead>
-              <tbody>
-                {list.isLoading && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Carregando...</td></tr>}
-                {!list.isLoading && rows.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Cadastre equipamentos para gerar parâmetros.</td></tr>}
-                {rows.map((d: any) => {
-                  const eq: any = eqMap.get(d.equipment_id);
-                  return (
-                    <tr key={d.id} className="border-t hover:bg-muted/30">
-                      <td className="p-3"><div className="font-medium">{eq?.name ?? "—"}</div><div className="text-xs text-muted-foreground font-mono">{eq?.patrimonial_code}</div></td>
-                      <td className="p-3">{fmt(Number(d.invoice_gross_value || 0))}</td>
-                      <td className="p-3">{fmt(Number(d.accounting_value || 0))}</td>
-                      <td className="p-3">{fmt(Number(d.depreciable_base || 0))}</td>
-                      <td className="p-3">{d.accounting_useful_life_months ?? "—"}</td>
-                      <td className="p-3">{d.manual_economic_status ? <Badge variant="outline">{labelize(d.manual_economic_status)}</Badge> : "—"}</td>
-                      <td className="p-3">{d.requires_finance_input ? <Badge className="bg-warning/15 text-warning">Pendente Financeiro</Badge> : <Badge className="bg-success/15 text-success">OK</Badge>}</td>
-                      <td className="p-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" title="Gerar cronograma" onClick={() => generate.mutate(d.equipment_id)} disabled={d.requires_finance_input}><CalendarCog className="h-4 w-4" /></Button>
-                          <Button size="sm" variant="ghost" title="Editar parâmetros" onClick={() => { setV({ ...d }); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <SectionCard
+        icon={Calculator}
+        title="Parâmetros de Depreciação"
+        description="Cálculo do valor contábil, base depreciável e vida útil dos equipamentos."
+      >
+        <div className="overflow-x-auto -mx-1">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50"><tr className="text-left">
+              <th className="p-3">Equipamento</th><th className="p-3">NF Bruto</th><th className="p-3">Valor contábil</th>
+              <th className="p-3">Base depreciável</th><th className="p-3">Vida (meses)</th><th className="p-3">Status econômico</th>
+              <th className="p-3">Pendência</th><th className="p-3 text-right w-20">Ação</th>
+            </tr></thead>
+            <tbody>
+              {list.isLoading && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Carregando...</td></tr>}
+              {!list.isLoading && rows.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Cadastre equipamentos para gerar parâmetros.</td></tr>}
+              {rows.map((d: any) => {
+                const eq: any = eqMap.get(d.equipment_id);
+                return (
+                  <tr key={d.id} className="border-t hover:bg-muted/30">
+                    <td className="p-3"><div className="font-medium">{eq?.name ?? "—"}</div><div className="text-xs text-muted-foreground font-mono">{eq?.patrimonial_code}</div></td>
+                    <td className="p-3">{fmt(Number(d.invoice_gross_value || 0))}</td>
+                    <td className="p-3">{fmt(Number(d.accounting_value || 0))}</td>
+                    <td className="p-3">{fmt(Number(d.depreciable_base || 0))}</td>
+                    <td className="p-3">{d.accounting_useful_life_months ?? "—"}</td>
+                    <td className="p-3">{d.manual_economic_status ? <Badge variant="outline">{labelize(d.manual_economic_status)}</Badge> : "—"}</td>
+                    <td className="p-3">{d.requires_finance_input ? <Badge className="bg-warning/15 text-warning">Pendente Financeiro</Badge> : <Badge className="bg-success/15 text-success">OK</Badge>}</td>
+                    <td className="p-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" title="Gerar cronograma" onClick={() => generate.mutate(d.equipment_id)} disabled={d.requires_finance_input}><CalendarCog className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" title="Editar parâmetros" onClick={() => { setV({ ...d }); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
 
       {v && (
         <Dialog open={open} onOpenChange={setOpen}>

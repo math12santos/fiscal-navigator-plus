@@ -17,7 +17,7 @@ export default function Juridico() {
   }, []);
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-4">
+    <div className="animate-fade-in space-y-6">
       <PageHeader
         title="Jurídico"
         description="Gestão de processos, riscos, provisões e impacto financeiro de contingências."
@@ -25,14 +25,14 @@ export default function Juridico() {
 
       <SectorOnboardingBar sector="juridico" onTabChange={setTab} />
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex flex-wrap h-auto">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="processos">Processos</TabsTrigger>
-          <TabsTrigger value="acordos">Acordos</TabsTrigger>
-          <TabsTrigger value="despesas">Despesas</TabsTrigger>
-          <TabsTrigger value="risco">Matriz de Risco</TabsTrigger>
-          <TabsTrigger value="config">Configurações</TabsTrigger>
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
+          <TabsTrigger value="dashboard" className="text-xs">Dashboard</TabsTrigger>
+          <TabsTrigger value="processos" className="text-xs">Processos</TabsTrigger>
+          <TabsTrigger value="acordos" className="text-xs">Acordos</TabsTrigger>
+          <TabsTrigger value="despesas" className="text-xs">Despesas</TabsTrigger>
+          <TabsTrigger value="risco" className="text-xs">Matriz de Risco</TabsTrigger>
+          <TabsTrigger value="config" className="text-xs">Configurações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard"><JuridicoDashboard /></TabsContent>

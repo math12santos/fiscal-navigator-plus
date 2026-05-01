@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Scale } from "lucide-react";
 import { useJuridicoProcesses } from "@/hooks/useJuridico";
 import { JuridicoProcessDialog } from "./JuridicoProcessDialog";
+import { SectionCard } from "@/components/SectionCard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,11 +44,13 @@ export function JuridicoProcessesTab() {
   });
 
   return (
-    <div className="space-y-4 mt-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Processos</CardTitle>
-          <div className="flex gap-2">
+    <div className="space-y-4">
+      <SectionCard
+        icon={Scale}
+        title="Processos"
+        description="Cadastro de processos judiciais com risco, provisão e impacto financeiro."
+        actions={
+          <>
             <Input
               placeholder="Buscar..."
               value={search}
@@ -58,59 +60,58 @@ export function JuridicoProcessesTab() {
             <Button onClick={() => { setEditing(null); setOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" /> Novo Processo
             </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {list.isLoading ? (
-            <p className="text-sm text-muted-foreground">Carregando...</p>
-          ) : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum processo cadastrado.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="py-2">Nº CNJ / Interno</th>
-                    <th>Parte Contrária</th>
-                    <th>Natureza</th>
-                    <th>Status</th>
-                    <th>Risco</th>
-                    <th className="text-right">V. Causa</th>
-                    <th className="text-right">Provisão</th>
-                    <th></th>
+          </>
+        }
+      >
+        {list.isLoading ? (
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        ) : data.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum processo cadastrado.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="py-2">Nº CNJ / Interno</th>
+                  <th>Parte Contrária</th>
+                  <th>Natureza</th>
+                  <th>Status</th>
+                  <th>Risco</th>
+                  <th className="text-right">V. Causa</th>
+                  <th className="text-right">Provisão</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((p) => (
+                  <tr key={p.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="py-2">
+                      <div className="font-medium">{p.numero_cnj || "—"}</div>
+                      <div className="text-xs text-muted-foreground">{p.numero_interno}</div>
+                    </td>
+                    <td>{p.parte_contraria || "—"}</td>
+                    <td className="capitalize">{p.natureza}</td>
+                    <td><Badge variant="outline">{p.status}</Badge></td>
+                    <td>
+                      <Badge className={probColor[p.probabilidade]}>{p.probabilidade}</Badge>
+                    </td>
+                    <td className="text-right">{fmt(Number(p.valor_causa))}</td>
+                    <td className="text-right font-medium">{fmt(Number(p.valor_provisionado))}</td>
+                    <td className="text-right">
+                      <Button size="icon" variant="ghost" onClick={() => { setEditing(p); setOpen(true); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => setDeleting(p.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {data.map((p) => (
-                    <tr key={p.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="py-2">
-                        <div className="font-medium">{p.numero_cnj || "—"}</div>
-                        <div className="text-xs text-muted-foreground">{p.numero_interno}</div>
-                      </td>
-                      <td>{p.parte_contraria || "—"}</td>
-                      <td className="capitalize">{p.natureza}</td>
-                      <td><Badge variant="outline">{p.status}</Badge></td>
-                      <td>
-                        <Badge className={probColor[p.probabilidade]}>{p.probabilidade}</Badge>
-                      </td>
-                      <td className="text-right">{fmt(Number(p.valor_causa))}</td>
-                      <td className="text-right font-medium">{fmt(Number(p.valor_provisionado))}</td>
-                      <td className="text-right">
-                        <Button size="icon" variant="ghost" onClick={() => { setEditing(p); setOpen(true); }}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => setDeleting(p.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
 
       <JuridicoProcessDialog open={open} onOpenChange={setOpen} initialData={editing} />
 
