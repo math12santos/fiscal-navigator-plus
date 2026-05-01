@@ -164,3 +164,38 @@ Posso começar pela **Fase 1** assim que aprovar — ou, se preferir, executar p
 **Métrica de churn** calculada client-side: `canceled / (active + canceled + past_due)`. Cores semafóricas: verde <2%, amarelo 2-5%, vermelho >5%.
 
 **Próximo passo natural:** Fase 3 (Suporte + Feature Flags + Anúncios) ou Fase 4 (Health Score + Governança).
+
+---
+
+## ✅ Execução — Fase 3 (Suporte + Feature Flags + Anúncios)
+
+**Concluído em 2026-04-30:**
+
+### Suporte (`/backoffice/suporte`)
+- Página `BackofficeSuporte` com 3 KPIs (abertos, em andamento, urgentes ativos)
+- Filtros por status/prioridade
+- Tabela clicável → Dialog detalhado com:
+  - Body do ticket
+  - Mudança rápida de status (auto-preenche `resolved_at` ao resolver/fechar)
+  - Conversa cronológica (mensagens públicas + notas internas em destaque amarelo)
+  - Resposta com toggle "nota interna" (RLS já bloqueia leitura pelo cliente)
+- Hooks: `useSupportTickets`, `useTicketMessages`, `useUpdateTicket`, `usePostTicketMessage`, `useCreateTicket`
+
+### Feature Flags (`/backoffice/produto` aba "Feature Flags")
+- CRUD completo com escopo (global/plan/org), `enabled`, `rollout_pct` (0-100), descrição
+- Chave imutável após criação (idiomático para flags)
+- Tabela + Dialog edição
+
+### Anúncios (`/backoffice/produto` aba "Anúncios")
+- CRUD com severidade (info/success/warning/critical), audiência (all/plan/org), janela `starts_at/ends_at`, CTA opcional, dispensável
+- Listagem com border-left semafórica + status (ativo/agendado/expirado)
+
+### Banner consumidor (app principal)
+- `AnnouncementBanner` montado em `AppLayout` logo abaixo do header
+- Hook `useActiveAnnouncements` filtra por janela de tempo + audiência (org-specific) + dispensados (localStorage `lovable.announcements.dismissed`)
+- Cores semafóricas + CTA externo opcional
+
+### Sidebar do BackOffice
+- 2 novos itens: **Suporte** (LifeBuoy) e **Produto** (Megaphone)
+
+**Próximo passo natural:** Fase 4 (Health Score automático + Governança + LGPD).
