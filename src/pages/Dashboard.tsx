@@ -298,6 +298,23 @@ export default function Dashboard() {
             minDate={refMinDate}
             maxDate={refMaxDate}
           />
+          {computedAt && (
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span title={cacheHit ? "Lendo do cache compartilhado" : "Recalculado agora"}>
+                Atualizado {format(new Date(computedAt), "HH:mm")}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => refreshSnapshot()}
+                disabled={snapFetching}
+                title="Recalcular agora"
+              >
+                <RefreshCw size={12} className={snapFetching ? "animate-spin" : ""} />
+              </Button>
+            </div>
+          )}
         </div>
       </PageHeader>
 
