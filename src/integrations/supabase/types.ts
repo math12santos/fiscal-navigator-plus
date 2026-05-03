@@ -1874,6 +1874,41 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_snapshots: {
+        Row: {
+          computed_at: string
+          data_version: number
+          organization_id: string
+          payload: Json
+          reference_month: string
+          stale_at: string
+        }
+        Insert: {
+          computed_at?: string
+          data_version: number
+          organization_id: string
+          payload: Json
+          reference_month: string
+          stale_at?: string
+        }
+        Update: {
+          computed_at?: string
+          data_version?: number
+          organization_id?: string
+          payload?: Json
+          reference_month?: string
+          stale_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_import_rows: {
         Row: {
           created_at: string | null
@@ -6630,6 +6665,32 @@ export type Database = {
           },
         ]
       }
+      org_data_version: {
+        Row: {
+          organization_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          organization_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          organization_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_data_version_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_notes: {
         Row: {
           author_id: string
@@ -9192,6 +9253,14 @@ export type Database = {
         Returns: Json
       }
       get_dashboard_kpis: { Args: { _organization_id: string }; Returns: Json }
+      get_dashboard_snapshot: {
+        Args: {
+          _force?: boolean
+          _organization_id: string
+          _reference_month: string
+        }
+        Returns: Json
+      }
       get_saas_kpis: { Args: never; Returns: Json }
       get_user_org_ids: { Args: { p_user_id: string }; Returns: string[] }
       has_backoffice_org_access: { Args: { _org_id: string }; Returns: boolean }
@@ -9289,6 +9358,13 @@ export type Database = {
           parcelas_total: number
         }[]
       }
+      list_orgs_for_snapshot_warmup: {
+        Args: never
+        Returns: {
+          organization_id: string
+          reference_month: string
+        }[]
+      }
       match_statement_to_cashflow: {
         Args: { p_statement_id: string }
         Returns: {
@@ -9326,6 +9402,10 @@ export type Database = {
       }
       purge_old_audit_logs: { Args: { _days?: number }; Returns: number }
       recompute_all_health_scores: { Args: never; Returns: number }
+      recompute_dashboard_snapshot: {
+        Args: { _organization_id: string; _reference_month: string }
+        Returns: Json
+      }
       recompute_payroll_item_from_events: {
         Args: { p_employee_id: string; p_run_id: string }
         Returns: undefined
