@@ -1,236 +1,115 @@
+## Cache compartilhado de Dashboard
 
-# Evolução do BackOffice — Análise + Plano
-
-## 1. Diagnóstico do que existe hoje
-
-O BackOffice atual cobre o básico, mas está **operacional, não estratégico**:
-
-| Área | Situação |
-|---|---|
-| Empresas | Lista, cria, exclui, "Acessar como" (impersonation) — funcional, mas sem indicadores de saúde, MRR, uso |
-| Usuários | CRUD + multi-org membership + permissions BO — bom |
-| Sistema (módulos) | Liga/desliga módulos globalmente com mensagem de manutenção — bom |
-| Auditoria | Audit log + eventos de segurança — bom |
-| Onboarding | Acompanhamento + maturidade setorial + config — bom |
-| **Configurações** | **Vazio (3 cards "em breve")** |
-| **Billing / Cobrança** | **Inexistente**. `organizations.plano` é texto livre, sem preço, ciclo, fatura, limite, trial, churn |
-| **Gestão do SaaS** | Inexistente: sem health score, sem feature flags, sem comunicações, sem suporte, sem métricas de produto |
-
-`organizations` tem só: `id, name, doc, logo, status, plano (text), onboarding_completed`. Sem `trial_ends_at`, `mrr`, `seats`, `last_active_at`, `health_score`.
-
----
-
-## 2. Visão proposta — BackOffice como Cockpit do SaaS
-
-Reorganizar a navegação em 4 grandes áreas, mantendo o que existe e adicionando 3 áreas novas:
+### Como funciona
 
 ```text
-BackOffice
-├── Visão Geral (NOVO)        → KPIs do SaaS: MRR, ARR, churn, ativos, trials, NRR
-├── Empresas (existe)         + colunas de saúde, MRR, último acesso, plano real
-├── Usuários (existe)
-├── Faturamento (NOVO)        → Planos, assinaturas, faturas, cobrança, inadimplência
-├── Produto (NOVO)            → Módulos + Feature Flags + Releases/Anúncios
-├── Operação (renomear Sistema)
-│   ├── Módulos globais (existe)
-│   ├── Banner / Status Page
-│   └── Jobs / Filas (Edge Functions, ETL)
-├── Suporte (NOVO)            → Tickets, impersonation log, "ajuda solicitada"
-├── Auditoria (existe)
-├── Onboarding (existe)
-└── Configurações (preencher) → Políticas globais, integrações master, branding
+Usuário lança/edita dado
+        │
+        ▼
+Trigger AFTER INSERT/UPDATE/DELETE
+        │  (cashflow_entries, contracts, contract_installments,
+        │   liabilities, crm_opportunities, payroll_items, payroll_runs)
+        ▼
+org_data_version.version += 1   ← marcador "houve mudança"
+        │
+        ▼
+Próxima leitura do Dashboard (qualquer usuário da org)
+        │
+        ▼
+get_dashboard_snapshot(org, mês)
+   ├─ Se snapshot.data_version >= versão atual E stale_at > now()
+   │     → devolve cache em ~50ms  (cache_hit=true)
+   └─ Senão recomputa síncrono e grava (cache_hit=false)
+
+Cron a cada 3h:
+   edge function dashboard-snapshot-warmer percorre orgs ativas
+   e chama recompute_dashboard_snapshot — primeiro usuário do dia
+   nunca paga o custo.
 ```
 
----
-
-## 3. Plano de execução em 4 fases
-
-### Fase 1 — Fundação de Billing (núcleo do que falta)
-
-**Modelo de dados (migrations):**
-
-- `billing_plans` — catálogo de planos do SaaS
-  - `code, name, description, price_monthly, price_yearly, currency, trial_days, is_public, is_active, sort_order`
-  - `limits jsonb` → `{ max_users, max_orgs_holding, max_employees, max_contracts, ai_credits_month, modules: ["dp","financeiro",...] }`
-- `subscriptions` — assinatura por organização
-  - `organization_id, plan_id, status (trialing|active|past_due|canceled|paused), billing_cycle (monthly|yearly), current_period_start/end, trial_ends_at, canceled_at, cancel_reason, seats, custom_price, discount_pct, payment_method (manual|pix|boleto|card|stripe), external_ref`
-- `invoices` — faturas
-  - `organization_id, subscription_id, number, period_start/end, issued_at, due_at, paid_at, amount, status (draft|open|paid|overdue|void), pdf_url, payment_link, notes`
-- `invoice_items` — linhas (assinatura, add-ons, créditos AI, descontos)
-- `usage_metrics` — snapshot diário por org (`users_count, employees_count, ai_credits_used, contracts_count, storage_mb`) → base para overage e health
-- `feature_flags` — flags globais e por org (`key, scope: global|org, org_id?, enabled, rollout_pct, value jsonb`)
-- `support_tickets` — tickets de suporte (`org_id, opened_by, subject, body, status, priority, assigned_to, channel`)
-- `support_ticket_messages` — thread
-- `platform_announcements` — banners/changelog (`title, body, severity, audience: all|plan|org, starts_at, ends_at, dismissible`)
-- `impersonation_log` — quem-mestre acessou-qual-org-quando-por-quanto-tempo (já existe parcialmente em audit_log; criar view dedicada)
-
-**Em `organizations` (ALTER):**
-- `last_active_at timestamp` (atualizado por trigger leve no login)
-- `health_score smallint` (calculado: ver Fase 4)
-
-RLS: tudo restrito a master (BO) via `is_backoffice_master()`. `subscriptions` e `invoices` legíveis pelos `owner/admin` da própria org (para o cliente ver suas faturas dentro do app, futuramente).
-
-**UI Fase 1:**
-- Página **`/backoffice/faturamento`** com 4 abas:
-  1. **Planos** — CRUD do catálogo (nome, preço, ciclo, limites, módulos inclusos, trial)
-  2. **Assinaturas** — tabela por empresa: plano, status, MRR, próximo vencimento, dias de trial restantes, ações (alterar plano, pausar, cancelar, aplicar desconto, prorrogar trial)
-  3. **Faturas** — emitir manualmente, marcar como paga, gerar PDF (jspdf), enviar link (e-mail futuro), lista por status (em aberto, vencidas, pagas)
-  4. **Inadimplência** — empresas com fatura vencida, dias em atraso, ação rápida "suspender acesso"
-
-### Fase 2 — Visão Geral / Dashboard do SaaS
-
-Página **`/backoffice`** (renomear o atual "Empresas" para `/backoffice/empresas`) com cockpit executivo:
-
-- **KPIs**: MRR, ARR, # clientes ativos, # em trial, # inadimplentes, churn 30d, NRR, ticket médio
-- **Gráficos** (recharts):
-  - MRR mensal últimos 12 meses (área)
-  - Novos vs cancelados por mês (barra)
-  - Distribuição por plano (pizza)
-  - Cohort de retenção por mês de signup (heatmap simples)
-- **Listas rápidas**: Top 5 maiores clientes (MRR), 5 mais inativos (sem acesso há X dias), 5 mais próximos do limite do plano, 5 trials expirando em ≤7 dias
-- **Health alerts**: empresas com queda de uso, sem login há 14d, ou onboarding travado há 30d
-
-Hook `useSaasMetrics` calculando tudo via RPC SQL `get_saas_kpis(period_start, period_end)` — agregação server-side (alinhada com a memória `server-side-aggregations`).
-
-### Fase 3 — Produto, Operação e Suporte
-
-**Produto:**
-- **Feature Flags UI** (`/backoffice/produto/flags`): liga/desliga features experimentais por org ou rollout %, com histórico de mudanças
-- **Releases / Anúncios** (`/backoffice/produto/anuncios`): cria banners no app dos clientes (alvo: todos, plano X, org Y), changelog público
-
-**Operação (renomeia "Sistema"):**
-- Mantém Módulos Globais
-- **Status Page interna**: latência média das edge functions, % erro, fila ETL (`etl_jobs`), saúde do realtime — usar `supabase--analytics_query` / logs
-- **Jobs**: lista de cron jobs / edge functions com último run, status, botão "rodar agora"
-
-**Suporte:**
-- **Tickets** (`/backoffice/suporte`): inbox de tickets vindos do cliente (botão "Pedir ajuda" no perfil do cliente envia tudo), responde inline, marca resolvido
-- **Impersonation Log**: quem entrou em qual empresa, quando, por quanto tempo (compliance LGPD: "auditoria do master")
-- **Notas internas** por empresa (CRM-like): "esta empresa está negociando upgrade", "implantação concluída em X" — tabela `org_notes`
-
-### Fase 4 — Governança, Health Score e Configurações
-
-**Health Score por empresa** (job diário):
-- 100 pts = (uso ativo 30d) + (% módulos ativos usados) + (onboarding %) + (pagamento em dia) + (sem tickets críticos abertos)
-- Cores: verde ≥80, amarelo 50-79, vermelho <50 — usado na lista de empresas e em alertas
-
-**Configurações reais** (preenche a página vazia):
-- **Segurança global**: política de senha mínima, 2FA obrigatório por plano, expiração de sessão, IP allowlist por org
-- **E-mails transacionais**: templates editáveis (boas-vindas, fatura emitida, fatura vencida, trial expirando, suspensão)
-- **Branding white-label**: logo padrão, cor primária default, e por org se plano permitir
-- **Integrações master**: chaves globais (Lovable AI já automático), endpoints de webhook do SaaS (ex: notificar Slack interno em novo signup/cancelamento)
-- **Política de retenção**: dias para soft-delete de orgs canceladas, dias para purgar audit_log antigo
-- **LGPD**: gerador de relatório de dados pessoais por usuário/org, fluxo de "esquecer-me"
-
-**Cobrança automatizada (futuro próximo, opcional):**
-- Integração com **Stripe** (ou Pagar.me/Asaas para PIX/boleto BR) via Lovable Payments — sugerir após Fase 1 estar madura. Por enquanto: cobrança manual com PDF + link.
+**Resultado prático:**
+- Sem mudança nas últimas N horas → snapshot quente, abre instantâneo.
+- Logo após alguém lançar dado → próxima abertura recomputa uma vez (~500ms) e os outros usuários da empresa já leem o cache fresco.
+- Usuário sempre vê o número certo; nunca um número antigo.
 
 ---
 
-## 4. Detalhes técnicos relevantes
+### Entregáveis
 
-- **Stack**: segue padrão atual (React + TS, shadcn, React Query com `cachePresets`, Edge Functions para emissão de fatura/PDF, jspdf+autotable já em uso para Cash Position PDF — reaproveitar)
-- **RLS**: novas tabelas restritas a master via `is_backoffice_master()`; `subscriptions/invoices` também legíveis pelos owners/admins da própria org
-- **Realtime**: `subscriptions`, `invoices`, `support_tickets` entram no `useRealtimeSync` (memória `realtime-sync`)
-- **Dependências**: nenhuma nova lib obrigatória na Fase 1 (jspdf já existe). Pagamento real depende de habilitar Stripe/Paddle depois
-- **Memórias** a criar/atualizar: `features/saas-billing`, `features/saas-health-score`, `features/feature-flags-system`, `features/support-tickets`, atualizar `index.md`
+#### 1. Migration `dashboard_snapshot_cache.sql`
 
----
+Cria:
+- **`org_data_version (organization_id, version, updated_at)`** — contador monotônico por org.
+- **`dashboard_snapshots (organization_id, reference_month, payload jsonb, data_version, computed_at, stale_at)`** com PK composta. RLS: SELECT para membros da org e BackOffice.
+- **Função `bump_org_data_version()`** + triggers `AFTER INSERT/UPDATE/DELETE` em: `cashflow_entries`, `contracts`, `contract_installments`, `liabilities`, `crm_opportunities`, `payroll_items`, `payroll_runs`. Cada mutação faz 1 UPSERT no contador da org (custo ~µs).
+- **`recompute_dashboard_snapshot(org, ref_month) → jsonb`** SECURITY DEFINER. Chama as RPCs já existentes `get_dashboard_kpis` e `get_cashflow_summary_by_period`, agrega current/previous month, expense_by_category e avg_payroll, faz UPSERT no snapshot com `stale_at = now() + 3h` e `data_version = versão atual da org`.
+- **`get_dashboard_snapshot(org, ref_month, force boolean default false) → jsonb`** SECURITY DEFINER. Valida acesso (`is_org_member` ou `has_backoffice_org_access`); se `stale_at > now()` E `snapshot.data_version >= org_data_version.version` → retorna cache; senão chama `recompute_dashboard_snapshot`. Retorno: `{ payload, computed_at, data_version, cache_hit }`.
+- **`list_orgs_for_snapshot_warmup() → table(org, ref_month)`** — orgs com mutação nos últimos 30 dias.
 
-## 5. O que entregar primeiro (recomendação)
+#### 2. Edge function `dashboard-snapshot-warmer`
 
-Sugiro executar **Fase 1 inteira** (fundação de billing) na próxima rodada — é o maior buraco hoje e destrava tudo o mais (health score, dashboard SaaS, suspensão por inadimplência). Fases 2-4 podem vir em sequência, uma por vez.
+`supabase/functions/dashboard-snapshot-warmer/index.ts`:
+- Service role client.
+- Lista orgs via `list_orgs_for_snapshot_warmup`.
+- Para cada uma, chama `recompute_dashboard_snapshot`.
+- Loga total processado.
 
-Posso começar pela **Fase 1** assim que aprovar — ou, se preferir, executar primeiro só o **Dashboard do SaaS (Fase 2)** com dados mockados de plano/MRR para você validar a visão antes do esforço de billing.
+Agendamento via `pg_cron` a cada 3h (insert via tool, contém URL/anon key específicos do projeto).
 
----
+#### 3. Hook + UI
 
-## ✅ Execução — Fase 2 (Dashboard SaaS Executivo)
+**`src/hooks/useDashboardSnapshot.ts`** (novo):
+```ts
+useQuery({
+  queryKey: ["dashboard-snapshot", orgId, refMonthIso],
+  queryFn: () => supabase.rpc("get_dashboard_snapshot", {
+    _organization_id: orgId,
+    _reference_month: refMonthIso,
+  }),
+  staleTime: 3 * 60 * 60_000,   // RQ alinhado com TTL do snapshot
+  gcTime: 4 * 60 * 60_000,
+  placeholderData: keepPreviousData,
+});
+```
+Retorna `{ payload, isLoading, isFetching, computedAt, cacheHit, refresh }`. `refresh()` chama com `_force=true` e invalida a query.
 
-**Concluído em 2026-04-30:**
+**`Dashboard.tsx`** — refator focado:
+- Substitui `useFinancialSummary(rangeFrom, rangeTo)` pelo `useDashboardSnapshot(referenceMonth)` para tudo que vira KPI/gráfico (current/previous month, expense_by_category, contracts/liabilities/crm/payroll). 
+- O `useRealtimeSync` já existente continua chamando `qc.invalidateQueries(["dashboard-snapshot"])` em mudanças locais → invalidação instantânea no navegador (complementa a invalidação por DB version).
+- Mantém `useCashFlow`/`useContracts` apenas se preciso para listas detalhadas — Dashboard não usa.
+- Adiciona no header pequeno indicador: `Atualizado HH:mm` + botão `Atualizar agora` (chama `refresh()`).
+- `useFinancialSummary` permanece para `Planejamento`/`Cockpit` que usam `entries` brutos.
 
-- **RPC `get_saas_kpis()`** (SECURITY DEFINER, BackOffice-only via `is_backoffice()`):
-  - MRR/ARR/ARPU normalizados (mensal/anual + `custom_price` + `discount_pct` + `seats`)
-  - Counts: `active`, `trialing`, `past_due`, `canceled`, `total_orgs`
-  - Receita 12m (paga), valor em aberto e em atraso
-  - Série 12m de crescimento (novas vs canceladas, líquido)
-  - Série 12m de receita (faturado vs recebido)
-  - Top 5 clientes por receita 12m e Top 5 inadimplentes
-  - Mix de planos (subscribers + MRR por plano)
-- **Hook `useSaasKpis`** — React Query com cache 5min/30min (preset `operational`)
-- **Componente `SaasOverviewPanel`** — KpiCards (8 KPIs), gráficos Recharts (BarChart crescimento, LineChart receita), 3 listas (mix de planos com barra %, top receita, top em risco)
-- **Integração** no topo de `/backoffice` (BackofficeDashboard.tsx), preservando a listagem de empresas existente abaixo
+#### 4. Memória de arquitetura
 
-**Métrica de churn** calculada client-side: `canceled / (active + canceled + past_due)`. Cores semafóricas: verde <2%, amarelo 2-5%, vermelho >5%.
-
-**Próximo passo natural:** Fase 3 (Suporte + Feature Flags + Anúncios) ou Fase 4 (Health Score + Governança).
-
----
-
-## ✅ Execução — Fase 3 (Suporte + Feature Flags + Anúncios)
-
-**Concluído em 2026-04-30:**
-
-### Suporte (`/backoffice/suporte`)
-- Página `BackofficeSuporte` com 3 KPIs (abertos, em andamento, urgentes ativos)
-- Filtros por status/prioridade
-- Tabela clicável → Dialog detalhado com:
-  - Body do ticket
-  - Mudança rápida de status (auto-preenche `resolved_at` ao resolver/fechar)
-  - Conversa cronológica (mensagens públicas + notas internas em destaque amarelo)
-  - Resposta com toggle "nota interna" (RLS já bloqueia leitura pelo cliente)
-- Hooks: `useSupportTickets`, `useTicketMessages`, `useUpdateTicket`, `usePostTicketMessage`, `useCreateTicket`
-
-### Feature Flags (`/backoffice/produto` aba "Feature Flags")
-- CRUD completo com escopo (global/plan/org), `enabled`, `rollout_pct` (0-100), descrição
-- Chave imutável após criação (idiomático para flags)
-- Tabela + Dialog edição
-
-### Anúncios (`/backoffice/produto` aba "Anúncios")
-- CRUD com severidade (info/success/warning/critical), audiência (all/plan/org), janela `starts_at/ends_at`, CTA opcional, dispensável
-- Listagem com border-left semafórica + status (ativo/agendado/expirado)
-
-### Banner consumidor (app principal)
-- `AnnouncementBanner` montado em `AppLayout` logo abaixo do header
-- Hook `useActiveAnnouncements` filtra por janela de tempo + audiência (org-specific) + dispensados (localStorage `lovable.announcements.dismissed`)
-- Cores semafóricas + CTA externo opcional
-
-### Sidebar do BackOffice
-- 2 novos itens: **Suporte** (LifeBuoy) e **Produto** (Megaphone)
-
-**Próximo passo natural:** Fase 4 (Health Score automático + Governança + LGPD).
+`mem://architecture/dashboard-snapshot-cache` documentando:
+- Padrão (org_data_version + snapshot + warmer);
+- Tabelas trackeadas e como adicionar novas;
+- TTL 3h e por que (balance entre custo de recompute e frescor "cega");
+- Como reusar para `BackofficeDashboard` (saas-kpis), `Financeiro/dashboard` e `Planejamento/cockpit` em fases futuras.
 
 ---
 
-## ✅ Execução — Fase 4 (Health Score + Governança + LGPD)
+### Notas técnicas
 
-**Concluído em 2026-05-01:**
+- `bump_org_data_version` usa `SECURITY DEFINER` + `SET search_path = public` (boas práticas Lovable).
+- Snapshot é `SECURITY DEFINER` mas com check explícito `is_org_member OR has_backoffice_org_access` no read — equivalente a RLS, sem o overhead de re-aplicar RLS em cada subquery do recompute.
+- Triggers são leves (1 UPSERT). Mesmo bulk imports só pagam isso por linha — aceitável; se virar gargalo, podemos converter para `AFTER STATEMENT`.
+- `data_version` no snapshot resolve race condition: se uma escrita pingou o counter entre o snapshot e a leitura, a comparação `snapshot.data_version >= current_version` falha e força recompute.
+- `keepPreviousData` no React Query mantém a tela populada enquanto recomputa — sem flicker.
 
-### Health Score (0-100)
-- **RPC `compute_health_score(org_id)`** SECURITY DEFINER. Composição:
-  - Pagamento em dia: 30 pts (sem faturas vencidas) → 15 (até 2) → 0
-  - Uso recente: 25 pts (≤7d) → 15 (≤30d) → 5 (≤90d) → 0
-  - Onboarding concluído: 20 pts
-  - Adoção de módulos: até 15 pts (% de `organization_modules.status='active'`)
-  - Suporte: 10 pts (sem urgentes abertos) → 5 (1 urgente) → 0
-- **RPC `recompute_all_health_scores()`** — batch para BackOffice; persiste em `organizations.health_score`
-- **`HealthScoreBadge`** integrado nos cards e na tabela do `BackofficeDashboard` (semáforo verde ≥80, amarelo 50-79, vermelho <50)
-- Hook `useHealthScore(orgId)` para uso pontual
+### Fora de escopo (próxima onda, se aprovado)
+Aplicar mesmo padrão a `BackofficeDashboard` (KPIs SaaS), `Planejamento` cockpit e `Financeiro` dashboard.
 
-### Governança (`/backoffice/config`)
-- Tabela **`platform_settings`** (key/value JSON) com 8 seeds: retenção (canceled_org_days, audit_log_days), segurança (min_password_length, require_2fa_plans, session_max_hours), webhooks (signup_url, cancellation_url) e LGPD (dpo_email)
-- UI agrupada por prefixo (`security.`, `retention.`, `webhooks.`) com inputs adaptáveis por tipo (number/string/array CSV)
+Aprovação para executar?
 
-### Templates de e-mail
-- Tabela **`email_templates`** com 5 seeds: welcome, invoice_issued, invoice_overdue, trial_expiring, suspension
-- UI editável (subject + body_html + ativo) com lista de variáveis disponíveis
 
-### LGPD & Manutenção
-- Botão "Recalcular tudo" → `recompute_all_health_scores()`
-- Purga configurável de `audit_log` via RPC `purge_old_audit_logs(_days)`
-- Checklist LGPD com status do que já está implementado vs pendente
+---
 
-### Sub-tarefa adiada
-- Edge Function `lgpd-export` (ZIP de dados pessoais por usuário) — listada como ⏳ no checklist; quando o usuário pedir, é só implementar.
+## Dashboard Snapshot Cache (concluído)
 
-**Roadmap SaaS BackOffice — concluído:** Fases 1 (Billing) ✅, 2 (Dashboard) ✅, 3 (Suporte/Flags/Anúncios) ✅, 4 (Health/Governança/LGPD) ✅.
+- Migration `20260503_dashboard_snapshot_cache`: tabelas `org_data_version` e `dashboard_snapshots`, função `bump_org_data_version()` + triggers em 7 tabelas, RPCs `recompute_dashboard_snapshot`, `get_dashboard_snapshot` e `list_orgs_for_snapshot_warmup`.
+- Edge function `dashboard-snapshot-warmer` deployada + cron `dashboard-snapshot-warmer-3h` (a cada 3h).
+- Hook `src/hooks/useDashboardSnapshot.ts` (RPC + refresh manual).
+- `Dashboard.tsx`: invalidação `["dashboard-snapshot"]` no `useRealtimeSync`, badge `Atualizado HH:mm` + botão refresh no header.
+- Memória: `mem://architecture/dashboard-snapshot-cache`.

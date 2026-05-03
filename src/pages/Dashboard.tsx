@@ -26,6 +26,8 @@ import { MonthPicker } from "@/components/MonthPicker";
 import { useReferenceMonth } from "@/hooks/useReferenceMonth";
 import { Badge } from "@/components/ui/badge";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { useDashboardSnapshot } from "@/hooks/useDashboardSnapshot";
+import { RefreshCw } from "lucide-react";
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
@@ -80,19 +82,33 @@ export default function Dashboard() {
     isLoading,
   } = useFinancialSummary(rangeFrom, rangeTo);
 
+  // Shared snapshot — pre-aggregated jsonb cached in DB, invalidated instantly
+  // by triggers on any input. Powers the "Atualizado X" indicator and warms
+  // the cache for every user of this org.
+  const { computedAt, cacheHit, isFetching: snapFetching, refresh: refreshSnapshot } =
+    useDashboardSnapshot(referenceMonth);
+
   // Realtime: refresh KPIs/charts whenever another user mutates these tables.
   useRealtimeSync([
     {
       table: "cashflow_entries",
-      invalidateKeys: [["cashflow"], ["cashflow-summary"], ["dashboard-kpis"]],
+      invalidateKeys: [["cashflow"], ["cashflow-summary"], ["dashboard-kpis"], ["dashboard-snapshot"]],
     },
     {
       table: "contracts",
-      invalidateKeys: [["contracts"], ["dashboard-kpis"]],
+      invalidateKeys: [["contracts"], ["dashboard-kpis"], ["dashboard-snapshot"]],
     },
     {
       table: "contract_installments",
-      invalidateKeys: [["contracts"], ["contract-installments"]],
+      invalidateKeys: [["contracts"], ["contract-installments"], ["dashboard-snapshot"]],
+    },
+    {
+      table: "liabilities",
+      invalidateKeys: [["liabilities"], ["dashboard-snapshot"]],
+    },
+    {
+      table: "crm_opportunities",
+      invalidateKeys: [["crm-opportunities"], ["dashboard-snapshot"]],
     },
   ]);
 
@@ -282,6 +298,23 @@ export default function Dashboard() {
             minDate={refMinDate}
             maxDate={refMaxDate}
           />
+          {computedAt && (
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span title={cacheHit ? "Lendo do cache compartilhado" : "Recalculado agora"}>
+                Atualizado {format(new Date(computedAt), "HH:mm")}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => refreshSnapshot()}
+                disabled={snapFetching}
+                title="Recalcular agora"
+              >
+                <RefreshCw size={12} className={snapFetching ? "animate-spin" : ""} />
+              </Button>
+            </div>
+          )}
         </div>
       </PageHeader>
 
