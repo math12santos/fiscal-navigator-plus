@@ -102,3 +102,14 @@ Retorna `{ payload, isLoading, isFetching, computedAt, cacheHit, refresh }`. `re
 Aplicar mesmo padrão a `BackofficeDashboard` (KPIs SaaS), `Planejamento` cockpit e `Financeiro` dashboard.
 
 Aprovação para executar?
+
+
+---
+
+## Dashboard Snapshot Cache (concluído)
+
+- Migration `20260503_dashboard_snapshot_cache`: tabelas `org_data_version` e `dashboard_snapshots`, função `bump_org_data_version()` + triggers em 7 tabelas, RPCs `recompute_dashboard_snapshot`, `get_dashboard_snapshot` e `list_orgs_for_snapshot_warmup`.
+- Edge function `dashboard-snapshot-warmer` deployada + cron `dashboard-snapshot-warmer-3h` (a cada 3h).
+- Hook `src/hooks/useDashboardSnapshot.ts` (RPC + refresh manual).
+- `Dashboard.tsx`: invalidação `["dashboard-snapshot"]` no `useRealtimeSync`, badge `Atualizado HH:mm` + botão refresh no header.
+- Memória: `mem://architecture/dashboard-snapshot-cache`.
