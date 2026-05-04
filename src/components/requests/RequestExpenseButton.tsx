@@ -523,7 +523,9 @@ export function RequestExpenseButton({
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={!canSubmit}>
-              {uploading || createRequest.isPending ? "Enviando..." : "Enviar Solicitação"}
+              {uploading || createRequest.isPending
+                ? "Enviando..."
+                : subtype === "ticket" ? "Abrir Chamado" : "Enviar Solicitação"}
             </Button>
           </DialogFooter>
         </DialogContent>
