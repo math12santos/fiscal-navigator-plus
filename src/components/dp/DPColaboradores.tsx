@@ -528,104 +528,235 @@ export default function DPColaboradores() {
                 </div>
               )}
             </div>
-            {/* Benefícios */}
-            {allBenefits.length > 0 && (
-              <div className="space-y-2 pt-2 border-t">
-                <Label className="text-sm font-semibold">Benefícios</Label>
-                <p className="text-[10px] text-muted-foreground">
-                  Cada colaborador só pode receber 1 benefício por categoria (exceto "Outros"). Selecionar outro da mesma categoria substitui o anterior.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {allBenefits.filter((b: any) => b.active).map((b: any) => {
-                    const cat = b.category || "outros";
-                    const isSelected = selectedBenefitIds.includes(b.id);
-                    // Detecta conflito: outro benefício já selecionado, mesma categoria (não "outros"), e não é este
-                    const conflictWith = !isSelected && cat !== "outros"
-                      ? allBenefits.find((x: any) =>
-                          x.id !== b.id &&
-                          selectedBenefitIds.includes(x.id) &&
-                          (x.category || "outros") === cat
-                        )
-                      : null;
-                    return (
-                      <div key={b.id} className="flex flex-col gap-1">
-                        <label
-                          className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
-                            conflictWith ? "bg-warning/10 border border-warning/40" : "border border-transparent"
-                          }`}
-                          title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
-                        >
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => {
-                              setSelectedBenefitIds((prev) => {
-                                if (!checked) {
-                                  // Limpa o custom_value desse benefício ao desmarcar
-                                  setBenefitCustomValues((cv) => {
-                                    const next = { ...cv };
-                                    delete next[b.id];
-                                    return next;
-                                  });
-                                  return prev.filter((id) => id !== b.id);
-                                }
-                                // Substituir outros benefícios da mesma categoria (exceto "outros")
-                                if (cat === "outros") return [...prev, b.id];
-                                const replaced = prev
-                                  .map((id) => allBenefits.find((x: any) => x.id === id))
-                                  .filter((x: any) => x && x.id !== b.id && (x.category || "outros") === cat);
-                                const next = prev.filter((id) => {
-                                  const other = allBenefits.find((x: any) => x.id === id);
-                                  return (other?.category || "outros") !== cat;
-                                });
-                                if (replaced.length > 0) {
-                                  toast({
-                                    title: "Benefício substituído",
-                                    description: `"${b.name}" substituiu "${replaced.map((r: any) => r.name).join(", ")}" na categoria ${cat}.`,
-                                  });
-                                }
-                                return [...next, b.id];
-                              });
-                            }}
-                          />
-                          <span className={conflictWith ? "font-medium" : ""}>{b.name}</span>
-                          {cat === "plano_saude" ? (
-                            <span className="text-muted-foreground text-xs">(valor manual)</span>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">
-                              ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
-                            </span>
-                          )}
-                          {conflictWith && (
-                            <span className="ml-auto text-[10px] text-warning font-medium">
-                              substitui {conflictWith.name}
-                            </span>
-                          )}
-                        </label>
-                        {isSelected && cat === "plano_saude" && (
-                          <div className="ml-7 flex items-center gap-2">
-                            <Label className="text-[11px] text-muted-foreground whitespace-nowrap">
-                              Valor mensal (R$) *
-                            </Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              className="h-7 text-sm"
-                              value={benefitCustomValues[b.id] ?? ""}
-                              onChange={(e) =>
-                                setBenefitCustomValues((cv) => ({ ...cv, [b.id]: e.target.value }))
-                              }
-                              placeholder="Ex: 350.00"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+            </TabsContent>
+
+            {/* Aba: Pagamento */}
+            <TabsContent value="pagamento" className="space-y-4 mt-0">
+              <div className="rounded-lg border border-border bg-card/50 p-3 text-xs text-muted-foreground">
+                Estes dados são usados para emissão de pagamentos da folha (salário, adiantamento, férias, rescisão e benefícios em dinheiro). Mantenha-os sempre atualizados.
+              </div>
+
+              <div className="space-y-1">
+                <Label>Forma de Pagamento Preferencial</Label>
+                <Select value={form.payment_method} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="ted">TED / Transferência</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* PIX */}
+              {form.payment_method === "pix" && (
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <Label className="text-sm font-semibold">Chave PIX</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tipo de chave</Label>
+                      <Select value={form.pix_key_type} onValueChange={(v) => setForm({ ...form, pix_key_type: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cpf">CPF</SelectItem>
+                          <SelectItem value="cnpj">CNPJ</SelectItem>
+                          <SelectItem value="email">Email</SelectItem>
+                          <SelectItem value="telefone">Telefone</SelectItem>
+                          <SelectItem value="aleatoria">Aleatória</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Chave PIX</Label>
+                      <Input
+                        value={form.pix_key}
+                        onChange={(e) => setForm({ ...form, pix_key: e.target.value })}
+                        placeholder="Informe a chave"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Conta bancária */}
+              {(form.payment_method === "ted" || form.payment_method === "pix") && (
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <Label className="text-sm font-semibold">
+                    Conta Bancária {form.payment_method === "pix" && <span className="text-muted-foreground text-xs font-normal">(opcional, fallback)</span>}
+                  </Label>
+                  <div className="grid grid-cols-6 gap-3">
+                    <div className="col-span-4 space-y-1">
+                      <Label className="text-xs">Banco</Label>
+                      <Input value={form.bank_name} onChange={(e) => setForm({ ...form, bank_name: e.target.value })} placeholder="Ex: Itaú Unibanco" />
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Código</Label>
+                      <Input value={form.bank_code} onChange={(e) => setForm({ ...form, bank_code: e.target.value })} placeholder="341" />
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Agência</Label>
+                      <Input value={form.bank_agency} onChange={(e) => setForm({ ...form, bank_agency: e.target.value })} placeholder="0000" />
+                    </div>
+                    <div className="col-span-3 space-y-1">
+                      <Label className="text-xs">Conta</Label>
+                      <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} placeholder="00000" />
+                    </div>
+                    <div className="col-span-1 space-y-1">
+                      <Label className="text-xs">Dígito</Label>
+                      <Input value={form.bank_account_digit} onChange={(e) => setForm({ ...form, bank_account_digit: e.target.value })} placeholder="0" />
+                    </div>
+                    <div className="col-span-3 space-y-1">
+                      <Label className="text-xs">Tipo de Conta</Label>
+                      <Select value={form.bank_account_type} onValueChange={(v) => setForm({ ...form, bank_account_type: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="corrente">Conta Corrente</SelectItem>
+                          <SelectItem value="poupanca">Conta Poupança</SelectItem>
+                          <SelectItem value="salario">Conta Salário</SelectItem>
+                          <SelectItem value="pagamento">Conta Pagamento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Titular (caso pagamento para terceiro) */}
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label className="text-sm font-semibold">Titular do Pagamento</Label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Preencha apenas se diferente do colaborador.
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nome do Titular</Label>
+                    <Input
+                      value={form.payment_holder_name}
+                      onChange={(e) => setForm({ ...form, payment_holder_name: e.target.value })}
+                      placeholder={form.name || "Nome completo do titular"}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">CPF / CNPJ do Titular</Label>
+                    <Input
+                      value={form.payment_holder_document}
+                      onChange={(e) => setForm({ ...form, payment_holder_document: e.target.value })}
+                      placeholder={form.cpf || "Documento do titular"}
+                    />
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Observações de Pagamento</Label>
+                <Textarea
+                  rows={2}
+                  value={form.payment_notes}
+                  onChange={(e) => setForm({ ...form, payment_notes: e.target.value })}
+                  placeholder="Instruções específicas, restrições, pagamentos divididos, etc."
+                />
+              </div>
+            </TabsContent>
+
+            {/* Aba: Benefícios */}
+            <TabsContent value="beneficios" className="space-y-3 mt-0">
+              {allBenefits.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Cada colaborador só pode receber 1 benefício por categoria (exceto "Outros"). Selecionar outro da mesma categoria substitui o anterior.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {allBenefits.filter((b: any) => b.active).map((b: any) => {
+                      const cat = b.category || "outros";
+                      const isSelected = selectedBenefitIds.includes(b.id);
+                      const conflictWith = !isSelected && cat !== "outros"
+                        ? allBenefits.find((x: any) =>
+                            x.id !== b.id &&
+                            selectedBenefitIds.includes(x.id) &&
+                            (x.category || "outros") === cat
+                          )
+                        : null;
+                      return (
+                        <div key={b.id} className="flex flex-col gap-1">
+                          <label
+                            className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
+                              conflictWith ? "bg-warning/10 border border-warning/40" : "border border-transparent"
+                            }`}
+                            title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                setSelectedBenefitIds((prev) => {
+                                  if (!checked) {
+                                    setBenefitCustomValues((cv) => {
+                                      const next = { ...cv };
+                                      delete next[b.id];
+                                      return next;
+                                    });
+                                    return prev.filter((id) => id !== b.id);
+                                  }
+                                  if (cat === "outros") return [...prev, b.id];
+                                  const replaced = prev
+                                    .map((id) => allBenefits.find((x: any) => x.id === id))
+                                    .filter((x: any) => x && x.id !== b.id && (x.category || "outros") === cat);
+                                  const next = prev.filter((id) => {
+                                    const other = allBenefits.find((x: any) => x.id === id);
+                                    return (other?.category || "outros") !== cat;
+                                  });
+                                  if (replaced.length > 0) {
+                                    toast({
+                                      title: "Benefício substituído",
+                                      description: `"${b.name}" substituiu "${replaced.map((r: any) => r.name).join(", ")}" na categoria ${cat}.`,
+                                    });
+                                  }
+                                  return [...next, b.id];
+                                });
+                              }}
+                            />
+                            <span className={conflictWith ? "font-medium" : ""}>{b.name}</span>
+                            {cat === "plano_saude" ? (
+                              <span className="text-muted-foreground text-xs">(valor manual)</span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">
+                                ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
+                              </span>
+                            )}
+                            {conflictWith && (
+                              <span className="ml-auto text-[10px] text-warning font-medium">
+                                substitui {conflictWith.name}
+                              </span>
+                            )}
+                          </label>
+                          {isSelected && cat === "plano_saude" && (
+                            <div className="ml-7 flex items-center gap-2">
+                              <Label className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                Valor mensal (R$) *
+                              </Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="h-7 text-sm"
+                                value={benefitCustomValues[b.id] ?? ""}
+                                onChange={(e) =>
+                                  setBenefitCustomValues((cv) => ({ ...cv, [b.id]: e.target.value }))
+                                }
+                                placeholder="Ex: 350.00"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={!form.name || !form.admission_date || create.isPending || update.isPending}>
