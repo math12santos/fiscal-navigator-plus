@@ -111,7 +111,16 @@ export default function DPColaboradores() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT", salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "", status: "ativo", notes: "", comissao_tipo: "nenhuma", comissao_valor: "", vt_ativo: false, vt_diario: "" });
+    setForm({
+      name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT",
+      salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "",
+      status: "ativo", notes: "", comissao_tipo: "nenhuma", comissao_valor: "",
+      vt_ativo: false, vt_diario: "",
+      payment_method: "pix", pix_key_type: "cpf", pix_key: "",
+      bank_name: "", bank_code: "", bank_agency: "",
+      bank_account: "", bank_account_digit: "", bank_account_type: "corrente",
+      payment_holder_name: "", payment_holder_document: "", payment_notes: "",
+    });
     setSelectedBenefitIds([]);
     setBenefitCustomValues({});
     setDialogOpen(true);
@@ -127,6 +136,18 @@ export default function DPColaboradores() {
       status: e.status, notes: e.notes || "",
       comissao_tipo: e.comissao_tipo || "nenhuma", comissao_valor: String(e.comissao_valor || ""),
       vt_ativo: e.vt_ativo || false, vt_diario: String(e.vt_diario || ""),
+      payment_method: e.payment_method || "pix",
+      pix_key_type: e.pix_key_type || "cpf",
+      pix_key: e.pix_key || "",
+      bank_name: e.bank_name || "",
+      bank_code: e.bank_code || "",
+      bank_agency: e.bank_agency || "",
+      bank_account: e.bank_account || "",
+      bank_account_digit: e.bank_account_digit || "",
+      bank_account_type: e.bank_account_type || "corrente",
+      payment_holder_name: e.payment_holder_name || "",
+      payment_holder_document: e.payment_holder_document || "",
+      payment_notes: e.payment_notes || "",
     });
     const empBenefits = allEmployeeBenefits.filter((eb: any) => eb.employee_id === e.id);
     setSelectedBenefitIds(empBenefits.map((eb: any) => eb.benefit_id));
