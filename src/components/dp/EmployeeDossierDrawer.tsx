@@ -290,6 +290,26 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+function paymentMethodLabel(m?: string) {
+  switch (m) {
+    case "pix": return "PIX";
+    case "ted": return "TED / Transferência";
+    case "boleto": return "Boleto";
+    case "dinheiro": return "Dinheiro";
+    default: return "—";
+  }
+}
+
+function accountTypeLabel(t?: string) {
+  switch (t) {
+    case "corrente": return "Corrente";
+    case "poupanca": return "Poupança";
+    case "salario": return "Salário";
+    case "pagamento": return "Pagamento";
+    default: return "—";
+  }
+}
+
 function timeOfService(admission?: string) {
   if (!admission) return "—";
   const days = differenceInDays(new Date(), new Date(admission));
