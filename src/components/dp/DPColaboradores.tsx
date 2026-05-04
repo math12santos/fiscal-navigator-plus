@@ -434,11 +434,18 @@ export default function DPColaboradores() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar Colaborador" : "Novo Colaborador"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <Tabs defaultValue="dados" className="space-y-4">
+            <TabsList className="bg-muted/40 border border-border p-1 h-auto w-full">
+              <TabsTrigger value="dados" className="text-xs flex-1">Dados Cadastrais</TabsTrigger>
+              <TabsTrigger value="pagamento" className="text-xs flex-1">Informações de Pagamento</TabsTrigger>
+              <TabsTrigger value="beneficios" className="text-xs flex-1" disabled={allBenefits.length === 0}>Benefícios</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dados" className="space-y-3 mt-0">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-1"><Label>Nome Completo</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div className="space-y-1"><Label>CPF</Label><Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" /></div>
