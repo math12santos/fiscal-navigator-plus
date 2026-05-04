@@ -71,7 +71,9 @@ export default function Financeiro() {
       <PageHeader
         title="Financeiro"
         description="Gestão financeira completa: contas, fluxo de caixa, conciliação e importações"
-      />
+      >
+        <RequestExpenseButton sourceModule="financeiro" />
+      </PageHeader>
 
       <SectorOnboardingBar sector="financeiro" onTabChange={handleMaturityTabChange} />
 
@@ -83,6 +85,9 @@ export default function Financeiro() {
         </TabsList>
         {allowedTabs.some((t) => t.key === "dashboard") && (
           <TabsContent value="dashboard"><FinancialDashboardTab /></TabsContent>
+        )}
+        {allowedTabs.some((t) => t.key === "solicitacoes") && (
+          <TabsContent value="solicitacoes"><SolicitacoesTab /></TabsContent>
         )}
         {allowedTabs.some((t) => t.key === "pagar") && (
           <TabsContent value="pagar"><ContasAPagar /></TabsContent>
