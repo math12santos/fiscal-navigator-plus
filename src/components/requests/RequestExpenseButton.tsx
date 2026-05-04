@@ -275,7 +275,7 @@ export function RequestExpenseButton({
 
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1 mt-3">
               {/* Policies hint */}
-              {policies && policies.length > 0 && (
+              {subtype !== "ticket" && policies && policies.length > 0 && (
                 <Alert className="py-2">
                   <Info className="h-4 w-4" />
                   <AlertDescription className="text-xs">
