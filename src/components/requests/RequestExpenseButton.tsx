@@ -167,7 +167,7 @@ export function RequestExpenseButton({
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return;
-    if (requiresAttachment && files.length === 0) {
+    if (subtype !== "ticket" && requiresAttachment && files.length === 0) {
       toast({
         title: "Anexo obrigatório",
         description: "A política exige pelo menos um comprovante.",
@@ -175,29 +175,49 @@ export function RequestExpenseButton({
       });
       return;
     }
+    if (subtype === "ticket" && !form.target_department_id && !form.target_area.trim()) {
+      toast({
+        title: "Selecione o departamento de destino",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       setUploading(true);
-      const descPayload = {
+      const descPayload: any = {
         subtype,
         text: form.justificativa,
-        estimated_value: form.estimated_value ? Number(form.estimated_value) : null,
+        estimated_value: subtype === "ticket" ? null : (form.estimated_value ? Number(form.estimated_value) : null),
         ...(subtype === "reimbursement" && {
           data_gasto: form.data_gasto || null,
           forma_pagamento_pessoal: form.forma_pagamento_pessoal,
         }),
+        ...(subtype === "ticket" && {
+          target_department_id: form.target_department_id || null,
+          target_area: form.target_area || null,
+          sla_due_date: form.sla_due_date || null,
+          source_module: sourceModule,
+        }),
       };
+
+      const isTicket = subtype === "ticket";
+      const targetDept = departments.find((d: any) => d.id === form.target_department_id);
+      const requestType = isTicket ? "interdepartmental" : "expense_request";
+      const areaResp = isTicket
+        ? (form.target_area || (targetDept?.name ?? "operacoes"))
+        : "financeiro";
 
       const req = await createRequest.mutateAsync({
         title: form.title,
-        type: "expense_request",
-        area_responsavel: "financeiro",
+        type: requestType,
+        area_responsavel: areaResp,
         reference_module: sourceModule,
         priority: form.priority,
-        cost_center_id: form.cost_center_id || null,
+        cost_center_id: isTicket ? null : (form.cost_center_id || null),
         entity_id: subtype === "expense" ? (form.entity_id || null) : null,
-        account_id: form.account_id || null,
-        competencia: form.competencia || null,
-        data_vencimento: form.data_vencimento || null,
+        account_id: isTicket ? null : (form.account_id || null),
+        competencia: isTicket ? null : (form.competencia || null),
+        data_vencimento: isTicket ? (form.sla_due_date || null) : (form.data_vencimento || null),
         justificativa: form.justificativa || null,
         description: JSON.stringify(descPayload),
       });
@@ -205,8 +225,16 @@ export function RequestExpenseButton({
       await uploadAttachments(req.id);
 
       toast({
-        title: subtype === "reimbursement" ? "Reembolso enviado ao financeiro" : "Solicitação enviada ao financeiro",
-        description: currentSla ? `SLA de resposta: ${currentSla.sla_hours}h` : undefined,
+        title:
+          subtype === "ticket"
+            ? "Chamado aberto"
+            : subtype === "reimbursement"
+              ? "Reembolso enviado ao financeiro"
+              : "Solicitação enviada ao financeiro",
+        description:
+          subtype === "ticket"
+            ? `Encaminhado para ${areaResp}`
+            : currentSla ? `SLA de resposta: ${currentSla.sla_hours}h` : undefined,
       });
       setOpen(false);
       reset();
@@ -219,7 +247,7 @@ export function RequestExpenseButton({
 
   const canSubmit = form.title.trim() && !createRequest.isPending && !uploading;
   const hasSuggestion = !!(suggestedAccountId || suggestedCostCenterId);
-  const buttonLabel = label ?? "Solicitar Despesa";
+  const buttonLabel = label ?? "Abrir Chamado";
 
   return (
     <>
