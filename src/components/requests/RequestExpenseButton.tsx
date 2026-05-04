@@ -341,92 +341,152 @@ export function RequestExpenseButton({
                 </div>
               </TabsContent>
 
-              <div className="grid grid-cols-2 gap-3">
+              <TabsContent value="ticket" className="space-y-4 m-0">
                 <div>
-                  <Label>{subtype === "reimbursement" ? "Valor pago" : "Valor estimado"}</Label>
-                  <Input
-                    type="number"
-                    value={form.estimated_value}
-                    onChange={(e) => setForm({ ...form, estimated_value: e.target.value })}
-                    placeholder="0,00"
-                  />
-                </div>
-                <div>
-                  <Label>Vencimento previsto</Label>
-                  <Input
-                    type="date"
-                    value={form.data_vencimento}
-                    onChange={(e) => setForm({ ...form, data_vencimento: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Competência</Label>
-                  <Input
-                    type="month"
-                    value={form.competencia}
-                    onChange={(e) => setForm({ ...form, competencia: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Prioridade</Label>
-                  <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Label>Departamento de destino *</Label>
+                  <Select
+                    value={form.target_department_id}
+                    onValueChange={(v) => setForm({ ...form, target_department_id: v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecione o departamento..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="baixa">Baixa</SelectItem>
-                      <SelectItem value="media">Média</SelectItem>
-                      <SelectItem value="alta">Alta</SelectItem>
-                      <SelectItem value="urgente">Urgente</SelectItem>
+                      {departments.map((d: any) => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Ou informe a área manualmente abaixo, se o departamento não estiver cadastrado.
+                  </p>
+                  <Input
+                    className="mt-1"
+                    value={form.target_area}
+                    onChange={(e) => setForm({ ...form, target_area: e.target.value })}
+                    placeholder="Ex: Operações, PMO, Suprimentos..."
+                  />
                 </div>
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Prazo solicitado (SLA)</Label>
+                    <Input
+                      type="date"
+                      value={form.sla_due_date}
+                      onChange={(e) => setForm({ ...form, sla_due_date: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Prioridade</Label>
+                    <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="baixa">Baixa</SelectItem>
+                        <SelectItem value="media">Média</SelectItem>
+                        <SelectItem value="alta">Alta</SelectItem>
+                        <SelectItem value="urgente">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Alert className="py-2">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Este chamado será encaminhado ao departamento de destino. O acompanhamento de SLA aparecerá no módulo PMO/Operações (em breve).
+                  </AlertDescription>
+                </Alert>
+              </TabsContent>
+
+              {subtype !== "ticket" && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>{subtype === "reimbursement" ? "Valor pago" : "Valor estimado"}</Label>
+                      <Input
+                        type="number"
+                        value={form.estimated_value}
+                        onChange={(e) => setForm({ ...form, estimated_value: e.target.value })}
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div>
+                      <Label>Vencimento previsto</Label>
+                      <Input
+                        type="date"
+                        value={form.data_vencimento}
+                        onChange={(e) => setForm({ ...form, data_vencimento: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Competência</Label>
+                      <Input
+                        type="month"
+                        value={form.competencia}
+                        onChange={(e) => setForm({ ...form, competencia: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Prioridade</Label>
+                      <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="baixa">Baixa</SelectItem>
+                          <SelectItem value="media">Média</SelectItem>
+                          <SelectItem value="alta">Alta</SelectItem>
+                          <SelectItem value="urgente">Urgente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>
+                      Categoria (Plano de Contas)
+                      {suggestedAccountId && form.account_id === suggestedAccountId && (
+                        <Badge variant="secondary" className="ml-2 text-[10px] py-0">
+                          <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
+                        </Badge>
+                      )}
+                    </Label>
+                    <SearchableSelect
+                      options={analyticalAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${a.name}` }))}
+                      value={form.account_id}
+                      onValueChange={(v) => setForm({ ...form, account_id: v })}
+                      placeholder="Selecione a conta..."
+                    />
+                  </div>
+
+                  <div>
+                    <Label>
+                      Centro de Custo
+                      {suggestedCostCenterId && form.cost_center_id === suggestedCostCenterId && (
+                        <Badge variant="secondary" className="ml-2 text-[10px] py-0">
+                          <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
+                        </Badge>
+                      )}
+                    </Label>
+                    <Select value={form.cost_center_id} onValueChange={(v) => setForm({ ...form, cost_center_id: v })}>
+                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        {costCenters.map((cc: any) => (
+                          <SelectItem key={cc.id} value={cc.id}>{cc.code} — {cc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
 
               <div>
-                <Label>
-                  Categoria (Plano de Contas)
-                  {suggestedAccountId && form.account_id === suggestedAccountId && (
-                    <Badge variant="secondary" className="ml-2 text-[10px] py-0">
-                      <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
-                    </Badge>
-                  )}
-                </Label>
-                <SearchableSelect
-                  options={analyticalAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${a.name}` }))}
-                  value={form.account_id}
-                  onValueChange={(v) => setForm({ ...form, account_id: v })}
-                  placeholder="Selecione a conta..."
-                />
-              </div>
-
-              <div>
-                <Label>
-                  Centro de Custo
-                  {suggestedCostCenterId && form.cost_center_id === suggestedCostCenterId && (
-                    <Badge variant="secondary" className="ml-2 text-[10px] py-0">
-                      <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
-                    </Badge>
-                  )}
-                </Label>
-                <Select value={form.cost_center_id} onValueChange={(v) => setForm({ ...form, cost_center_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    {costCenters.map((cc: any) => (
-                      <SelectItem key={cc.id} value={cc.id}>{cc.code} — {cc.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Justificativa</Label>
+                <Label>{subtype === "ticket" ? "Descrição do chamado *" : "Justificativa"}</Label>
                 <Textarea
                   value={form.justificativa}
                   onChange={(e) => setForm({ ...form, justificativa: e.target.value })}
                   rows={3}
-                  placeholder="Descreva a necessidade ou contexto do gasto..."
+                  placeholder={subtype === "ticket"
+                    ? "Descreva a demanda, contexto e o que precisa ser entregue..."
+                    : "Descreva a necessidade ou contexto do gasto..."}
                 />
               </div>
 
