@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { SendHorizonal, Paperclip, X, Sparkles, Receipt, Wallet, Info } from "lucide-react";
+import { SendHorizonal, Paperclip, X, Sparkles, Receipt, Wallet, Info, Ticket } from "lucide-react";
 import { useCreateRequest } from "@/hooks/useRequests";
 import { useCostCenters } from "@/hooks/useCostCenters";
 import { useEntities } from "@/hooks/useEntities";
@@ -16,6 +16,7 @@ import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
 import { useSupplierClassificationHistory } from "@/hooks/useSupplierClassificationHistory";
 import { useExpensePolicies } from "@/hooks/useExpensePolicies";
 import { useRequestSlas } from "@/hooks/useRequestSlas";
+import { useDepartments } from "@/hooks/useDepartments";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -54,7 +55,7 @@ export function RequestExpenseButton({
   label,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [subtype, setSubtype] = useState<"expense" | "reimbursement">("expense");
+  const [subtype, setSubtype] = useState<"expense" | "reimbursement" | "ticket">("expense");
   const [form, setForm] = useState({
     title: "",
     justificativa: "",
@@ -68,6 +69,10 @@ export function RequestExpenseButton({
     // Reimbursement-only
     data_gasto: format(new Date(), "yyyy-MM-dd"),
     forma_pagamento_pessoal: "cartao_pessoal",
+    // Ticket-only
+    target_department_id: "",
+    target_area: "",
+    sla_due_date: "",
   });
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -76,8 +81,9 @@ export function RequestExpenseButton({
   const { costCenters } = useCostCenters();
   const { entities } = useEntities();
   const { accounts } = useChartOfAccounts();
-  const { policies } = useExpensePolicies({ sourceModule, subtype });
-  const { slas } = useRequestSlas({ sourceModule, subtype });
+  const { policies } = useExpensePolicies({ sourceModule, subtype: subtype === "ticket" ? "expense" : subtype });
+  const { slas } = useRequestSlas({ sourceModule, subtype: subtype === "ticket" ? "expense" : subtype });
+  const { data: departments = [] } = useDepartments();
   const { toast } = useToast();
   const { user } = useAuth();
   const { currentOrg } = useOrganization();
@@ -152,13 +158,16 @@ export function RequestExpenseButton({
       data_vencimento: "",
       data_gasto: format(new Date(), "yyyy-MM-dd"),
       forma_pagamento_pessoal: "cartao_pessoal",
+      target_department_id: "",
+      target_area: "",
+      sla_due_date: "",
     });
     setFiles([]);
   };
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return;
-    if (requiresAttachment && files.length === 0) {
+    if (subtype !== "ticket" && requiresAttachment && files.length === 0) {
       toast({
         title: "Anexo obrigatório",
         description: "A política exige pelo menos um comprovante.",
@@ -166,29 +175,49 @@ export function RequestExpenseButton({
       });
       return;
     }
+    if (subtype === "ticket" && !form.target_department_id && !form.target_area.trim()) {
+      toast({
+        title: "Selecione o departamento de destino",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       setUploading(true);
-      const descPayload = {
+      const descPayload: any = {
         subtype,
         text: form.justificativa,
-        estimated_value: form.estimated_value ? Number(form.estimated_value) : null,
+        estimated_value: subtype === "ticket" ? null : (form.estimated_value ? Number(form.estimated_value) : null),
         ...(subtype === "reimbursement" && {
           data_gasto: form.data_gasto || null,
           forma_pagamento_pessoal: form.forma_pagamento_pessoal,
         }),
+        ...(subtype === "ticket" && {
+          target_department_id: form.target_department_id || null,
+          target_area: form.target_area || null,
+          sla_due_date: form.sla_due_date || null,
+          source_module: sourceModule,
+        }),
       };
+
+      const isTicket = subtype === "ticket";
+      const targetDept = departments.find((d: any) => d.id === form.target_department_id);
+      const requestType = isTicket ? "interdepartmental" : "expense_request";
+      const areaResp = isTicket
+        ? (form.target_area || (targetDept?.name ?? "operacoes"))
+        : "financeiro";
 
       const req = await createRequest.mutateAsync({
         title: form.title,
-        type: "expense_request",
-        area_responsavel: "financeiro",
+        type: requestType,
+        area_responsavel: areaResp,
         reference_module: sourceModule,
         priority: form.priority,
-        cost_center_id: form.cost_center_id || null,
+        cost_center_id: isTicket ? null : (form.cost_center_id || null),
         entity_id: subtype === "expense" ? (form.entity_id || null) : null,
-        account_id: form.account_id || null,
-        competencia: form.competencia || null,
-        data_vencimento: form.data_vencimento || null,
+        account_id: isTicket ? null : (form.account_id || null),
+        competencia: isTicket ? null : (form.competencia || null),
+        data_vencimento: isTicket ? (form.sla_due_date || null) : (form.data_vencimento || null),
         justificativa: form.justificativa || null,
         description: JSON.stringify(descPayload),
       });
@@ -196,8 +225,16 @@ export function RequestExpenseButton({
       await uploadAttachments(req.id);
 
       toast({
-        title: subtype === "reimbursement" ? "Reembolso enviado ao financeiro" : "Solicitação enviada ao financeiro",
-        description: currentSla ? `SLA de resposta: ${currentSla.sla_hours}h` : undefined,
+        title:
+          subtype === "ticket"
+            ? "Chamado aberto"
+            : subtype === "reimbursement"
+              ? "Reembolso enviado ao financeiro"
+              : "Solicitação enviada ao financeiro",
+        description:
+          subtype === "ticket"
+            ? `Encaminhado para ${areaResp}`
+            : currentSla ? `SLA de resposta: ${currentSla.sla_hours}h` : undefined,
       });
       setOpen(false);
       reset();
@@ -210,32 +247,35 @@ export function RequestExpenseButton({
 
   const canSubmit = form.title.trim() && !createRequest.isPending && !uploading;
   const hasSuggestion = !!(suggestedAccountId || suggestedCostCenterId);
-  const buttonLabel = label ?? "Solicitar Despesa";
+  const buttonLabel = label ?? "Abrir Chamado";
 
   return (
     <>
       <Button size={size} variant={variant} onClick={() => setOpen(true)}>
-        <SendHorizonal className="h-4 w-4 mr-1" /> {buttonLabel}
+        <Ticket className="h-4 w-4 mr-1" /> {buttonLabel}
       </Button>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nova solicitação ao financeiro</DialogTitle>
+            <DialogTitle>
+              {subtype === "ticket" ? "Abrir chamado a outro departamento" : "Nova solicitação ao financeiro"}
+            </DialogTitle>
             <DialogDescription>
               Origem: <span className="font-medium">{MODULE_LABELS[sourceModule]}</span>
             </DialogDescription>
           </DialogHeader>
 
           <Tabs value={subtype} onValueChange={(v) => setSubtype(v as any)}>
-            <TabsList className="grid grid-cols-2">
+            <TabsList className="grid grid-cols-3">
               <TabsTrigger value="expense"><Receipt className="h-3.5 w-3.5 mr-1" /> Despesa</TabsTrigger>
               <TabsTrigger value="reimbursement"><Wallet className="h-3.5 w-3.5 mr-1" /> Reembolso</TabsTrigger>
+              <TabsTrigger value="ticket"><Ticket className="h-3.5 w-3.5 mr-1" /> Chamado</TabsTrigger>
             </TabsList>
 
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1 mt-3">
               {/* Policies hint */}
-              {policies && policies.length > 0 && (
+              {subtype !== "ticket" && policies && policies.length > 0 && (
                 <Alert className="py-2">
                   <Info className="h-4 w-4" />
                   <AlertDescription className="text-xs">
@@ -301,92 +341,152 @@ export function RequestExpenseButton({
                 </div>
               </TabsContent>
 
-              <div className="grid grid-cols-2 gap-3">
+              <TabsContent value="ticket" className="space-y-4 m-0">
                 <div>
-                  <Label>{subtype === "reimbursement" ? "Valor pago" : "Valor estimado"}</Label>
-                  <Input
-                    type="number"
-                    value={form.estimated_value}
-                    onChange={(e) => setForm({ ...form, estimated_value: e.target.value })}
-                    placeholder="0,00"
-                  />
-                </div>
-                <div>
-                  <Label>Vencimento previsto</Label>
-                  <Input
-                    type="date"
-                    value={form.data_vencimento}
-                    onChange={(e) => setForm({ ...form, data_vencimento: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Competência</Label>
-                  <Input
-                    type="month"
-                    value={form.competencia}
-                    onChange={(e) => setForm({ ...form, competencia: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Prioridade</Label>
-                  <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Label>Departamento de destino *</Label>
+                  <Select
+                    value={form.target_department_id}
+                    onValueChange={(v) => setForm({ ...form, target_department_id: v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecione o departamento..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="baixa">Baixa</SelectItem>
-                      <SelectItem value="media">Média</SelectItem>
-                      <SelectItem value="alta">Alta</SelectItem>
-                      <SelectItem value="urgente">Urgente</SelectItem>
+                      {departments.map((d: any) => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Ou informe a área manualmente abaixo, se o departamento não estiver cadastrado.
+                  </p>
+                  <Input
+                    className="mt-1"
+                    value={form.target_area}
+                    onChange={(e) => setForm({ ...form, target_area: e.target.value })}
+                    placeholder="Ex: Operações, PMO, Suprimentos..."
+                  />
                 </div>
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Prazo solicitado (SLA)</Label>
+                    <Input
+                      type="date"
+                      value={form.sla_due_date}
+                      onChange={(e) => setForm({ ...form, sla_due_date: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Prioridade</Label>
+                    <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="baixa">Baixa</SelectItem>
+                        <SelectItem value="media">Média</SelectItem>
+                        <SelectItem value="alta">Alta</SelectItem>
+                        <SelectItem value="urgente">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Alert className="py-2">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Este chamado será encaminhado ao departamento de destino. O acompanhamento de SLA aparecerá no módulo PMO/Operações (em breve).
+                  </AlertDescription>
+                </Alert>
+              </TabsContent>
+
+              {subtype !== "ticket" && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>{subtype === "reimbursement" ? "Valor pago" : "Valor estimado"}</Label>
+                      <Input
+                        type="number"
+                        value={form.estimated_value}
+                        onChange={(e) => setForm({ ...form, estimated_value: e.target.value })}
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div>
+                      <Label>Vencimento previsto</Label>
+                      <Input
+                        type="date"
+                        value={form.data_vencimento}
+                        onChange={(e) => setForm({ ...form, data_vencimento: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Competência</Label>
+                      <Input
+                        type="month"
+                        value={form.competencia}
+                        onChange={(e) => setForm({ ...form, competencia: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Prioridade</Label>
+                      <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="baixa">Baixa</SelectItem>
+                          <SelectItem value="media">Média</SelectItem>
+                          <SelectItem value="alta">Alta</SelectItem>
+                          <SelectItem value="urgente">Urgente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>
+                      Categoria (Plano de Contas)
+                      {suggestedAccountId && form.account_id === suggestedAccountId && (
+                        <Badge variant="secondary" className="ml-2 text-[10px] py-0">
+                          <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
+                        </Badge>
+                      )}
+                    </Label>
+                    <SearchableSelect
+                      options={analyticalAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${a.name}` }))}
+                      value={form.account_id}
+                      onValueChange={(v) => setForm({ ...form, account_id: v })}
+                      placeholder="Selecione a conta..."
+                    />
+                  </div>
+
+                  <div>
+                    <Label>
+                      Centro de Custo
+                      {suggestedCostCenterId && form.cost_center_id === suggestedCostCenterId && (
+                        <Badge variant="secondary" className="ml-2 text-[10px] py-0">
+                          <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
+                        </Badge>
+                      )}
+                    </Label>
+                    <Select value={form.cost_center_id} onValueChange={(v) => setForm({ ...form, cost_center_id: v })}>
+                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        {costCenters.map((cc: any) => (
+                          <SelectItem key={cc.id} value={cc.id}>{cc.code} — {cc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
 
               <div>
-                <Label>
-                  Categoria (Plano de Contas)
-                  {suggestedAccountId && form.account_id === suggestedAccountId && (
-                    <Badge variant="secondary" className="ml-2 text-[10px] py-0">
-                      <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
-                    </Badge>
-                  )}
-                </Label>
-                <SearchableSelect
-                  options={analyticalAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${a.name}` }))}
-                  value={form.account_id}
-                  onValueChange={(v) => setForm({ ...form, account_id: v })}
-                  placeholder="Selecione a conta..."
-                />
-              </div>
-
-              <div>
-                <Label>
-                  Centro de Custo
-                  {suggestedCostCenterId && form.cost_center_id === suggestedCostCenterId && (
-                    <Badge variant="secondary" className="ml-2 text-[10px] py-0">
-                      <Sparkles className="h-3 w-3 mr-0.5" /> Sugerido
-                    </Badge>
-                  )}
-                </Label>
-                <Select value={form.cost_center_id} onValueChange={(v) => setForm({ ...form, cost_center_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    {costCenters.map((cc: any) => (
-                      <SelectItem key={cc.id} value={cc.id}>{cc.code} — {cc.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Justificativa</Label>
+                <Label>{subtype === "ticket" ? "Descrição do chamado *" : "Justificativa"}</Label>
                 <Textarea
                   value={form.justificativa}
                   onChange={(e) => setForm({ ...form, justificativa: e.target.value })}
                   rows={3}
-                  placeholder="Descreva a necessidade ou contexto do gasto..."
+                  placeholder={subtype === "ticket"
+                    ? "Descreva a demanda, contexto e o que precisa ser entregue..."
+                    : "Descreva a necessidade ou contexto do gasto..."}
                 />
               </div>
 
@@ -423,7 +523,9 @@ export function RequestExpenseButton({
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={!canSubmit}>
-              {uploading || createRequest.isPending ? "Enviando..." : "Enviar Solicitação"}
+              {uploading || createRequest.isPending
+                ? "Enviando..."
+                : subtype === "ticket" ? "Abrir Chamado" : "Enviar Solicitação"}
             </Button>
           </DialogFooter>
         </DialogContent>
