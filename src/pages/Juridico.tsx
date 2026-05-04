@@ -9,6 +9,7 @@ import { JuridicoSettlementsTab } from "@/components/juridico/JuridicoSettlement
 import { JuridicoExpensesTab } from "@/components/juridico/JuridicoExpensesTab";
 import { JuridicoRiskMatrix } from "@/components/juridico/JuridicoRiskMatrix";
 import { JuridicoConfigTab } from "@/components/juridico/JuridicoConfigTab";
+import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
 
 export default function Juridico() {
   const [tab, setTab] = useUrlState("tab", "dashboard");
@@ -21,7 +22,9 @@ export default function Juridico() {
       <PageHeader
         title="Jurídico"
         description="Gestão de processos, riscos, provisões e impacto financeiro de contingências."
-      />
+      >
+        <RequestExpenseButton sourceModule="juridico" />
+      </PageHeader>
 
       <SectorOnboardingBar sector="juridico" onTabChange={setTab} />
 
