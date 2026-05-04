@@ -68,6 +68,14 @@ export default function DPColaboradores() {
     position_id: "", cost_center_id: "", status: "ativo", notes: "",
     comissao_tipo: "nenhuma", comissao_valor: "",
     vt_ativo: false, vt_diario: "",
+    // Pagamento
+    payment_method: "pix",
+    pix_key_type: "cpf",
+    pix_key: "",
+    bank_name: "", bank_code: "", bank_agency: "",
+    bank_account: "", bank_account_digit: "", bank_account_type: "corrente",
+    payment_holder_name: "", payment_holder_document: "",
+    payment_notes: "",
   });
   const [selectedBenefitIds, setSelectedBenefitIds] = useState<string[]>([]);
   // Map benefit_id -> custom_value (used for plano_saude where each employee has own price)
