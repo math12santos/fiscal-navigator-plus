@@ -55,7 +55,7 @@ export function RequestExpenseButton({
   label,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [subtype, setSubtype] = useState<"expense" | "reimbursement">("expense");
+  const [subtype, setSubtype] = useState<"expense" | "reimbursement" | "ticket">("expense");
   const [form, setForm] = useState({
     title: "",
     justificativa: "",
@@ -69,6 +69,10 @@ export function RequestExpenseButton({
     // Reimbursement-only
     data_gasto: format(new Date(), "yyyy-MM-dd"),
     forma_pagamento_pessoal: "cartao_pessoal",
+    // Ticket-only
+    target_department_id: "",
+    target_area: "",
+    sla_due_date: "",
   });
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -77,8 +81,9 @@ export function RequestExpenseButton({
   const { costCenters } = useCostCenters();
   const { entities } = useEntities();
   const { accounts } = useChartOfAccounts();
-  const { policies } = useExpensePolicies({ sourceModule, subtype });
-  const { slas } = useRequestSlas({ sourceModule, subtype });
+  const { policies } = useExpensePolicies({ sourceModule, subtype: subtype === "ticket" ? "expense" : subtype });
+  const { slas } = useRequestSlas({ sourceModule, subtype: subtype === "ticket" ? "expense" : subtype });
+  const { data: departments = [] } = useDepartments();
   const { toast } = useToast();
   const { user } = useAuth();
   const { currentOrg } = useOrganization();
