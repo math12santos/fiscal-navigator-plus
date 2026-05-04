@@ -252,22 +252,25 @@ export function RequestExpenseButton({
   return (
     <>
       <Button size={size} variant={variant} onClick={() => setOpen(true)}>
-        <SendHorizonal className="h-4 w-4 mr-1" /> {buttonLabel}
+        <Ticket className="h-4 w-4 mr-1" /> {buttonLabel}
       </Button>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nova solicitação ao financeiro</DialogTitle>
+            <DialogTitle>
+              {subtype === "ticket" ? "Abrir chamado a outro departamento" : "Nova solicitação ao financeiro"}
+            </DialogTitle>
             <DialogDescription>
               Origem: <span className="font-medium">{MODULE_LABELS[sourceModule]}</span>
             </DialogDescription>
           </DialogHeader>
 
           <Tabs value={subtype} onValueChange={(v) => setSubtype(v as any)}>
-            <TabsList className="grid grid-cols-2">
+            <TabsList className="grid grid-cols-3">
               <TabsTrigger value="expense"><Receipt className="h-3.5 w-3.5 mr-1" /> Despesa</TabsTrigger>
               <TabsTrigger value="reimbursement"><Wallet className="h-3.5 w-3.5 mr-1" /> Reembolso</TabsTrigger>
+              <TabsTrigger value="ticket"><Ticket className="h-3.5 w-3.5 mr-1" /> Chamado</TabsTrigger>
             </TabsList>
 
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1 mt-3">
