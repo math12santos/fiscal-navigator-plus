@@ -3139,6 +3139,59 @@ export type Database = {
           },
         ]
       }
+      expense_policies: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          max_value: number | null
+          organization_id: string
+          requires_attachment: boolean
+          source_module: string
+          subtype: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          max_value?: number | null
+          organization_id: string
+          requires_attachment?: boolean
+          source_module: string
+          subtype: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          max_value?: number | null
+          organization_id?: string
+          requires_attachment?: boolean
+          source_module?: string
+          subtype?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feature_flags: {
         Row: {
           created_at: string
@@ -8310,6 +8363,50 @@ export type Database = {
             columns: ["request_id"]
             isOneToOne: false
             referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      request_slas: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          organization_id: string
+          priority: string
+          sla_hours: number
+          source_module: string
+          subtype: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          organization_id: string
+          priority: string
+          sla_hours: number
+          source_module: string
+          subtype: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          organization_id?: string
+          priority?: string
+          sla_hours?: number
+          source_module?: string
+          subtype?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_slas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

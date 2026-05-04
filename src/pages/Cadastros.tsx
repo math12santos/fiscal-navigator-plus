@@ -16,6 +16,7 @@ import { useEntities, Entity } from "@/hooks/useEntities";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
 
 const ALL_TABS = [
   { key: "fornecedores", label: "Fornecedores" },
@@ -133,7 +134,9 @@ export default function Cadastros() {
         title="Cadastros"
         description="Fornecedores, Clientes, Produtos e Serviços"
         showHoldingToggle={false}
-      />
+      >
+        <RequestExpenseButton sourceModule="cadastros" label="Solicitar Compra" />
+      </PageHeader>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

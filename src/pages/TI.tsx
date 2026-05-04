@@ -12,6 +12,7 @@ import { DepreciationTab } from "@/components/ti/DepreciationTab";
 import { TIConfigTab } from "@/components/ti/TIConfigTab";
 import { TCOTab } from "@/components/ti/TCOTab";
 import { useEffect } from "react";
+import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
 
 export default function TI() {
   const [tab, setTab] = useUrlState("tab", "dashboard");
@@ -22,7 +23,9 @@ export default function TI() {
       <PageHeader
         title="TI & Patrimônio Tech"
         description="Equipamentos, sistemas, links, chamados, sinistros e integração financeira."
-      />
+      >
+        <RequestExpenseButton sourceModule="ti" />
+      </PageHeader>
 
       <SectorOnboardingBar sector="ti" onTabChange={setTab} />
 

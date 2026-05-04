@@ -14,9 +14,12 @@ import { ConciliacaoTab } from "@/components/financeiro/ConciliacaoTab";
 import { IntegracoesTab } from "@/components/financeiro/IntegracoesTab";
 import { FinancialDashboardTab } from "@/components/financeiro/dashboard/FinancialDashboardTab";
 import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
+import { SolicitacoesTab } from "@/components/financeiro/SolicitacoesTab";
+import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
 
 const ALL_TABS = [
   { key: "dashboard", label: "Dashboard" },
+  { key: "solicitacoes", label: "Solicitações" },
   { key: "pagar", label: "Contas a Pagar" },
   { key: "receber", label: "Contas a Receber" },
   { key: "aging", label: "Aging List" },
@@ -68,7 +71,9 @@ export default function Financeiro() {
       <PageHeader
         title="Financeiro"
         description="Gestão financeira completa: contas, fluxo de caixa, conciliação e importações"
-      />
+      >
+        <RequestExpenseButton sourceModule="financeiro" />
+      </PageHeader>
 
       <SectorOnboardingBar sector="financeiro" onTabChange={handleMaturityTabChange} />
 
@@ -80,6 +85,9 @@ export default function Financeiro() {
         </TabsList>
         {allowedTabs.some((t) => t.key === "dashboard") && (
           <TabsContent value="dashboard"><FinancialDashboardTab /></TabsContent>
+        )}
+        {allowedTabs.some((t) => t.key === "solicitacoes") && (
+          <TabsContent value="solicitacoes"><SolicitacoesTab /></TabsContent>
         )}
         {allowedTabs.some((t) => t.key === "pagar") && (
           <TabsContent value="pagar"><ContasAPagar /></TabsContent>

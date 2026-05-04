@@ -22,6 +22,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
 
 export default function CRM() {
   const { getAllowedTabs } = useUserPermissions();
@@ -116,7 +117,9 @@ export default function CRM() {
       <PageHeader
         title="CRM Comercial"
         description="Gestão de carteira, pipeline de vendas e inteligência comercial"
-      />
+      >
+        <RequestExpenseButton sourceModule="crm" />
+      </PageHeader>
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground animate-pulse">Carregando...</div>

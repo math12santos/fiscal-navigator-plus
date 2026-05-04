@@ -17,6 +17,7 @@ import DPEncargos from "@/components/dp/DPEncargos";
 import DPCargos from "@/components/dp/DPCargos";
 import DPBeneficios from "@/components/dp/DPBeneficios";
 import DPConfig from "@/components/dp/DPConfig";
+import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
 
 const ALL_TABS = [
   { key: "dashboard", label: "Dashboard" },
@@ -66,6 +67,7 @@ export default function DepartamentoPessoal() {
           <CalendarRange size={12} />
           <span>Ref. {format(new Date(), "MMM/yyyy", { locale: ptBR })}</span>
         </div>
+        <RequestExpenseButton sourceModule="dp" />
         <Button
           variant="outline"
           size="sm"
