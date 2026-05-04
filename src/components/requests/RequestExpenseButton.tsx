@@ -158,6 +158,9 @@ export function RequestExpenseButton({
       data_vencimento: "",
       data_gasto: format(new Date(), "yyyy-MM-dd"),
       forma_pagamento_pessoal: "cartao_pessoal",
+      target_department_id: "",
+      target_area: "",
+      sla_due_date: "",
     });
     setFiles([]);
   };
