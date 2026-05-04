@@ -121,6 +121,33 @@ export function EmployeeDossierDrawer({ open, onOpenChange, employee }: DossierP
               <Field label="VT Diário" value={employee.vt_ativo ? fmt(Number(employee.vt_diario || 0)) : "—"} />
               <Field label="Tempo de Casa" value={timeOfService(employee.admission_date)} />
             </div>
+
+            <div className="pt-3 border-t">
+              <Label className="text-xs font-semibold text-foreground">Informações de Pagamento</Label>
+              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                <Field label="Forma" value={paymentMethodLabel(employee.payment_method)} />
+                {employee.payment_method === "pix" && (
+                  <Field
+                    label={`PIX (${employee.pix_key_type || "—"})`}
+                    value={employee.pix_key || "—"}
+                  />
+                )}
+                {(employee.bank_name || employee.bank_account) && (
+                  <>
+                    <Field label="Banco" value={employee.bank_name ? `${employee.bank_name}${employee.bank_code ? ` (${employee.bank_code})` : ""}` : "—"} />
+                    <Field label="Agência / Conta" value={`${employee.bank_agency || "—"} / ${employee.bank_account || "—"}${employee.bank_account_digit ? `-${employee.bank_account_digit}` : ""}`} />
+                    <Field label="Tipo de Conta" value={accountTypeLabel(employee.bank_account_type)} />
+                  </>
+                )}
+                {employee.payment_holder_name && (
+                  <Field label="Titular" value={`${employee.payment_holder_name}${employee.payment_holder_document ? ` • ${employee.payment_holder_document}` : ""}`} />
+                )}
+              </div>
+              {employee.payment_notes && (
+                <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap">{employee.payment_notes}</p>
+              )}
+            </div>
+
             {employee.notes && (
               <div className="pt-2 border-t">
                 <Label className="text-xs text-muted-foreground">Observações</Label>
