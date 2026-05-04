@@ -14,9 +14,12 @@ import { ConciliacaoTab } from "@/components/financeiro/ConciliacaoTab";
 import { IntegracoesTab } from "@/components/financeiro/IntegracoesTab";
 import { FinancialDashboardTab } from "@/components/financeiro/dashboard/FinancialDashboardTab";
 import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
+import { SolicitacoesTab } from "@/components/financeiro/SolicitacoesTab";
+import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
 
 const ALL_TABS = [
   { key: "dashboard", label: "Dashboard" },
+  { key: "solicitacoes", label: "Solicitações" },
   { key: "pagar", label: "Contas a Pagar" },
   { key: "receber", label: "Contas a Receber" },
   { key: "aging", label: "Aging List" },
