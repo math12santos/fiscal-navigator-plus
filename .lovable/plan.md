@@ -1,115 +1,129 @@
-## Cache compartilhado de Dashboard
+## Objetivo
 
-### Como funciona
+Disponibilizar o botão **Solicitar Despesa / Reembolso** apenas nos módulos onde colaboradores efetivamente geram gastos operacionais — **DP, Jurídico, TI, CRM (Comercial), Financeiro e Cadastros (futuro Compras)** — e centralizar a triagem em uma nova aba **"Solicitações"** dentro do Financeiro, onde o time financeiro aprova, classifica e provisiona automaticamente no fluxo de caixa.
+
+---
+
+## 1. Componente unificado de solicitação
+
+Generalizar o atual `ExpenseRequestButton` (hoje específico do Financeiro) em um componente reutilizável:
+
+- Novo: `src/components/requests/RequestExpenseButton.tsx`
+  - Props: `sourceModule` (`dp` | `juridico` | `ti` | `crm` | `financeiro` | `cadastros`), `defaultCostCenterId?`, `variant?`, `size?`, `label?`.
+  - Tabs internas no Dialog: **Despesa** e **Reembolso**.
+    - Reembolso adiciona campos: `data_gasto`, `forma_pagamento_pessoal` (cartão pessoal / dinheiro / pix), e marca `subtype = 'reimbursement'` no payload.
+  - Mantém anexos (PDF/XML/imagens), sugestão por fornecedor, competência, vencimento, CC, conta contábil, prioridade, justificativa.
+  - Persiste `reference_module = sourceModule` para rastreabilidade da origem.
+- Deprecação suave: `ExpenseRequestButton.tsx` passa a re-exportar `RequestExpenseButton` com `sourceModule="financeiro"` para não quebrar `ContasAPagar`.
+
+---
+
+## 2. Inserção do botão por módulo
+
+Adicionar `<RequestExpenseButton sourceModule="..." />` no slot `children` do `PageHeader`:
+
+- `src/pages/DepartamentoPessoal.tsx` → `dp` (despesas/reembolsos do RH)
+- `src/pages/Juridico.tsx` → `juridico`
+- `src/pages/TI.tsx` → `ti`
+- `src/pages/CRM.tsx` → `crm` (Departamento Comercial — viagens, brindes, eventos)
+- `src/pages/Financeiro.tsx` → `financeiro` (despesas e reembolsos do próprio time)
+- `src/pages/Cadastros.tsx` → `cadastros` (futuro Compras)
+
+Nada em Contratos, Planejamento, Tarefas, Dashboard ou BackOffice.
+
+---
+
+## 3. Nova aba "Solicitações" no Financeiro
+
+Adicionar aba dedicada em `src/pages/Financeiro.tsx`:
+
+- Nova entrada em `ALL_TABS`: `{ key: "solicitacoes", label: "Solicitações" }` posicionada logo após **Dashboard**, com badge de contagem de pendentes.
+- Novo componente: `src/components/financeiro/SolicitacoesTab.tsx` no padrão `SectionCard` (DP-style).
+
+Estrutura interna (sub-tabs):
+
+1. **Pendentes** — fila a aprovar (status `aberta` / `em_revisao`).
+2. **Aprovadas** — já provisionadas, com link para a entrada no fluxo de caixa.
+3. **Rejeitadas** — histórico.
+4. **Todas** — visão completa com filtros (módulo origem, prioridade, período, solicitante, subtipo despesa/reembolso).
+5. SLAs - configuração de SLAs para cada novo tipo de solicitação e sessão para cadastrar políticas de despesas e reembolsos (SLAs para cada tipo de despesa Reembolso permitida) para manter transparência no processo. 
+
+Cada linha exibe: título, solicitante, módulo de origem (badge colorido), subtipo (Despesa/Reembolso), valor estimado, vencimento, competência, prioridade, anexos.
+
+Ações por solicitação pendente:
+
+- **Visualizar** (Drawer): detalhes completos, comentários, anexos, histórico de status.
+- **Aprovar e Provisionar** (CTA principal): abre wizard compacto.
+- **Solicitar ajuste** (devolve ao solicitante com comentário, status `em_revisao`).
+- **Rejeitar** (motivo obrigatório).
+
+A `PendingExpenseRequests` em `ContasAPagar` continua existindo como atalho rápido, mas ganha link "Ver todas" para a nova aba.
+
+---
+
+## 4. Wizard "Aprovar e Provisionar"
+
+Componente `src/components/financeiro/ApproveRequestDialog.tsx`:
+
+- Pré-preenche com dados da solicitação (fornecedor, conta, CC, valor estimado, vencimento, competência, anexos).
+- Permite ajustes finais: valor confirmado, parcelamento (1x ou Nx), forma de pagamento, conta bancária prevista, observações.
+- Para **reembolso**: força `entity_id` do colaborador (busca em `employees`/cria entidade `funcionario`) e fixa categoria contábil de reembolso.
+- Ao confirmar:
+  1. Cria `cashflow_entries` (status `provisionado`, `direction='out'`, `source='request'`, `source_ref='request:<id>'`).
+  2. Move/vincula anexos do bucket `request-attachments` para `cashflow-attachments`.
+  3. Atualiza `requests`: `status='aprovada'`, `cashflow_entry_id`, `classified_by`, `classified_at`.
+  4. Cria comentário/auditoria + notificação ao solicitante.
+  5. Trigger `bump_org_data_version` em `cashflow_entries` invalida snapshots/Aging List em tempo real.
+
+---
+
+## 5. Notificações & Realtime
+
+- Solicitante recebe notificação em cada transição: `aprovada`, `rejeitada`, `em_revisao`.
+- Time financeiro (papel `financeiro`/`admin`/`master`) recebe notificação em toda nova solicitação `aberta`.
+- `requests` já está em `useRealtimeSync`; adicionar invalidação da queryKey `requests-financeiro`.
+
+---
+
+## 6. Permissões
+
+- Sem migração nova; reaproveita RLS de `requests` (multi-tenant por `organization_id`).
+- Aba "Solicitações" visível para quem tem acesso a `financeiro`. Aprovar/rejeitar exige papel `admin`/`financeiro`/`master` (validado no front via `useUserPermissions` + RLS no backend).
+- Botão em cada módulo respeita `useUserPermissions` do módulo de origem (ocultado para perfis somente-leitura).
+
+---
+
+## 7. Detalhes técnicos
+
+- Nenhuma mudança de schema — `requests`, `request_attachments`, `request_comments` já têm os campos necessários (`reference_module`, `cashflow_entry_id`, `entity_id`, `account_id`, `competencia`, `data_vencimento`, `justificativa`).
+- Subtipo despesa vs. reembolso vai no campo `description` (JSON já usado): `{ subtype: 'expense' | 'reimbursement', text, estimated_value, ... }`. Helper `parseRequestDescription` centraliza leitura.
+- Provisionamento usa `cashflow_entries.status = 'provisionado'` e marca `source = 'request'` para rastreabilidade MECE.
+- Memória `mem://features/financial-expense-requests` será atualizada: origem multi-módulo (DP/Jurídico/TI/CRM/Financeiro/Cadastros), aba dedicada, wizard de provisionamento, suporte a reembolso.
+
+---
+
+## Entregáveis
 
 ```text
-Usuário lança/edita dado
-        │
-        ▼
-Trigger AFTER INSERT/UPDATE/DELETE
-        │  (cashflow_entries, contracts, contract_installments,
-        │   liabilities, crm_opportunities, payroll_items, payroll_runs)
-        ▼
-org_data_version.version += 1   ← marcador "houve mudança"
-        │
-        ▼
-Próxima leitura do Dashboard (qualquer usuário da org)
-        │
-        ▼
-get_dashboard_snapshot(org, mês)
-   ├─ Se snapshot.data_version >= versão atual E stale_at > now()
-   │     → devolve cache em ~50ms  (cache_hit=true)
-   └─ Senão recomputa síncrono e grava (cache_hit=false)
+Novo
+  src/components/requests/RequestExpenseButton.tsx
+  src/components/financeiro/SolicitacoesTab.tsx
+  src/components/financeiro/ApproveRequestDialog.tsx
+  src/components/financeiro/RequestDetailDrawer.tsx
 
-Cron a cada 3h:
-   edge function dashboard-snapshot-warmer percorre orgs ativas
-   e chama recompute_dashboard_snapshot — primeiro usuário do dia
-   nunca paga o custo.
+Editado
+  src/components/financeiro/ExpenseRequestButton.tsx  (re-export do novo)
+  src/components/financeiro/ContasAPagar.tsx          (link "Ver todas")
+  src/pages/Financeiro.tsx                            (nova aba + botão header)
+  src/pages/DepartamentoPessoal.tsx                   (botão)
+  src/pages/Juridico.tsx                              (botão)
+  src/pages/TI.tsx                                    (botão)
+  src/pages/CRM.tsx                                   (botão)
+  src/pages/Cadastros.tsx                             (botão)
+  src/hooks/useRequests.ts                            (filtro reference_module)
+  src/hooks/useRealtimeSync.ts                        (queryKey nova)
+  .lovable/memory/features/financial-expense-requests.md
+  .lovable/plan.md
 ```
 
-**Resultado prático:**
-- Sem mudança nas últimas N horas → snapshot quente, abre instantâneo.
-- Logo após alguém lançar dado → próxima abertura recomputa uma vez (~500ms) e os outros usuários da empresa já leem o cache fresco.
-- Usuário sempre vê o número certo; nunca um número antigo.
-
----
-
-### Entregáveis
-
-#### 1. Migration `dashboard_snapshot_cache.sql`
-
-Cria:
-- **`org_data_version (organization_id, version, updated_at)`** — contador monotônico por org.
-- **`dashboard_snapshots (organization_id, reference_month, payload jsonb, data_version, computed_at, stale_at)`** com PK composta. RLS: SELECT para membros da org e BackOffice.
-- **Função `bump_org_data_version()`** + triggers `AFTER INSERT/UPDATE/DELETE` em: `cashflow_entries`, `contracts`, `contract_installments`, `liabilities`, `crm_opportunities`, `payroll_items`, `payroll_runs`. Cada mutação faz 1 UPSERT no contador da org (custo ~µs).
-- **`recompute_dashboard_snapshot(org, ref_month) → jsonb`** SECURITY DEFINER. Chama as RPCs já existentes `get_dashboard_kpis` e `get_cashflow_summary_by_period`, agrega current/previous month, expense_by_category e avg_payroll, faz UPSERT no snapshot com `stale_at = now() + 3h` e `data_version = versão atual da org`.
-- **`get_dashboard_snapshot(org, ref_month, force boolean default false) → jsonb`** SECURITY DEFINER. Valida acesso (`is_org_member` ou `has_backoffice_org_access`); se `stale_at > now()` E `snapshot.data_version >= org_data_version.version` → retorna cache; senão chama `recompute_dashboard_snapshot`. Retorno: `{ payload, computed_at, data_version, cache_hit }`.
-- **`list_orgs_for_snapshot_warmup() → table(org, ref_month)`** — orgs com mutação nos últimos 30 dias.
-
-#### 2. Edge function `dashboard-snapshot-warmer`
-
-`supabase/functions/dashboard-snapshot-warmer/index.ts`:
-- Service role client.
-- Lista orgs via `list_orgs_for_snapshot_warmup`.
-- Para cada uma, chama `recompute_dashboard_snapshot`.
-- Loga total processado.
-
-Agendamento via `pg_cron` a cada 3h (insert via tool, contém URL/anon key específicos do projeto).
-
-#### 3. Hook + UI
-
-**`src/hooks/useDashboardSnapshot.ts`** (novo):
-```ts
-useQuery({
-  queryKey: ["dashboard-snapshot", orgId, refMonthIso],
-  queryFn: () => supabase.rpc("get_dashboard_snapshot", {
-    _organization_id: orgId,
-    _reference_month: refMonthIso,
-  }),
-  staleTime: 3 * 60 * 60_000,   // RQ alinhado com TTL do snapshot
-  gcTime: 4 * 60 * 60_000,
-  placeholderData: keepPreviousData,
-});
-```
-Retorna `{ payload, isLoading, isFetching, computedAt, cacheHit, refresh }`. `refresh()` chama com `_force=true` e invalida a query.
-
-**`Dashboard.tsx`** — refator focado:
-- Substitui `useFinancialSummary(rangeFrom, rangeTo)` pelo `useDashboardSnapshot(referenceMonth)` para tudo que vira KPI/gráfico (current/previous month, expense_by_category, contracts/liabilities/crm/payroll). 
-- O `useRealtimeSync` já existente continua chamando `qc.invalidateQueries(["dashboard-snapshot"])` em mudanças locais → invalidação instantânea no navegador (complementa a invalidação por DB version).
-- Mantém `useCashFlow`/`useContracts` apenas se preciso para listas detalhadas — Dashboard não usa.
-- Adiciona no header pequeno indicador: `Atualizado HH:mm` + botão `Atualizar agora` (chama `refresh()`).
-- `useFinancialSummary` permanece para `Planejamento`/`Cockpit` que usam `entries` brutos.
-
-#### 4. Memória de arquitetura
-
-`mem://architecture/dashboard-snapshot-cache` documentando:
-- Padrão (org_data_version + snapshot + warmer);
-- Tabelas trackeadas e como adicionar novas;
-- TTL 3h e por que (balance entre custo de recompute e frescor "cega");
-- Como reusar para `BackofficeDashboard` (saas-kpis), `Financeiro/dashboard` e `Planejamento/cockpit` em fases futuras.
-
----
-
-### Notas técnicas
-
-- `bump_org_data_version` usa `SECURITY DEFINER` + `SET search_path = public` (boas práticas Lovable).
-- Snapshot é `SECURITY DEFINER` mas com check explícito `is_org_member OR has_backoffice_org_access` no read — equivalente a RLS, sem o overhead de re-aplicar RLS em cada subquery do recompute.
-- Triggers são leves (1 UPSERT). Mesmo bulk imports só pagam isso por linha — aceitável; se virar gargalo, podemos converter para `AFTER STATEMENT`.
-- `data_version` no snapshot resolve race condition: se uma escrita pingou o counter entre o snapshot e a leitura, a comparação `snapshot.data_version >= current_version` falha e força recompute.
-- `keepPreviousData` no React Query mantém a tela populada enquanto recomputa — sem flicker.
-
-### Fora de escopo (próxima onda, se aprovado)
-Aplicar mesmo padrão a `BackofficeDashboard` (KPIs SaaS), `Planejamento` cockpit e `Financeiro` dashboard.
-
-Aprovação para executar?
-
-
----
-
-## Dashboard Snapshot Cache (concluído)
-
-- Migration `20260503_dashboard_snapshot_cache`: tabelas `org_data_version` e `dashboard_snapshots`, função `bump_org_data_version()` + triggers em 7 tabelas, RPCs `recompute_dashboard_snapshot`, `get_dashboard_snapshot` e `list_orgs_for_snapshot_warmup`.
-- Edge function `dashboard-snapshot-warmer` deployada + cron `dashboard-snapshot-warmer-3h` (a cada 3h).
-- Hook `src/hooks/useDashboardSnapshot.ts` (RPC + refresh manual).
-- `Dashboard.tsx`: invalidação `["dashboard-snapshot"]` no `useRealtimeSync`, badge `Atualizado HH:mm` + botão refresh no header.
-- Memória: `mem://architecture/dashboard-snapshot-cache`.
+Aprovar para eu implementar?
