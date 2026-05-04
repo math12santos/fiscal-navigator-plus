@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Edit2, Trash2, UserMinus, TrendingUp, FileUp } from "lucide-react";
 import TerminationSimulatorDialog from "./TerminationSimulatorDialog";
 import { EmployeeDossierDrawer } from "./EmployeeDossierDrawer";
@@ -66,6 +68,14 @@ export default function DPColaboradores() {
     position_id: "", cost_center_id: "", status: "ativo", notes: "",
     comissao_tipo: "nenhuma", comissao_valor: "",
     vt_ativo: false, vt_diario: "",
+    // Pagamento
+    payment_method: "pix",
+    pix_key_type: "cpf",
+    pix_key: "",
+    bank_name: "", bank_code: "", bank_agency: "",
+    bank_account: "", bank_account_digit: "", bank_account_type: "corrente",
+    payment_holder_name: "", payment_holder_document: "",
+    payment_notes: "",
   });
   const [selectedBenefitIds, setSelectedBenefitIds] = useState<string[]>([]);
   // Map benefit_id -> custom_value (used for plano_saude where each employee has own price)
@@ -101,7 +111,16 @@ export default function DPColaboradores() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT", salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "", status: "ativo", notes: "", comissao_tipo: "nenhuma", comissao_valor: "", vt_ativo: false, vt_diario: "" });
+    setForm({
+      name: "", cpf: "", email: "", phone: "", admission_date: "", contract_type: "CLT",
+      salary_base: "", workload_hours: "44", position_id: "", cost_center_id: "",
+      status: "ativo", notes: "", comissao_tipo: "nenhuma", comissao_valor: "",
+      vt_ativo: false, vt_diario: "",
+      payment_method: "pix", pix_key_type: "cpf", pix_key: "",
+      bank_name: "", bank_code: "", bank_agency: "",
+      bank_account: "", bank_account_digit: "", bank_account_type: "corrente",
+      payment_holder_name: "", payment_holder_document: "", payment_notes: "",
+    });
     setSelectedBenefitIds([]);
     setBenefitCustomValues({});
     setDialogOpen(true);
@@ -117,6 +136,18 @@ export default function DPColaboradores() {
       status: e.status, notes: e.notes || "",
       comissao_tipo: e.comissao_tipo || "nenhuma", comissao_valor: String(e.comissao_valor || ""),
       vt_ativo: e.vt_ativo || false, vt_diario: String(e.vt_diario || ""),
+      payment_method: e.payment_method || "pix",
+      pix_key_type: e.pix_key_type || "cpf",
+      pix_key: e.pix_key || "",
+      bank_name: e.bank_name || "",
+      bank_code: e.bank_code || "",
+      bank_agency: e.bank_agency || "",
+      bank_account: e.bank_account || "",
+      bank_account_digit: e.bank_account_digit || "",
+      bank_account_type: e.bank_account_type || "corrente",
+      payment_holder_name: e.payment_holder_name || "",
+      payment_holder_document: e.payment_holder_document || "",
+      payment_notes: e.payment_notes || "",
     });
     const empBenefits = allEmployeeBenefits.filter((eb: any) => eb.employee_id === e.id);
     setSelectedBenefitIds(empBenefits.map((eb: any) => eb.benefit_id));
@@ -403,11 +434,18 @@ export default function DPColaboradores() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar Colaborador" : "Novo Colaborador"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <Tabs defaultValue="dados" className="space-y-4">
+            <TabsList className="bg-muted/40 border border-border p-1 h-auto w-full">
+              <TabsTrigger value="dados" className="text-xs flex-1">Dados Cadastrais</TabsTrigger>
+              <TabsTrigger value="pagamento" className="text-xs flex-1">Informações de Pagamento</TabsTrigger>
+              <TabsTrigger value="beneficios" className="text-xs flex-1" disabled={allBenefits.length === 0}>Benefícios</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dados" className="space-y-3 mt-0">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-1"><Label>Nome Completo</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div className="space-y-1"><Label>CPF</Label><Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" /></div>
@@ -490,104 +528,235 @@ export default function DPColaboradores() {
                 </div>
               )}
             </div>
-            {/* Benefícios */}
-            {allBenefits.length > 0 && (
-              <div className="space-y-2 pt-2 border-t">
-                <Label className="text-sm font-semibold">Benefícios</Label>
-                <p className="text-[10px] text-muted-foreground">
-                  Cada colaborador só pode receber 1 benefício por categoria (exceto "Outros"). Selecionar outro da mesma categoria substitui o anterior.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {allBenefits.filter((b: any) => b.active).map((b: any) => {
-                    const cat = b.category || "outros";
-                    const isSelected = selectedBenefitIds.includes(b.id);
-                    // Detecta conflito: outro benefício já selecionado, mesma categoria (não "outros"), e não é este
-                    const conflictWith = !isSelected && cat !== "outros"
-                      ? allBenefits.find((x: any) =>
-                          x.id !== b.id &&
-                          selectedBenefitIds.includes(x.id) &&
-                          (x.category || "outros") === cat
-                        )
-                      : null;
-                    return (
-                      <div key={b.id} className="flex flex-col gap-1">
-                        <label
-                          className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
-                            conflictWith ? "bg-warning/10 border border-warning/40" : "border border-transparent"
-                          }`}
-                          title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
-                        >
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => {
-                              setSelectedBenefitIds((prev) => {
-                                if (!checked) {
-                                  // Limpa o custom_value desse benefício ao desmarcar
-                                  setBenefitCustomValues((cv) => {
-                                    const next = { ...cv };
-                                    delete next[b.id];
-                                    return next;
-                                  });
-                                  return prev.filter((id) => id !== b.id);
-                                }
-                                // Substituir outros benefícios da mesma categoria (exceto "outros")
-                                if (cat === "outros") return [...prev, b.id];
-                                const replaced = prev
-                                  .map((id) => allBenefits.find((x: any) => x.id === id))
-                                  .filter((x: any) => x && x.id !== b.id && (x.category || "outros") === cat);
-                                const next = prev.filter((id) => {
-                                  const other = allBenefits.find((x: any) => x.id === id);
-                                  return (other?.category || "outros") !== cat;
-                                });
-                                if (replaced.length > 0) {
-                                  toast({
-                                    title: "Benefício substituído",
-                                    description: `"${b.name}" substituiu "${replaced.map((r: any) => r.name).join(", ")}" na categoria ${cat}.`,
-                                  });
-                                }
-                                return [...next, b.id];
-                              });
-                            }}
-                          />
-                          <span className={conflictWith ? "font-medium" : ""}>{b.name}</span>
-                          {cat === "plano_saude" ? (
-                            <span className="text-muted-foreground text-xs">(valor manual)</span>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">
-                              ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
-                            </span>
-                          )}
-                          {conflictWith && (
-                            <span className="ml-auto text-[10px] text-warning font-medium">
-                              substitui {conflictWith.name}
-                            </span>
-                          )}
-                        </label>
-                        {isSelected && cat === "plano_saude" && (
-                          <div className="ml-7 flex items-center gap-2">
-                            <Label className="text-[11px] text-muted-foreground whitespace-nowrap">
-                              Valor mensal (R$) *
-                            </Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              className="h-7 text-sm"
-                              value={benefitCustomValues[b.id] ?? ""}
-                              onChange={(e) =>
-                                setBenefitCustomValues((cv) => ({ ...cv, [b.id]: e.target.value }))
-                              }
-                              placeholder="Ex: 350.00"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+            </TabsContent>
+
+            {/* Aba: Pagamento */}
+            <TabsContent value="pagamento" className="space-y-4 mt-0">
+              <div className="rounded-lg border border-border bg-card/50 p-3 text-xs text-muted-foreground">
+                Estes dados são usados para emissão de pagamentos da folha (salário, adiantamento, férias, rescisão e benefícios em dinheiro). Mantenha-os sempre atualizados.
+              </div>
+
+              <div className="space-y-1">
+                <Label>Forma de Pagamento Preferencial</Label>
+                <Select value={form.payment_method} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="ted">TED / Transferência</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* PIX */}
+              {form.payment_method === "pix" && (
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <Label className="text-sm font-semibold">Chave PIX</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tipo de chave</Label>
+                      <Select value={form.pix_key_type} onValueChange={(v) => setForm({ ...form, pix_key_type: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cpf">CPF</SelectItem>
+                          <SelectItem value="cnpj">CNPJ</SelectItem>
+                          <SelectItem value="email">Email</SelectItem>
+                          <SelectItem value="telefone">Telefone</SelectItem>
+                          <SelectItem value="aleatoria">Aleatória</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Chave PIX</Label>
+                      <Input
+                        value={form.pix_key}
+                        onChange={(e) => setForm({ ...form, pix_key: e.target.value })}
+                        placeholder="Informe a chave"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Conta bancária */}
+              {(form.payment_method === "ted" || form.payment_method === "pix") && (
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <Label className="text-sm font-semibold">
+                    Conta Bancária {form.payment_method === "pix" && <span className="text-muted-foreground text-xs font-normal">(opcional, fallback)</span>}
+                  </Label>
+                  <div className="grid grid-cols-6 gap-3">
+                    <div className="col-span-4 space-y-1">
+                      <Label className="text-xs">Banco</Label>
+                      <Input value={form.bank_name} onChange={(e) => setForm({ ...form, bank_name: e.target.value })} placeholder="Ex: Itaú Unibanco" />
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Código</Label>
+                      <Input value={form.bank_code} onChange={(e) => setForm({ ...form, bank_code: e.target.value })} placeholder="341" />
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Agência</Label>
+                      <Input value={form.bank_agency} onChange={(e) => setForm({ ...form, bank_agency: e.target.value })} placeholder="0000" />
+                    </div>
+                    <div className="col-span-3 space-y-1">
+                      <Label className="text-xs">Conta</Label>
+                      <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} placeholder="00000" />
+                    </div>
+                    <div className="col-span-1 space-y-1">
+                      <Label className="text-xs">Dígito</Label>
+                      <Input value={form.bank_account_digit} onChange={(e) => setForm({ ...form, bank_account_digit: e.target.value })} placeholder="0" />
+                    </div>
+                    <div className="col-span-3 space-y-1">
+                      <Label className="text-xs">Tipo de Conta</Label>
+                      <Select value={form.bank_account_type} onValueChange={(v) => setForm({ ...form, bank_account_type: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="corrente">Conta Corrente</SelectItem>
+                          <SelectItem value="poupanca">Conta Poupança</SelectItem>
+                          <SelectItem value="salario">Conta Salário</SelectItem>
+                          <SelectItem value="pagamento">Conta Pagamento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Titular (caso pagamento para terceiro) */}
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label className="text-sm font-semibold">Titular do Pagamento</Label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Preencha apenas se diferente do colaborador.
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nome do Titular</Label>
+                    <Input
+                      value={form.payment_holder_name}
+                      onChange={(e) => setForm({ ...form, payment_holder_name: e.target.value })}
+                      placeholder={form.name || "Nome completo do titular"}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">CPF / CNPJ do Titular</Label>
+                    <Input
+                      value={form.payment_holder_document}
+                      onChange={(e) => setForm({ ...form, payment_holder_document: e.target.value })}
+                      placeholder={form.cpf || "Documento do titular"}
+                    />
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Observações de Pagamento</Label>
+                <Textarea
+                  rows={2}
+                  value={form.payment_notes}
+                  onChange={(e) => setForm({ ...form, payment_notes: e.target.value })}
+                  placeholder="Instruções específicas, restrições, pagamentos divididos, etc."
+                />
+              </div>
+            </TabsContent>
+
+            {/* Aba: Benefícios */}
+            <TabsContent value="beneficios" className="space-y-3 mt-0">
+              {allBenefits.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Cada colaborador só pode receber 1 benefício por categoria (exceto "Outros"). Selecionar outro da mesma categoria substitui o anterior.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {allBenefits.filter((b: any) => b.active).map((b: any) => {
+                      const cat = b.category || "outros";
+                      const isSelected = selectedBenefitIds.includes(b.id);
+                      const conflictWith = !isSelected && cat !== "outros"
+                        ? allBenefits.find((x: any) =>
+                            x.id !== b.id &&
+                            selectedBenefitIds.includes(x.id) &&
+                            (x.category || "outros") === cat
+                          )
+                        : null;
+                      return (
+                        <div key={b.id} className="flex flex-col gap-1">
+                          <label
+                            className={`flex items-center gap-2 text-sm cursor-pointer rounded-md p-1.5 transition-colors ${
+                              conflictWith ? "bg-warning/10 border border-warning/40" : "border border-transparent"
+                            }`}
+                            title={conflictWith ? `Selecionar irá substituir "${conflictWith.name}" (mesma categoria: ${cat})` : undefined}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                setSelectedBenefitIds((prev) => {
+                                  if (!checked) {
+                                    setBenefitCustomValues((cv) => {
+                                      const next = { ...cv };
+                                      delete next[b.id];
+                                      return next;
+                                    });
+                                    return prev.filter((id) => id !== b.id);
+                                  }
+                                  if (cat === "outros") return [...prev, b.id];
+                                  const replaced = prev
+                                    .map((id) => allBenefits.find((x: any) => x.id === id))
+                                    .filter((x: any) => x && x.id !== b.id && (x.category || "outros") === cat);
+                                  const next = prev.filter((id) => {
+                                    const other = allBenefits.find((x: any) => x.id === id);
+                                    return (other?.category || "outros") !== cat;
+                                  });
+                                  if (replaced.length > 0) {
+                                    toast({
+                                      title: "Benefício substituído",
+                                      description: `"${b.name}" substituiu "${replaced.map((r: any) => r.name).join(", ")}" na categoria ${cat}.`,
+                                    });
+                                  }
+                                  return [...next, b.id];
+                                });
+                              }}
+                            />
+                            <span className={conflictWith ? "font-medium" : ""}>{b.name}</span>
+                            {cat === "plano_saude" ? (
+                              <span className="text-muted-foreground text-xs">(valor manual)</span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">
+                                ({b.type === "percentual" ? `${b.default_value}%` : `R$ ${Number(b.default_value).toFixed(2)}`})
+                              </span>
+                            )}
+                            {conflictWith && (
+                              <span className="ml-auto text-[10px] text-warning font-medium">
+                                substitui {conflictWith.name}
+                              </span>
+                            )}
+                          </label>
+                          {isSelected && cat === "plano_saude" && (
+                            <div className="ml-7 flex items-center gap-2">
+                              <Label className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                Valor mensal (R$) *
+                              </Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="h-7 text-sm"
+                                value={benefitCustomValues[b.id] ?? ""}
+                                onChange={(e) =>
+                                  setBenefitCustomValues((cv) => ({ ...cv, [b.id]: e.target.value }))
+                                }
+                                placeholder="Ex: 350.00"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={!form.name || !form.admission_date || create.isPending || update.isPending}>

@@ -2603,6 +2603,12 @@ export type Database = {
       employees: {
         Row: {
           admission_date: string
+          bank_account: string | null
+          bank_account_digit: string | null
+          bank_account_type: string | null
+          bank_agency: string | null
+          bank_code: string | null
+          bank_name: string | null
           comissao_tipo: string | null
           comissao_valor: number | null
           contract_id: string | null
@@ -2617,7 +2623,13 @@ export type Database = {
           name: string
           notes: string | null
           organization_id: string | null
+          payment_holder_document: string | null
+          payment_holder_name: string | null
+          payment_method: string | null
+          payment_notes: string | null
           phone: string | null
+          pix_key: string | null
+          pix_key_type: string | null
           position_id: string | null
           salary_base: number
           status: string
@@ -2629,6 +2641,12 @@ export type Database = {
         }
         Insert: {
           admission_date: string
+          bank_account?: string | null
+          bank_account_digit?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_code?: string | null
+          bank_name?: string | null
           comissao_tipo?: string | null
           comissao_valor?: number | null
           contract_id?: string | null
@@ -2643,7 +2661,13 @@ export type Database = {
           name: string
           notes?: string | null
           organization_id?: string | null
+          payment_holder_document?: string | null
+          payment_holder_name?: string | null
+          payment_method?: string | null
+          payment_notes?: string | null
           phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
           position_id?: string | null
           salary_base?: number
           status?: string
@@ -2655,6 +2679,12 @@ export type Database = {
         }
         Update: {
           admission_date?: string
+          bank_account?: string | null
+          bank_account_digit?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_code?: string | null
+          bank_name?: string | null
           comissao_tipo?: string | null
           comissao_valor?: number | null
           contract_id?: string | null
@@ -2669,7 +2699,13 @@ export type Database = {
           name?: string
           notes?: string | null
           organization_id?: string | null
+          payment_holder_document?: string | null
+          payment_holder_name?: string | null
+          payment_method?: string | null
+          payment_notes?: string | null
           phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
           position_id?: string | null
           salary_base?: number
           status?: string
