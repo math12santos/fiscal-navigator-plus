@@ -26,7 +26,8 @@ const STATUS_TONE: Record<string, string> = {
 
 export function EquipmentTab() {
   const { list, upsert, remove } = useITEquipment();
-  const [q, setQ] = useState("");
+  const { data: employees = [] } = useEmployees();
+  const empMap = useMemo(() => Object.fromEntries((employees ?? []).map((e: any) => [e.id, e.name])), [employees]);
   const [editing, setEditing] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
