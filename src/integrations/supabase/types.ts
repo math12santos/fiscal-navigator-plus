@@ -9622,6 +9622,9 @@ export type Database = {
         | "nobreak"
         | "periferico"
         | "outro"
+        | "eletrico_energia"
+        | "seguranca_controle"
+        | "apoio_operacional"
       it_impact_level: "baixo" | "medio" | "alto" | "critico"
       it_incident_status:
         | "registrado"
@@ -9959,6 +9962,9 @@ export const Constants = {
         "nobreak",
         "periferico",
         "outro",
+        "eletrico_energia",
+        "seguranca_controle",
+        "apoio_operacional",
       ],
       it_impact_level: ["baixo", "medio", "alto", "critico"],
       it_incident_status: [
