@@ -67,14 +67,15 @@ export function EquipmentTab() {
                 <th className="p-3">Código</th>
                 <th className="p-3">Nome</th>
                 <th className="p-3">Tipo</th>
+                <th className="p-3">Responsável</th>
                 <th className="p-3">Status</th>
-                <th className="p-3">Valor aquisição</th>
+                <th className="p-3 text-right">Valor aquisição</th>
                 <th className="p-3 w-48 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {list.isLoading && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Carregando...</td></tr>}
-              {!list.isLoading && rows.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Nenhum equipamento cadastrado.</td></tr>}
+              {list.isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Carregando...</td></tr>}
+              {!list.isLoading && rows.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Nenhum equipamento cadastrado.</td></tr>}
               {rows.map((e: any) => (
                 <tr key={e.id} className="border-t hover:bg-muted/30">
                   <td className="p-3 font-mono">{e.patrimonial_code}</td>
@@ -83,8 +84,16 @@ export function EquipmentTab() {
                     <div className="text-xs text-muted-foreground">{[e.brand, e.model].filter(Boolean).join(" ")}</div>
                   </td>
                   <td className="p-3 capitalize">{e.equipment_type?.replace(/_/g, " ")}</td>
+                  <td className="p-3">
+                    {e.responsible_employee_id ? (
+                      <span className="inline-flex items-center gap-1 text-sm"><User className="h-3 w-3" />{empMap[e.responsible_employee_id] ?? "—"}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Disponível</span>
+                    )}
+                    {e.home_office && <Badge variant="outline" className="ml-2 gap-1"><Home className="h-3 w-3" />HO</Badge>}
+                  </td>
                   <td className="p-3"><Badge className={STATUS_TONE[e.status] ?? ""}>{e.status?.replace(/_/g, " ")}</Badge></td>
-                  <td className="p-3">{fmt(Number(e.acquisition_value || 0))}</td>
+                  <td className="p-3 text-right tabular-nums">{fmt(Number(e.acquisition_value || 0))}</td>
                   <td className="p-3">
                     <div className="flex justify-end gap-1">
                       <Button size="sm" variant="ghost" title="Detalhes / Histórico" onClick={() => { setActiveEq(e); setDetailOpen(true); }}><Eye className="h-4 w-4" /></Button>
