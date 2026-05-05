@@ -28,6 +28,7 @@ export function EquipmentTab() {
   const { list, upsert, remove } = useITEquipment();
   const { data: employees = [] } = useEmployees();
   const empMap = useMemo(() => Object.fromEntries((employees ?? []).map((e: any) => [e.id, e.name])), [employees]);
+  const [q, setQ] = useState("");
   const [editing, setEditing] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
