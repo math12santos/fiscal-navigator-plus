@@ -5030,9 +5030,11 @@ export type Database = {
         Row: {
           account_id: string | null
           acquisition_date: string | null
+          acquisition_estimated_month: string | null
           acquisition_form:
             | Database["public"]["Enums"]["it_acquisition_form"]
             | null
+          acquisition_mode: string
           acquisition_value: number | null
           brand: string | null
           conservation_state:
@@ -5047,11 +5049,13 @@ export type Database = {
             | Database["public"]["Enums"]["it_economic_status"]
             | null
           enters_patrimonial_planning: boolean | null
+          equipment_subtype: string | null
           equipment_type: Database["public"]["Enums"]["it_equipment_type"]
           first_installment_date: string | null
           generates_future_installments: boolean | null
           generates_recurring_cost: boolean | null
           generates_replacement_forecast: boolean | null
+          home_office: boolean
           id: string
           installment_value: number | null
           installments_count: number | null
@@ -5059,6 +5063,7 @@ export type Database = {
           location: string | null
           model: string | null
           name: string
+          next_replacement_review_date: string | null
           notes: string | null
           organization_id: string
           patrimonial_code: string
@@ -5069,8 +5074,11 @@ export type Database = {
             | Database["public"]["Enums"]["it_criticality"]
             | null
           residual_value: number | null
+          responsibility_term_path: string | null
+          responsibility_term_signed: boolean
           responsible_employee_id: string | null
           serial_number: string | null
+          specs: Json
           status: Database["public"]["Enums"]["it_equipment_status"]
           supplier_entity_id: string | null
           updated_at: string
@@ -5080,9 +5088,11 @@ export type Database = {
         Insert: {
           account_id?: string | null
           acquisition_date?: string | null
+          acquisition_estimated_month?: string | null
           acquisition_form?:
             | Database["public"]["Enums"]["it_acquisition_form"]
             | null
+          acquisition_mode?: string
           acquisition_value?: number | null
           brand?: string | null
           conservation_state?:
@@ -5097,11 +5107,13 @@ export type Database = {
             | Database["public"]["Enums"]["it_economic_status"]
             | null
           enters_patrimonial_planning?: boolean | null
+          equipment_subtype?: string | null
           equipment_type: Database["public"]["Enums"]["it_equipment_type"]
           first_installment_date?: string | null
           generates_future_installments?: boolean | null
           generates_recurring_cost?: boolean | null
           generates_replacement_forecast?: boolean | null
+          home_office?: boolean
           id?: string
           installment_value?: number | null
           installments_count?: number | null
@@ -5109,6 +5121,7 @@ export type Database = {
           location?: string | null
           model?: string | null
           name: string
+          next_replacement_review_date?: string | null
           notes?: string | null
           organization_id: string
           patrimonial_code: string
@@ -5119,8 +5132,11 @@ export type Database = {
             | Database["public"]["Enums"]["it_criticality"]
             | null
           residual_value?: number | null
+          responsibility_term_path?: string | null
+          responsibility_term_signed?: boolean
           responsible_employee_id?: string | null
           serial_number?: string | null
+          specs?: Json
           status?: Database["public"]["Enums"]["it_equipment_status"]
           supplier_entity_id?: string | null
           updated_at?: string
@@ -5130,9 +5146,11 @@ export type Database = {
         Update: {
           account_id?: string | null
           acquisition_date?: string | null
+          acquisition_estimated_month?: string | null
           acquisition_form?:
             | Database["public"]["Enums"]["it_acquisition_form"]
             | null
+          acquisition_mode?: string
           acquisition_value?: number | null
           brand?: string | null
           conservation_state?:
@@ -5147,11 +5165,13 @@ export type Database = {
             | Database["public"]["Enums"]["it_economic_status"]
             | null
           enters_patrimonial_planning?: boolean | null
+          equipment_subtype?: string | null
           equipment_type?: Database["public"]["Enums"]["it_equipment_type"]
           first_installment_date?: string | null
           generates_future_installments?: boolean | null
           generates_recurring_cost?: boolean | null
           generates_replacement_forecast?: boolean | null
+          home_office?: boolean
           id?: string
           installment_value?: number | null
           installments_count?: number | null
@@ -5159,6 +5179,7 @@ export type Database = {
           location?: string | null
           model?: string | null
           name?: string
+          next_replacement_review_date?: string | null
           notes?: string | null
           organization_id?: string
           patrimonial_code?: string
@@ -5169,8 +5190,11 @@ export type Database = {
             | Database["public"]["Enums"]["it_criticality"]
             | null
           residual_value?: number | null
+          responsibility_term_path?: string | null
+          responsibility_term_signed?: boolean
           responsible_employee_id?: string | null
           serial_number?: string | null
+          specs?: Json
           status?: Database["public"]["Enums"]["it_equipment_status"]
           supplier_entity_id?: string | null
           updated_at?: string
@@ -9622,6 +9646,9 @@ export type Database = {
         | "nobreak"
         | "periferico"
         | "outro"
+        | "eletrico_energia"
+        | "seguranca_controle"
+        | "apoio_operacional"
       it_impact_level: "baixo" | "medio" | "alto" | "critico"
       it_incident_status:
         | "registrado"
@@ -9959,6 +9986,9 @@ export const Constants = {
         "nobreak",
         "periferico",
         "outro",
+        "eletrico_energia",
+        "seguranca_controle",
+        "apoio_operacional",
       ],
       it_impact_level: ["baixo", "medio", "alto", "critico"],
       it_incident_status: [
