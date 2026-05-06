@@ -5026,6 +5026,53 @@ export type Database = {
           },
         ]
       }
+      it_employee_kit_assignments: {
+        Row: {
+          assigned_at: string
+          created_at: string
+          created_by: string
+          employee_id: string
+          id: string
+          kit_id: string
+          notes: string | null
+          organization_id: string
+          returned_at: string | null
+          status: string
+        }
+        Insert: {
+          assigned_at?: string
+          created_at?: string
+          created_by: string
+          employee_id: string
+          id?: string
+          kit_id: string
+          notes?: string | null
+          organization_id: string
+          returned_at?: string | null
+          status?: string
+        }
+        Update: {
+          assigned_at?: string
+          created_at?: string
+          created_by?: string
+          employee_id?: string
+          id?: string
+          kit_id?: string
+          notes?: string | null
+          organization_id?: string
+          returned_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_employee_kit_assignments_kit_id_fkey"
+            columns: ["kit_id"]
+            isOneToOne: false
+            referencedRelation: "it_equipment_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       it_equipment: {
         Row: {
           account_id: string | null
@@ -5257,6 +5304,80 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      it_equipment_kit_items: {
+        Row: {
+          created_at: string
+          equipment_subtype: string | null
+          equipment_type: Database["public"]["Enums"]["it_equipment_type"]
+          id: string
+          kit_id: string
+          notes: string | null
+          quantity: number
+          suggested_specs: Json
+        }
+        Insert: {
+          created_at?: string
+          equipment_subtype?: string | null
+          equipment_type: Database["public"]["Enums"]["it_equipment_type"]
+          id?: string
+          kit_id: string
+          notes?: string | null
+          quantity?: number
+          suggested_specs?: Json
+        }
+        Update: {
+          created_at?: string
+          equipment_subtype?: string | null
+          equipment_type?: Database["public"]["Enums"]["it_equipment_type"]
+          id?: string
+          kit_id?: string
+          notes?: string | null
+          quantity?: number
+          suggested_specs?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_equipment_kit_items_kit_id_fkey"
+            columns: ["kit_id"]
+            isOneToOne: false
+            referencedRelation: "it_equipment_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_equipment_kits: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       it_equipment_movements: {
         Row: {
@@ -9328,6 +9449,26 @@ export type Database = {
         }
         Relationships: []
       }
+      it_equipment_by_employee: {
+        Row: {
+          employee_id: string | null
+          equipments: Json | null
+          home_office_count: number | null
+          next_review_date: string | null
+          organization_id: string | null
+          total_acquisition_value: number | null
+          total_equipments: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_equipment_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       apply_reconciliation_rules: {
@@ -9452,6 +9593,10 @@ export type Database = {
         Args: { p_org_id: string; p_user_id: string }
         Returns: boolean
       }
+      it_assign_kit_to_employee: {
+        Args: { p_employee_id: string; p_kit_id: string; p_notes?: string }
+        Returns: Json
+      }
       it_compute_tco: {
         Args: { p_from: string; p_org: string; p_to: string }
         Returns: {
@@ -9471,6 +9616,23 @@ export type Database = {
       it_generate_depreciation_schedule: {
         Args: { p_equipment_id: string }
         Returns: Json
+      }
+      it_get_lifecycle_alerts: {
+        Args: { p_org_id: string }
+        Returns: {
+          acquisition_date: string
+          alert_level: string
+          end_of_life_date: string
+          equipment_id: string
+          equipment_type: Database["public"]["Enums"]["it_equipment_type"]
+          months_remaining: number
+          name: string
+          next_replacement_review_date: string
+          patrimonial_code: string
+          responsible_employee_id: string
+          review_overdue: boolean
+          useful_life_economic_months: number
+        }[]
       }
       it_materialize_equipment_installments: {
         Args: { p_equipment_id: string }
