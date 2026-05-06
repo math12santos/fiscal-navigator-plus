@@ -1,0 +1,1 @@
+ALTER VIEW public.it_equipment_by_employee SET (security_invoker = on);

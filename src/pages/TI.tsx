@@ -4,6 +4,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { SectorOnboardingBar } from "@/components/sector-onboarding/SectorOnboardingBar";
 import { TIDashboard } from "@/components/ti/TIDashboard";
 import { EquipmentTab } from "@/components/ti/EquipmentTab";
+import { KitsTab } from "@/components/ti/KitsTab";
+import { EquipmentByEmployeeTab } from "@/components/ti/EquipmentByEmployeeTab";
+import { LifecycleTab } from "@/components/ti/LifecycleTab";
 import { SystemsTab } from "@/components/ti/SystemsTab";
 import { TelecomTab } from "@/components/ti/TelecomTab";
 import { TicketsTab } from "@/components/ti/TicketsTab";
@@ -33,6 +36,9 @@ export default function TI() {
         <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
           <TabsTrigger value="dashboard" className="text-xs">Dashboard</TabsTrigger>
           <TabsTrigger value="equipamentos" className="text-xs">Equipamentos</TabsTrigger>
+          <TabsTrigger value="por-colaborador" className="text-xs">Por colaborador</TabsTrigger>
+          <TabsTrigger value="kits" className="text-xs">Kits</TabsTrigger>
+          <TabsTrigger value="lifecycle" className="text-xs">Ciclo de vida</TabsTrigger>
           <TabsTrigger value="sistemas" className="text-xs">Sistemas</TabsTrigger>
           <TabsTrigger value="telecom" className="text-xs">Links / Telecom</TabsTrigger>
           <TabsTrigger value="chamados" className="text-xs">Chamados</TabsTrigger>
@@ -44,6 +50,9 @@ export default function TI() {
 
         <TabsContent value="dashboard"><TIDashboard /></TabsContent>
         <TabsContent value="equipamentos"><EquipmentTab /></TabsContent>
+        <TabsContent value="por-colaborador"><EquipmentByEmployeeTab /></TabsContent>
+        <TabsContent value="kits"><KitsTab /></TabsContent>
+        <TabsContent value="lifecycle"><LifecycleTab /></TabsContent>
         <TabsContent value="sistemas"><SystemsTab /></TabsContent>
         <TabsContent value="telecom"><TelecomTab /></TabsContent>
         <TabsContent value="chamados"><TicketsTab /></TabsContent>
