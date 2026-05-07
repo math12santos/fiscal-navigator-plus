@@ -167,16 +167,27 @@ export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPend
   const [showEntityDialog, setShowEntityDialog] = useState(false);
   const [showBankDialog, setShowBankDialog] = useState(false);
 
-  // Recalculate valor_previsto (líquido) when bruto/desconto/juros change
-  const valorLiquido = form.valor_bruto - form.valor_desconto + form.valor_juros_multa;
+  const isEntrada = tipo === "entrada";
+  const TIPOS_DOCUMENTO = isEntrada ? TIPOS_DOCUMENTO_ENTRADA : TIPOS_DOCUMENTO_SAIDA;
+  const NATUREZAS = isEntrada ? NATUREZAS_ENTRADA : NATUREZAS_SAIDA;
+  const STATUS_OPTIONS = isEntrada ? STATUS_OPTIONS_ENTRADA : STATUS_OPTIONS_SAIDA;
+  const TIPOS_CLASSIF = isEntrada ? TIPOS_RECEITA : TIPOS_DESPESA;
 
-  // Chart of accounts: level 2 (categories) and level 3 (subcategories)
-  const categorias = accounts.filter((a) => a.level === 2 && a.active && a.nature === "saida");
+  // Chart of accounts: filter by nature matching the lançamento direction
+  const categorias = accounts.filter(
+    (a) => a.level === 2 && a.active && a.nature === (isEntrada ? "entrada" : "saida")
+  );
   const selectedCatId = form.account_id;
   const subcategorias = accounts.filter((a) => a.level === 3 && a.active && a.parent_id === selectedCatId);
 
-  // Fornecedores
-  const fornecedores = entities.filter((e) => e.active && (e.type === "fornecedor" || e.type === "cliente_fornecedor"));
+  // Cliente (entrada) ou Fornecedor (saida)
+  const counterpartyEntities = entities.filter((e) =>
+    e.active && (
+      isEntrada
+        ? (e.type === "cliente" || e.type === "cliente_fornecedor")
+        : (e.type === "fornecedor" || e.type === "cliente_fornecedor")
+    )
+  );
 
   const set = <K extends keyof FinanceiroInput>(k: K, v: FinanceiroInput[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }));
