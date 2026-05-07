@@ -44,7 +44,22 @@ const TIPOS_DESPESA = [
   { value: "outros", label: "Outros" },
 ];
 
-const TIPOS_DOCUMENTO = [
+// Classificação de receitas / entradas de capital
+const TIPOS_RECEITA = [
+  { value: "receita_servicos", label: "Receita de Serviços" },
+  { value: "receita_produtos", label: "Receita de Produtos / Vendas" },
+  { value: "receita_recorrente", label: "Receita Recorrente (assinaturas)" },
+  { value: "receita_financeira", label: "Receita Financeira (juros/aplicações)" },
+  { value: "aporte_socios", label: "Aporte de Sócios" },
+  { value: "aporte_investidor", label: "Aporte de Investidor" },
+  { value: "emprestimo_recebido", label: "Empréstimo / Captação" },
+  { value: "venda_ativo", label: "Venda de Ativo" },
+  { value: "reembolso", label: "Reembolso / Estorno" },
+  { value: "subvencao", label: "Subvenção / Incentivo" },
+  { value: "outras_receitas", label: "Outras Receitas" },
+];
+
+const TIPOS_DOCUMENTO_SAIDA = [
   { value: "nota_fiscal", label: "Nota Fiscal" },
   { value: "fatura", label: "Fatura" },
   { value: "recibo", label: "Recibo" },
@@ -53,7 +68,17 @@ const TIPOS_DOCUMENTO = [
   { value: "guia", label: "Guia" },
 ];
 
-const NATUREZAS = [
+const TIPOS_DOCUMENTO_ENTRADA = [
+  { value: "nota_fiscal", label: "Nota Fiscal de Serviço/Venda" },
+  { value: "fatura", label: "Fatura / Boleto" },
+  { value: "recibo", label: "Recibo" },
+  { value: "contrato", label: "Contrato Nº" },
+  { value: "ted_doc", label: "Comprovante TED/PIX" },
+  { value: "termo_aporte", label: "Termo de Aporte" },
+  { value: "ccb", label: "CCB / Contrato de Mútuo" },
+];
+
+const NATUREZAS_SAIDA = [
   { value: "operacional", label: "Operacional" },
   { value: "administrativa", label: "Administrativa" },
   { value: "comercial", label: "Comercial" },
@@ -62,10 +87,27 @@ const NATUREZAS = [
   { value: "patrimonial", label: "Patrimonial" },
 ];
 
-const STATUS_OPTIONS = [
+const NATUREZAS_ENTRADA = [
+  { value: "operacional", label: "Operacional (atividade-fim)" },
+  { value: "nao_operacional", label: "Não Operacional" },
+  { value: "financeira", label: "Financeira" },
+  { value: "patrimonial", label: "Patrimonial (venda de ativo)" },
+  { value: "capital", label: "Entrada de Capital (aporte/empréstimo)" },
+];
+
+const STATUS_OPTIONS_SAIDA = [
   { value: "pendente", label: "Pendente" },
   { value: "agendada", label: "Agendada" },
   { value: "paga", label: "Paga" },
+  { value: "vencida", label: "Vencida" },
+  { value: "cancelada", label: "Cancelada" },
+  { value: "renegociada", label: "Renegociada" },
+];
+
+const STATUS_OPTIONS_ENTRADA = [
+  { value: "pendente", label: "Pendente" },
+  { value: "agendada", label: "Agendada" },
+  { value: "recebido", label: "Recebido" },
   { value: "vencida", label: "Vencida" },
   { value: "cancelada", label: "Cancelada" },
   { value: "renegociada", label: "Renegociada" },
@@ -125,16 +167,28 @@ export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPend
   const [showEntityDialog, setShowEntityDialog] = useState(false);
   const [showBankDialog, setShowBankDialog] = useState(false);
 
-  // Recalculate valor_previsto (líquido) when bruto/desconto/juros change
   const valorLiquido = form.valor_bruto - form.valor_desconto + form.valor_juros_multa;
+  const isEntrada = tipo === "entrada";
+  const TIPOS_DOCUMENTO = isEntrada ? TIPOS_DOCUMENTO_ENTRADA : TIPOS_DOCUMENTO_SAIDA;
+  const NATUREZAS = isEntrada ? NATUREZAS_ENTRADA : NATUREZAS_SAIDA;
+  const STATUS_OPTIONS = isEntrada ? STATUS_OPTIONS_ENTRADA : STATUS_OPTIONS_SAIDA;
+  const TIPOS_CLASSIF = isEntrada ? TIPOS_RECEITA : TIPOS_DESPESA;
 
-  // Chart of accounts: level 2 (categories) and level 3 (subcategories)
-  const categorias = accounts.filter((a) => a.level === 2 && a.active && a.nature === "saida");
+  // Chart of accounts: filter by nature matching the lançamento direction
+  const categorias = accounts.filter(
+    (a) => a.level === 2 && a.active && a.nature === (isEntrada ? "entrada" : "saida")
+  );
   const selectedCatId = form.account_id;
   const subcategorias = accounts.filter((a) => a.level === 3 && a.active && a.parent_id === selectedCatId);
 
-  // Fornecedores
-  const fornecedores = entities.filter((e) => e.active && (e.type === "fornecedor" || e.type === "cliente_fornecedor"));
+  // Cliente (entrada) ou Fornecedor (saida)
+  const counterpartyEntities = entities.filter((e) =>
+    e.active && (
+      isEntrada
+        ? (e.type === "cliente" || e.type === "cliente_fornecedor")
+        : (e.type === "fornecedor" || e.type === "cliente_fornecedor")
+    )
+  );
 
   const set = <K extends keyof FinanceiroInput>(k: K, v: FinanceiroInput[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }));
@@ -199,18 +253,18 @@ export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPend
               </div>
 
               <div className="space-y-2">
-                <Label>Fornecedor</Label>
+                <Label>{isEntrada ? "Cliente / Pagador" : "Fornecedor"}</Label>
                 <div className="flex gap-2">
                   <Select value={form.entity_id ?? "none"} onValueChange={(v) => set("entity_id", v === "none" ? null : v)}>
                     <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Nenhum</SelectItem>
-                      {fornecedores.map((e) => (
+                      {counterpartyEntities.map((e) => (
                         <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" size="icon" onClick={() => setShowEntityDialog(true)} title="Novo fornecedor">
+                  <Button variant="outline" size="icon" onClick={() => setShowEntityDialog(true)} title={isEntrada ? "Novo cliente" : "Novo fornecedor"}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -218,11 +272,11 @@ export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPend
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Tipo</Label>
+                  <Label>{isEntrada ? "Classificação da Receita" : "Tipo"}</Label>
                   <Select value={form.tipo_despesa ?? ""} onValueChange={(v) => set("tipo_despesa", v || null)}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
-                      {TIPOS_DESPESA.map((t) => (
+                      {TIPOS_CLASSIF.map((t) => (
                         <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                       ))}
                     </SelectContent>
