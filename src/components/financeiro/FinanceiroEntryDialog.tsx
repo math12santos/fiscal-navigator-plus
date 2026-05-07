@@ -253,18 +253,18 @@ export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPend
               </div>
 
               <div className="space-y-2">
-                <Label>Fornecedor</Label>
+                <Label>{isEntrada ? "Cliente / Pagador" : "Fornecedor"}</Label>
                 <div className="flex gap-2">
                   <Select value={form.entity_id ?? "none"} onValueChange={(v) => set("entity_id", v === "none" ? null : v)}>
                     <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Nenhum</SelectItem>
-                      {fornecedores.map((e) => (
+                      {counterpartyEntities.map((e) => (
                         <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" size="icon" onClick={() => setShowEntityDialog(true)} title="Novo fornecedor">
+                  <Button variant="outline" size="icon" onClick={() => setShowEntityDialog(true)} title={isEntrada ? "Novo cliente" : "Novo fornecedor"}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -272,11 +272,11 @@ export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPend
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Tipo</Label>
+                  <Label>{isEntrada ? "Classificação da Receita" : "Tipo"}</Label>
                   <Select value={form.tipo_despesa ?? ""} onValueChange={(v) => set("tipo_despesa", v || null)}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
-                      {TIPOS_DESPESA.map((t) => (
+                      {TIPOS_CLASSIF.map((t) => (
                         <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                       ))}
                     </SelectContent>
