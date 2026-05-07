@@ -167,6 +167,7 @@ export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPend
   const [showEntityDialog, setShowEntityDialog] = useState(false);
   const [showBankDialog, setShowBankDialog] = useState(false);
 
+  const valorLiquido = form.valor_bruto - form.valor_desconto + form.valor_juros_multa;
   const isEntrada = tipo === "entrada";
   const TIPOS_DOCUMENTO = isEntrada ? TIPOS_DOCUMENTO_ENTRADA : TIPOS_DOCUMENTO_SAIDA;
   const NATUREZAS = isEntrada ? NATUREZAS_ENTRADA : NATUREZAS_SAIDA;
