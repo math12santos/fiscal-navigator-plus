@@ -44,7 +44,22 @@ const TIPOS_DESPESA = [
   { value: "outros", label: "Outros" },
 ];
 
-const TIPOS_DOCUMENTO = [
+// Classificação de receitas / entradas de capital
+const TIPOS_RECEITA = [
+  { value: "receita_servicos", label: "Receita de Serviços" },
+  { value: "receita_produtos", label: "Receita de Produtos / Vendas" },
+  { value: "receita_recorrente", label: "Receita Recorrente (assinaturas)" },
+  { value: "receita_financeira", label: "Receita Financeira (juros/aplicações)" },
+  { value: "aporte_socios", label: "Aporte de Sócios" },
+  { value: "aporte_investidor", label: "Aporte de Investidor" },
+  { value: "emprestimo_recebido", label: "Empréstimo / Captação" },
+  { value: "venda_ativo", label: "Venda de Ativo" },
+  { value: "reembolso", label: "Reembolso / Estorno" },
+  { value: "subvencao", label: "Subvenção / Incentivo" },
+  { value: "outras_receitas", label: "Outras Receitas" },
+];
+
+const TIPOS_DOCUMENTO_SAIDA = [
   { value: "nota_fiscal", label: "Nota Fiscal" },
   { value: "fatura", label: "Fatura" },
   { value: "recibo", label: "Recibo" },
@@ -53,7 +68,17 @@ const TIPOS_DOCUMENTO = [
   { value: "guia", label: "Guia" },
 ];
 
-const NATUREZAS = [
+const TIPOS_DOCUMENTO_ENTRADA = [
+  { value: "nota_fiscal", label: "Nota Fiscal de Serviço/Venda" },
+  { value: "fatura", label: "Fatura / Boleto" },
+  { value: "recibo", label: "Recibo" },
+  { value: "contrato", label: "Contrato Nº" },
+  { value: "ted_doc", label: "Comprovante TED/PIX" },
+  { value: "termo_aporte", label: "Termo de Aporte" },
+  { value: "ccb", label: "CCB / Contrato de Mútuo" },
+];
+
+const NATUREZAS_SAIDA = [
   { value: "operacional", label: "Operacional" },
   { value: "administrativa", label: "Administrativa" },
   { value: "comercial", label: "Comercial" },
@@ -62,10 +87,27 @@ const NATUREZAS = [
   { value: "patrimonial", label: "Patrimonial" },
 ];
 
-const STATUS_OPTIONS = [
+const NATUREZAS_ENTRADA = [
+  { value: "operacional", label: "Operacional (atividade-fim)" },
+  { value: "nao_operacional", label: "Não Operacional" },
+  { value: "financeira", label: "Financeira" },
+  { value: "patrimonial", label: "Patrimonial (venda de ativo)" },
+  { value: "capital", label: "Entrada de Capital (aporte/empréstimo)" },
+];
+
+const STATUS_OPTIONS_SAIDA = [
   { value: "pendente", label: "Pendente" },
   { value: "agendada", label: "Agendada" },
   { value: "paga", label: "Paga" },
+  { value: "vencida", label: "Vencida" },
+  { value: "cancelada", label: "Cancelada" },
+  { value: "renegociada", label: "Renegociada" },
+];
+
+const STATUS_OPTIONS_ENTRADA = [
+  { value: "pendente", label: "Pendente" },
+  { value: "agendada", label: "Agendada" },
+  { value: "recebido", label: "Recebido" },
   { value: "vencida", label: "Vencida" },
   { value: "cancelada", label: "Cancelada" },
   { value: "renegociada", label: "Renegociada" },
