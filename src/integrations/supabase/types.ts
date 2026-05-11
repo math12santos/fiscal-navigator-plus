@@ -139,6 +139,10 @@ export type Database = {
           saldo_atual: number | null
           saldo_atualizado_em: string | null
           saldo_atualizado_por: string | null
+          saldo_ofx: number | null
+          saldo_ofx_atualizado_em: string | null
+          saldo_ofx_data: string | null
+          saldo_ofx_import_id: string | null
           tipo_conta: string | null
           user_id: string
         }
@@ -162,6 +166,10 @@ export type Database = {
           saldo_atual?: number | null
           saldo_atualizado_em?: string | null
           saldo_atualizado_por?: string | null
+          saldo_ofx?: number | null
+          saldo_ofx_atualizado_em?: string | null
+          saldo_ofx_data?: string | null
+          saldo_ofx_import_id?: string | null
           tipo_conta?: string | null
           user_id: string
         }
@@ -185,6 +193,10 @@ export type Database = {
           saldo_atual?: number | null
           saldo_atualizado_em?: string | null
           saldo_atualizado_por?: string | null
+          saldo_ofx?: number | null
+          saldo_ofx_atualizado_em?: string | null
+          saldo_ofx_data?: string | null
+          saldo_ofx_import_id?: string | null
           tipo_conta?: string | null
           user_id?: string
         }
