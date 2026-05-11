@@ -150,6 +150,32 @@ export function ReceiptsTab() {
               <Input type="date" value={form.data_emissao_nf || ""} onChange={(e) => setForm({ ...form, data_emissao_nf: e.target.value || null })} />
             </div>
             <div className="col-span-2">
+              <Label>Chave NF-e (44 dígitos)</Label>
+              <Input
+                value={form.nf_chave || ""}
+                onChange={(e) => setForm({ ...form, nf_chave: e.target.value })}
+                maxLength={54}
+                placeholder="0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000"
+                className="font-mono text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Validação automática (DV módulo 11). Divergência é aberta se a chave for inválida.
+              </p>
+            </div>
+            <div>
+              <Label>CNPJ emissor (NF)</Label>
+              <Input value={form.nf_cnpj || ""} onChange={(e) => setForm({ ...form, nf_cnpj: e.target.value })} placeholder="00.000.000/0000-00" />
+            </div>
+            <div>
+              <Label>Valor total NF (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.nf_valor ?? ""}
+                onChange={(e) => setForm({ ...form, nf_valor: e.target.value === "" ? null : Number(e.target.value) })}
+              />
+            </div>
+            <div className="col-span-2">
               <Label>Observação</Label>
               <Textarea value={form.observacao || ""} onChange={(e) => setForm({ ...form, observacao: e.target.value })} rows={2} />
             </div>
