@@ -432,6 +432,22 @@ export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPend
                   <p className="text-xs text-muted-foreground">Preenchida ao confirmar pagamento</p>
                 </div>
               </div>
+
+              {isEntrada && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Data de Assinatura do Contrato</Label>
+                    <Input
+                      type="date"
+                      value={form.data_assinatura ?? ""}
+                      onChange={(e) => set("data_assinatura", e.target.value || null)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Data em que o contrato comercial foi assinado pelo cliente.
+                    </p>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             {/* ───── TAB 3: Natureza Contábil ───── */}
