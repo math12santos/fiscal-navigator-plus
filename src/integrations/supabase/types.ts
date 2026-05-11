@@ -5133,6 +5133,7 @@ export type Database = {
           notes: string | null
           organization_id: string
           patrimonial_code: string
+          pending_wizard: boolean
           replacement_estimated_value: number | null
           replacement_forecast_date: string | null
           replacement_justification: string | null
@@ -5191,6 +5192,7 @@ export type Database = {
           notes?: string | null
           organization_id: string
           patrimonial_code: string
+          pending_wizard?: boolean
           replacement_estimated_value?: number | null
           replacement_forecast_date?: string | null
           replacement_justification?: string | null
@@ -5249,6 +5251,7 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           patrimonial_code?: string
+          pending_wizard?: boolean
           replacement_estimated_value?: number | null
           replacement_forecast_date?: string | null
           replacement_justification?: string | null
@@ -10716,6 +10719,20 @@ export type Database = {
       }
       etl_retry_failed: { Args: { p_job_id: string }; Returns: number }
       etl_retry_item: { Args: { p_item_id: string }; Returns: undefined }
+      fn_compras_ensure_workflow_task: {
+        Args: {
+          p_assignee: string
+          p_description: string
+          p_due: string
+          p_org_id: string
+          p_priority: string
+          p_ref_id: string
+          p_ref_module: string
+          p_title: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       fn_generate_recurring_purchases: {
         Args: { _horizonte_dias?: number; _org?: string }
         Returns: {
