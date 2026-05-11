@@ -25,6 +25,8 @@ const fmt = (v: number) =>
 const statusConfig: Record<string, { icon: typeof Circle; class: string; label: string }> = {
   previsto: { icon: Clock, class: "text-muted-foreground", label: "Previsto" },
   confirmado: { icon: CheckCircle, class: "text-warning", label: "Confirmado" },
+  pagamento_emitido: { icon: Banknote, class: "text-amber-600", label: "Em pagamento" },
+  recebimento_esperado: { icon: Banknote, class: "text-amber-600", label: "Recebimento esperado" },
   pago: { icon: CheckCircle, class: "text-success", label: "Pago" },
   recebido: { icon: CheckCircle, class: "text-success", label: "Recebido" },
   cancelado: { icon: Circle, class: "text-destructive", label: "Cancelado" },
@@ -33,13 +35,14 @@ const statusConfig: Record<string, { icon: typeof Circle; class: string; label: 
 interface Props {
   entries: FinanceiroEntry[];
   tipo: "saida" | "entrada";
-  onMarkAsPaid: (entry: { id: string; valor_realizado: number; data_realizada: string; isProjected: boolean }) => void;
+  onMarkAsPaid: (entry: { id: string; valor_realizado: number; data_realizada: string; isProjected: boolean; meio?: string | null }) => void;
+  onUndoIssued?: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit?: (entry: FinanceiroEntry) => void;
   isDeleting: boolean;
 }
 
-export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, onEdit, isDeleting }: Props) {
+export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onUndoIssued, onDelete, onEdit, isDeleting }: Props) {
   const { getMatchingRule, getGroupLabel, getMinItems, getSubGroupLabel } = useGroupingRules();
   const { macrogroups, groups } = useGroupingMacrogroups();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -114,7 +117,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, onEdit,
     }
   };
 
-  const actionLabel = tipo === "entrada" ? "Receber" : "Pagar";
+  const actionLabel = tipo === "entrada" ? "Registrar recebimento" : "Registrar pagamento";
 
   if (entries.length === 0) {
     return (
@@ -129,6 +132,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, onEdit,
     const sc = statusConfig[e.status] ?? statusConfig.previsto;
     const Icon = sc.icon;
     const isPending = e.status === "previsto" || e.status === "confirmado";
+    const isIssued = e.status === "pagamento_emitido" || e.status === "recebimento_esperado";
     const isManual = e.source === "manual";
 
     return (
@@ -167,6 +171,12 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, onEdit,
               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => openPay(e)}>
                 <Banknote size={14} />
                 {actionLabel}
+              </Button>
+            )}
+            {isIssued && onUndoIssued && !isProjected && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-amber-700"
+                title="Aguardando confirmação no extrato" onClick={() => onUndoIssued(e.id)}>
+                Desfazer emissão
               </Button>
             )}
             {isManual && !isProjected && onEdit && (
@@ -385,21 +395,25 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, onEdit,
       <Dialog open={!!payEntry} onOpenChange={() => setPayEntry(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{tipo === "entrada" ? "Confirmar Recebimento" : "Confirmar Pagamento"}</DialogTitle>
+            <DialogTitle>{tipo === "entrada" ? "Registrar recebimento esperado" : "Registrar pagamento emitido"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-xs text-amber-700">
+              Esta ação registra apenas a <strong>intenção / emissão</strong>.
+              O lançamento só vira <strong>realizado</strong> quando confirmado pelo extrato bancário.
+            </div>
             <div className="space-y-2">
-              <Label>Valor Realizado (R$)</Label>
+              <Label>Valor previsto (R$)</Label>
               <Input type="number" value={payValue} onChange={(e) => setPayValue(Number(e.target.value))} />
             </div>
             <div className="space-y-2">
-              <Label>{tipo === "entrada" ? "Data Recebimento" : "Data Pagamento"}</Label>
+              <Label>{tipo === "entrada" ? "Data prevista do recebimento" : "Data de emissão do pagamento"}</Label>
               <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayEntry(null)}>Cancelar</Button>
-            <Button onClick={confirmPay}>Confirmar</Button>
+            <Button onClick={confirmPay}>Registrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

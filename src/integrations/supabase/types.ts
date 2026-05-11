@@ -645,6 +645,7 @@ export type Database = {
           cost_center_id: string | null
           created_at: string
           data_assinatura: string | null
+          data_pagamento_emitido: string | null
           data_prevista: string
           data_prevista_pagamento: string | null
           data_realizada: string | null
@@ -663,6 +664,9 @@ export type Database = {
           notes: string | null
           num_parcelas: number | null
           organization_id: string | null
+          pagamento_emitido_em: string | null
+          pagamento_emitido_por: string | null
+          pagamento_meio: string | null
           purchase_order_id: string | null
           recorrencia: string | null
           source: string
@@ -696,6 +700,7 @@ export type Database = {
           cost_center_id?: string | null
           created_at?: string
           data_assinatura?: string | null
+          data_pagamento_emitido?: string | null
           data_prevista: string
           data_prevista_pagamento?: string | null
           data_realizada?: string | null
@@ -714,6 +719,9 @@ export type Database = {
           notes?: string | null
           num_parcelas?: number | null
           organization_id?: string | null
+          pagamento_emitido_em?: string | null
+          pagamento_emitido_por?: string | null
+          pagamento_meio?: string | null
           purchase_order_id?: string | null
           recorrencia?: string | null
           source?: string
@@ -747,6 +755,7 @@ export type Database = {
           cost_center_id?: string | null
           created_at?: string
           data_assinatura?: string | null
+          data_pagamento_emitido?: string | null
           data_prevista?: string
           data_prevista_pagamento?: string | null
           data_realizada?: string | null
@@ -765,6 +774,9 @@ export type Database = {
           notes?: string | null
           num_parcelas?: number | null
           organization_id?: string | null
+          pagamento_emitido_em?: string | null
+          pagamento_emitido_por?: string | null
+          pagamento_meio?: string | null
           purchase_order_id?: string | null
           recorrencia?: string | null
           source?: string
@@ -10757,6 +10769,26 @@ export type Database = {
         Args: { p_import_id?: string; p_org_id: string }
         Returns: Json
       }
+      close_fiscal_period: {
+        Args: { p_org_id: string; p_year_month: string }
+        Returns: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string | null
+          id: string
+          organization_id: string
+          reopened_at: string | null
+          reopened_by: string | null
+          status: string
+          year_month: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "fiscal_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       compute_health_score: { Args: { _org_id: string }; Returns: number }
       compute_purchase_tax_retentions: {
         Args: { _tipo: string; _valor: number }
@@ -10860,6 +10892,10 @@ export type Database = {
           _organization_id: string
           _reference_month: string
         }
+        Returns: Json
+      }
+      get_month_closing_readiness: {
+        Args: { p_org_id: string; p_year_month: string }
         Returns: Json
       }
       get_saas_kpis: { Args: never; Returns: Json }
@@ -11062,6 +11098,70 @@ export type Database = {
         Args: { p_cashflow_id: string; p_statement_id: string }
         Returns: undefined
       }
+      register_payment_issued: {
+        Args: { p_data_emissao?: string; p_entry_id: string; p_meio?: string }
+        Returns: {
+          account_id: string | null
+          acordo_id: string | null
+          afeta_caixa_no_vencimento: boolean | null
+          categoria: string | null
+          competencia: string | null
+          conciliacao_id: string | null
+          conta_bancaria_id: string | null
+          conta_contabil_ref: string | null
+          contract_id: string | null
+          contract_installment_id: string | null
+          cost_center_allocations: Json | null
+          cost_center_id: string | null
+          created_at: string
+          data_assinatura: string | null
+          data_pagamento_emitido: string | null
+          data_prevista: string
+          data_prevista_pagamento: string | null
+          data_realizada: string | null
+          data_vencimento: string | null
+          dedup_hash: string | null
+          descricao: string
+          documento: string | null
+          entity_id: string | null
+          expense_request_id: string | null
+          forma_pagamento: string | null
+          id: string
+          impacto_fluxo_caixa: boolean | null
+          impacto_orcamento: boolean | null
+          import_id: string | null
+          natureza_contabil: string | null
+          notes: string | null
+          num_parcelas: number | null
+          organization_id: string | null
+          pagamento_emitido_em: string | null
+          pagamento_emitido_por: string | null
+          pagamento_meio: string | null
+          purchase_order_id: string | null
+          recorrencia: string | null
+          source: string
+          source_ref: string | null
+          status: string
+          subcategoria_id: string | null
+          tax_retentions: Json | null
+          tipo: string
+          tipo_despesa: string | null
+          tipo_documento: string | null
+          updated_at: string
+          user_id: string
+          valor_bruto: number | null
+          valor_desconto: number | null
+          valor_juros_multa: number | null
+          valor_previsto: number
+          valor_realizado: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cashflow_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       remove_org_member: {
         Args: { _org_id: string; _target_user_id: string }
         Returns: undefined
@@ -11122,6 +11222,70 @@ export type Database = {
       snapshot_bank_balances_daily: {
         Args: { p_org_id: string; p_snapshot_date?: string }
         Returns: Json
+      }
+      undo_payment_issued: {
+        Args: { p_entry_id: string }
+        Returns: {
+          account_id: string | null
+          acordo_id: string | null
+          afeta_caixa_no_vencimento: boolean | null
+          categoria: string | null
+          competencia: string | null
+          conciliacao_id: string | null
+          conta_bancaria_id: string | null
+          conta_contabil_ref: string | null
+          contract_id: string | null
+          contract_installment_id: string | null
+          cost_center_allocations: Json | null
+          cost_center_id: string | null
+          created_at: string
+          data_assinatura: string | null
+          data_pagamento_emitido: string | null
+          data_prevista: string
+          data_prevista_pagamento: string | null
+          data_realizada: string | null
+          data_vencimento: string | null
+          dedup_hash: string | null
+          descricao: string
+          documento: string | null
+          entity_id: string | null
+          expense_request_id: string | null
+          forma_pagamento: string | null
+          id: string
+          impacto_fluxo_caixa: boolean | null
+          impacto_orcamento: boolean | null
+          import_id: string | null
+          natureza_contabil: string | null
+          notes: string | null
+          num_parcelas: number | null
+          organization_id: string | null
+          pagamento_emitido_em: string | null
+          pagamento_emitido_por: string | null
+          pagamento_meio: string | null
+          purchase_order_id: string | null
+          recorrencia: string | null
+          source: string
+          source_ref: string | null
+          status: string
+          subcategoria_id: string | null
+          tax_retentions: Json | null
+          tipo: string
+          tipo_despesa: string | null
+          tipo_documento: string | null
+          updated_at: string
+          user_id: string
+          valor_bruto: number | null
+          valor_desconto: number | null
+          valor_juros_multa: number | null
+          valor_previsto: number
+          valor_realizado: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cashflow_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       unreconcile_statement_entry: {
         Args: { p_statement_id: string }

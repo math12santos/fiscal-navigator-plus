@@ -13,7 +13,7 @@ import { ExpenseRequestButton } from "./ExpenseRequestButton";
 import { PendingExpenseRequests } from "./PendingExpenseRequests";
 import { ImportDialog } from "./ImportDialog";
 import { PMPMRKpiCard } from "./PMPMRKpiCard";
-import { Plus, Loader2, TrendingDown, Wallet, Clock, FileUp } from "lucide-react";
+import { Plus, Loader2, TrendingDown, Wallet, Clock, FileUp, Banknote } from "lucide-react";
 import { useUpdateRequest, type Request } from "@/hooks/useRequests";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -21,7 +21,7 @@ const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
 
 export function ContasAPagar() {
-  const { entries, totals, isLoading, create, markAsPaid, remove } = useFinanceiro("saida");
+  const { entries, totals, isLoading, create, markAsPaid, undoPaymentIssued, remove } = useFinanceiro("saida");
   const duplicates = useDuplicateDetection(entries);
   const updateRequest = useUpdateRequest();
   const { user } = useAuth();
@@ -152,11 +152,11 @@ export function ContasAPagar() {
 
   return (
     <div className="space-y-4">
-      {/* KPIs */}
+      {/* KPIs MECE: Previsto · Em pagamento · Pago · PMP */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard title="Total Previsto" value={fmt(totals.total_previsto)} icon={<TrendingDown size={20} />} />
-        <KPICard title="Total Pago" value={fmt(totals.total_realizado)} icon={<Wallet size={20} />} />
-        <KPICard title="Pendente" value={`${fmt(totals.pendente)} (${totals.count_pendente})`} icon={<Clock size={20} />} />
+        <KPICard title="Previsto" value={`${fmt(totals.pendente)} (${totals.count_pendente})`} icon={<Clock size={20} />} />
+        <KPICard title="Em pagamento" value={`${fmt(totals.em_pagamento)} (${totals.count_em_pagamento})`} icon={<Banknote size={20} />} />
+        <KPICard title="Pago (conciliado)" value={fmt(totals.total_realizado)} icon={<Wallet size={20} />} />
         <PMPMRKpiCard tipo="saida" />
       </div>
 
@@ -188,6 +188,7 @@ export function ContasAPagar() {
         entries={entries}
         tipo="saida"
         onMarkAsPaid={(data) => markAsPaid.mutate(data)}
+        onUndoIssued={(id) => undoPaymentIssued.mutate(id)}
         onDelete={(id) => remove.mutate(id)}
         isDeleting={remove.isPending}
       />

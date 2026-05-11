@@ -1,127 +1,98 @@
-## Princípio (MECE)
+# Reformulação MECE do Módulo Financeiro
 
-Toda linha de um extrato (OFX/XLSX/CSV/PDF) **precisa** terminar em exatamente um destes destinos. Nenhuma linha pode ser descartada silenciosamente.
+## Diagnóstico atual
 
+Hoje o sistema confunde **"intenção de pagar"** com **"pagamento efetivo"**:
+
+- `Contas a Pagar` tem botão "Marcar como pago" (`markAsPaid`) que **já grava** `status='pago'`, `valor_realizado` e `data_realizada` — sem nenhuma confirmação no extrato.
+- `Conciliação` também marca como `pago/recebido` ao vincular extrato. Resultado: dois caminhos diferentes geram o mesmo estado, quebrando MECE (um lançamento pode estar "pago" sem nunca ter saído do banco).
+- `Fechamento de mês` (`fiscal_periods`) existe, mas pode ser fechado mesmo com lançamentos previstos sem conciliação e linhas de extrato pendentes.
+- Solicitações de outros departamentos já caem corretamente em `previsto` via `ApproveRequestDialog`, mas depois seguem o mesmo fluxo ambíguo.
+
+## Princípio MECE alvo
+
+Toda movimentação financeira deve estar **em exatamente um** de três estados:
+
+```text
+PREVISTO              EM PAGAMENTO                 REALIZADO
+(planejamento)   →    (ação registrada,       →   (confirmado
+                       aguardando banco)           pelo extrato)
 ```
-linha do arquivo
-   ├─ Importada e conciliada (auto-match alto)            ← já existe
-   ├─ Importada e sugerida (match parcial, 1 clique)      ← já existe
-   ├─ Importada e classificada como realizado              ← já existe (ClassifyAndReconcile)
-   ├─ Vinculada a um previsto ainda não conciliado          ← NOVO
-   ├─ Vinculada a um previsto JÁ conciliado (corrigindo histórico)  ← NOVO
-   └─ Descartada com motivo (audit log)                    ← NOVO
+
+Regra dura: **só a conciliação bancária promove para REALIZADO**. Nenhum botão de outro módulo pode gravar `valor_realizado` / `data_realizada` / `status='pago|recebido'` diretamente.
+
+## Mudanças por área
+
+### 1. Modelo de dados (migration)
+
+Adicionar a `cashflow_entries`:
+- `status` ganha dois novos valores: `pagamento_emitido` (saída) e `recebimento_esperado` (entrada).
+- `data_pagamento_emitido date`, `pagamento_emitido_por uuid`, `pagamento_emitido_em timestamptz`, `pagamento_meio text` (pix/ted/boleto/cartao).
+- Trigger `cashflow_entries_status_guard`: bloqueia transições para `pago`/`recebido` se a linha não tiver `bank_statement_entry_id` vinculado (exceções: import histórico marcado com `source='import_historico'`).
+- Trigger `cashflow_entries_realized_fields`: `valor_realizado` e `data_realizada` só podem ser escritos a partir do fluxo de conciliação (RPC), nunca via update direto.
+
+Estado de `fiscal_periods`:
+- Nova coluna `fechamento_checklist jsonb` (snapshot do que foi validado).
+- RPC `close_fiscal_period(p_org, p_year_month)` — só aceita fechar quando:
+  1. 0 linhas em `bank_statement_entries` com `status='pendente'` no período;
+  2. 0 linhas em `bank_statement_staging` com `status='pendente'`;
+  3. 100% dos `cashflow_entries` com `data_vencimento` dentro do mês e `impacto_fluxo_caixa=true` estão em `pago`/`recebido` ou justificados (`status='cancelado'` com motivo).
+- RPC `get_month_closing_readiness(p_org, p_year_month)` retorna percentuais por bloco para o cabeçalho.
+
+### 2. Contas a Pagar / Receber
+
+- Renomear ação "Marcar como pago" para **"Registrar pagamento emitido"** (saída) e **"Registrar recebimento esperado"** (entrada).
+- Esta ação grava apenas: `status='pagamento_emitido'`, `data_pagamento_emitido`, `pagamento_meio`, `pagamento_emitido_por`. **Não** toca `valor_realizado` nem `data_realizada`.
+- Novo chip de status na tabela: `Previsto` (azul) · `Em pagamento` (âmbar) · `Pago/Recebido` (verde) · `Cancelado` (cinza).
+- Novo filtro/aba "Em pagamento aguardando extrato" mostrando idade do registro (alerta se >3 dias úteis sem conciliação).
+- Botão "Desfazer pagamento emitido" disponível enquanto não conciliado.
+- `ValorExecutadoDialog` deixa de ser confirmação final — vira apenas a tela de "registro de emissão" (mantém data, mas sem campo `valor_realizado`).
+
+### 3. Conciliação
+
+- Continua sendo o **único** caminho que promove para `pago`/`recebido`.
+- Ao conciliar uma linha de extrato com um cashflow `pagamento_emitido` ou `recebimento_esperado`: confirma e fecha o ciclo.
+- Ao conciliar com um `previsto` que pulou a etapa intermediária: aceita, mas registra `pulou_emissao=true` no `cashflow_audit_log` para evidência.
+- Ao conciliar com um lançamento ainda inexistente: o fluxo de "Resolver Extrato" (já implementado) cria direto como `realizado`, mantendo MECE.
+
+### 4. Solicitações de outros departamentos
+
+- Fluxo permanece: `solicitada → aprovada` → cria `cashflow_entries` com `status='previsto'`. ✓
+- **Bloqueio novo (trigger)**: `requests` não pode ser marcada como `executada` se o `cashflow_entry_id` referenciado não estiver `pago/recebido` (i.e. conciliado).
+- Notificação ao solicitante muda de "Aprovada" para "Aprovada — aguardando pagamento" e depois "Paga — confirmada no extrato".
+
+### 5. Cabeçalho do Financeiro — Termômetro de fechamento
+
+Componente `MonthClosingReadinessCard` no topo de `Financeiro.tsx`:
+
+```text
+Maio/2026 — Pronto para fechar: 78%
+[ 92% conciliação extrato ] [ 71% AP liquidado ] [ 80% AR liquidado ]
+[ Fechar mês ]  (desabilitado até 100%)
 ```
 
-Hoje, 49/49 falhas viram um botão "Baixar CSV das falhas" — isso quebra o princípio.
+Ao chegar em 100%, botão `Fechar mês` chama a RPC e bloqueia escrita no período (já existe a infra de `fiscal_periods`).
 
----
+### 6. Aging List e Dashboards
 
-## Diagnóstico do caso 49/49 (OFX)
-
-Antes de implementar, instrumentar o parser para reportar **por linha** o que falhou. Hipóteses prováveis:
-- OFX do banco usa tags fora do padrão (ex.: `<TRNAMT>` com vírgula decimal, `<DTPOSTED>` em formato local) — `ofxParser.ts` hoje só aceita yyyymmdd e ponto decimal.
-- `parseBRDate` é aplicada por engano em ISO se o `detectedFormat` foi alterado pelo usuário.
-- RLS/unique-constraint rejeitando o batch inteiro em `bank_statement_entries`.
-
-Robustez no `parseOfx`:
-- Aceitar `TRNAMT` com vírgula (`1.234,56`) e sinal posfixado.
-- Aceitar `DTPOSTED` curto/longo e com timezone.
-- Se `STMTTRN` não for encontrado, tentar `BANKTRANLIST` solto.
-- Sempre devolver as linhas brutas mesmo quando algum campo falhar (validação fica no staging).
-
----
-
-## Backend
-
-**Nova tabela `bank_statement_staging`** (toda linha do arquivo é persistida, inclusive inválidas):
-
-| coluna | tipo |
-|---|---|
-| id | uuid |
-| organization_id | uuid |
-| bank_account_id | uuid |
-| import_id | uuid (FK `data_imports`) |
-| row_index | int |
-| raw | jsonb |
-| parsed | jsonb |
-| errors | text[] |
-| status | enum: `pendente`, `importado`, `vinculado`, `descartado`, `erro_validacao` |
-| resolution | jsonb (cashflow_entry_id, motivo, flag `previa_conciliacao_substituida`) |
-| bank_statement_entry_id | uuid |
-| resolved_by / resolved_at | uuid / timestamptz |
-
-RLS por `organization_id`. Trigger `bump_org_data_version`.
-
-**RPCs novas (SECURITY DEFINER):**
-- `resolve_link_to_cashflow(p_staging_id, p_cashflow_entry_id, p_force_relink boolean default false)` — vincula a um previsto. Comportamento:
-  - Se o cashflow estiver `previsto`/`atrasado`: marca como `realizado`, copia data/valor reais, vincula `bank_statement_entry_id`, staging → `vinculado`.
-  - Se o cashflow já estiver `realizado` e tiver outro `bank_statement_entry_id` conciliado: exige `p_force_relink=true`. Aí desvincula o anterior (volta `bank_statement_entries.status` da linha antiga para `pendente` e marca `resolution.previa_conciliacao_substituida=true` no staging anterior, se houver), vincula a nova, ajusta valor/data se diferente, registra em `audit_log` (categoria `reconciliation_override`).
-- `resolve_discard(p_staging_id, p_category, p_reason)` — exige texto não vazio, status `descartado`, audit.
-- `resolve_correct_and_retry(p_staging_id, p_data, p_valor, p_descricao, p_documento)` — revalida e faz upsert em `bank_statement_entries`.
-- `list_unresolved_statement_lines(p_org)` — alimenta o banner.
-- `search_cashflow_for_link(p_org, p_bank_account, p_data, p_valor, p_include_already_reconciled boolean)` — retorna candidatos com `match_score`, `status_atual`, `ja_conciliado_com` (descricao + id da linha bancária anterior, se houver).
-
----
-
-## Frontend
-
-### 1. Persistência total no `executeImport`
-- Inserir **todas** as linhas (válidas e inválidas) em `bank_statement_staging`.
-- Apenas as válidas seguem para `bank_statement_entries`; falha de batch marca staging como `erro_validacao`.
-
-### 2. Tela `Resolver Extrato` (substitui o "done" simples)
-Acessada ao final da importação **e** via banner permanente em `/financeiro?tab=conciliacao`.
-
-Tabs (toda linha do arquivo aparece em alguma):
-- **A resolver** (`pendente` + `erro_validacao` + `nao_previsto`)
-- **Importados OK**
-- **Resolvidos** (vinculados normais + vinculados por substituição + descartados, com chip distintivo)
-
-Ações inline por linha "A resolver":
-1. **Corrigir** — popover com 4 inputs → `resolve_correct_and_retry`.
-2. **Vincular a previsto** — abre `LinkToPlannedDialog`.
-3. **Criar realizado** — reusa `ClassifyAndReconcileDialog`.
-4. **Descartar** — popover com categoria obrigatória + motivo → `resolve_discard`.
-
-### 3. `LinkToPlannedDialog` (novo) — com toggle "incluir já conciliados"
-- Topo: switch "**Mostrar também previstos já conciliados**" (default off).
-- Lista candidatos via `search_cashflow_for_link`. Cada item mostra:
-  - data prevista, descrição, valor, conta contábil, centro de custo;
-  - chip de status: `Previsto` | `Atrasado` | **`Já conciliado`** (amber).
-  - Se "Já conciliado": linha extra "Conciliado anteriormente com: <descricao da linha bancária antiga> em <data>".
-- Confirmar em "Já conciliado":
-  - Modal de confirmação **dupla**: "Isso vai substituir a conciliação anterior. A linha bancária anterior voltará para o status 'pendente' e precisará ser resolvida. Confirma?"
-  - Chama `resolve_link_to_cashflow(..., p_force_relink=true)`.
-  - Após sucesso, exibe toast com link "Ver linha que voltou a pendente".
-
-### 4. Banner global em Conciliação
-`UnresolvedStatementBanner` no topo de `ConciliacaoTab`:
-> "23 linhas de extrato aguardam resolução — [Abrir tela de resolução]"
-
-### 5. Pré-validação do OFX
-Se >40% das linhas vierem sem `data` ou `valor` no parse, mostrar bloco amarelo no mapeamento e oferecer "Tratar como tabela manual".
-
----
-
-## Critério de aceitação
-
-- Importar um OFX problemático cria N linhas em `bank_statement_staging` (nenhuma some).
-- Tela "A resolver" lista todas com chip de erro.
-- Para cada linha é possível: corrigir, vincular a previsto **não conciliado**, vincular a previsto **já conciliado** (com confirmação dupla), criar realizado, ou descartar com motivo.
-- Substituir conciliação devolve a linha bancária anterior ao estado `pendente` e a coloca de volta na tela de resolução.
-- Audit log registra cada ação (`reconciliation_override` quando aplicável).
-- Banner some quando staging fica zerado.
-
----
+- `AgingListTab` ganha coluna "Estado de pagamento" (Previsto/Em pagamento/Pago).
+- Card "Em pagamento aguardando extrato" no dashboard com drill-down.
+- KPIs do `ContasAPagar`: separar `Total previsto` · `Em pagamento` · `Pago` (hoje só tem previsto/pago).
 
 ## Arquivos afetados
 
-- `supabase/migrations/<new>.sql` — tabela `bank_statement_staging`, 5 RPCs, RLS, trigger.
-- `src/lib/parsers/ofxParser.ts` — robustez de tags/formatos.
-- `src/hooks/useBankStatementImport.ts` — gravar staging antes do insert.
-- `src/components/financeiro/BankStatementImportDialog.tsx` — passo "done" abre a tela de resolução.
-- `src/components/financeiro/StatementResolutionPanel.tsx` (novo) — 3 tabs + 4 ações.
-- `src/components/financeiro/LinkToPlannedDialog.tsx` (novo) — toggle "incluir já conciliados" + confirmação dupla.
-- `src/components/financeiro/UnresolvedStatementBanner.tsx` (novo).
-- `src/components/financeiro/ConciliacaoTab.tsx` — banner.
-- `src/hooks/useStatementResolution.ts` (novo) — wrappers das RPCs.
+**Migration nova** (estados + triggers + RPCs `close_fiscal_period` / `get_month_closing_readiness`).
+
+**Backend lógico**: `src/hooks/useFinanceiro.ts` (split de `markAsPaid` em `registerPaymentIssued` + nova `confirmRealization` interna usada só pela conciliação), `src/hooks/useConciliacao.ts`, `src/hooks/useFiscalPeriods.ts`, `src/hooks/useStatementResolution.ts`.
+
+**UI**: `ContasAPagar.tsx`, `ContasAReceber.tsx`, `ValorExecutadoDialog.tsx` (renomear/refazer), `FinanceiroTable.tsx` (chips e filtros), `ConciliacaoTab.tsx` (badge "fecha pagamento emitido"), novo `MonthClosingReadinessCard.tsx`, `AgingListTab.tsx`, `PendenciasPanel.tsx`.
+
+**Memória do projeto**: registrar a nova regra dos 3 estados em `mem://logic/financeiro-mece-3-states` e atualizar o índice.
+
+## Migração de dados existentes
+
+- Cashflow com `status='pago'` E `bank_statement_entry_id IS NULL` → reclassificar como `pagamento_emitido` (e `recebido` → `recebimento_esperado`), preservando `valor_realizado` em campo de auditoria, para que o usuário possa concluir a conciliação retroativamente. Linhas vinculadas ao extrato permanecem `pago/recebido`.
+
+## Resultado esperado
+
+Toda linha do sistema cabe em exatamente um balde MECE. Fechar o mês deixa de ser ato de fé: passa a ser uma consequência matemática de **AP + AR + Extrato 100% conciliados**.
