@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, FolderOpen, Layers } from "lucide-react";
+import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, FolderOpen, Layers, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGroupingRules } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
@@ -35,10 +35,11 @@ interface Props {
   tipo: "saida" | "entrada";
   onMarkAsPaid: (entry: { id: string; valor_realizado: number; data_realizada: string; isProjected: boolean }) => void;
   onDelete: (id: string) => void;
+  onEdit?: (entry: FinanceiroEntry) => void;
   isDeleting: boolean;
 }
 
-export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDeleting }: Props) {
+export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, onEdit, isDeleting }: Props) {
   const { getMatchingRule, getGroupLabel, getMinItems, getSubGroupLabel } = useGroupingRules();
   const { macrogroups, groups } = useGroupingMacrogroups();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -166,6 +167,11 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, isDelet
               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => openPay(e)}>
                 <Banknote size={14} />
                 {actionLabel}
+              </Button>
+            )}
+            {isManual && !isProjected && onEdit && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(e)} title="Editar">
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
               </Button>
             )}
             {isManual && !isProjected && (

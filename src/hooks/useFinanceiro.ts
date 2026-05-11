@@ -53,6 +53,7 @@ export interface FinanceiroInput {
   num_parcelas: number | null;
   recorrencia: string | null;
   conciliacao_id: string | null;
+  data_assinatura: string | null;
 }
 
 /**

@@ -552,6 +552,7 @@ export type Database = {
           cost_center_allocations: Json | null
           cost_center_id: string | null
           created_at: string
+          data_assinatura: string | null
           data_prevista: string
           data_prevista_pagamento: string | null
           data_realizada: string | null
@@ -602,6 +603,7 @@ export type Database = {
           cost_center_allocations?: Json | null
           cost_center_id?: string | null
           created_at?: string
+          data_assinatura?: string | null
           data_prevista: string
           data_prevista_pagamento?: string | null
           data_realizada?: string | null
@@ -652,6 +654,7 @@ export type Database = {
           cost_center_allocations?: Json | null
           cost_center_id?: string | null
           created_at?: string
+          data_assinatura?: string | null
           data_prevista?: string
           data_prevista_pagamento?: string | null
           data_realizada?: string | null
