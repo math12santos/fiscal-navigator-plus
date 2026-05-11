@@ -33,6 +33,9 @@ export function ConciliacaoTab() {
   const [candidates, setCandidates] = useState<CashflowCandidate[]>([]);
   const [loadingCands, setLoadingCands] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [resolutionOpen, setResolutionOpen] = useState(false);
+  const { unresolved } = useStatementResolution();
+  const unresolvedCount = unresolved.data?.length ?? 0;
 
   const { bankAccounts } = useBankAccounts();
   const { entries, isLoading, stats, fetchCandidates, reconcile, unreconcile, updateStatus, autoReconcileBatch, snapshotBalances } = useConciliacao({
