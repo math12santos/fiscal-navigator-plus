@@ -349,8 +349,8 @@ export function useBankStatementImport() {
           organization_id: currentOrg.id,
           user_id: user.id,
           file_name: fileName,
-          source_type: "csv_xlsx",
-          column_mapping: { module: "extrato_bancario", bankAccountId } as any,
+          source_type: sourceFormat ?? "csv_xlsx",
+          column_mapping: { module: "extrato_bancario", bankAccountId, format: sourceFormat } as any,
           row_count: validRows.length,
           status: "processing",
         })
