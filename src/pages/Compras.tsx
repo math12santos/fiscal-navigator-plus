@@ -10,6 +10,8 @@ import { RulesTab } from "@/components/compras/RulesTab";
 import { QuotationsTab } from "@/components/compras/QuotationsTab";
 import { ReceiptsTab } from "@/components/compras/ReceiptsTab";
 import { DivergencesTab } from "@/components/compras/DivergencesTab";
+import { RecurrencesTab } from "@/components/compras/RecurrencesTab";
+import { ComprasSettingsTab } from "@/components/compras/ComprasSettingsTab";
 
 export default function Compras() {
   const [tab, setTab] = useState("dashboard");
@@ -28,8 +30,10 @@ export default function Compras() {
           <TabsTrigger value="pedidos" className="text-xs">Pedidos</TabsTrigger>
           <TabsTrigger value="recebimentos" className="text-xs">Recebimentos</TabsTrigger>
           <TabsTrigger value="divergencias" className="text-xs">Divergências</TabsTrigger>
+          <TabsTrigger value="recorrencias" className="text-xs">Recorrências</TabsTrigger>
           <TabsTrigger value="fornecedores" className="text-xs">Fornecedores</TabsTrigger>
           <TabsTrigger value="regras" className="text-xs">Regras</TabsTrigger>
+          <TabsTrigger value="config" className="text-xs">Configurações</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard"><ComprasDashboard /></TabsContent>
         <TabsContent value="solicitacoes"><RequestsTab /></TabsContent>
@@ -38,8 +42,10 @@ export default function Compras() {
         <TabsContent value="pedidos"><OrdersTab /></TabsContent>
         <TabsContent value="recebimentos"><ReceiptsTab /></TabsContent>
         <TabsContent value="divergencias"><DivergencesTab /></TabsContent>
+        <TabsContent value="recorrencias"><RecurrencesTab /></TabsContent>
         <TabsContent value="fornecedores"><SuppliersTab /></TabsContent>
         <TabsContent value="regras"><RulesTab /></TabsContent>
+        <TabsContent value="config"><ComprasSettingsTab /></TabsContent>
       </Tabs>
     </div>
   );
