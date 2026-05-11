@@ -12,6 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FluxoCaixaPeriodNav } from "@/components/fluxocaixa/FluxoCaixaPeriodNav";
 import { FluxoCaixaCharts } from "@/components/fluxocaixa/FluxoCaixaCharts";
 import { FluxoCaixaTable } from "@/components/fluxocaixa/FluxoCaixaTable";
+import { FixedExpensesSuggestionsCard } from "@/components/financeiro/FixedExpensesSuggestionsCard";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   ArrowUpCircle,
   ArrowDownCircle,
@@ -20,6 +22,7 @@ import {
   Download,
   FileText,
   TrendingDown,
+  AlertTriangle,
 } from "lucide-react";
 import {
   exportFluxoCaixaCSV,
