@@ -191,6 +191,57 @@ export function ContasBancariasTab() {
     { saldo: 0, limiteTotal: 0, limiteUsado: 0, limiteDisp: 0, disponivel: 0, jurosEstimado: 0 }
   );
 
+  // Divergência de conciliação: saldo OFX (referência) vs saldo manual
+  const ofxAccounts = allBankAccounts.filter((a) => a.saldo_ofx != null);
+  const divergenciaTotal = ofxAccounts.reduce(
+    (acc, a) => acc + ((a.saldo_ofx ?? 0) - (a.saldo_atual || 0)),
+    0,
+  );
+  const contasAConciliar = ofxAccounts.filter(
+    (a) => Math.abs((a.saldo_ofx ?? 0) - (a.saldo_atual || 0)) >= 0.01,
+  ).length;
+
+  const handleAdotarOfx = (acc: BankAccount) => {
+    if (acc.saldo_ofx == null) return;
+    update.mutate({
+      id: acc.id,
+      saldo_atual: acc.saldo_ofx,
+      saldo_atualizado_em: new Date().toISOString(),
+    } as any);
+  };
+
+  const handleEmitirPdf = async () => {
+    const rows = allBankAccounts.map((a) => ({
+      orgName: orgNameMap[a.organization_id ?? ""] || (currentOrg?.name ?? "—"),
+      nome: a.nome,
+      banco: a.banco,
+      tipo_conta: tipoContaLabels[a.tipo_conta] || a.tipo_conta,
+      saldo_manual: a.saldo_atual || 0,
+      saldo_manual_em: a.saldo_atualizado_em,
+      saldo_ofx: a.saldo_ofx,
+      saldo_ofx_data: a.saldo_ofx_data,
+    }));
+    if (rows.length === 0) {
+      toast({ title: "Sem contas bancárias para o relatório", variant: "destructive" });
+      return;
+    }
+    try {
+      await generateBankBalancesPdf({
+        contextName: holdingMode ? "Consolidado (Holding)" : (currentOrg?.name ?? "—"),
+        isConsolidated: holdingMode,
+        accounts: rows,
+        issuer: {
+          name: (user?.user_metadata as any)?.full_name || user?.email || "—",
+          email: user?.email || "—",
+          id: user?.id,
+        },
+      });
+      toast({ title: "Relatório de saldos gerado" });
+    } catch (e: any) {
+      toast({ title: "Erro ao gerar PDF", description: e?.message, variant: "destructive" });
+    }
+  };
+
   const proximoFechamento = getNextClosingDate();
 
   if (isLoading) {
