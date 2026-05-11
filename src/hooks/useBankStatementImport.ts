@@ -131,6 +131,10 @@ export function useBankStatementImport() {
   const [failedRows, setFailedRows] = useState<{ rowIndex: number; raw: Record<string, string>; error: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [excludedRows, setExcludedRows] = useState<Set<number>>(new Set());
+  const [sourceFormat, setSourceFormat] = useState<StatementSourceFormat | null>(null);
+  const [coverage, setCoverage] = useState<CoverageResult | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(false);
+  const [lastImportId, setLastImportId] = useState<string | null>(null);
 
   const reset = useCallback(() => {
     setStep("upload");
@@ -146,6 +150,9 @@ export function useBankStatementImport() {
     setFailedRows([]);
     setError(null);
     setExcludedRows(new Set());
+    setSourceFormat(null);
+    setCoverage(null);
+    setLastImportId(null);
   }, []);
 
   const setDateFormat = useCallback((fmt: "dd/MM/yyyy" | "MM/dd/yyyy") => {
