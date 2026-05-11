@@ -525,5 +525,9 @@ export function useBankStatementImport() {
     setDateFormat,
     setNumberFormat,
     downloadFailedRowsCSV,
+    sourceFormat,
+    coverage,
+    coverageLoading,
+    lastImportId,
   };
 }
