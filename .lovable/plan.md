@@ -1,131 +1,110 @@
+## Objetivo
 
-# Onda B — Workflow operacional do módulo Compras
+Transformar a aba **Financeiro → Conciliação** na **porta de entrada da realidade financeira**: importar extratos bancários em **XLSX, OFX e PDF**, casar automaticamente com lançamentos previstos, e **exigir classificação contábil de qualquer linha não-prevista antes de marcá-la como conciliada** — gerando assim um `cashflow_entry` real e mantendo o caixa fiel ao banco.
 
-Objetivo: tirar o módulo de Compras do "registro manual" e plugá-lo no fluxo vivo de tarefas, notificações em tempo real e cadastro completo de ativos TI. Tudo em cima do que a Onda A já entregou (materialização MECE, validação NF-e, retenções, rateio).
+## Estado atual
 
----
+Já existe:
+- `BankStatementImportDialog` (CSV/XLSX) → grava em `bank_statement_entries` com `status='pendente'`.
+- RPC `match_statement_to_cashflow_v2` (similaridade textual + ±valor/data) e `auto_reconcile_statement_batch` (score ≥ 0.95).
+- `ConciliacaoTab` com auto-conciliar, regras (`reconciliation_rules`) e snapshot de saldo.
 
-## 1. Tarefas automáticas no workflow (`request_tasks`)
+Faltam:
+1. Suporte a **OFX** e **PDF** no importador.
+2. Fluxo de **classificação obrigatória** antes de conciliar linhas sem candidato.
+3. Visual claro do **funil**: previstas casadas / divergentes / não-previstas.
 
-Hoje Compras só dispara `notifications`. Vamos passar a criar tarefas reais, rastreáveis em /tarefas.
+## Escopo
 
-**Triggers a criar:**
+### 1. Parsers adicionais no `useBankStatementImport`
 
-- `trg_po_create_receipt_task` — ao confirmar um `purchase_order` (`status='confirmado'`):
-  - cria `request_tasks` "Confirmar recebimento de <fornecedor> — pedido #<numero>"
-  - `due_date` = `data_entrega_prevista` (ou `created_at + 7 dias`)
-  - `assigned_to` = `recebedor_id` do PO (fallback: solicitante)
-  - `source='compras'`, `source_ref='po:<id>'` para idempotência
+- **OFX** (`.ofx`, `.qfx`): parser próprio em TS lendo blocos `<STMTTRN>` (DTPOSTED, TRNAMT, MEMO, NAME, FITID, CHECKNUM). FITID vira `documento` e participa da deduplicação. Detecta cabeçalho SGML/OFX 1.x e XML 2.x.
+- **PDF** (`.pdf`): extração textual via `pdfjs-dist` no cliente. Heurística por linha: `dd/mm/aaaa  descrição  valor (D/C)`. Como PDFs variam por banco, oferecer **revisão manual obrigatória** no passo "mapeamento" — usuário confirma colunas detectadas/edita, mesmo fluxo do XLSX. Mostrar aviso "PDF é melhor esforço; recomendamos OFX/XLSX quando disponível".
+- Reutilizar o resto do pipeline (preview, deduplicação, `bank_statement_entries`).
 
-- `trg_divergence_create_task` — ao inserir `purchase_divergences` com `status='aberta'`:
-  - cria tarefa "Resolver divergência <tipo> — pedido #<numero>"
-  - `priority` derivada de `severity` (high→alta, medium→média)
-  - `assigned_to` = comprador do PO
-  - `source_ref='divergence:<id>'`
+Aceitar arquivos: `.csv,.xlsx,.xls,.ofx,.qfx,.pdf`.
 
-- `trg_divergence_close_task` — ao fechar divergência (`status='resolvida'`), marca a tarefa relacionada como `concluida`.
+### 2. Motor "Pré-conciliação" após importar
 
-**Sem duplicação:** `ON CONFLICT (source, source_ref) DO NOTHING` em `request_tasks` (precisa do índice único).
-
----
-
-## 2. Realtime nas abas operacionais
-
-Atualmente só `cashflow_entries`/`contracts`/`request_tasks` estão na publicação. Vamos adicionar:
-
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE
-  public.purchase_orders,
-  public.purchase_receipts,
-  public.purchase_divergences,
-  public.purchase_quotations;
-
-ALTER TABLE public.purchase_orders        REPLICA IDENTITY FULL;
-ALTER TABLE public.purchase_receipts      REPLICA IDENTITY FULL;
-ALTER TABLE public.purchase_divergences   REPLICA IDENTITY FULL;
-ALTER TABLE public.purchase_quotations    REPLICA IDENTITY FULL;
-```
-
-(Onda A já adicionou receipts/divergences/quotations — confirmar e completar com `purchase_orders`.)
-
-**Frontend:** adicionar `useRealtimeSync` em `src/pages/Compras.tsx`:
-
-```ts
-useRealtimeSync([
-  { table: "purchase_orders",      invalidateKeys: [["compras","orders"], ["dashboard-snapshot"]] },
-  { table: "purchase_receipts",    invalidateKeys: [["compras","receipts"], ["compras","divergences"]] },
-  { table: "purchase_divergences", invalidateKeys: [["compras","divergences"], ["compras","dashboard"]] },
-  { table: "purchase_quotations",  invalidateKeys: [["compras","quotations"]] },
-]);
-```
-
-E garantir que as queries em `useCompras` usem essas keys.
-
----
-
-## 3. Wizard "Completar cadastro TI" pós-recebimento de ativo
-
-Hoje o `fn_po_after_confirm` cria um `it_equipment` cru para `ativo_imobilizado`. Vamos transformar isso em um fluxo guiado:
-
-- Trigger atualizado: ao criar `it_equipment` originado de Compras, marcar `pending_wizard=true` (nova coluna boolean, default false).
-- Criar `request_tasks` "Completar cadastro TI: <equipamento>" com `link_url='/ti?equipment=<id>&wizard=open'`, `assigned_to` = responsável TI (de `system_settings.it_responsible_user_id` ou fallback admin).
-- No `/ti`, ao abrir com `?wizard=open&equipment=<id>`, montar automaticamente o [TI Equipment Wizard](mem://features/ti-equipment-wizard) em **modo "completar existente"**, pré-preenchido com fornecedor, valor, data — usuário só preenche tipo/specs/atribuição.
-- Ao concluir o wizard, `pending_wizard=false` e a tarefa é fechada.
-
----
-
-## 4. Divergência automática refinada sobre NF
-
-Onda A já gera divergência quando: chave NF-e inválida, CNPJ ≠ fornecedor, valor da NF ≠ pedido. Onda B amplia:
-
-- **Quantidade recebida ≠ pedida** por item → divergência `tipo='quantidade'`.
-- **Data de emissão da NF posterior à entrega** → divergência `tipo='prazo'` severity=low.
-- **Fornecedor sem cadastro fiscal completo** (sem CNPJ ou IE) ao receber NF → divergência `tipo='cadastro'` apontando para o fornecedor.
-
-Tudo no mesmo `trg_pr_validate_nf` estendido, idempotente por `(receipt_id, tipo)`.
-
----
-
-## 5. UX nas abas
-
-- **OrdersTab:** badge "🔴 X divergências" e "📋 tarefa pendente" por linha (join leve via hook).
-- **DivergencesTab:** botão "Resolver" agora também fecha a tarefa associada (já automático via trigger).
-- **ReceiptsTab:** após salvar com NF, toast "Validação fiscal OK" ou "Divergência aberta automaticamente — ver aba Divergências".
-- **ComprasDashboard:** novo card "Tarefas de Compras pendentes" (count de `request_tasks` com `source='compras'` e `status<>'concluida'`).
-
----
-
-## 6. Arquivos afetados
+Ao concluir a importação, executar automaticamente uma **análise de cobertura** que classifica cada linha nova em três baldes via `match_statement_to_cashflow_v2`:
 
 ```text
-supabase/migrations/<ts>_compras_onda_b.sql      ← novo
-src/pages/Compras.tsx                            ← useRealtimeSync
-src/hooks/useCompras.ts                          ← keys consistentes + count tasks
-src/components/compras/OrdersTab.tsx             ← badges divergência/tarefa
-src/components/compras/DivergencesTab.tsx        ← UX/feedback
-src/components/compras/ReceiptsTab.tsx           ← toast pós-validação
-src/components/compras/ComprasDashboard.tsx      ← card tarefas
-src/pages/TI.tsx                                 ← suporte ?wizard=open&equipment=
-src/components/ti/EquipmentWizard.tsx (existente) ← modo "completar existente"
-.lovable/plan.md                                 ← registrar Onda B
-mem://features/compras-mece-integration          ← atualizar com Onda B
+┌──────────────────────────┬───────────────────────────────────────────┐
+│ casado_alto (≥ 0.85)     │ Auto-concilia em background.              │
+│ casado_baixo (0.50–0.85) │ Aparece como "Sugestão" (1 clique).       │
+│ nao_previsto (< 0.50 ou  │ Bloqueia conciliar até o usuário          │
+│  sem candidato)          │ classificar contabilmente (ver passo 3).  │
+└──────────────────────────┴───────────────────────────────────────────┘
 ```
 
----
+Implementação: nova RPC `classify_statement_coverage(p_org_id, p_import_id)` que retorna contagens + lista. Dispara após `executeImport` e abre um painel-resumo "Resultado da importação" no próprio Dialog (passo `done`):
 
-## 7. Não entra agora (fica para Onda C/D)
+- ✅ `X` linhas casadas com lançamentos previstos
+- ⚠ `Y` linhas com sugestões (revisar)
+- 🚨 `Z` linhas **não previstas** — exigem classificação
 
-- `employee_id`/`opportunity_id` (DP/CRM) — Onda C
-- Pedido consolidado da Holding — Onda C
-- Roles granulares `compras_*` — Onda C
-- IA de sugestão / ETL XML NF-e — Onda D
+### 3. Classificação obrigatória de não-previstos
 
----
+Nova ação na `ConciliacaoTab` para linhas pendentes sem candidato: botão **"Classificar e conciliar"** (substitui "Conciliar" quando `match_score < 0.5` ou nenhum candidato). Abre um `Dialog` enxuto reaproveitando os campos do `ClassificacaoDialog` existente:
 
-## 8. Critérios de pronto
+Campos obrigatórios:
+- Tipo (`receita` ou `despesa`, pré-preenchido pelo sinal do valor)
+- Conta contábil (`chart_of_accounts`, 4 níveis)
+- Centro de custo (ou rateio)
+- Entidade/fornecedor (opcional, com sugestão se descrição bater com `entities`)
+- Competência (default = mês da `data` do extrato)
+- Observação (default = descrição do extrato)
 
-- Confirmar um PO cria automaticamente a tarefa de recebimento em /tarefas.
-- Receber NF com CNPJ errado abre divergência **e** tarefa "Resolver divergência" sem ação manual.
-- Outra aba aberta vê o pedido mudar de status sem F5.
-- Comprar um notebook gera tarefa "Completar cadastro TI" que leva direto ao wizard pré-preenchido.
-- Nenhuma duplicação de tarefa em re-execuções (idempotência por `source_ref`).
+Ao confirmar, RPC `materialize_unplanned_statement_entry(p_statement_id, p_classification jsonb)`:
+1. Cria `cashflow_entries` com `status='realizado'`, `data_realizada=data do extrato`, `valor_realizado=valor`, `source='conciliacao'`, `source_ref='statement:<id>'`.
+2. Aplica RLS/cost-center splits se houver rateio (mesma lógica do `FinanceiroEntryDialog`).
+3. Vincula `bank_statement_entries.cashflow_entry_id` e marca `status='conciliado'`.
+4. Opcional: salva regra (`reconciliation_rules`) "se descrição contém X → usar conta Y / CC Z" para automatizar próximas importações.
+
+Bloquear no front: para linhas marcadas `nao_previsto`, o botão "Conciliar" simples fica oculto — só aparece "Classificar e conciliar" ou "Ignorar".
+
+### 4. UX da Conciliação
+
+- Adicionar 1 KPI extra: **"Não previstos"** (count de pendentes sem candidato) com cor `destructive`.
+- Filtro extra no Select de status: `"nao_previsto"`, `"sugestao"`, `"casado"`.
+- Coluna `Match` na tabela mostrando badge de score ou "Sem candidato".
+- Banner topo se `nao_previsto > 0`: "X lançamentos não estavam no plano. Classifique antes de conciliar para manter o caixa real."
+
+### 5. Realtime e cache
+
+- `useRealtimeSync(['bank_statement_entries','cashflow_entries'])` na aba (já parcialmente).
+- Invalidar `cashflow-entries`, `dashboard_snapshots`, `cash-position` após materializar.
+
+## Arquivos
+
+**Novos**
+- `src/lib/parsers/ofxParser.ts`
+- `src/lib/parsers/pdfStatementParser.ts` (usa `pdfjs-dist`)
+- `src/components/financeiro/ClassifyAndReconcileDialog.tsx`
+- Migração SQL com:
+  - RPC `classify_statement_coverage`
+  - RPC `materialize_unplanned_statement_entry`
+  - Coluna `match_score numeric` e `match_bucket text` em `bank_statement_entries` (preenchida no import + auto-reconcile)
+
+**Editados**
+- `src/hooks/useBankStatementImport.ts` (rotear por extensão; aceitar OFX/PDF; rodar `classify_statement_coverage` ao final)
+- `src/components/financeiro/BankStatementImportDialog.tsx` (extensões aceitas, banner PDF, painel resultado)
+- `src/components/financeiro/ConciliacaoTab.tsx` (KPI, filtro, badge match, botão "Classificar e conciliar", banner)
+- `src/hooks/useConciliacao.ts` (mutações `materializeUnplanned`, filtros por bucket)
+- `package.json`: adicionar `pdfjs-dist`
+
+## Critérios de aceite
+
+1. Importar `.ofx` real e ver linhas em `bank_statement_entries` com `documento=FITID`.
+2. Importar `.pdf` de extrato e revisar/ajustar mapeamento antes de salvar.
+3. Após importar, abrir painel "Resultado" mostrando casados/sugestões/não-previstos.
+4. Linha "não-prevista" não pode ser marcada conciliado sem passar pelo dialog de classificação.
+5. Ao classificar, um `cashflow_entry` realizado é criado com a mesma data/valor e a linha vira `conciliado`.
+6. Saldo da conta (cash position) reflete imediatamente o novo realizado.
+7. Re-importar o mesmo arquivo não duplica linhas (deduplicação por `source_ref`/FITID já existente).
+
+## Fora de escopo (próxima onda)
+
+- Parsing PDF por banco específico com templates (Itaú, Bradesco, BB) — fica como melhoria iterativa.
+- Conciliação de cartão de crédito (fatura ≠ extrato).
+- Importação direta via Open Finance API.
