@@ -329,6 +329,92 @@ export type Database = {
           },
         ]
       }
+      bank_statement_staging: {
+        Row: {
+          bank_account_id: string
+          bank_statement_entry_id: string | null
+          created_at: string
+          errors: string[]
+          id: string
+          import_id: string | null
+          organization_id: string
+          parsed: Json
+          raw: Json
+          resolution: Json
+          resolved_at: string | null
+          resolved_by: string | null
+          row_index: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bank_account_id: string
+          bank_statement_entry_id?: string | null
+          created_at?: string
+          errors?: string[]
+          id?: string
+          import_id?: string | null
+          organization_id: string
+          parsed?: Json
+          raw?: Json
+          resolution?: Json
+          resolved_at?: string | null
+          resolved_by?: string | null
+          row_index: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bank_account_id?: string
+          bank_statement_entry_id?: string | null
+          created_at?: string
+          errors?: string[]
+          id?: string
+          import_id?: string | null
+          organization_id?: string
+          parsed?: Json
+          raw?: Json
+          resolution?: Json
+          resolved_at?: string | null
+          resolved_by?: string | null
+          row_index?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_statement_staging_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_staging_bank_statement_entry_id_fkey"
+            columns: ["bank_statement_entry_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statement_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_staging_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_staging_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_plans: {
         Row: {
           code: string
@@ -10901,6 +10987,20 @@ export type Database = {
           reference_month: string
         }[]
       }
+      list_unresolved_statement_lines: {
+        Args: { p_org: string }
+        Returns: {
+          bank_account_id: string
+          bank_account_nome: string
+          created_at: string
+          errors: string[]
+          id: string
+          parsed: Json
+          raw: Json
+          row_index: number
+          status: string
+        }[]
+      }
       match_statement_to_cashflow: {
         Args: { p_statement_id: string }
         Returns: {
@@ -10966,9 +11066,56 @@ export type Database = {
         Args: { _org_id: string; _target_user_id: string }
         Returns: undefined
       }
+      resolve_correct_and_retry: {
+        Args: {
+          p_data: string
+          p_descricao: string
+          p_documento?: string
+          p_staging_id: string
+          p_valor: number
+        }
+        Returns: Json
+      }
+      resolve_discard: {
+        Args: { p_category: string; p_reason: string; p_staging_id: string }
+        Returns: Json
+      }
+      resolve_link_to_cashflow: {
+        Args: {
+          p_cashflow_entry_id: string
+          p_force_relink?: boolean
+          p_staging_id: string
+        }
+        Returns: Json
+      }
       rotate_endpoint_secret: {
         Args: { p_endpoint_id: string }
         Returns: string
+      }
+      search_cashflow_for_link: {
+        Args: {
+          p_bank_account: string
+          p_data: string
+          p_include_already_reconciled?: boolean
+          p_org: string
+          p_valor: number
+          p_window_days?: number
+        }
+        Returns: {
+          account_id: string
+          cashflow_id: string
+          cost_center_id: string
+          data_prevista: string
+          data_realizada: string
+          descricao: string
+          ja_conciliado_com_data: string
+          ja_conciliado_com_descricao: string
+          ja_conciliado_com_id: string
+          match_score: number
+          status: string
+          valor_previsto: number
+          valor_realizado: number
+        }[]
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
