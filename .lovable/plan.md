@@ -99,3 +99,11 @@ Sem migrations. Sem mudanças em RPCs nem no engine de projeção (`projectionRe
 - Reescrever Conciliação ou regras de matching automático.
 - Mudar estrutura de `cashflow_entries`.
 - Tocar no DRE/KPIs do Dashboard executivo (já consomem RPC `get_dashboard_kpis` separada).
+
+## Status: implementado (2026-05-11)
+
+- `useCashFlow` agora consulta `bank_statement_entries` do período e anota `is_realizado_caixa` em cada entry. Expõe `realizadoEntries`, `previstoEntries`, `transferEntries`, `paidNotReconciledEntries`, `totalsRealizado`, `totalsPrevisto`. Estornos abatem (sign -1); transferências internas excluídas dos totais.
+- `FluxoCaixaTab`: na Visão Geral, KPIs mostram Realizado em destaque + Previsto no subtítulo; Saldo Final = abertura + realizado + previsto. Aba Realizado exibe Alert "pago sem conciliação" linkando para Conciliação.
+- `FluxoCaixaCharts`: novo modo overlay (Visão Geral) com 4 barras (entradas/saídas × real/prev) e duas linhas de saldo (Realizado sólido / Projetado tracejado) + ReferenceLine "Hoje".
+- `FluxoCaixaTable`: coluna Origem agora usa badges semânticas: Extrato (success), Conciliado, Previsto (outline), Transferência, Estorno.
+- Novo `FixedExpensesSuggestionsCard` na aba Projetado: lista contratos recorrentes ativos sem projeção + padrões repetidos em ≥2 dos últimos 3 meses; Adicionar cria `cashflow_entry` `status=previsto` `source=sugestao_fixa`; Ignorar é persistido em localStorage por org.
