@@ -42,7 +42,7 @@ interface Props {
   isDeleting: boolean;
 }
 
-export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, onEdit, isDeleting }: Props) {
+export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onUndoIssued, onDelete, onEdit, isDeleting }: Props) {
   const { getMatchingRule, getGroupLabel, getMinItems, getSubGroupLabel } = useGroupingRules();
   const { macrogroups, groups } = useGroupingMacrogroups();
   const [deleteId, setDeleteId] = useState<string | null>(null);
