@@ -318,9 +318,12 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
           categoria: original.categoria,
           descricao: original.descricao,
           valor_previsto: original.valor_previsto,
-          valor_realizado: entry.valor_realizado,
+          // valor_realizado/data_realizada NÃO são preenchidos aqui — só na conciliação.
           data_prevista: original.data_prevista,
-          data_realizada: entry.data_realizada,
+          data_pagamento_emitido: entry.data_realizada,
+          pagamento_emitido_em: new Date().toISOString(),
+          pagamento_emitido_por: user!.id,
+          pagamento_meio: entry.meio ?? null,
           status,
           account_id: original.account_id,
           cost_center_id: original.cost_center_id,
@@ -332,13 +335,11 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
           organization_id: orgId,
         };
 
-        // Upsert by dedup_hash → repeated clicks won't duplicate.
         const { error } = sourceRef
           ? await supabase.from("cashflow_entries" as any).upsert(payload, { onConflict: "organization_id,source,source_ref" } as any)
           : await supabase.from("cashflow_entries" as any).insert(payload);
         if (error) throw error;
 
-        // Also update installment status if linked
         if (original.contract_installment_id) {
           await supabase
             .from("contract_installments" as any)
@@ -346,22 +347,32 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
             .eq("id", original.contract_installment_id);
         }
       } else {
-        // Update existing record
-        const { error } = await supabase
-          .from("cashflow_entries" as any)
-          .update({
-            status,
-            valor_realizado: entry.valor_realizado,
-            data_realizada: entry.data_realizada,
-          } as any)
-          .eq("id", entry.id);
+        // Usa RPC register_payment_issued — seta data/meio, não toca valor_realizado.
+        const { error } = await supabase.rpc("register_payment_issued" as any, {
+          p_entry_id: entry.id,
+          p_data_emissao: entry.data_realizada,
+          p_meio: entry.meio ?? null,
+        });
         if (error) throw error;
       }
     },
     onSuccess: () => {
       invalidateAll();
-      toast({ title: tipo === "entrada" ? "Recebimento confirmado" : "Pagamento confirmado" });
+      toast({
+        title: tipo === "entrada" ? "Recebimento esperado registrado" : "Pagamento emitido registrado",
+        description: "Aguardando confirmação no extrato bancário para virar realizado.",
+      });
     },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  // Desfazer pagamento emitido (só enquanto não conciliado)
+  const undoPaymentIssued = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("undo_payment_issued" as any, { p_entry_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidateAll(); toast({ title: "Emissão desfeita" }); },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
