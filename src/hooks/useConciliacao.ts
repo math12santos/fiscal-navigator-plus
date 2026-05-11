@@ -18,6 +18,8 @@ export interface BankStatementEntry {
   cashflow_entry_id: string | null;
   reconciled_at: string | null;
   created_at: string;
+  match_score?: number | null;
+  match_bucket?: string | null;
   bank_accounts?: { nome: string; banco: string | null } | null;
 }
 
