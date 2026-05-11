@@ -6,6 +6,8 @@ export interface OfxParseResult {
   headers: string[];
   rows: string[][];
   bank?: { bankid?: string; acctid?: string; currency?: string } | null;
+  /** Saldo de fechamento (LEDGERBAL) lido do extrato — referência da conta naquela data. */
+  closingBalance?: { value: number; asOf: string | null } | null;
 }
 
 const FIELDS = ["data", "descricao", "valor", "documento", "notes"] as const;
