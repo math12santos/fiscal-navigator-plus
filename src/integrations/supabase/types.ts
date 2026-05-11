@@ -8230,6 +8230,82 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_divergences: {
+        Row: {
+          acao_corretiva: string | null
+          created_at: string
+          created_by: string | null
+          descricao: string
+          id: string
+          order_id: string
+          organization_id: string
+          receipt_id: string
+          receipt_item_id: string | null
+          resolvida_em: string | null
+          resolvida_por: string | null
+          severidade: string
+          status: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          acao_corretiva?: string | null
+          created_at?: string
+          created_by?: string | null
+          descricao: string
+          id?: string
+          order_id: string
+          organization_id: string
+          receipt_id: string
+          receipt_item_id?: string | null
+          resolvida_em?: string | null
+          resolvida_por?: string | null
+          severidade?: string
+          status?: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          acao_corretiva?: string | null
+          created_at?: string
+          created_by?: string | null
+          descricao?: string
+          id?: string
+          order_id?: string
+          organization_id?: string
+          receipt_id?: string
+          receipt_item_id?: string | null
+          resolvida_em?: string | null
+          resolvida_por?: string | null
+          severidade?: string
+          status?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_divergences_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_divergences_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_divergences_receipt_item_id_fkey"
+            columns: ["receipt_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_receipt_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_order_items: {
         Row: {
           created_at: string
@@ -8401,6 +8477,269 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_quotation_items: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          observacao: string | null
+          ordem: number
+          quantidade: number
+          quotation_id: string
+          request_item_id: string | null
+          unidade: string | null
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          observacao?: string | null
+          ordem?: number
+          quantidade?: number
+          quotation_id: string
+          request_item_id?: string | null
+          unidade?: string | null
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          observacao?: string | null
+          ordem?: number
+          quantidade?: number
+          quotation_id?: string
+          request_item_id?: string | null
+          unidade?: string | null
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_quotation_items_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_quotation_items_request_item_id_fkey"
+            columns: ["request_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_quotations: {
+        Row: {
+          anexo_path: string | null
+          codigo: string | null
+          condicao_pagamento: string | null
+          created_at: string
+          created_by: string | null
+          decided_at: string | null
+          desconto: number | null
+          frete: number | null
+          id: string
+          observacao: string | null
+          organization_id: string
+          prazo_entrega_dias: number | null
+          recebida_em: string | null
+          request_id: string
+          status: string
+          supplier_id: string | null
+          updated_at: string
+          validade_proposta: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          anexo_path?: string | null
+          codigo?: string | null
+          condicao_pagamento?: string | null
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          desconto?: number | null
+          frete?: number | null
+          id?: string
+          observacao?: string | null
+          organization_id: string
+          prazo_entrega_dias?: number | null
+          recebida_em?: string | null
+          request_id: string
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string
+          validade_proposta?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          anexo_path?: string | null
+          codigo?: string | null
+          condicao_pagamento?: string | null
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          desconto?: number | null
+          frete?: number | null
+          id?: string
+          observacao?: string | null
+          organization_id?: string
+          prazo_entrega_dias?: number | null
+          recebida_em?: string | null
+          request_id?: string
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string
+          validade_proposta?: string | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_quotations_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_quotations_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_receipt_items: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          observacao: string | null
+          ordem: number
+          order_item_id: string | null
+          quantidade_pedida: number
+          quantidade_recebida: number
+          receipt_id: string
+          status_item: string
+          unidade: string | null
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          observacao?: string | null
+          ordem?: number
+          order_item_id?: string | null
+          quantidade_pedida?: number
+          quantidade_recebida?: number
+          receipt_id: string
+          status_item?: string
+          unidade?: string | null
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          observacao?: string | null
+          ordem?: number
+          order_item_id?: string | null
+          quantidade_pedida?: number
+          quantidade_recebida?: number
+          receipt_id?: string
+          status_item?: string
+          unidade?: string | null
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_receipt_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_receipt_items_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_receipts: {
+        Row: {
+          anexo_path: string | null
+          codigo: string | null
+          created_at: string
+          created_by: string | null
+          data_emissao_nf: string | null
+          data_recebimento: string
+          id: string
+          numero_nf: string | null
+          observacao: string | null
+          order_id: string
+          organization_id: string
+          recebido_por: string | null
+          serie_nf: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          anexo_path?: string | null
+          codigo?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_emissao_nf?: string | null
+          data_recebimento?: string
+          id?: string
+          numero_nf?: string | null
+          observacao?: string | null
+          order_id: string
+          organization_id: string
+          recebido_por?: string | null
+          serie_nf?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          anexo_path?: string | null
+          codigo?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_emissao_nf?: string | null
+          data_recebimento?: string
+          id?: string
+          numero_nf?: string | null
+          observacao?: string | null
+          order_id?: string
+          organization_id?: string
+          recebido_por?: string | null
+          serie_nf?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_receipts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
         ]
