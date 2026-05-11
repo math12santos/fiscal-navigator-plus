@@ -8,13 +8,13 @@ import { FinanceiroTable } from "./FinanceiroTable";
 import { ImportDialog } from "./ImportDialog";
 import { DuplicateAlerts } from "./DuplicateAlerts";
 import { PMPMRKpiCard } from "./PMPMRKpiCard";
-import { Plus, Loader2, TrendingUp, Wallet, Clock, FileUp } from "lucide-react";
+import { Plus, Loader2, TrendingUp, Wallet, Clock, FileUp, Banknote } from "lucide-react";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
 
 export function ContasAReceber() {
-  const { entries, totals, isLoading, create, update, markAsPaid, remove } = useFinanceiro("entrada");
+  const { entries, totals, isLoading, create, update, markAsPaid, undoPaymentIssued, remove } = useFinanceiro("entrada");
   const duplicates = useDuplicateDetection(entries);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -61,9 +61,9 @@ export function ContasAReceber() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard title="Total Previsto" value={fmt(totals.total_previsto)} icon={<TrendingUp size={20} />} />
-        <KPICard title="Total Recebido" value={fmt(totals.total_realizado)} icon={<Wallet size={20} />} />
-        <KPICard title="Pendente" value={`${fmt(totals.pendente)} (${totals.count_pendente})`} icon={<Clock size={20} />} />
+        <KPICard title="Previsto" value={`${fmt(totals.pendente)} (${totals.count_pendente})`} icon={<Clock size={20} />} />
+        <KPICard title="Recebimento esperado" value={`${fmt(totals.em_pagamento)} (${totals.count_em_pagamento})`} icon={<Banknote size={20} />} />
+        <KPICard title="Recebido (conciliado)" value={fmt(totals.total_realizado)} icon={<Wallet size={20} />} />
         <PMPMRKpiCard tipo="entrada" />
       </div>
 
@@ -82,6 +82,7 @@ export function ContasAReceber() {
         entries={entries}
         tipo="entrada"
         onMarkAsPaid={(data) => markAsPaid.mutate(data)}
+        onUndoIssued={(id) => undoPaymentIssued.mutate(id)}
         onDelete={(id) => remove.mutate(id)}
         onEdit={(e) => setEditEntry(e)}
         isDeleting={remove.isPending}
