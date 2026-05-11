@@ -76,8 +76,11 @@ export function useConciliacao(filters: ConciliacaoFilters = {}) {
     const conciliados = list.filter((e) => e.status === "conciliado").length;
     const divergentes = list.filter((e) => e.status === "divergente").length;
     const pendentes = list.filter((e) => e.status === "pendente").length;
+    const naoPrevistos = list.filter(
+      (e) => e.status === "pendente" && (e.match_bucket === "nao_previsto" || (e.match_score ?? 0) < 0.5)
+    ).length;
     const taxa = total > 0 ? (conciliados / total) * 100 : 0;
-    return { total, conciliados, divergentes, pendentes, taxa };
+    return { total, conciliados, divergentes, pendentes, naoPrevistos, taxa };
   })();
 
   const fetchCandidates = async (statementId: string): Promise<CashflowCandidate[]> => {
