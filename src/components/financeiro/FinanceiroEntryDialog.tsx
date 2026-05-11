@@ -154,7 +154,7 @@ function buildDefault(tipo: "saida" | "entrada", initial?: Partial<FinanceiroInp
 }
 
 export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPending, initial, editMode }: Props) {
-  const { entities } = useEntities();
+  const { entities, create: createEntity } = useEntities();
   const { costCenters } = useCostCenters();
   const { accounts } = useChartOfAccounts();
   const { bankAccounts, create: createBank } = useBankAccounts();
@@ -590,10 +590,19 @@ export function FinanceiroEntryDialog({ open, onOpenChange, tipo, onSave, isPend
         open={showEntityDialog}
         onOpenChange={setShowEntityDialog}
         entity={null}
+        defaultType={isEntrada ? "cliente" : "fornecedor"}
         onSubmit={(data) => {
-          // Will be handled by entities hook
+          createEntity.mutate(
+            { ...data, type: data.type || (isEntrada ? "cliente" : "fornecedor") },
+            {
+              onSuccess: (created) => {
+                set("entity_id", created.id);
+                setShowEntityDialog(false);
+              },
+            }
+          );
         }}
-        isLoading={false}
+        isLoading={createEntity.isPending}
       />
 
       {/* Inline Bank Account creation */}
