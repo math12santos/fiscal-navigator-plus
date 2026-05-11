@@ -56,7 +56,7 @@ export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccou
   const handleFile = (file: File | undefined) => {
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!["csv", "xlsx", "xls"].includes(ext || "")) return;
+    if (!["csv", "xlsx", "xls", "ofx", "qfx", "pdf"].includes(ext || "")) return;
     if (!imp.bankAccountId) return;
     imp.parseFile(file);
   };
