@@ -51,6 +51,7 @@ export function ContasBancariasTab() {
   const [showCreate, setShowCreate] = useState(false);
   const { holdingMode, subsidiaryOrgs } = useHolding();
   const { currentOrg } = useOrganization();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   // PIX dialog state
