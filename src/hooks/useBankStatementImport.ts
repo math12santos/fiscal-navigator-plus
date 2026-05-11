@@ -169,8 +169,12 @@ export function useBankStatementImport() {
     try {
       let headers: string[] = [];
       let rows: string[][] = [];
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      let format: StatementSourceFormat = "csv";
+      let dateFmt: "dd/MM/yyyy" | "MM/dd/yyyy" = "dd/MM/yyyy";
 
-      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      if (ext === "xlsx" || ext === "xls") {
+        format = "xlsx";
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -179,7 +183,31 @@ export function useBankStatementImport() {
           headers = data[0].map((h) => String(h ?? "").trim());
           rows = data.slice(1).filter((r) => r.some((c) => c != null && String(c).trim() !== ""));
         }
+      } else if (ext === "ofx" || ext === "qfx") {
+        format = "ofx";
+        const text = await file.text();
+        const result = parseOfx(text);
+        if (result.rows.length === 0) {
+          setError("OFX vazio ou inválido. Nenhum lançamento (<STMTTRN>) encontrado.");
+          return;
+        }
+        headers = [...result.headers];
+        rows = result.rows;
+        // OFX always uses ISO date and dot-decimal numbers
+        dateFmt = "dd/MM/yyyy"; // not used (data is already ISO)
+      } else if (ext === "pdf") {
+        format = "pdf";
+        const result = await parsePdfStatement(file);
+        if (result.rows.length === 0) {
+          setError(
+            "Não foi possível extrair lançamentos do PDF. PDFs digitalizados (imagem) não são suportados — use OFX ou XLSX quando possível."
+          );
+          return;
+        }
+        headers = [...result.headers];
+        rows = result.rows;
       } else {
+        format = "csv";
         const text = await file.text();
         const firstLine = text.split("\n")[0] || "";
         const sep = firstLine.includes(";") ? ";" : firstLine.includes("\t") ? "\t" : ",";
@@ -195,15 +223,29 @@ export function useBankStatementImport() {
         return;
       }
 
+      setSourceFormat(format);
       setRawHeaders(headers);
       setRawRows(rows);
+      // For OFX/PDF the parser already produces ISO dates and dot-decimal numbers
+      const isPreParsed = format === "ofx" || format === "pdf";
       setDetectedFormat({
         separator: ";",
-        date_format: "dd/MM/yyyy",
-        number_format: "br",
+        date_format: isPreParsed ? "yyyy-MM-dd" : dateFmt,
+        number_format: isPreParsed ? "us" : "br",
         mappings: [],
       });
-      setMappings(autoMapHeaders(headers));
+      // For OFX/PDF, headers already match target field names → identity mapping
+      if (isPreParsed) {
+        setMappings(
+          STATEMENT_TARGET_FIELDS.map((f) => ({
+            target_field: f.value,
+            source_column: headers.includes(f.value) ? f.value : null,
+            confidence: headers.includes(f.value) ? ("high" as const) : null,
+          }))
+        );
+      } else {
+        setMappings(autoMapHeaders(headers));
+      }
       setStep("mapping");
     } catch (e) {
       if (import.meta.env.DEV) console.error("Parse error:", e);
