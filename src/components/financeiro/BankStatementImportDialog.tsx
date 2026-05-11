@@ -81,7 +81,7 @@ export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccou
             </h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Importe linhas do extrato (CSV ou XLSX) para conciliar com lançamentos do fluxo de caixa
+            Importe linhas do extrato (XLSX, CSV, OFX/QFX ou PDF) para conciliar com o fluxo de caixa
           </p>
 
           <div className="flex items-center gap-1 text-xs text-muted-foreground mt-3">
