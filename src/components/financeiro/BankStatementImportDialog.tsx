@@ -473,10 +473,41 @@ export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccou
                 </div>
               )}
 
+              {imp.coverageLoading && (
+                <div className="w-full rounded-md border bg-muted/30 p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Analisando cobertura contra lançamentos previstos...
+                </div>
+              )}
+
+              {imp.coverage && (
+                <div className="w-full rounded-md border p-3 space-y-2">
+                  <p className="text-sm font-medium">Resultado da pré-conciliação</p>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded border bg-emerald-500/10 p-2">
+                      <div className="text-xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{imp.coverage.casado}</div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Casados (auto)</div>
+                    </div>
+                    <div className="rounded border bg-amber-500/10 p-2">
+                      <div className="text-xl font-bold tabular-nums text-amber-700 dark:text-amber-400">{imp.coverage.sugestao}</div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Sugestões</div>
+                    </div>
+                    <div className="rounded border bg-destructive/10 p-2">
+                      <div className="text-xl font-bold tabular-nums text-destructive">{imp.coverage.nao_previsto}</div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Não previstos</div>
+                    </div>
+                  </div>
+                  {imp.coverage.nao_previsto > 0 && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Linhas <strong>não previstas</strong> precisam ser classificadas (conta contábil + centro de custo) antes de conciliar — isso garante que o caixa real reflita o banco.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <p className="text-xs text-muted-foreground max-w-md text-center">
-                Agora vá para a tela de Conciliação para vincular as linhas importadas aos lançamentos do fluxo de caixa.
+                Vá para a Conciliação para revisar sugestões e classificar lançamentos não previstos.
               </p>
-              <Button size="sm" onClick={() => handleClose(false)} className="mt-2">Fechar</Button>
+              <Button size="sm" onClick={() => handleClose(false)} className="mt-2">Ir para Conciliação</Button>
             </div>
           )}
         </div>
