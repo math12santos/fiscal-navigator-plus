@@ -1187,7 +1187,7 @@ function OrgModulesTab({ orgId }: { orgId: string }) {
         .select("subsidiary_id")
         .eq("holding_id", orgId);
       if (error) throw error;
-      return (data ?? []) as { subsidiary_id: string }[];
+      return (data ?? []) as unknown as { subsidiary_id: string }[];
     },
     enabled: !!orgId,
   });
