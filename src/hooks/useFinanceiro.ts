@@ -297,10 +297,11 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
-  // Mark as paid/received
+  // Registrar pagamento emitido (saída) ou recebimento esperado (entrada).
+  // NÃO marca como realizado — isso só acontece via conciliação bancária.
   const markAsPaid = useMutation({
-    mutationFn: async (entry: { id: string; valor_realizado: number; data_realizada: string; isProjected: boolean }) => {
-      const status = tipo === "entrada" ? "recebido" : "pago";
+    mutationFn: async (entry: { id: string; valor_realizado: number; data_realizada: string; isProjected: boolean; meio?: string | null }) => {
+      const status = tipo === "entrada" ? "recebimento_esperado" : "pagamento_emitido";
 
       if (entry.isProjected) {
         // Find the original entry data from allEntries
