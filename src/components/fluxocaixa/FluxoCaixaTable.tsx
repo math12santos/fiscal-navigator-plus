@@ -131,7 +131,27 @@ export function FluxoCaixaTable({ entries }: Props) {
                         {isProjected && <span className="text-muted-foreground ml-1">(projeção)</span>}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground capitalize">{e.source}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        if ((e.categoria ?? "") === "transferencia_interna") {
+                          return <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">Transferência</Badge>;
+                        }
+                        if (e.is_estorno) {
+                          return <Badge variant="outline" className="text-[10px] border-warning/50 text-warning">Estorno</Badge>;
+                        }
+                        if (e.source === "extrato_bancario") {
+                          return <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/20 border-0">Extrato</Badge>;
+                        }
+                        if (e.is_realizado_caixa) {
+                          return <Badge className="text-[10px] bg-success/10 text-success hover:bg-success/15 border-0">Conciliado</Badge>;
+                        }
+                        return (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            Previsto
+                          </Badge>
+                        );
+                      })()}
+                    </TableCell>
                   </TableRow>
                 );
               })}
