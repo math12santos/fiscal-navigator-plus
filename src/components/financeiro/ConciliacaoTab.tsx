@@ -275,6 +275,12 @@ export function ConciliacaoTab() {
       />
 
       <ReconciliationRulesDialog open={rulesOpen} onOpenChange={setRulesOpen} />
+
+      <ClassifyAndReconcileDialog
+        open={!!classifyEntry}
+        onOpenChange={(o) => !o && setClassifyEntry(null)}
+        entry={classifyEntry}
+      />
     </div>
   );
 }
