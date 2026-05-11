@@ -448,8 +448,23 @@ export function useBankStatementImport() {
       setImportCount(imported);
       setSkippedCount(skipped);
       setFailedRows(failed);
+      setLastImportId(importId);
       setStep("done");
       queryClient.invalidateQueries({ queryKey: ["bank-statement-entries", currentOrg.id] });
+
+      // Run coverage classification (matches each new line against expected cashflow)
+      if (imported > 0) {
+        setCoverageLoading(true);
+        try {
+          const { data: cov, error: covErr } = await supabase.rpc(
+            "classify_statement_coverage" as any,
+            { p_org_id: currentOrg.id, p_import_id: importId }
+          );
+          if (!covErr && cov) setCoverage(cov as unknown as CoverageResult);
+        } finally {
+          setCoverageLoading(false);
+        }
+      }
 
       const parts = [`${imported} importados`];
       if (skipped > 0) parts.push(`${skipped} duplicatas puladas`);
@@ -464,7 +479,7 @@ export function useBankStatementImport() {
       setError("Erro: " + (e instanceof Error ? e.message : "desconhecido"));
       setStep("preview");
     }
-  }, [user, currentOrg, bankAccountId, parsedRows, excludedRows, fileName, queryClient, toast]);
+  }, [user, currentOrg, bankAccountId, parsedRows, excludedRows, fileName, queryClient, toast, sourceFormat]);
 
   const downloadFailedRowsCSV = useCallback(() => {
     if (failedRows.length === 0) return;
