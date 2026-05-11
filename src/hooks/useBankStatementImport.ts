@@ -5,6 +5,17 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import { parseOfx } from "@/lib/parsers/ofxParser";
+import { parsePdfStatement } from "@/lib/parsers/pdfStatementParser";
+
+export type StatementSourceFormat = "csv" | "xlsx" | "ofx" | "pdf";
+
+export interface CoverageResult {
+  total: number;
+  casado: number;
+  sugestao: number;
+  nao_previsto: number;
+}
 
 export type StatementImportStep = "upload" | "detecting" | "mapping" | "preview" | "importing" | "done";
 
