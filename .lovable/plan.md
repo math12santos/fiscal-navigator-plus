@@ -1,98 +1,163 @@
-# Reformulação MECE do Módulo Financeiro
+# Extrato imutável + criar lançamento + transferências + estornos (MECE)
 
-## Diagnóstico atual
+Este plano consolida 4 demandas que se entrelaçam no fluxo de resolução de extrato bancário, todas regidas pelo princípio: **o extrato é a verdade realizada e imutável; o sistema deve absorver toda movimentação sem duplicidade.**
 
-Hoje o sistema confunde **"intenção de pagar"** com **"pagamento efetivo"**:
+## Princípios
 
-- `Contas a Pagar` tem botão "Marcar como pago" (`markAsPaid`) que **já grava** `status='pago'`, `valor_realizado` e `data_realizada` — sem nenhuma confirmação no extrato.
-- `Conciliação` também marca como `pago/recebido` ao vincular extrato. Resultado: dois caminhos diferentes geram o mesmo estado, quebrando MECE (um lançamento pode estar "pago" sem nunca ter saído do banco).
-- `Fechamento de mês` (`fiscal_periods`) existe, mas pode ser fechado mesmo com lançamentos previstos sem conciliação e linhas de extrato pendentes.
-- Solicitações de outros departamentos já caem corretamente em `previsto` via `ApproveRequestDialog`, mas depois seguem o mesmo fluxo ambíguo.
+1. **Imutabilidade do extrato** — data e valor de uma linha bancária não podem ser editados pelo usuário.
+2. **Cobertura total (MECE-collectively exhaustive)** — toda linha do extrato precisa virar um destino: vincular a previsto, criar lançamento novo, marcar como transferência (par) ou estornar um realizado anterior.
+3. **Não-duplicação (MECE-mutually exclusive)** — transferência aparece como **uma única operação** (1 saída + 1 entrada = mesmo evento); estorno **anula** o realizado original em vez de criar uma receita/despesa nova.
 
-## Princípio MECE alvo
+---
 
-Toda movimentação financeira deve estar **em exatamente um** de três estados:
+## 1. Travar data/valor na correção (Corrigir → "Complementar dados")
 
-```text
-PREVISTO              EM PAGAMENTO                 REALIZADO
-(planejamento)   →    (ação registrada,       →   (confirmado
-                       aguardando banco)           pelo extrato)
+- Renomear ação **"Corrigir"** para **"Complementar dados"** em `StatementResolutionPanel.tsx`.
+- Campos `data` e `valor` ficam **read-only** com badge "imutável (vem do extrato)" quando o `parsed` original já tinha valores válidos.
+- Continuam editáveis apenas: **descrição** e **documento**.
+- Caso o parser não tenha conseguido ler data/valor (erro real do arquivo OFX), os campos abrem para edição com aviso explícito.
+- Backend: `resolve_correct_and_retry` recusa alteração de data/valor quando `staging.parsed` já tinha esses campos válidos (compara com snapshot original em `raw`); registra tentativas em `audit_log`.
+
+---
+
+## 2. Criar lançamento a partir da linha do extrato
+
+Novo botão **"Criar lançamento"** ao lado de "Vincular", para o caso "não existe previsto".
+
+- Habilitado quando data/valor estão válidos.
+- Abre `CreateCashflowFromStatementDialog` com:
+  - Cabeçalho fixo: data + valor (read-only, badge imutável).
+  - Tipo (`despesa`/`receita`) inferido pelo sinal — não editável.
+  - Campos do usuário: descrição (pré-preenchida), conta contábil, centro de custo, fornecedor/cliente, contrato (opcional), observações.
+  - Botão **"Criar e marcar como realizado"**.
+- Backend: nova RPC `resolve_create_cashflow` (SECURITY DEFINER) que, em transação:
+  1. Insere `cashflow_entries` com `tipo` derivado do sinal, `data_prevista = data_realizada = parsed.data`, `valor_previsto = valor_realizado = abs(parsed.valor)`, `status = 'pago'|'recebido'`, `source = 'extrato_bancario'`, classificação informada, `bank_account_id`.
+  2. Insere `bank_statement_entries` apontando para o novo `cashflow_entry_id`, status `conciliado`.
+  3. Atualiza `bank_statement_staging` → `status='vinculado'`, `resolution = {"via":"create_from_statement", ...}`.
+  4. `audit_log` com ação `cashflow_created_from_statement`.
+  5. Respeita trava de fechamento de período fiscal já existente.
+- Como passa por `bank_statement_entries`, a regra MECE 3 estados ("só conciliação promove a realizado") permanece íntegra — previsto e realizado nascem juntos no mesmo ato.
+
+---
+
+## 3. Transferências entre contas da mesma empresa
+
+Toda transferência interna gera **duas linhas no extrato** (saída na conta A, entrada na conta B). O sistema deve representá-la como **um único evento** (sem virar despesa+receita).
+
+### Modelo de dados
+
+- Nova tabela `internal_transfers`:
+  - `organization_id`, `from_bank_account_id`, `to_bank_account_id`, `valor`, `data`, `descricao`, `notes`, `created_by`.
+  - `from_cashflow_entry_id`, `to_cashflow_entry_id`, `from_bank_statement_entry_id`, `to_bank_statement_entry_id` (todos nullable até a contraparte aparecer).
+  - `status`: `aguardando_contraparte` (1 lado conciliado) | `completa` (2 lados conciliados).
+- `cashflow_entries` ganha coluna `transfer_id uuid references internal_transfers(id)` e `categoria='transferencia_interna'` reservada.
+- Trigger `cashflow_realize_guard` permite `pago/recebido` em entradas com `transfer_id` se ambas as pontas estão pareadas via reconciliação.
+- **DRE/KPIs/Dashboard** ignoram entradas com `categoria='transferencia_interna'` (não contam como receita/despesa) — apenas afetam saldo bancário por conta.
+
+### Fluxo na resolução
+
+Novo botão **"É transferência entre contas"** no `StatementResolutionPanel`:
+
+- Abre `MarkAsTransferDialog` mostrando:
+  - Cabeçalho com a linha atual (conta + valor + data, read-only).
+  - Lista de candidatos automáticos: linhas do staging/extrato em **outras contas da mesma org** com `valor` oposto e `data` em janela de ±3 dias úteis.
+  - Opção "Criar contraparte virtual" caso a outra ponta ainda não tenha sido importada (cria registro `aguardando_contraparte`; quando o outro extrato chegar, o sistema sugere o pareamento).
+- Backend RPC `resolve_mark_as_transfer(p_staging_id, p_counterparty_staging_id?)`:
+  - Se `counterparty` informado: cria `internal_transfers` com ambos os pares, gera 2 `cashflow_entries` (transferencia_interna, ambas com `transfer_id`), liga a 2 `bank_statement_entries`, atualiza ambos staging → `vinculado`, status da transferência → `completa`.
+  - Se sem contraparte: cria `internal_transfers` parcial, marca staging atual → `vinculado_parcial`, e a sugestão de pareamento entra no painel quando a outra linha aparecer.
+  - Validações: contas pertencem à mesma `organization_id`, valores opostos com tolerância configurável, datas dentro da janela.
+
+### Detecção pró-ativa
+
+- Hook `unresolved` passa a expor flag `provavel_transferencia` quando o algoritmo encontra par óbvio (mesmo módulo, valores espelho).
+- Banner sugere "X linhas parecem ser transferências entre contas — revisar".
+
+---
+
+## 4. Estornos / devoluções (sem duplicidade)
+
+Estorno = linha bancária que **anula** um realizado anterior (estorno de pagamento, devolução de cobrança, chargeback). Tratar como **anti-lançamento**, não como nova receita/despesa.
+
+### Modelo
+
+- `cashflow_entries` ganha colunas `is_estorno boolean default false` e `estorno_de_entry_id uuid references cashflow_entries(id)`.
+- Constraint: se `is_estorno=true`, `estorno_de_entry_id` obrigatório, e `tipo` deve ser **oposto** ao da entrada original; valor deve igualar o original.
+- Original recebe `estornado_em`, `estornado_por_entry_id` para rastreio reverso.
+- DRE/KPIs: estorno **subtrai** do realizado original (mostrado como "líquido após estorno"); nunca soma como receita avulsa.
+
+### Fluxo na resolução
+
+Novo botão **"É estorno/devolução"** no painel:
+
+- Abre `MarkAsReversalDialog` mostrando:
+  - Cabeçalho da linha (read-only).
+  - Lista de candidatos: `cashflow_entries` da mesma org/conta, **status `pago`/`recebido`**, valor igual em sentido oposto, data dentro de janela de 90 dias.
+  - Filtro/busca por descrição, fornecedor, documento.
+  - Aviso quando o original já foi estornado (impede duplicidade).
+- Backend RPC `resolve_mark_as_reversal(p_staging_id, p_original_entry_id)`:
+  1. Valida: original existe, está realizado, ainda não estornado, mesma org, sinais opostos, valores casam.
+  2. Cria `cashflow_entries` com `is_estorno=true`, `estorno_de_entry_id`, `status='pago'/'recebido'`, `source='extrato_bancario'`, `bank_account_id` da linha.
+  3. Liga a `bank_statement_entries` (status `conciliado`).
+  4. Atualiza original: `estornado_em = now()`, `estornado_por_entry_id`.
+  5. Atualiza staging → `vinculado` com `resolution.via='reversal'`.
+  6. `audit_log` com ação `cashflow_reversed`.
+- Trigger impede 2º estorno do mesmo `original_entry_id`.
+
+### KPI de fechamento
+
+`get_month_closing_readiness` continua exigindo 100% de extrato resolvido — transferências e estornos contam como "resolvidos".
+
+---
+
+## 5. UI consolidada
+
+`StatementResolutionPanel` passa a ter (por linha):
+
+```
+[Complementar] [Vincular a previsto] [Criar lançamento] [É transferência] [É estorno] [Descartar]
 ```
 
-Regra dura: **só a conciliação bancária promove para REALIZADO**. Nenhum botão de outro módulo pode gravar `valor_realizado` / `data_realizada` / `status='pago|recebido'` diretamente.
+- Botões agrupados em dropdown "Mais ações" se ficar apertado em 1454px.
+- Banner no topo com contadores: `N a resolver · X parecem transferências · Y parecem estornos`.
+- Cada ação abre seu próprio diálogo focado.
 
-## Mudanças por área
-
-### 1. Modelo de dados (migration)
-
-Adicionar a `cashflow_entries`:
-- `status` ganha dois novos valores: `pagamento_emitido` (saída) e `recebimento_esperado` (entrada).
-- `data_pagamento_emitido date`, `pagamento_emitido_por uuid`, `pagamento_emitido_em timestamptz`, `pagamento_meio text` (pix/ted/boleto/cartao).
-- Trigger `cashflow_entries_status_guard`: bloqueia transições para `pago`/`recebido` se a linha não tiver `bank_statement_entry_id` vinculado (exceções: import histórico marcado com `source='import_historico'`).
-- Trigger `cashflow_entries_realized_fields`: `valor_realizado` e `data_realizada` só podem ser escritos a partir do fluxo de conciliação (RPC), nunca via update direto.
-
-Estado de `fiscal_periods`:
-- Nova coluna `fechamento_checklist jsonb` (snapshot do que foi validado).
-- RPC `close_fiscal_period(p_org, p_year_month)` — só aceita fechar quando:
-  1. 0 linhas em `bank_statement_entries` com `status='pendente'` no período;
-  2. 0 linhas em `bank_statement_staging` com `status='pendente'`;
-  3. 100% dos `cashflow_entries` com `data_vencimento` dentro do mês e `impacto_fluxo_caixa=true` estão em `pago`/`recebido` ou justificados (`status='cancelado'` com motivo).
-- RPC `get_month_closing_readiness(p_org, p_year_month)` retorna percentuais por bloco para o cabeçalho.
-
-### 2. Contas a Pagar / Receber
-
-- Renomear ação "Marcar como pago" para **"Registrar pagamento emitido"** (saída) e **"Registrar recebimento esperado"** (entrada).
-- Esta ação grava apenas: `status='pagamento_emitido'`, `data_pagamento_emitido`, `pagamento_meio`, `pagamento_emitido_por`. **Não** toca `valor_realizado` nem `data_realizada`.
-- Novo chip de status na tabela: `Previsto` (azul) · `Em pagamento` (âmbar) · `Pago/Recebido` (verde) · `Cancelado` (cinza).
-- Novo filtro/aba "Em pagamento aguardando extrato" mostrando idade do registro (alerta se >3 dias úteis sem conciliação).
-- Botão "Desfazer pagamento emitido" disponível enquanto não conciliado.
-- `ValorExecutadoDialog` deixa de ser confirmação final — vira apenas a tela de "registro de emissão" (mantém data, mas sem campo `valor_realizado`).
-
-### 3. Conciliação
-
-- Continua sendo o **único** caminho que promove para `pago`/`recebido`.
-- Ao conciliar uma linha de extrato com um cashflow `pagamento_emitido` ou `recebimento_esperado`: confirma e fecha o ciclo.
-- Ao conciliar com um `previsto` que pulou a etapa intermediária: aceita, mas registra `pulou_emissao=true` no `cashflow_audit_log` para evidência.
-- Ao conciliar com um lançamento ainda inexistente: o fluxo de "Resolver Extrato" (já implementado) cria direto como `realizado`, mantendo MECE.
-
-### 4. Solicitações de outros departamentos
-
-- Fluxo permanece: `solicitada → aprovada` → cria `cashflow_entries` com `status='previsto'`. ✓
-- **Bloqueio novo (trigger)**: `requests` não pode ser marcada como `executada` se o `cashflow_entry_id` referenciado não estiver `pago/recebido` (i.e. conciliado).
-- Notificação ao solicitante muda de "Aprovada" para "Aprovada — aguardando pagamento" e depois "Paga — confirmada no extrato".
-
-### 5. Cabeçalho do Financeiro — Termômetro de fechamento
-
-Componente `MonthClosingReadinessCard` no topo de `Financeiro.tsx`:
-
-```text
-Maio/2026 — Pronto para fechar: 78%
-[ 92% conciliação extrato ] [ 71% AP liquidado ] [ 80% AR liquidado ]
-[ Fechar mês ]  (desabilitado até 100%)
-```
-
-Ao chegar em 100%, botão `Fechar mês` chama a RPC e bloqueia escrita no período (já existe a infra de `fiscal_periods`).
-
-### 6. Aging List e Dashboards
-
-- `AgingListTab` ganha coluna "Estado de pagamento" (Previsto/Em pagamento/Pago).
-- Card "Em pagamento aguardando extrato" no dashboard com drill-down.
-- KPIs do `ContasAPagar`: separar `Total previsto` · `Em pagamento` · `Pago` (hoje só tem previsto/pago).
+---
 
 ## Arquivos afetados
 
-**Migration nova** (estados + triggers + RPCs `close_fiscal_period` / `get_month_closing_readiness`).
+```text
+supabase/migrations/<novo>_statement_resolution_v2.sql
+  - tabela internal_transfers + RLS
+  - colunas: cashflow_entries.transfer_id, is_estorno, estorno_de_entry_id, estornado_em, estornado_por_entry_id
+  - RPCs: resolve_create_cashflow, resolve_mark_as_transfer, resolve_mark_as_reversal
+  - ajuste resolve_correct_and_retry (recusa alterar data/valor já válidos)
+  - ajuste cashflow_realize_guard (whitelist transferencia_interna + estorno via reconciliação)
+  - constraints/triggers anti-duplicidade (estorno único, transferência única por par)
 
-**Backend lógico**: `src/hooks/useFinanceiro.ts` (split de `markAsPaid` em `registerPaymentIssued` + nova `confirmRealization` interna usada só pela conciliação), `src/hooks/useConciliacao.ts`, `src/hooks/useFiscalPeriods.ts`, `src/hooks/useStatementResolution.ts`.
+src/hooks/useStatementResolution.ts
+  - + createFromStatement, markAsTransfer, markAsReversal
+  - + searchTransferCounterparties, searchReversalCandidates
 
-**UI**: `ContasAPagar.tsx`, `ContasAReceber.tsx`, `ValorExecutadoDialog.tsx` (renomear/refazer), `FinanceiroTable.tsx` (chips e filtros), `ConciliacaoTab.tsx` (badge "fecha pagamento emitido"), novo `MonthClosingReadinessCard.tsx`, `AgingListTab.tsx`, `PendenciasPanel.tsx`.
+src/components/financeiro/StatementResolutionPanel.tsx
+  - read-only data/valor no Complementar
+  - 3 novos botões + dropdown agrupador
+  - banner de detecção pró-ativa
 
-**Memória do projeto**: registrar a nova regra dos 3 estados em `mem://logic/financeiro-mece-3-states` e atualizar o índice.
+src/components/financeiro/CreateCashflowFromStatementDialog.tsx     (novo)
+src/components/financeiro/MarkAsTransferDialog.tsx                  (novo)
+src/components/financeiro/MarkAsReversalDialog.tsx                  (novo)
 
-## Migração de dados existentes
+src/hooks/useFinanceiro.ts
+  - excluir entradas com categoria='transferencia_interna' dos totais de Previsto/Realizado de AP/AR
+  - exibir realizados estornados como "líquido após estorno"
 
-- Cashflow com `status='pago'` E `bank_statement_entry_id IS NULL` → reclassificar como `pagamento_emitido` (e `recebido` → `recebimento_esperado`), preservando `valor_realizado` em campo de auditoria, para que o usuário possa concluir a conciliação retroativamente. Linhas vinculadas ao extrato permanecem `pago/recebido`.
+src/hooks/useDashboardKPIs.ts / RPC get_dashboard_kpis
+  - filtrar transferencia_interna; subtrair estornos do realizado
+```
 
-## Resultado esperado
+## Fora de escopo
 
-Toda linha do sistema cabe em exatamente um balde MECE. Fechar o mês deixa de ser ato de fé: passa a ser uma consequência matemática de **AP + AR + Extrato 100% conciliados**.
+- Não mexer em `LinkToPlannedDialog` (já cumpre o vínculo a previsto e correção de conciliação anterior).
+- Não alterar lógica de fechamento de período além de tratar os novos status como "resolvidos".
+- Não mexer na importação OFX em si — só na camada de resolução.
+- Conciliação automática de transferências por algoritmo de matching fica para fase futura; nesta entrega o usuário confirma o par.
