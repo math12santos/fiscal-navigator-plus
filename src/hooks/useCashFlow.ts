@@ -84,7 +84,31 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     placeholderData: keepPreviousData,
   });
 
-  // Contract projections (virtual) — recurrent contracts
+  // Bank statement reconciliations — used to mark which cashflow entries
+  // are Realizado-de-caixa (conciliados com extrato), em oposição a apenas "marcado como pago".
+  const reconciledQuery = useQuery({
+    queryKey: ["bank_statement_reconciled", holdingMode ? activeOrgIds : orgId, rangeFrom?.toISOString(), rangeTo?.toISOString()],
+    queryFn: async () => {
+      let q = supabase
+        .from("bank_statement_entries" as any)
+        .select("cashflow_entry_id")
+        .not("cashflow_entry_id", "is", null);
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else if (orgId) {
+        q = q.eq("organization_id", orgId);
+      }
+      if (rangeFrom) q = q.gte("data", format(rangeFrom, "yyyy-MM-dd"));
+      if (rangeTo) q = q.lte("data", format(rangeTo, "yyyy-MM-dd"));
+      const { data, error } = await q;
+      if (error) throw error;
+      return new Set<string>((data ?? []).map((r: any) => r.cashflow_entry_id).filter(Boolean));
+    },
+    enabled: !!user && !!orgId,
+    placeholderData: keepPreviousData,
+  });
+
+
   const { contracts } = useContracts();
 
   // Installments for all non-recurring contracts (merchandise, assets, one-off services, etc.)
