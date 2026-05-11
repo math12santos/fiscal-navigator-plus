@@ -8744,6 +8744,112 @@ export type Database = {
           },
         ]
       }
+      purchase_recurrences: {
+        Row: {
+          account_id: string | null
+          ativo: boolean
+          categoria: string | null
+          contract_id: string | null
+          cost_center_id: string | null
+          created_at: string
+          created_by: string | null
+          data_fim: string | null
+          data_inicio: string
+          descricao: string | null
+          dia_geracao: number
+          id: string
+          nome: string
+          observacao: string | null
+          organization_id: string
+          periodicidade: string
+          proxima_geracao: string
+          request_template_id: string | null
+          supplier_id: string | null
+          tipo_compra: string
+          total_geracoes: number
+          ultima_geracao_em: string | null
+          ultima_request_id: string | null
+          updated_at: string
+          valor_estimado: number
+        }
+        Insert: {
+          account_id?: string | null
+          ativo?: boolean
+          categoria?: string | null
+          contract_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          descricao?: string | null
+          dia_geracao?: number
+          id?: string
+          nome: string
+          observacao?: string | null
+          organization_id: string
+          periodicidade?: string
+          proxima_geracao: string
+          request_template_id?: string | null
+          supplier_id?: string | null
+          tipo_compra?: string
+          total_geracoes?: number
+          ultima_geracao_em?: string | null
+          ultima_request_id?: string | null
+          updated_at?: string
+          valor_estimado?: number
+        }
+        Update: {
+          account_id?: string | null
+          ativo?: boolean
+          categoria?: string | null
+          contract_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          descricao?: string | null
+          dia_geracao?: number
+          id?: string
+          nome?: string
+          observacao?: string | null
+          organization_id?: string
+          periodicidade?: string
+          proxima_geracao?: string
+          request_template_id?: string | null
+          supplier_id?: string | null
+          tipo_compra?: string
+          total_geracoes?: number
+          ultima_geracao_em?: string | null
+          ultima_request_id?: string | null
+          updated_at?: string
+          valor_estimado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_recurrences_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_recurrences_request_template_id_fkey"
+            columns: ["request_template_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_recurrences_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_request_items: {
         Row: {
           categoria: string | null
@@ -8922,6 +9028,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      purchase_settings: {
+        Row: {
+          alerta_aprovacao_pendente_dias: number
+          alerta_divergencia_aberta_dias: number
+          alerta_recorrencia_antecedencia_dias: number
+          auto_criar_ativo_imobilizado: boolean
+          auto_criar_contrato_recorrente: boolean
+          created_at: string
+          id: string
+          organization_id: string
+          recorrencia_horizonte_meses: number
+          updated_at: string
+          vida_util_contabil_meses: number
+          vida_util_economica_meses: number
+        }
+        Insert: {
+          alerta_aprovacao_pendente_dias?: number
+          alerta_divergencia_aberta_dias?: number
+          alerta_recorrencia_antecedencia_dias?: number
+          auto_criar_ativo_imobilizado?: boolean
+          auto_criar_contrato_recorrente?: boolean
+          created_at?: string
+          id?: string
+          organization_id: string
+          recorrencia_horizonte_meses?: number
+          updated_at?: string
+          vida_util_contabil_meses?: number
+          vida_util_economica_meses?: number
+        }
+        Update: {
+          alerta_aprovacao_pendente_dias?: number
+          alerta_divergencia_aberta_dias?: number
+          alerta_recorrencia_antecedencia_dias?: number
+          auto_criar_ativo_imobilizado?: boolean
+          auto_criar_contrato_recorrente?: boolean
+          created_at?: string
+          id?: string
+          organization_id?: string
+          recorrencia_horizonte_meses?: number
+          updated_at?: string
+          vida_util_contabil_meses?: number
+          vida_util_economica_meses?: number
+        }
+        Relationships: []
       }
       reconciliation_rules: {
         Row: {
@@ -10537,6 +10688,18 @@ export type Database = {
       }
       etl_retry_failed: { Args: { p_job_id: string }; Returns: number }
       etl_retry_item: { Args: { p_item_id: string }; Returns: undefined }
+      fn_generate_recurring_purchases: {
+        Args: { _horizonte_dias?: number; _org?: string }
+        Returns: {
+          competencia: string
+          recurrence_id: string
+          request_id: string
+        }[]
+      }
+      fn_recur_next_date: {
+        Args: { _base: string; _periodicidade: string }
+        Returns: string
+      }
       generate_purchase_code: {
         Args: { _org: string; _prefix: string }
         Returns: string
