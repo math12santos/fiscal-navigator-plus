@@ -25,6 +25,8 @@ const fmt = (v: number) =>
 const statusConfig: Record<string, { icon: typeof Circle; class: string; label: string }> = {
   previsto: { icon: Clock, class: "text-muted-foreground", label: "Previsto" },
   confirmado: { icon: CheckCircle, class: "text-warning", label: "Confirmado" },
+  pagamento_emitido: { icon: Banknote, class: "text-amber-600", label: "Em pagamento" },
+  recebimento_esperado: { icon: Banknote, class: "text-amber-600", label: "Recebimento esperado" },
   pago: { icon: CheckCircle, class: "text-success", label: "Pago" },
   recebido: { icon: CheckCircle, class: "text-success", label: "Recebido" },
   cancelado: { icon: Circle, class: "text-destructive", label: "Cancelado" },
