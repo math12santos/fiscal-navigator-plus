@@ -150,6 +150,7 @@ function buildDefault(tipo: "saida" | "entrada", initial?: Partial<FinanceiroInp
     num_parcelas: initial?.num_parcelas ?? null,
     recorrencia: initial?.recorrencia ?? null,
     conciliacao_id: initial?.conciliacao_id ?? null,
+    data_assinatura: initial?.data_assinatura ?? null,
   };
 }
 
