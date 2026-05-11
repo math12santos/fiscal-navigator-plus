@@ -10,8 +10,10 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp, Info, KeyRound, Copy } from "lucide-react";
+import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp, Info, KeyRound, Copy, FileDown, Scale, ArrowDownToLine } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { generateBankBalancesPdf } from "@/lib/bankBalancesPdf";
 import { useHolding } from "@/contexts/HoldingContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -49,6 +51,7 @@ export function ContasBancariasTab() {
   const [showCreate, setShowCreate] = useState(false);
   const { holdingMode, subsidiaryOrgs } = useHolding();
   const { currentOrg } = useOrganization();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   // PIX dialog state
@@ -188,6 +191,57 @@ export function ContasBancariasTab() {
     { saldo: 0, limiteTotal: 0, limiteUsado: 0, limiteDisp: 0, disponivel: 0, jurosEstimado: 0 }
   );
 
+  // Divergência de conciliação: saldo OFX (referência) vs saldo manual
+  const ofxAccounts = allBankAccounts.filter((a) => a.saldo_ofx != null);
+  const divergenciaTotal = ofxAccounts.reduce(
+    (acc, a) => acc + ((a.saldo_ofx ?? 0) - (a.saldo_atual || 0)),
+    0,
+  );
+  const contasAConciliar = ofxAccounts.filter(
+    (a) => Math.abs((a.saldo_ofx ?? 0) - (a.saldo_atual || 0)) >= 0.01,
+  ).length;
+
+  const handleAdotarOfx = (acc: BankAccount) => {
+    if (acc.saldo_ofx == null) return;
+    update.mutate({
+      id: acc.id,
+      saldo_atual: acc.saldo_ofx,
+      saldo_atualizado_em: new Date().toISOString(),
+    } as any);
+  };
+
+  const handleEmitirPdf = async () => {
+    const rows = allBankAccounts.map((a) => ({
+      orgName: orgNameMap[a.organization_id ?? ""] || (currentOrg?.name ?? "—"),
+      nome: a.nome,
+      banco: a.banco,
+      tipo_conta: tipoContaLabels[a.tipo_conta] || a.tipo_conta,
+      saldo_manual: a.saldo_atual || 0,
+      saldo_manual_em: a.saldo_atualizado_em,
+      saldo_ofx: a.saldo_ofx,
+      saldo_ofx_data: a.saldo_ofx_data,
+    }));
+    if (rows.length === 0) {
+      toast({ title: "Sem contas bancárias para o relatório", variant: "destructive" });
+      return;
+    }
+    try {
+      await generateBankBalancesPdf({
+        contextName: holdingMode ? "Consolidado (Holding)" : (currentOrg?.name ?? "—"),
+        isConsolidated: holdingMode,
+        accounts: rows,
+        issuer: {
+          name: (user?.user_metadata as any)?.full_name || user?.email || "—",
+          email: user?.email || "—",
+          id: user?.id,
+        },
+      });
+      toast({ title: "Relatório de saldos gerado" });
+    } catch (e: any) {
+      toast({ title: "Erro ao gerar PDF", description: e?.message, variant: "destructive" });
+    }
+  };
+
   const proximoFechamento = getNextClosingDate();
 
   if (isLoading) {
@@ -197,7 +251,7 @@ export function ContasBancariasTab() {
   return (
     <div className="space-y-4">
       {/* KPIs de capital de giro */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -267,15 +321,48 @@ export function ContasBancariasTab() {
             </p>
           </CardContent>
         </Card>
+        <Card className={contasAConciliar > 0 ? "border-warning/50" : "border-success/40"}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Scale className="h-3.5 w-3.5" /> Divergência (OFX − Manual)
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Soma de (saldo OFX − saldo manual) entre as contas com extrato importado.
+                      O saldo OFX é a referência; o manual permanece para emissão de relatórios manuais.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <p className={`text-lg font-bold mt-1 ${Math.abs(divergenciaTotal) >= 0.01 ? "text-warning" : "text-success"}`}>
+              {ofxAccounts.length === 0 ? "—" : fmt(divergenciaTotal)}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {ofxAccounts.length === 0
+                ? "Nenhum OFX importado"
+                : `${contasAConciliar} a conciliar · ${ofxAccounts.length - contasAConciliar} ok`}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
           {allBankAccounts.length} conta(s) bancária(s) cadastrada(s)
         </p>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Nova Conta
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleEmitirPdf} disabled={allBankAccounts.length === 0}>
+            <FileDown className="h-4 w-4 mr-1" /> Emitir Relatório PDF
+          </Button>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nova Conta
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -287,7 +374,7 @@ export function ContasBancariasTab() {
                 <TableHead>Banco</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Chave PIX</TableHead>
-                <TableHead className="text-right">Saldo Atual</TableHead>
+                <TableHead className="text-right">Saldo (Manual / OFX)</TableHead>
                 <TableHead className="text-right">Limite</TableHead>
                 <TableHead className="text-right">Disponível</TableHead>
                 {holdingMode && <TableHead>Empresa</TableHead>}
@@ -378,7 +465,7 @@ export function ContasBancariasTab() {
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7"
-                          title="Inserir saldo manualmente"
+                          title="Inserir saldo manualmente (usado em relatório PDF)"
                           onClick={() => {
                             setBalanceAccount(acc);
                             setBalanceValue(String(acc.saldo_atual));
@@ -389,9 +476,54 @@ export function ContasBancariasTab() {
                       </div>
                       {acc.saldo_atualizado_em && (
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {format(new Date(acc.saldo_atualizado_em), "dd/MM/yy HH:mm", { locale: ptBR })}
+                          manual: {format(new Date(acc.saldo_atualizado_em), "dd/MM/yy HH:mm", { locale: ptBR })}
                         </p>
                       )}
+                      {(() => {
+                        if (acc.saldo_ofx == null) {
+                          return (
+                            <Badge variant="outline" className="mt-1 text-[10px]">
+                              Sem OFX
+                            </Badge>
+                          );
+                        }
+                        const delta = (acc.saldo_ofx ?? 0) - (acc.saldo_atual || 0);
+                        const conciliado = Math.abs(delta) < 0.01;
+                        return (
+                          <div className="mt-1 flex flex-col items-end gap-0.5">
+                            <p className="font-mono text-[11px] text-muted-foreground">
+                              OFX: {fmt(acc.saldo_ofx)}
+                              {acc.saldo_ofx_data && (
+                                <span className="ml-1 text-[10px]">
+                                  · {format(new Date(acc.saldo_ofx_data + "T00:00:00"), "dd/MM/yy")}
+                                </span>
+                              )}
+                            </p>
+                            <div className="flex items-center gap-1">
+                              {conciliado ? (
+                                <Badge className="text-[10px] bg-success/15 text-success border-success/30 hover:bg-success/15">
+                                  Conciliado
+                                </Badge>
+                              ) : (
+                                <>
+                                  <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                    A conciliar {delta > 0 ? "+" : ""}{fmt(delta)}
+                                  </Badge>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    title="Adotar saldo do OFX como saldo manual"
+                                    onClick={() => handleAdotarOfx(acc)}
+                                  >
+                                    <ArrowDownToLine className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">

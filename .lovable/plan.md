@@ -1,109 +1,83 @@
 
-# Fluxo de Caixa: Previsto x Realizado (MECE) + Sugestão de Contas Fixas
+# Contas Bancárias: Saldo Manual × Saldo OFX + Relatório PDF
 
-## Problema atual
+## Objetivo
 
-Na aba **Fluxo de Caixa** (`FluxoCaixaTab`, `FluxoCaixaCharts`, `FluxoCaixaTable`):
+- Manter o **saldo manual** como hoje (campo livre, usado para emissão de relatório).
+- Tratar o **saldo do OFX** como **referência** (verdade) e mostrar a **divergência** ao lado do manual, para o gestor ver o que falta conciliar.
+- Adicionar botão **"Emitir Relatório PDF"** com o mesmo padrão visual do `cashPositionPdf` (header + resumo + tabelas + carimbo de rastreabilidade).
 
-- KPIs e gráficos tratam um lançamento `previsto`/`confirmado` como se fosse caixa real, usando `valor_realizado ?? valor_previsto`. Isso quebra o princípio MECE recém-implementado (Previsto, Executado declarado, Realizado conciliado).
-- A aba "Realizado" hoje aceita qualquer entrada com `status in (pago,recebido)`, mesmo sem conciliação com extrato — então um clique em "Marcar como pago" em Contas a Pagar vira "caixa real".
-- O gráfico de evolução de saldo mistura previsto + realizado num único traçado.
-- Não há nenhum recurso que pegue contratos recorrentes / despesas fixas e sugira sua projeção para orçamento.
+## Mudanças
 
-## Princípios
+### 1. Banco — guardar saldo OFX por conta
 
-1. **Previsto** = qualquer `cashflow_entry` com `status in (previsto, confirmado)` ou projeção virtual (`proj-*`) **ou** `status in (pago,recebido)` ainda sem `bank_statement_entries` conciliado.
-2. **Realizado** = `cashflow_entry` que tem **linha de extrato conciliada** (existe `bank_statement_entries` vinculado) **ou** veio do próprio extrato (`source='extrato_bancario'`). Estornos descontam o original; transferências internas não contam em entradas/saídas.
-3. **Visão Geral** mostra **dois traçados sobrepostos**: linha sólida = Realizado acumulado (até hoje), linha pontilhada = Previsto acumulado (do hoje em diante e sobre o passado para auditoria de aderência).
-4. Contas fixas (contratos recorrentes ativos + lançamentos repetidos nos últimos 3 meses) viram **sugestões de orçamento** na aba Projetado.
+Migration adiciona em `bank_accounts`:
+- `saldo_ofx numeric` — último saldo `<LEDGERBAL><BALAMT>` lido do OFX.
+- `saldo_ofx_data date` — `DTASOF` do mesmo OFX.
+- `saldo_ofx_atualizado_em timestamptz`.
+- `saldo_ofx_import_id uuid` (referência ao import que carregou o saldo, para auditoria).
 
-## Mudanças de UI/dados
+Sem nova RLS — herda das policies existentes.
 
-### 1. `useCashFlow` — derivar flag `is_realizado_caixa`
+### 2. Parser OFX — extrair LEDGERBAL
 
-Adicionar, na materialização de `entries`, um campo derivado por entrada:
+`src/lib/parsers/ofxParser.ts`:
+- Adicionar bloco `<LEDGERBAL>` → expor `closingBalance: { value: number; asOf: string | null } | null` no `OfxParseResult`.
+- Mantém compat (campos atuais inalterados).
 
-```ts
-is_realizado_caixa: boolean
-// true se: source === 'extrato_bancario'
-//       OU existe link em bank_statement_entries onde cashflow_entry_id = e.id
-//       (consultar via novo subquery por organization+período, hash em memória)
-```
+### 3. Hook de import — gravar saldo OFX
 
-Buscar uma única vez `bank_statement_entries` do período (id, cashflow_entry_id, status) e montar `Set<cashflow_entry_id>` para anotar `is_realizado_caixa` nos entries.
+`src/hooks/useBankStatementImport.ts`:
+- Após parse OFX, se `closingBalance` presente e a conta destino for conhecida, atualizar `bank_accounts.saldo_ofx*` na finalização do import (idempotente — sempre sobrescreve com o OFX mais recente comparando `saldo_ofx_data`).
 
-Também expor já no hook:
-- `realizadoEntries` — `is_realizado_caixa === true` e não-estorno (estornos abatem)
-- `previstoEntries` — todo o resto (inclui virtuais `proj-*`, AP/AR ainda não conciliados, mesmo se `status='pago'`)
-- `transferEntries` — `categoria='transferencia_interna'` (excluídos de KPIs de E/S)
+### 4. UI da aba Contas Bancárias
 
-### 2. `FluxoCaixaTab` — KPIs e abas
+`ContasBancariasTab.tsx`:
 
-- **Visão Geral**: KPIs passam a ter dois valores cada — "Realizado" (grande) + "Previsto" (subtítulo cinza), por exemplo:
-  - `Entradas: R$ 120k realizado / R$ 300k previsto`
-  - `Saídas: R$ 80k realizado / R$ 250k previsto`
-  - `Saldo Final = Saldo Abertura + Realizado + (Previsto restante até fim do período)`
-- **Aba Realizado**: usa **somente** `realizadoEntries`. Adicionar aviso se houver lançamentos com `status='pago'` mas **sem** conciliação — link "Conciliar agora" para a aba Conciliação.
-- **Aba Projetado**: usa `previstoEntries` (inclui virtuais e `pago`-não-conciliado).
-- Runway recalculado com base em saídas previstas (mantém comportamento), mas saldo de abertura passa a ser `openingBalance + Σ realizado até hoje` (em vez de só saldo das contas), garantindo continuidade entre passado conciliado e futuro projetado.
+a) **KPIs**: novo card "Divergência de Conciliação" mostrando soma absoluta de `saldo_ofx − saldo_atual` entre contas com OFX importado, com tooltip explicando.
 
-### 3. `FluxoCaixaCharts` — Previsto x Realizado
+b) **Tabela**: a coluna "Saldo Atual" vira **"Saldo (Manual / OFX)"** com:
+- Linha 1: saldo manual (mantém botão de inserir).
+- Linha 2 (subtítulo, monoespaçada): `OFX: R$ x · dd/MM/aa` ou `OFX: —`.
+- Badge à direita:
+  - `Conciliado` (sucesso) se `|manual − ofx| < 0.01`.
+  - `A conciliar +R$ Δ` (warning) se há diferença.
+  - `Sem OFX` (outline) se nunca houve import.
+- Ação "Adotar OFX" no menu da linha → seta `saldo_atual = saldo_ofx`, registra timestamp.
 
-Cada gráfico passa a ter duas séries:
+c) **Botão de cabeçalho**: `Emitir Relatório PDF` (ao lado de "Nova Conta"), abre o relatório direto (sem dialog extra; já temos contexto org).
 
-- **Entradas vs Saídas (barras)**: 4 barras por dia — `entradas_realizadas`, `entradas_previstas`, `saidas_realizadas`, `saidas_previstas`. Realizadas em cor sólida, previstas em padrão hachurado/opacidade 0.5.
-- **Evolução do Saldo (área)**: duas linhas:
-  - Sólida: saldo acumulado **só com Realizado** até a data de hoje.
-  - Tracejada: saldo acumulado **Previsto** (Realizado até hoje + previsto a partir de hoje).
-  - `ReferenceLine` vertical em "Hoje".
+### 5. Relatório PDF — `bankBalancesPdf.ts`
 
-Excluir entradas de `categoria='transferencia_interna'` (já tem flag) das duas séries; estornos somam negativo do tipo original.
+Novo módulo `src/lib/bankBalancesPdf.ts`, **exatamente no mesmo padrão visual** de `cashPositionPdf`:
 
-### 4. `FluxoCaixaTable` — coluna Origem
+- Header: título "Relatório de Saldos Bancários", contexto (org / Holding), emissor, timestamp.
+- Resumo: total saldo manual, total saldo OFX, divergência total, contas conciliadas vs a conciliar.
+- Tabela única (ou por organização em modo Holding) com colunas:
+  `Conta | Banco | Tipo | Saldo Manual | Saldo OFX | Δ | Última conciliação`
+- Linhas com Δ ≠ 0 marcadas em vermelho via `colorNegatives` (usar formato contábil `(xxx)`).
+- Rodapé com paginação + carimbo SHA-256 + emissor (idêntico ao cashPosition).
+- Salva como `saldos-bancarios-YYYYMMDD-HHMM.pdf`.
 
-Adicionar coluna **Origem** com badge:
-- "Extrato" (verde) para `is_realizado_caixa`
-- "Conciliado" para `status pago/recebido` com link de extrato
-- "Previsto" para o resto
-- "Transferência" / "Estorno" para categorias especiais
+Reusa helpers (`fmt`, `colorNegatives`, `sha256Hex`) — copiados ou extraídos para um util compartilhado pequeno (`src/lib/pdfShared.ts`) se virar 3+ usos. Por ora, copiar para evitar refator amplo.
 
-A coluna Status existente continua, mas o destaque visual passa a ser a Origem.
+### 6. Integração no botão
 
-### 5. Sugestão de contas fixas para orçamento — novo `FixedExpensesSuggestionsCard`
-
-Componente acima do gráfico na aba **Projetado**, que lista despesas fixas candidatas a entrar no orçamento do próximo período:
-
-Fonte das sugestões (lado cliente, já temos os dados):
-- **Contratos recorrentes ativos** (`useContracts` + `isRecurringCashflow`) que **ainda não têm projeção materializada** dentro do `rangeFrom..rangeTo`.
-- **Padrão de repetição em `cashflow_entries`**: agrupar por `(descricao normalizada, account_id, fornecedor)` nos últimos 3 meses; se ocorreu em ≥2 dos 3, é candidato.
-
-Cada sugestão mostra: descrição, valor médio, recorrência detectada, e dois botões:
-- **Adicionar à projeção** → cria `cashflow_entry` com `status='previsto'`, `data_prevista` = mesmo dia do mês, dentro do período visualizado.
-- **Ignorar** (persistido em `localStorage` por organização + chave da sugestão; sem migração).
-
-Sem novas tabelas, sem nova RPC. Tudo deriva de dados já em cache do React Query.
+`ContasBancariasTab` chama `generateBankBalancesPdf({...})` com:
+- `contextName = currentOrg.name` (ou "Consolidado" em Holding).
+- `accounts` = `allBankAccounts` mapeadas + nome da org.
+- `issuer = { name: user metadata, email, id: user.id }`.
 
 ## Arquivos
 
-- `src/hooks/useCashFlow.ts` — adicionar busca de `bank_statement_entries`, anotar `is_realizado_caixa`, expor `realizadoEntries`/`previstoEntries`/`transferEntries`.
-- `src/components/financeiro/FluxoCaixaTab.tsx` — KPIs duplos, recomputo de totais, alerta de "pago não conciliado".
-- `src/components/fluxocaixa/FluxoCaixaCharts.tsx` — séries previsto x realizado, ReferenceLine "Hoje".
-- `src/components/fluxocaixa/FluxoCaixaTable.tsx` — coluna Origem.
-- `src/components/financeiro/FixedExpensesSuggestionsCard.tsx` — novo, sugestões de contas fixas.
-- `src/lib/fixedExpensesDetection.ts` — novo, helpers puros: detectar recorrência e gerar candidatos.
+- `supabase/migrations/<novo>_bank_accounts_saldo_ofx.sql` (migration)
+- `src/lib/parsers/ofxParser.ts` (extrair LEDGERBAL)
+- `src/hooks/useBankStatementImport.ts` (gravar saldo OFX no fim do import)
+- `src/components/financeiro/ContasBancariasTab.tsx` (KPI Divergência, coluna dupla, botão PDF, ação "Adotar OFX")
+- `src/lib/bankBalancesPdf.ts` (novo)
 
-Sem migrations. Sem mudanças em RPCs nem no engine de projeção (`projectionRegistry`/`contractProjections`).
+## Fora de escopo
 
-## Fora do escopo
-
-- Reescrever Conciliação ou regras de matching automático.
-- Mudar estrutura de `cashflow_entries`.
-- Tocar no DRE/KPIs do Dashboard executivo (já consomem RPC `get_dashboard_kpis` separada).
-
-## Status: implementado (2026-05-11)
-
-- `useCashFlow` agora consulta `bank_statement_entries` do período e anota `is_realizado_caixa` em cada entry. Expõe `realizadoEntries`, `previstoEntries`, `transferEntries`, `paidNotReconciledEntries`, `totalsRealizado`, `totalsPrevisto`. Estornos abatem (sign -1); transferências internas excluídas dos totais.
-- `FluxoCaixaTab`: na Visão Geral, KPIs mostram Realizado em destaque + Previsto no subtítulo; Saldo Final = abertura + realizado + previsto. Aba Realizado exibe Alert "pago sem conciliação" linkando para Conciliação.
-- `FluxoCaixaCharts`: novo modo overlay (Visão Geral) com 4 barras (entradas/saídas × real/prev) e duas linhas de saldo (Realizado sólido / Projetado tracejado) + ReferenceLine "Hoje".
-- `FluxoCaixaTable`: coluna Origem agora usa badges semânticas: Extrato (success), Conciliado, Previsto (outline), Transferência, Estorno.
-- Novo `FixedExpensesSuggestionsCard` na aba Projetado: lista contratos recorrentes ativos sem projeção + padrões repetidos em ≥2 dos últimos 3 meses; Adicionar cria `cashflow_entry` `status=previsto` `source=sugestao_fixa`; Ignorar é persistido em localStorage por org.
+- Reescrever conciliação ou matching automático.
+- Substituir o saldo manual: continua editável (CFO precisa para fechamento manual sem OFX disponível).
+- Versionamento histórico de saldo OFX (mantemos só o último; histórico fica nos `bank_statement_entries`).

@@ -6,6 +6,8 @@ export interface OfxParseResult {
   headers: string[];
   rows: string[][];
   bank?: { bankid?: string; acctid?: string; currency?: string } | null;
+  /** Saldo de fechamento (LEDGERBAL) lido do extrato — referência da conta naquela data. */
+  closingBalance?: { value: number; asOf: string | null } | null;
 }
 
 const FIELDS = ["data", "descricao", "valor", "documento", "notes"] as const;
@@ -109,10 +111,20 @@ export function parseOfx(text: string): OfxParseResult {
     ]);
   }
 
+  // LEDGERBAL — saldo de fechamento de referência do banco
+  const ledgerBlock = body.match(/<LEDGERBAL>([\s\S]*?)<\/LEDGERBAL>/i)?.[1] ?? "";
+  let closingBalance: OfxParseResult["closingBalance"] = null;
+  if (ledgerBlock) {
+    const balVal = parseOfxAmount(getTag(ledgerBlock, "BALAMT"));
+    const balAsOf = ofxDateToIso(getTag(ledgerBlock, "DTASOF"));
+    if (balVal != null) closingBalance = { value: balVal, asOf: balAsOf };
+  }
+
   return {
     headers: ["data", "descricao", "valor", "documento", "notes"],
     rows,
     bank,
+    closingBalance,
   };
 }
 
