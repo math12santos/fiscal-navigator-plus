@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, FolderOpen, Layers } from "lucide-react";
+import { CheckCircle, Clock, Circle, Trash2, Banknote, ChevronRight, ChevronDown, FolderOpen, Layers, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGroupingRules } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
