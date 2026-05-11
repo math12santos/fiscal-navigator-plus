@@ -213,33 +213,82 @@ export function FluxoCaixaTab() {
         </div>
 
         <TabsContent value={activeTab} className="space-y-6 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <KPICard
-              title="Saldo de Abertura"
-              value={fmt(openingBalance)}
-              icon={<Wallet size={20} />}
-            />
-            <KPICard
-              title="Total Entradas"
-              value={fmt(currentTotals.entradas)}
-              icon={<ArrowUpCircle size={20} />}
-            />
-            <KPICard
-              title="Total Saídas"
-              value={fmt(currentTotals.saidas)}
-              icon={<ArrowDownCircle size={20} />}
-            />
-            <KPICard
-              title="Saldo Final Projetado"
-              value={fmt(openingBalance + currentTotals.saldo)}
-              icon={<Wallet size={20} />}
-            />
-            <KPICard
-              title="Runway"
-              value={runwayDisplay}
-              icon={<TrendingDown size={20} />}
-            />
-          </div>
+          {activeTab === "geral" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <KPICard
+                title="Saldo de Abertura"
+                value={fmt(openingBalance)}
+                icon={<Wallet size={20} />}
+              />
+              <KPICard
+                title="Entradas"
+                value={fmt(totalsRealizado.entradas)}
+                subtitle={`Realizado · Previsto ${fmt(totalsPrevisto.entradas)}`}
+                icon={<ArrowUpCircle size={20} />}
+              />
+              <KPICard
+                title="Saídas"
+                value={fmt(totalsRealizado.saidas)}
+                subtitle={`Realizado · Previsto ${fmt(totalsPrevisto.saidas)}`}
+                icon={<ArrowDownCircle size={20} />}
+              />
+              <KPICard
+                title="Saldo Final (proj.)"
+                value={fmt(openingBalance + totalsRealizado.saldo + totalsPrevisto.saldo)}
+                subtitle={`Realizado: ${fmt(openingBalance + totalsRealizado.saldo)}`}
+                icon={<Wallet size={20} />}
+              />
+              <KPICard
+                title="Runway"
+                value={runwayDisplay}
+                icon={<TrendingDown size={20} />}
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <KPICard
+                title="Saldo de Abertura"
+                value={fmt(openingBalance)}
+                icon={<Wallet size={20} />}
+              />
+              <KPICard
+                title="Total Entradas"
+                value={fmt(currentTotals.entradas)}
+                icon={<ArrowUpCircle size={20} />}
+              />
+              <KPICard
+                title="Total Saídas"
+                value={fmt(currentTotals.saidas)}
+                icon={<ArrowDownCircle size={20} />}
+              />
+              <KPICard
+                title={activeTab === "realizado" ? "Saldo Realizado" : "Saldo Final Projetado"}
+                value={fmt(openingBalance + currentTotals.saldo)}
+                icon={<Wallet size={20} />}
+              />
+              <KPICard
+                title="Runway"
+                value={runwayDisplay}
+                icon={<TrendingDown size={20} />}
+              />
+            </div>
+          )}
+
+          {activeTab === "realizado" && paidNotReconciledEntries.length > 0 && (
+            <Alert variant="default" className="border-warning/50">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <AlertTitle>
+                {paidNotReconciledEntries.length} lançamento{paidNotReconciledEntries.length > 1 ? "s" : ""} marcado{paidNotReconciledEntries.length > 1 ? "s" : ""} como pago/recebido sem conciliação bancária
+              </AlertTitle>
+              <AlertDescription>
+                Enquanto não houver linha de extrato vinculada, isso é apenas um <strong>registro de ação</strong>, não um realizado de caixa. Vá para a aba <strong>Conciliação</strong> para confirmar.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {activeTab === "projetado" && (
+            <FixedExpensesSuggestionsCard rangeFrom={rangeFrom} />
+          )}
 
           {isLoading ? (
             <div className="flex justify-center py-12">
@@ -249,12 +298,18 @@ export function FluxoCaixaTab() {
             <div className="glass-card p-8 text-center text-muted-foreground">
               <p>Nenhum lançamento encontrado para este período.</p>
               <p className="text-sm mt-1">
-                Cadastre contratos ou lançamentos no módulo Financeiro.
+                {activeTab === "realizado"
+                  ? "Importe um extrato e concilie pagamentos para ver o caixa real aqui."
+                  : "Cadastre contratos ou lançamentos no módulo Financeiro."}
               </p>
             </div>
           ) : (
             <>
-              <FluxoCaixaCharts entries={currentEntries} />
+              <FluxoCaixaCharts
+                entries={currentEntries}
+                realizadoEntries={activeTab === "geral" ? realizadoEntries : undefined}
+                previstoEntries={activeTab === "geral" ? previstoEntries : undefined}
+              />
               <FluxoCaixaTable entries={currentEntries} />
             </>
           )}
