@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp, Info, KeyRound, Copy, FileDown, ScaleIcon, ArrowDownToLine } from "lucide-react";
+import { Plus, Loader2, Building2, Landmark, Trash2, DollarSign, CreditCard, TrendingUp, Info, KeyRound, Copy, FileDown, Scale, ArrowDownToLine } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { generateBankBalancesPdf } from "@/lib/bankBalancesPdf";
