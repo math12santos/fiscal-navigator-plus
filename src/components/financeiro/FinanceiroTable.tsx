@@ -35,6 +35,7 @@ interface Props {
   tipo: "saida" | "entrada";
   onMarkAsPaid: (entry: { id: string; valor_realizado: number; data_realizada: string; isProjected: boolean }) => void;
   onDelete: (id: string) => void;
+  onEdit?: (entry: FinanceiroEntry) => void;
   isDeleting: boolean;
 }
 
