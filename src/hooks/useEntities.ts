@@ -63,12 +63,17 @@ export function useEntities() {
 
   const create = useMutation({
     mutationFn: async (input: Partial<EntityInsert>) => {
-      const { error } = await supabase.from("entities").insert({
-        ...input,
-        user_id: user!.id,
-        organization_id: orgId,
-      } as any);
+      const { data, error } = await supabase
+        .from("entities")
+        .insert({
+          ...input,
+          user_id: user!.id,
+          organization_id: orgId,
+        } as any)
+        .select("*")
+        .single();
       if (error) throw error;
+      return data as Entity;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast({ title: "Cadastro criado" }); },
     onError: (e: any) => toast({ title: "Erro ao criar", description: e.message, variant: "destructive" }),
