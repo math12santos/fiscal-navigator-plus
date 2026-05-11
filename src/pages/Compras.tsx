@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { ComprasDashboard } from "@/components/compras/ComprasDashboard";
 import { RequestsTab } from "@/components/compras/RequestsTab";
 import { ApprovalsTab } from "@/components/compras/ApprovalsTab";
