@@ -237,9 +237,11 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
   const { filterByScope } = useUserDataScope();
 
   // Merge materialized + projected + payroll, applying registry-based dedup.
+  // Annotate `is_realizado_caixa` based on bank statement reconciliations.
   const allEntries = useMemo(() => {
     const materialized = entriesQuery.data ?? [];
     const materializedRefs = buildMaterializedRefs(materialized);
+    const reconciledIds = reconciledQuery.data ?? new Set<string>();
 
     // Dedup payroll projections against materialized DP entries by source_ref.
     const payrollDeduped = (payrollProjections as any[]).filter((p) => {
@@ -249,21 +251,78 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
 
     const merged = [...materialized, ...projectedEntries as any[], ...payrollDeduped, ...crmProjections];
     merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
-    return filterByScope(merged as CashFlowEntry[]);
-  }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections, filterByScope]);
 
-  // KPIs (consolidated across realized + projected, no double counting).
-  // Provisões acumuladas (passivo trabalhista) NÃO impactam o caixa.
-  const totals = useMemo(() => {
+    // MECE: realizado-de-caixa só quando o lançamento veio do extrato OU foi conciliado.
+    const annotated = merged.map((e: any) => ({
+      ...e,
+      is_realizado_caixa:
+        e.source === "extrato_bancario" ||
+        (typeof e.id === "string" && !e.id.startsWith("proj-") && reconciledIds.has(e.id)),
+    })) as CashFlowEntry[];
+
+    return filterByScope(annotated);
+  }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections, filterByScope, reconciledQuery.data]);
+
+  const isTransfer = (e: CashFlowEntry) => (e.categoria ?? "") === "transferencia_interna";
+
+  const realizadoEntries = useMemo(
+    () => allEntries.filter((e) => e.is_realizado_caixa && !isTransfer(e)),
+    [allEntries],
+  );
+
+  const previstoEntries = useMemo(
+    () => allEntries.filter((e) => !e.is_realizado_caixa && !isTransfer(e)),
+    [allEntries],
+  );
+
+  const transferEntries = useMemo(
+    () => allEntries.filter((e) => isTransfer(e)),
+    [allEntries],
+  );
+
+  // Lançamentos marcados como pagos/recebidos mas SEM conciliação (suspeitos).
+  const paidNotReconciledEntries = useMemo(
+    () =>
+      allEntries.filter(
+        (e) =>
+          !e.is_realizado_caixa &&
+          !isTransfer(e) &&
+          (e.status === "pago" || e.status === "recebido") &&
+          typeof e.id === "string" &&
+          !e.id.startsWith("proj-"),
+      ),
+    [allEntries],
+  );
+
+  const sumByTipo = (rows: CashFlowEntry[], useRealized: boolean) => {
     let entradas = 0, saidas = 0;
-    for (const e of allEntries) {
+    for (const e of rows) {
       if ((e as any).dp_sub_category === "provisao_acumulada") continue;
-      const val = e.valor_realizado ?? e.valor_previsto;
-      if (e.tipo === "entrada") entradas += Number(val);
-      else saidas += Number(val);
+      const sign = e.is_estorno ? -1 : 1;
+      const val = useRealized
+        ? Number(e.valor_realizado ?? e.valor_previsto)
+        : Number(e.valor_previsto);
+      if (e.tipo === "entrada") entradas += sign * val;
+      else saidas += sign * val;
     }
     return { entradas, saidas, saldo: entradas - saidas };
-  }, [allEntries]);
+  };
+
+  const totalsRealizado = useMemo(() => sumByTipo(realizadoEntries, true), [realizadoEntries]);
+  const totalsPrevisto = useMemo(() => sumByTipo(previstoEntries, false), [previstoEntries]);
+
+  // Backwards-compatible totals: realizado + previsto (no double counting because they're disjoint).
+  const totals = useMemo(
+    () => ({
+      entradas: totalsRealizado.entradas + totalsPrevisto.entradas,
+      saidas: totalsRealizado.saidas + totalsPrevisto.saidas,
+      saldo:
+        totalsRealizado.entradas + totalsPrevisto.entradas -
+        (totalsRealizado.saidas + totalsPrevisto.saidas),
+    }),
+    [totalsRealizado, totalsPrevisto],
+  );
+
 
   // Mutations for materialized entries
   const create = useMutation({
