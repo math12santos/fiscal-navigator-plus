@@ -35,7 +35,8 @@ const statusConfig: Record<string, { icon: typeof Circle; class: string; label: 
 interface Props {
   entries: FinanceiroEntry[];
   tipo: "saida" | "entrada";
-  onMarkAsPaid: (entry: { id: string; valor_realizado: number; data_realizada: string; isProjected: boolean }) => void;
+  onMarkAsPaid: (entry: { id: string; valor_realizado: number; data_realizada: string; isProjected: boolean; meio?: string | null }) => void;
+  onUndoIssued?: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit?: (entry: FinanceiroEntry) => void;
   isDeleting: boolean;
