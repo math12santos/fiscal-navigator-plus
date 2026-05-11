@@ -31,6 +31,27 @@ export interface CashflowLinkCandidate {
   ja_conciliado_com_data: string | null;
 }
 
+export interface TransferCounterparty {
+  staging_id: string;
+  bank_account_id: string;
+  bank_account_nome: string | null;
+  data: string;
+  valor: number;
+  descricao: string | null;
+  status: string;
+  match_score: number;
+}
+
+export interface ReversalCandidate {
+  cashflow_id: string;
+  descricao: string;
+  data_realizada: string | null;
+  valor_realizado: number | null;
+  tipo: string;
+  conta_bancaria_id: string | null;
+  match_score: number;
+}
+
 export function useStatementResolution() {
   const { currentOrg } = useOrganization();
   const qc = useQueryClient();
@@ -54,6 +75,8 @@ export function useStatementResolution() {
     qc.invalidateQueries({ queryKey: ["statement-staging-unresolved", currentOrg?.id] });
     qc.invalidateQueries({ queryKey: ["bank-statement-entries", currentOrg?.id] });
     qc.invalidateQueries({ queryKey: ["cashflow_entries"] });
+    qc.invalidateQueries({ queryKey: ["financeiro_entries"] });
+    qc.invalidateQueries({ queryKey: ["internal_transfers"] });
   };
 
   const searchCandidates = async (
@@ -76,6 +99,30 @@ export function useStatementResolution() {
     );
     if (error) throw error;
     return (rows ?? []) as CashflowLinkCandidate[];
+  };
+
+  const searchTransferCounterparties = async (
+    stagingId: string,
+    windowDays = 3
+  ): Promise<TransferCounterparty[]> => {
+    const { data, error } = await supabase.rpc("search_transfer_counterparties" as any, {
+      p_staging_id: stagingId,
+      p_window_days: windowDays,
+    });
+    if (error) throw error;
+    return (data ?? []) as TransferCounterparty[];
+  };
+
+  const searchReversalCandidates = async (
+    stagingId: string,
+    windowDays = 90
+  ): Promise<ReversalCandidate[]> => {
+    const { data, error } = await supabase.rpc("search_reversal_candidates" as any, {
+      p_staging_id: stagingId,
+      p_window_days: windowDays,
+    });
+    if (error) throw error;
+    return (data ?? []) as ReversalCandidate[];
   };
 
   const linkToCashflow = useMutation({
@@ -137,11 +184,105 @@ export function useStatementResolution() {
     },
     onSuccess: () => {
       invalidate();
-      toast({ title: "Linha corrigida", description: "Lançamento adicionado ao extrato." });
+      toast({ title: "Dados complementados", description: "Linha pronta para resolução." });
     },
     onError: (e: any) =>
       toast({ title: "Falha ao corrigir", description: e.message, variant: "destructive" }),
   });
 
-  return { unresolved, searchCandidates, linkToCashflow, discard, correctAndRetry };
+  const createFromStatement = useMutation({
+    mutationFn: async (input: {
+      stagingId: string;
+      descricao: string;
+      account_id?: string | null;
+      cost_center_id?: string | null;
+      entity_id?: string | null;
+      contract_id?: string | null;
+      categoria?: string | null;
+      notes?: string | null;
+    }) => {
+      const { data, error } = await supabase.rpc("resolve_create_cashflow" as any, {
+        p_staging_id: input.stagingId,
+        p_descricao: input.descricao,
+        p_account_id: input.account_id ?? null,
+        p_cost_center_id: input.cost_center_id ?? null,
+        p_entity_id: input.entity_id ?? null,
+        p_contract_id: input.contract_id ?? null,
+        p_categoria: input.categoria ?? null,
+        p_notes: input.notes ?? null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      invalidate();
+      toast({
+        title: "Lançamento criado",
+        description: "Movimentação cadastrada e marcada como realizada.",
+      });
+    },
+    onError: (e: any) =>
+      toast({ title: "Falha ao criar lançamento", description: e.message, variant: "destructive" }),
+  });
+
+  const markAsTransfer = useMutation({
+    mutationFn: async (input: {
+      stagingId: string;
+      counterpartyStagingId?: string | null;
+      descricao?: string | null;
+    }) => {
+      const { data, error } = await supabase.rpc("resolve_mark_as_transfer" as any, {
+        p_staging_id: input.stagingId,
+        p_counterparty_staging_id: input.counterpartyStagingId ?? null,
+        p_descricao: input.descricao ?? null,
+      });
+      if (error) throw error;
+      return data as { ok: boolean; transfer_id: string; status: string };
+    },
+    onSuccess: (r) => {
+      invalidate();
+      toast({
+        title: "Transferência registrada",
+        description: r.status === "completa"
+          ? "Os dois lados foram pareados."
+          : "Aguardando contraparte aparecer no extrato da outra conta.",
+      });
+    },
+    onError: (e: any) =>
+      toast({ title: "Falha ao marcar transferência", description: e.message, variant: "destructive" }),
+  });
+
+  const markAsReversal = useMutation({
+    mutationFn: async (input: { stagingId: string; originalEntryId: string; notes?: string | null }) => {
+      const { data, error } = await supabase.rpc("resolve_mark_as_reversal" as any, {
+        p_staging_id: input.stagingId,
+        p_original_entry_id: input.originalEntryId,
+        p_notes: input.notes ?? null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      invalidate();
+      toast({
+        title: "Estorno registrado",
+        description: "Lançamento original anulado, sem duplicidade.",
+      });
+    },
+    onError: (e: any) =>
+      toast({ title: "Falha ao registrar estorno", description: e.message, variant: "destructive" }),
+  });
+
+  return {
+    unresolved,
+    searchCandidates,
+    searchTransferCounterparties,
+    searchReversalCandidates,
+    linkToCashflow,
+    discard,
+    correctAndRetry,
+    createFromStatement,
+    markAsTransfer,
+    markAsReversal,
+  };
 }

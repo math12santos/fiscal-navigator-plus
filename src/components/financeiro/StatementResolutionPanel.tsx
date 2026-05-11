@@ -7,10 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AlertTriangle, Link2, Pencil, Trash2, Loader2, CheckCircle2 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { AlertTriangle, Link2, Pencil, Trash2, Loader2, CheckCircle2, MoreHorizontal, Plus, ArrowLeftRight, RotateCcw, Lock } from "lucide-react";
 import { useStatementResolution, type UnresolvedLine } from "@/hooks/useStatementResolution";
 import { LinkToPlannedDialog } from "./LinkToPlannedDialog";
+import { CreateCashflowFromStatementDialog } from "./CreateCashflowFromStatementDialog";
+import { MarkAsTransferDialog } from "./MarkAsTransferDialog";
+import { MarkAsReversalDialog } from "./MarkAsReversalDialog";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -32,8 +37,12 @@ const DISCARD_CATEGORIES = [
 export function StatementResolutionPanel({ open, onOpenChange }: Props) {
   const { unresolved, discard, correctAndRetry } = useStatementResolution();
   const [linkTarget, setLinkTarget] = useState<UnresolvedLine | null>(null);
+  const [createTarget, setCreateTarget] = useState<UnresolvedLine | null>(null);
+  const [transferTarget, setTransferTarget] = useState<UnresolvedLine | null>(null);
+  const [reversalTarget, setReversalTarget] = useState<UnresolvedLine | null>(null);
   const [editTarget, setEditTarget] = useState<UnresolvedLine | null>(null);
-  const [editForm, setEditForm] = useState({ data: "", valor: "", descricao: "", documento: "" });
+  const [editForm, setEditForm] = useState({ descricao: "", documento: "" });
+  const [editLocked, setEditLocked] = useState({ data: "", valor: "" });
   const [discardTarget, setDiscardTarget] = useState<UnresolvedLine | null>(null);
   const [discardForm, setDiscardForm] = useState({ category: "outro", reason: "" });
 
@@ -42,26 +51,34 @@ export function StatementResolutionPanel({ open, onOpenChange }: Props) {
   const openEdit = (l: UnresolvedLine) => {
     setEditTarget(l);
     setEditForm({
+      descricao: String(l.parsed?.descricao ?? ""),
+      documento: String(l.parsed?.documento ?? ""),
+    });
+    setEditLocked({
       data: l.parsed?.data ?? "",
       valor: l.parsed?.valor != null ? String(l.parsed.valor) : "",
-      descricao: l.parsed?.descricao ?? "",
-      documento: l.parsed?.documento ?? "",
     });
   };
 
+  const dataLocked = !!editLocked.data;
+  const valorLocked = editLocked.valor !== "";
+  const [editFreeData, setEditFreeData] = useState("");
+  const [editFreeValor, setEditFreeValor] = useState("");
+
   const submitEdit = () => {
     if (!editTarget) return;
-    const valor = Number(editForm.valor);
-    if (!editForm.data || isNaN(valor) || !editForm.descricao.trim()) return;
+    const data = dataLocked ? editLocked.data : editFreeData;
+    const valor = valorLocked ? Number(editLocked.valor) : Number(editFreeValor);
+    if (!data || isNaN(valor) || !editForm.descricao.trim()) return;
     correctAndRetry.mutate(
       {
         stagingId: editTarget.id,
-        data: editForm.data,
+        data,
         valor,
         descricao: editForm.descricao.trim(),
         documento: editForm.documento.trim() || null,
       },
-      { onSuccess: () => setEditTarget(null) }
+      { onSuccess: () => { setEditTarget(null); setEditFreeData(""); setEditFreeValor(""); } }
     );
   };
 
@@ -83,8 +100,8 @@ export function StatementResolutionPanel({ open, onOpenChange }: Props) {
               Resolver linhas do extrato
             </DialogTitle>
             <DialogDescription>
-              Toda linha do extrato precisa de um destino. Corrija, vincule a um previsto, classifique como realizada
-              ou descarte com motivo.
+              Toda linha precisa de um destino: vincule a um previsto, crie um lançamento novo,
+              marque como transferência entre contas, registre como estorno ou descarte com motivo.
             </DialogDescription>
           </DialogHeader>
 
@@ -108,8 +125,8 @@ export function StatementResolutionPanel({ open, onOpenChange }: Props) {
                       <TableHead>Descrição</TableHead>
                       <TableHead className="text-right w-[120px]">Valor</TableHead>
                       <TableHead className="w-[120px]">Conta</TableHead>
-                      <TableHead className="w-[180px]">Erros</TableHead>
-                      <TableHead className="text-right w-[280px]">Ações</TableHead>
+                      <TableHead className="w-[160px]">Erros</TableHead>
+                      <TableHead className="text-right w-[260px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -141,27 +158,51 @@ export function StatementResolutionPanel({ open, onOpenChange }: Props) {
                             )}
                           </TableCell>
                           <TableCell className="text-right space-x-1">
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openEdit(l)}>
-                              <Pencil className="h-3 w-3 mr-1" /> Corrigir
-                            </Button>
                             <Button
                               size="sm"
                               variant="default"
                               className="h-7 text-xs"
                               disabled={!valid}
-                              title={!valid ? "Corrija data/valor antes de vincular" : ""}
+                              title={!valid ? "Complemente data/valor antes de vincular" : ""}
                               onClick={() => setLinkTarget(l)}
                             >
                               <Link2 className="h-3 w-3 mr-1" /> Vincular
                             </Button>
                             <Button
                               size="sm"
-                              variant="ghost"
-                              className="h-7 text-xs text-muted-foreground"
-                              onClick={() => setDiscardTarget(l)}
+                              variant="outline"
+                              className="h-7 text-xs"
+                              disabled={!valid}
+                              title={!valid ? "Complemente data/valor antes" : ""}
+                              onClick={() => setCreateTarget(l)}
                             >
-                              <Trash2 className="h-3 w-3 mr-1" /> Descartar
+                              <Plus className="h-3 w-3 mr-1" /> Criar
                             </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
+                                  <MoreHorizontal className="h-3.5 w-3.5" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem disabled={!valid} onClick={() => setTransferTarget(l)}>
+                                  <ArrowLeftRight className="h-3.5 w-3.5 mr-2" /> É transferência entre contas
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled={!valid} onClick={() => setReversalTarget(l)}>
+                                  <RotateCcw className="h-3.5 w-3.5 mr-2" /> É estorno / devolução
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => openEdit(l)}>
+                                  <Pencil className="h-3.5 w-3.5 mr-2" /> Complementar dados
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setDiscardTarget(l)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-2" /> Descartar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       );
@@ -184,21 +225,68 @@ export function StatementResolutionPanel({ open, onOpenChange }: Props) {
         } : null}
       />
 
-      {/* Corrigir */}
+      <CreateCashflowFromStatementDialog
+        open={!!createTarget}
+        onOpenChange={(o) => !o && setCreateTarget(null)}
+        staging={createTarget}
+      />
+
+      <MarkAsTransferDialog
+        open={!!transferTarget}
+        onOpenChange={(o) => !o && setTransferTarget(null)}
+        staging={transferTarget}
+      />
+
+      <MarkAsReversalDialog
+        open={!!reversalTarget}
+        onOpenChange={(o) => !o && setReversalTarget(null)}
+        staging={reversalTarget}
+      />
+
+      {/* Complementar dados (data e valor imutáveis quando vêm do extrato) */}
       <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Corrigir linha</DialogTitle>
-            <DialogDescription>Ajuste data, valor e descrição para reprocessar.</DialogDescription>
+            <DialogTitle>Complementar dados da linha</DialogTitle>
+            <DialogDescription>
+              Data e valor vêm do extrato e não podem ser alterados — ajuste apenas descrição
+              e documento. Caso o banco não tenha enviado data/valor, os campos abrem para edição.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Data (AAAA-MM-DD)</Label>
-              <Input value={editForm.data} onChange={(e) => setEditForm({ ...editForm, data: e.target.value })} placeholder="2025-01-15" />
+              <Label className="text-xs flex items-center gap-1">
+                Data {dataLocked && <Lock className="h-3 w-3 text-muted-foreground" />}
+              </Label>
+              {dataLocked ? (
+                <Input value={editLocked.data} readOnly className="bg-muted/50 font-mono" />
+              ) : (
+                <Input
+                  value={editFreeData}
+                  onChange={(e) => setEditFreeData(e.target.value)}
+                  placeholder="2025-01-15"
+                />
+              )}
+              {dataLocked && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">imutável (vem do extrato)</p>
+              )}
             </div>
             <div>
-              <Label className="text-xs">Valor (use sinal negativo para débitos)</Label>
-              <Input value={editForm.valor} onChange={(e) => setEditForm({ ...editForm, valor: e.target.value })} placeholder="-150.00" />
+              <Label className="text-xs flex items-center gap-1">
+                Valor {valorLocked && <Lock className="h-3 w-3 text-muted-foreground" />}
+              </Label>
+              {valorLocked ? (
+                <Input value={editLocked.valor} readOnly className="bg-muted/50 font-mono" />
+              ) : (
+                <Input
+                  value={editFreeValor}
+                  onChange={(e) => setEditFreeValor(e.target.value)}
+                  placeholder="-150.00"
+                />
+              )}
+              {valorLocked && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">imutável (vem do extrato)</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Descrição</Label>

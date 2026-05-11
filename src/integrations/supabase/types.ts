@@ -654,12 +654,16 @@ export type Database = {
           descricao: string
           documento: string | null
           entity_id: string | null
+          estornado_em: string | null
+          estornado_por_entry_id: string | null
+          estorno_de_entry_id: string | null
           expense_request_id: string | null
           forma_pagamento: string | null
           id: string
           impacto_fluxo_caixa: boolean | null
           impacto_orcamento: boolean | null
           import_id: string | null
+          is_estorno: boolean
           natureza_contabil: string | null
           notes: string | null
           num_parcelas: number | null
@@ -677,6 +681,7 @@ export type Database = {
           tipo: string
           tipo_despesa: string | null
           tipo_documento: string | null
+          transfer_id: string | null
           updated_at: string
           user_id: string
           valor_bruto: number | null
@@ -709,12 +714,16 @@ export type Database = {
           descricao: string
           documento?: string | null
           entity_id?: string | null
+          estornado_em?: string | null
+          estornado_por_entry_id?: string | null
+          estorno_de_entry_id?: string | null
           expense_request_id?: string | null
           forma_pagamento?: string | null
           id?: string
           impacto_fluxo_caixa?: boolean | null
           impacto_orcamento?: boolean | null
           import_id?: string | null
+          is_estorno?: boolean
           natureza_contabil?: string | null
           notes?: string | null
           num_parcelas?: number | null
@@ -732,6 +741,7 @@ export type Database = {
           tipo?: string
           tipo_despesa?: string | null
           tipo_documento?: string | null
+          transfer_id?: string | null
           updated_at?: string
           user_id: string
           valor_bruto?: number | null
@@ -764,12 +774,16 @@ export type Database = {
           descricao?: string
           documento?: string | null
           entity_id?: string | null
+          estornado_em?: string | null
+          estornado_por_entry_id?: string | null
+          estorno_de_entry_id?: string | null
           expense_request_id?: string | null
           forma_pagamento?: string | null
           id?: string
           impacto_fluxo_caixa?: boolean | null
           impacto_orcamento?: boolean | null
           import_id?: string | null
+          is_estorno?: boolean
           natureza_contabil?: string | null
           notes?: string | null
           num_parcelas?: number | null
@@ -787,6 +801,7 @@ export type Database = {
           tipo?: string
           tipo_despesa?: string | null
           tipo_documento?: string | null
+          transfer_id?: string | null
           updated_at?: string
           user_id?: string
           valor_bruto?: number | null
@@ -846,6 +861,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cashflow_entries_estornado_por_entry_id_fkey"
+            columns: ["estornado_por_entry_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_estorno_de_entry_id_fkey"
+            columns: ["estorno_de_entry_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_entries"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cashflow_entries_expense_request_id_fkey"
             columns: ["expense_request_id"]
             isOneToOne: false
@@ -878,6 +907,13 @@ export type Database = {
             columns: ["subcategoria_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_entries_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "internal_transfers"
             referencedColumns: ["id"]
           },
         ]
@@ -4770,6 +4806,113 @@ export type Database = {
             columns: ["endpoint_id"]
             isOneToOne: false
             referencedRelation: "integration_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_transfers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data: string
+          descricao: string | null
+          from_bank_account_id: string
+          from_bank_statement_entry_id: string | null
+          from_cashflow_entry_id: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          status: string
+          to_bank_account_id: string
+          to_bank_statement_entry_id: string | null
+          to_cashflow_entry_id: string | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data: string
+          descricao?: string | null
+          from_bank_account_id: string
+          from_bank_statement_entry_id?: string | null
+          from_cashflow_entry_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          status?: string
+          to_bank_account_id: string
+          to_bank_statement_entry_id?: string | null
+          to_cashflow_entry_id?: string | null
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          descricao?: string | null
+          from_bank_account_id?: string
+          from_bank_statement_entry_id?: string | null
+          from_cashflow_entry_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          status?: string
+          to_bank_account_id?: string
+          to_bank_statement_entry_id?: string | null
+          to_cashflow_entry_id?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_transfers_from_bank_account_id_fkey"
+            columns: ["from_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_transfers_from_bank_statement_entry_id_fkey"
+            columns: ["from_bank_statement_entry_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statement_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_transfers_from_cashflow_entry_id_fkey"
+            columns: ["from_cashflow_entry_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_transfers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_transfers_to_bank_account_id_fkey"
+            columns: ["to_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_transfers_to_bank_statement_entry_id_fkey"
+            columns: ["to_bank_statement_entry_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statement_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_transfers_to_cashflow_entry_id_fkey"
+            columns: ["to_cashflow_entry_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -11124,12 +11267,16 @@ export type Database = {
           descricao: string
           documento: string | null
           entity_id: string | null
+          estornado_em: string | null
+          estornado_por_entry_id: string | null
+          estorno_de_entry_id: string | null
           expense_request_id: string | null
           forma_pagamento: string | null
           id: string
           impacto_fluxo_caixa: boolean | null
           impacto_orcamento: boolean | null
           import_id: string | null
+          is_estorno: boolean
           natureza_contabil: string | null
           notes: string | null
           num_parcelas: number | null
@@ -11147,6 +11294,7 @@ export type Database = {
           tipo: string
           tipo_despesa: string | null
           tipo_documento: string | null
+          transfer_id: string | null
           updated_at: string
           user_id: string
           valor_bruto: number | null
@@ -11176,6 +11324,19 @@ export type Database = {
         }
         Returns: Json
       }
+      resolve_create_cashflow: {
+        Args: {
+          p_account_id?: string
+          p_categoria?: string
+          p_contract_id?: string
+          p_cost_center_id?: string
+          p_descricao: string
+          p_entity_id?: string
+          p_notes?: string
+          p_staging_id: string
+        }
+        Returns: Json
+      }
       resolve_discard: {
         Args: { p_category: string; p_reason: string; p_staging_id: string }
         Returns: Json
@@ -11184,6 +11345,22 @@ export type Database = {
         Args: {
           p_cashflow_entry_id: string
           p_force_relink?: boolean
+          p_staging_id: string
+        }
+        Returns: Json
+      }
+      resolve_mark_as_reversal: {
+        Args: {
+          p_notes?: string
+          p_original_entry_id: string
+          p_staging_id: string
+        }
+        Returns: Json
+      }
+      resolve_mark_as_transfer: {
+        Args: {
+          p_counterparty_staging_id?: string
+          p_descricao?: string
           p_staging_id: string
         }
         Returns: Json
@@ -11215,6 +11392,31 @@ export type Database = {
           status: string
           valor_previsto: number
           valor_realizado: number
+        }[]
+      }
+      search_reversal_candidates: {
+        Args: { p_staging_id: string; p_window_days?: number }
+        Returns: {
+          cashflow_id: string
+          conta_bancaria_id: string
+          data_realizada: string
+          descricao: string
+          match_score: number
+          tipo: string
+          valor_realizado: number
+        }[]
+      }
+      search_transfer_counterparties: {
+        Args: { p_staging_id: string; p_window_days?: number }
+        Returns: {
+          bank_account_id: string
+          bank_account_nome: string
+          data: string
+          descricao: string
+          match_score: number
+          staging_id: string
+          status: string
+          valor: number
         }[]
       }
       show_limit: { Args: never; Returns: number }
@@ -11249,12 +11451,16 @@ export type Database = {
           descricao: string
           documento: string | null
           entity_id: string | null
+          estornado_em: string | null
+          estornado_por_entry_id: string | null
+          estorno_de_entry_id: string | null
           expense_request_id: string | null
           forma_pagamento: string | null
           id: string
           impacto_fluxo_caixa: boolean | null
           impacto_orcamento: boolean | null
           import_id: string | null
+          is_estorno: boolean
           natureza_contabil: string | null
           notes: string | null
           num_parcelas: number | null
@@ -11272,6 +11478,7 @@ export type Database = {
           tipo: string
           tipo_despesa: string | null
           tipo_documento: string | null
+          transfer_id: string | null
           updated_at: string
           user_id: string
           valor_bruto: number | null
