@@ -244,6 +244,8 @@ export type Database = {
           documento: string | null
           id: string
           import_id: string | null
+          match_bucket: string | null
+          match_score: number | null
           notes: string | null
           organization_id: string
           reconciled_at: string | null
@@ -263,6 +265,8 @@ export type Database = {
           documento?: string | null
           id?: string
           import_id?: string | null
+          match_bucket?: string | null
+          match_score?: number | null
           notes?: string | null
           organization_id: string
           reconciled_at?: string | null
@@ -282,6 +286,8 @@ export type Database = {
           documento?: string | null
           id?: string
           import_id?: string | null
+          match_bucket?: string | null
+          match_score?: number | null
           notes?: string | null
           organization_id?: string
           reconciled_at?: string | null
@@ -10661,6 +10667,10 @@ export type Database = {
         }
         Returns: Json
       }
+      classify_statement_coverage: {
+        Args: { p_import_id?: string; p_org_id: string }
+        Returns: Json
+      }
       compute_health_score: { Args: { _org_id: string }; Returns: number }
       compute_purchase_tax_retentions: {
         Args: { _tipo: string; _valor: number }
@@ -10921,6 +10931,10 @@ export type Database = {
           valor_previsto: number
           valor_realizado: number
         }[]
+      }
+      materialize_unplanned_statement_entry: {
+        Args: { p_classification: Json; p_statement_id: string }
+        Returns: string
       }
       propagate_benefit_to_subsidiaries: {
         Args: { p_benefit_id: string }
