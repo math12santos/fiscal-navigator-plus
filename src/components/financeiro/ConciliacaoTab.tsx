@@ -4,13 +4,15 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2, Wand2, Camera, Settings2, Sparkles } from "lucide-react";
+import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2, Wand2, Camera, Settings2, Sparkles, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConciliacao, type StatementStatus, type CashflowCandidate } from "@/hooks/useConciliacao";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { BankStatementImportDialog } from "@/components/financeiro/BankStatementImportDialog";
 import { ReconciliationRulesDialog } from "@/components/financeiro/ReconciliationRulesDialog";
 import { ClassifyAndReconcileDialog } from "@/components/financeiro/ClassifyAndReconcileDialog";
+import { StatementResolutionPanel } from "@/components/financeiro/StatementResolutionPanel";
+import { useStatementResolution } from "@/hooks/useStatementResolution";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
