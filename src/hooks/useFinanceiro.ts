@@ -208,17 +208,19 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
     return filterByScope(merged);
   }, [entriesQuery.data, installmentsQuery.data, contracts, tipo, orgId, filterByScope, payrollProjections]);
 
-  // Totais — MECE: cada lançamento conta em exatamente UM bucket (pendente OU realizado).
-  // Provisões acumuladas (passivo trabalhista) NÃO entram no caixa.
+  // Totais — MECE 3 estados: Previsto + Em pagamento + Realizado.
   const totals = useMemo(() => {
-    let total_previsto = 0;     // soma de TUDO (referência), sem dupla contagem entre buckets
-    let total_realizado = 0;    // só pago/recebido (valor efetivamente movimentado)
-    let pendente = 0;           // só previsto/confirmado (a vencer ou em aberto)
+    let total_previsto = 0;
+    let total_realizado = 0;
+    let em_pagamento = 0;
+    let count_em_pagamento = 0;
+    let pendente = 0;
     let count_pendente = 0;
 
     for (const e of allEntries) {
       if ((e as any).dp_sub_category === "provisao_acumulada") continue;
       const isRealized = e.status === "pago" || e.status === "recebido";
+      const isIssued = e.status === "pagamento_emitido" || e.status === "recebimento_esperado";
       const isPending = e.status === "previsto" || e.status === "confirmado";
       const valorRef = isRealized
         ? Number(e.valor_realizado ?? e.valor_previsto)
@@ -226,13 +228,16 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
       total_previsto += valorRef;
       if (isRealized) {
         total_realizado += Number(e.valor_realizado ?? e.valor_previsto);
+      } else if (isIssued) {
+        em_pagamento += Number(e.valor_previsto);
+        count_em_pagamento++;
       } else if (isPending) {
         pendente += Number(e.valor_previsto);
         count_pendente++;
       }
     }
 
-    return { total_previsto, total_realizado, pendente, count_pendente, total: allEntries.length };
+    return { total_previsto, total_realizado, em_pagamento, count_em_pagamento, pendente, count_pendente, total: allEntries.length };
   }, [allEntries]);
 
   // Create manual entry (with installment/recurring projection logic)
