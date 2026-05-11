@@ -154,3 +154,25 @@ Mapeei o que já existe nas Fases 1–3 e identifiquei lacunas em cada cruzament
 - Integração com bancos (boleto/Pix de fornecedor) — fica para módulo Financeiro AP.
 
 Após aprovação, sugiro começar pela **Onda A** porque endereça os riscos de duplicação financeira (MECE) e fecha o ciclo "PO → Recebimento → AP realizado → DRE".
+
+---
+
+## 6. ✅ Onda A — IMPLEMENTADA
+
+**Migration:** `20260511_compras_onda_a.sql`
+
+- `purchase_receipts`: novos campos `nf_chave`, `nf_cnpj`, `nf_valor`.
+- `purchase_orders` + `cashflow_entries`: `cost_center_allocations` (jsonb, validado 100%) e `tax_retentions` (jsonb).
+- Função `validate_nfe_chave(text)` — DV módulo 11 dos 44 dígitos.
+- Função `compute_purchase_tax_retentions(tipo, valor)` — IRRF 1,5% / INSS 11% / ISS 5% / PIS 0,65% / COFINS 3% / CSLL 1% para serviço/manutenção/obra.
+- Trigger `trg_pr_validate_nf` — abre divergência automática quando chave inválida, CNPJ ≠ fornecedor ou valor da NF ≠ pedido.
+- Trigger `trg_pr_materialize_cashflow` — quando recebimento fica `total`, atualiza o lançamento provisório para `a_pagar` com valor da NF, vencimento por `condicao_pagamento` (regex de dias), competência, retenções e rateio. Idempotente via `source_ref = purchase_order:<id>`.
+- `purchase_order_to_cashflow` agora **ignora pedidos com `contract_id`** (parcela do contrato é a fonte da verdade — MECE).
+- Trigger `trg_po_check_fiscal_period` — bloqueia confirmação/envio de PO em competência fechada.
+- Auditoria de cotações/recebimentos corrigida (colunas `entity_type/entity_id/action/new_value`).
+- Realtime + REPLICA IDENTITY FULL para `purchase_receipts`, `purchase_divergences`, `purchase_quotations`.
+- `bump_org_data_version` em `purchase_receipts` e `purchase_divergences` → invalida `dashboard_snapshots`.
+
+**Frontend:** `ReceiptsTab` ganhou inputs de Chave NF-e, CNPJ emissor e valor total da NF.
+
+**Próximo:** Onda B (tarefas automáticas, divergência sobre NF, realtime nas abas, wizard TI).
