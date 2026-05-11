@@ -374,7 +374,7 @@ export function ContasBancariasTab() {
                 <TableHead>Banco</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Chave PIX</TableHead>
-                <TableHead className="text-right">Saldo Atual</TableHead>
+                <TableHead className="text-right">Saldo (Manual / OFX)</TableHead>
                 <TableHead className="text-right">Limite</TableHead>
                 <TableHead className="text-right">Disponível</TableHead>
                 {holdingMode && <TableHead>Empresa</TableHead>}
