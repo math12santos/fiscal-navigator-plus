@@ -70,9 +70,10 @@ export function ValorExecutadoDialog({ open, onOpenChange, entries, onConfirm, i
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Confirmar Valor Executado</DialogTitle>
+          <DialogTitle>Registrar pagamentos emitidos</DialogTitle>
           <DialogDescription>
-            Confirme os valores efetivamente pagos. Este double-check garante a conciliação entre previsto e realizado.
+            Marca os lançamentos como <strong>"Em pagamento"</strong>. O status final
+            <strong> "Pago"</strong> só será atribuído quando confirmado pelo extrato bancário (conciliação).
           </DialogDescription>
         </DialogHeader>
 
@@ -96,11 +97,11 @@ export function ValorExecutadoDialog({ open, onOpenChange, entries, onConfirm, i
               {item.selected && (
                 <div className="grid grid-cols-2 gap-3 pl-8">
                   <div className="space-y-1">
-                    <Label className="text-xs">Valor Realizado</Label>
+                    <Label className="text-xs">Valor a pagar</Label>
                     <Input type="number" step="0.01" value={item.valor_realizado} onChange={(e) => updateValue(idx, Number(e.target.value))} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Data Realizada</Label>
+                    <Label className="text-xs">Data de emissão</Label>
                     <Input type="date" value={item.data_realizada} onChange={(e) => updateDate(idx, e.target.value)} />
                   </div>
                 </div>
