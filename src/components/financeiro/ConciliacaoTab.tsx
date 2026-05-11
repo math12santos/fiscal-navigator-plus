@@ -27,6 +27,7 @@ export function ConciliacaoTab() {
   const [statusFilter, setStatusFilter] = useState<StatementStatus | "all">("all");
   const [importOpen, setImportOpen] = useState(false);
   const [matchEntry, setMatchEntry] = useState<{ id: string; descricao: string; valor: number } | null>(null);
+  const [classifyEntry, setClassifyEntry] = useState<{ id: string; descricao: string; valor: number; data: string; bank_account_id: string } | null>(null);
   const [candidates, setCandidates] = useState<CashflowCandidate[]>([]);
   const [loadingCands, setLoadingCands] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
