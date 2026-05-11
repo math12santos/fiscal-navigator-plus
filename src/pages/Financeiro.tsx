@@ -15,6 +15,7 @@ import { IntegracoesTab } from "@/components/financeiro/IntegracoesTab";
 import { FinancialDashboardTab } from "@/components/financeiro/dashboard/FinancialDashboardTab";
 import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
 import { SolicitacoesTab } from "@/components/financeiro/SolicitacoesTab";
+import { MonthClosingReadinessCard } from "@/components/financeiro/MonthClosingReadinessCard";
 import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
 
 const ALL_TABS = [
@@ -76,6 +77,8 @@ export default function Financeiro() {
       </PageHeader>
 
       <SectorOnboardingBar sector="financeiro" onTabChange={handleMaturityTabChange} />
+
+      <MonthClosingReadinessCard />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
