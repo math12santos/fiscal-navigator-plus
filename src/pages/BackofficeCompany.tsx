@@ -1267,6 +1267,28 @@ function OrgModulesTab({ orgId }: { orgId: string }) {
             );
           })}
         </div>
+
+        {isHolding && (
+          <div className="mt-6 p-4 border border-border rounded-lg bg-muted/30 space-y-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <h4 className="text-sm font-semibold text-foreground">Propagar para filiadas</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Replica esta configuração de módulos para as {subsidiaries.length} subsidiária(s) desta Holding.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch id="overwrite-modules" checked={overwrite} onCheckedChange={setOverwrite} />
+                  <Label htmlFor="overwrite-modules" className="text-xs">Sobrescrever existentes</Label>
+                </div>
+                <Button size="sm" onClick={handlePropagate} disabled={propagating}>
+                  {propagating ? "Propagando..." : "Propagar agora"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
