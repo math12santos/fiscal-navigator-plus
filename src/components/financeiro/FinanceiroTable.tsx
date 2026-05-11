@@ -169,6 +169,11 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onDelete, onEdit,
                 {actionLabel}
               </Button>
             )}
+            {isManual && !isProjected && onEdit && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(e)} title="Editar">
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+              </Button>
+            )}
             {isManual && !isProjected && (
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDeleteId(e.id)}>
                 <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
