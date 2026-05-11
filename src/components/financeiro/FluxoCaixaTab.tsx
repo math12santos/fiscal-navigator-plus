@@ -85,7 +85,16 @@ export function FluxoCaixaTab() {
     ? customTo ?? endOfMonth(new Date())
     : endOfMonth(addMonths(startOfMonth(refDate), months - 1));
 
-  const { entries, totals, isLoading } = useCashFlow(rangeFrom, rangeTo);
+  const {
+    entries,
+    realizadoEntries,
+    previstoEntries,
+    paidNotReconciledEntries,
+    totals,
+    totalsRealizado,
+    totalsPrevisto,
+    isLoading,
+  } = useCashFlow(rangeFrom, rangeTo);
   const { bankAccounts } = useBankAccounts();
   const { user } = useAuth();
   const { currentOrg } = useOrganization();
@@ -99,50 +108,15 @@ export function FluxoCaixaTab() {
     [bankAccounts],
   );
 
-  const projetado = useMemo(
-    () =>
-      entries.filter(
-        (e) => e.status === "previsto" || e.status === "confirmado",
-      ),
-    [entries],
-  );
-  const realizado = useMemo(
-    () => entries.filter((e) => e.status === "pago" || e.status === "recebido"),
-    [entries],
-  );
-
-  const totaisRealizado = useMemo(() => {
-    let entradas = 0,
-      saidas = 0;
-    for (const e of realizado) {
-      const val = Number(e.valor_realizado ?? e.valor_previsto);
-      if (e.tipo === "entrada") entradas += val;
-      else saidas += val;
-    }
-    return { entradas, saidas, saldo: entradas - saidas };
-  }, [realizado]);
-
-  const totaisProjetado = useMemo(() => {
-    let entradas = 0,
-      saidas = 0;
-    for (const e of projetado) {
-      const val = Number(e.valor_previsto);
-      if (e.tipo === "entrada") entradas += val;
-      else saidas += val;
-    }
-    return { entradas, saidas, saldo: entradas - saidas };
-  }, [projetado]);
-
-  // Burn rate: média de saídas líquidas mensais quando há déficit.
-  // Runway (em meses) = openingBalance / burn mensal médio.
+  // Burn rate baseado no previsto (planejamento).
   const runway = useMemo(() => {
     const monthsSpan = Math.max(1, months);
-    const netMonthly = totaisProjetado.saldo / monthsSpan;
+    const netMonthly = totalsPrevisto.saldo / monthsSpan;
     if (netMonthly >= 0) return { months: Infinity, burnPerMonth: 0 };
     const burn = Math.abs(netMonthly);
     const m = openingBalance > 0 ? openingBalance / burn : 0;
     return { months: m, burnPerMonth: burn };
-  }, [totaisProjetado.saldo, months, openingBalance]);
+  }, [totalsPrevisto.saldo, months, openingBalance]);
 
   const navigatePeriod = (direction: 1 | -1) => {
     setRefDate(
@@ -152,15 +126,15 @@ export function FluxoCaixaTab() {
 
   const currentEntries =
     activeTab === "realizado"
-      ? realizado
+      ? realizadoEntries
       : activeTab === "projetado"
-        ? projetado
+        ? previstoEntries
         : entries;
   const currentTotals =
     activeTab === "realizado"
-      ? totaisRealizado
+      ? totalsRealizado
       : activeTab === "projetado"
-        ? totaisProjetado
+        ? totalsPrevisto
         : totals;
 
   const periodLabel = isCustom
