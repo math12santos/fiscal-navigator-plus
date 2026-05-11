@@ -403,6 +403,7 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
     create,
     update,
     markAsPaid,
+    undoPaymentIssued,
     remove,
   };
 }
