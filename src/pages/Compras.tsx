@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { ComprasDashboard } from "@/components/compras/ComprasDashboard";
 import { RequestsTab } from "@/components/compras/RequestsTab";
 import { ApprovalsTab } from "@/components/compras/ApprovalsTab";
@@ -15,6 +16,13 @@ import { ComprasSettingsTab } from "@/components/compras/ComprasSettingsTab";
 
 export default function Compras() {
   const [tab, setTab] = useState("dashboard");
+  useRealtimeSync([
+    { table: "purchase_orders",      invalidateKeys: [["compras","orders"]] },
+    { table: "purchase_receipts",    invalidateKeys: [["compras","receipts"], ["compras","divergences"]] },
+    { table: "purchase_divergences", invalidateKeys: [["compras","divergences"]] },
+    { table: "purchase_quotations",  invalidateKeys: [["compras","quotations"]] },
+    { table: "purchase_requests",    invalidateKeys: [["compras","requests"], ["compras","approvals"]] },
+  ]);
   return (
     <div className="space-y-4">
       <PageHeader

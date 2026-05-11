@@ -1,178 +1,131 @@
 
-# Revisão das integrações do módulo Compras
+# Onda B — Workflow operacional do módulo Compras
 
-Mapeei o que já existe nas Fases 1–3 e identifiquei lacunas em cada cruzamento com os demais módulos do cockpit financeiro. Abaixo: estado atual → gap → melhoria proposta.
+Objetivo: tirar o módulo de Compras do "registro manual" e plugá-lo no fluxo vivo de tarefas, notificações em tempo real e cadastro completo de ativos TI. Tudo em cima do que a Onda A já entregou (materialização MECE, validação NF-e, retenções, rateio).
 
 ---
 
-## 1. Mapa atual de integrações
+## 1. Tarefas automáticas no workflow (`request_tasks`)
 
-```text
-                ┌──────────────────────┐
-                │   COMPRAS (core)     │
-                │ requests/orders/...  │
-                └──────────┬───────────┘
-   cashflow_entries ◄──────┤  trg_po_to_cashflow (AP projetado)
-   contracts        ◄──────┤  fn_po_after_confirm (software_saas)
-   it_equipment     ◄──────┤  fn_po_after_confirm (ativo_imobilizado)
-   notifications    ◄──────┤  trg_notify_approval_pending / divergence_open
-   purchase_audit   ◄──────┤  trg_pq_audit / trg_pr_audit
-   suppliers        ◄──────┤  FK + fornecedor dedicado
-   contracts (FK)   ──────►│  request.contract_id / order.contract_id
-   check_purchase_budget   │  consulta planejamento (planned vs realizado)
-                ▲
-                │  (faltando) DP, CRM, Estoque, Tarefas, DRE, Fiscal
+Hoje Compras só dispara `notifications`. Vamos passar a criar tarefas reais, rastreáveis em /tarefas.
+
+**Triggers a criar:**
+
+- `trg_po_create_receipt_task` — ao confirmar um `purchase_order` (`status='confirmado'`):
+  - cria `request_tasks` "Confirmar recebimento de <fornecedor> — pedido #<numero>"
+  - `due_date` = `data_entrega_prevista` (ou `created_at + 7 dias`)
+  - `assigned_to` = `recebedor_id` do PO (fallback: solicitante)
+  - `source='compras'`, `source_ref='po:<id>'` para idempotência
+
+- `trg_divergence_create_task` — ao inserir `purchase_divergences` com `status='aberta'`:
+  - cria tarefa "Resolver divergência <tipo> — pedido #<numero>"
+  - `priority` derivada de `severity` (high→alta, medium→média)
+  - `assigned_to` = comprador do PO
+  - `source_ref='divergence:<id>'`
+
+- `trg_divergence_close_task` — ao fechar divergência (`status='resolvida'`), marca a tarefa relacionada como `concluida`.
+
+**Sem duplicação:** `ON CONFLICT (source, source_ref) DO NOTHING` em `request_tasks` (precisa do índice único).
+
+---
+
+## 2. Realtime nas abas operacionais
+
+Atualmente só `cashflow_entries`/`contracts`/`request_tasks` estão na publicação. Vamos adicionar:
+
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE
+  public.purchase_orders,
+  public.purchase_receipts,
+  public.purchase_divergences,
+  public.purchase_quotations;
+
+ALTER TABLE public.purchase_orders        REPLICA IDENTITY FULL;
+ALTER TABLE public.purchase_receipts      REPLICA IDENTITY FULL;
+ALTER TABLE public.purchase_divergences   REPLICA IDENTITY FULL;
+ALTER TABLE public.purchase_quotations    REPLICA IDENTITY FULL;
 ```
 
-**Já cobre bem:** Financeiro AP (cashflow), Contratos (SaaS), TI (ativo imobilizado), Notificações, Auditoria, Orçamento (planned).
+(Onda A já adicionou receipts/divergences/quotations — confirmar e completar com `purchase_orders`.)
 
-**Lacunas relevantes:** integração com Tarefas/Workflow, DP (compras de benefícios/treinamento), CRM (compras vinculadas a oportunidade/projeto), Estoque/Almoxarifado, Centro de Custo + DRE, Fiscal (NF-e), Holding/multi-empresa, Realtime.
+**Frontend:** adicionar `useRealtimeSync` em `src/pages/Compras.tsx`:
 
----
+```ts
+useRealtimeSync([
+  { table: "purchase_orders",      invalidateKeys: [["compras","orders"], ["dashboard-snapshot"]] },
+  { table: "purchase_receipts",    invalidateKeys: [["compras","receipts"], ["compras","divergences"]] },
+  { table: "purchase_divergences", invalidateKeys: [["compras","divergences"], ["compras","dashboard"]] },
+  { table: "purchase_quotations",  invalidateKeys: [["compras","quotations"]] },
+]);
+```
 
-## 2. Gaps por módulo e melhorias
-
-### 2.1 Financeiro (AP / Cashflow / Reconciliação)
-- ✅ `trg_po_to_cashflow` já cria entrada projetada idempotente em `cashflow_entries` (source=`compras`).
-- ⚠️ **Gap:** ao receber NF (`purchase_receipts.nf_*`), o valor projetado **não é re-tipado** para "a pagar realizado" (princípio MECE de materialização).
-- ⚠️ **Gap:** divergência de preço resolvida não ajusta valor em `cashflow_entries`.
-- ⚠️ **Gap:** rateio por centro de custo (`financial-cost-center-prorating`) não é propagado do pedido para o lançamento financeiro.
-- 🔧 **Melhoria:** trigger `fn_pr_materialize_cashflow` quando recebimento status=`total` → atualiza entry para `realizado`, valor da NF, vencimento conforme `condicao_pagamento`. Idempotente via `source_ref = 'po:<id>'`.
-- 🔧 **Melhoria:** propagar `cost_center_allocations` (rateio 100%) do PO para o cashflow_entry.
-- 🔧 **Melhoria:** retenções (IRRF/INSS/ISS/PIS/COFINS) calculadas e gravadas no entry quando tipo=`servico`.
-
-### 2.2 Contratos
-- ✅ FK `contract_id` em request e order; auto-criação para `software_saas`.
-- ⚠️ **Gap:** `manutencao` recorrente, `obra` e `servico` recorrente não geram contrato.
-- ⚠️ **Gap:** quando há contrato existente, pedido **não consome** parcelas de `contract_installments` (pode duplicar projeção).
-- 🔧 **Melhoria:** ampliar `fn_po_after_confirm` para cobrir `manutencao`/`servico` recorrente.
-- 🔧 **Melhoria:** se `purchase_orders.contract_id` preenchido, pular `trg_po_to_cashflow` (a parcela do contrato já projeta) — respeitar [Materialization MECE](mem://logic/financeiro-materialization-mece).
-- 🔧 **Melhoria:** botão "Vincular a contrato existente" na `OrdersTab`.
-
-### 2.3 TI (Patrimônio)
-- ✅ Cria `it_equipment` com depreciação 60/48m para `ativo_imobilizado`.
-- ⚠️ **Gap:** não respeita o wizard TI ([TI Equipment Wizard](mem://features/ti-equipment-wizard)) — gera equipamento "cru" sem tipo/specs/atribuição.
-- ⚠️ **Gap:** sem geração de tarefa semestral de revisão de substituição.
-- 🔧 **Melhoria:** após criar equipamento, abrir tarefa de "Completar cadastro TI" via `request_tasks`, com link para o wizard.
-- 🔧 **Melhoria:** pedidos do tipo `ativo_imobilizado` exigirem campos mínimos (tipo TI, specs jsonb) já no item do PO.
-
-### 2.4 DP (RH)
-- ❌ **Gap total:** nenhum link com DP. Compras de benefícios (VR/VA/Saúde), uniformes, treinamentos e equipamentos para colaboradores não enxergam `employees`.
-- 🔧 **Melhoria:** novo tipo `beneficio_colaborador` + FK opcional `employee_id` no item; integração com `employee_benefits` para custo unitário plano de saúde.
-- 🔧 **Melhoria:** compras de treinamento criar evento em `dp_routine_tasks` para acompanhamento.
-
-### 2.5 CRM Comercial
-- ❌ **Gap total:** sem vínculo com `crm_opportunities`/`crm_deals`. Compras destinadas a entregar uma venda (custo direto) não rastreiam margem.
-- 🔧 **Melhoria:** FK opcional `opportunity_id` em `purchase_requests`; relatório de margem por oportunidade (receita CRM − custo Compras).
-
-### 2.6 Estoque / Almoxarifado
-- ❌ **Gap:** não existe entidade de estoque. Itens recebidos não atualizam saldo.
-- 🔧 **Melhoria (futura):** tabela `inventory_items` + `inventory_movements`, recebimentos do tipo `produto`/`consumo` geram entrada (kardex). Por ora, só sinalizar para evitar contagem dupla no cashflow.
-
-### 2.7 Centro de Custo / DRE
-- ✅ `purchase_requests.cost_center_id` existe.
-- ⚠️ **Gap:** não usa rateio multi-CC; não força conta contábil (4 níveis) no item.
-- 🔧 **Melhoria:** RPC `suggest_account_for_purchase(tipo, descricao)` usando o motor [Chart Automation](mem://features/chart-of-accounts-automation).
-- 🔧 **Melhoria:** validação de período fiscal aberto ([Governance Periods](mem://features/financial-governance-periods)) ao confirmar pedido.
-
-### 2.8 Fiscal / NF-e
-- ⚠️ Recebimento captura `nf_numero`, `nf_chave`, `nf_valor` mas não valida.
-- 🔧 **Melhoria:** edge function `validate_nfe_chave` (DV módulo 11); futura ingestão XML via `etl_pipeline_core`.
-- 🔧 **Melhoria:** divergência automática se `nf_valor ≠ Σ items.valor_total` ou `nf_cnpj ≠ supplier.cnpj`.
-
-### 2.9 Tarefas & Workflow ([Task Workflow](mem://features/task-management-workflow))
-- ⚠️ Compras emite `notifications` mas não cria `request_tasks`.
-- 🔧 **Melhoria:** ao gerar PO, criar tarefa "Confirmar recebimento até <data_prevista>" para responsável; ao abrir divergência, criar tarefa "Resolver divergência".
-
-### 2.10 Holding / Multi-empresa
-- ⚠️ Tudo escopado por `organization_id` (correto), mas não há **compra centralizada** para várias filiais (rateio entre subsidiárias da Holding).
-- 🔧 **Melhoria:** opção "Pedido consolidado da Holding" com rateio para `subsidiary_ids[]` — gera N entries em cashflow proporcionais.
-
-### 2.11 Realtime + Snapshot Cache
-- ⚠️ `purchase_*` não estão em `supabase_realtime` nem disparam `bump_org_data_version` para Dashboard.
-- ✅ `bump_org_data_version` já está em `purchase_requests` e `purchase_orders` (verificado).
-- 🔧 **Melhoria:** adicionar `purchase_orders`, `purchase_receipts`, `purchase_divergences` à publicação realtime para a `OrdersTab`/`DivergencesTab` se atualizarem ao vivo.
-
-### 2.12 Backoffice / Permissões
-- ⚠️ Sem mapeamento explícito de `purchase.*` em `MODULE_DEFINITIONS` granular (aprovador, comprador, recebedor, financeiro).
-- 🔧 **Melhoria:** roles `compras_solicitante`, `compras_aprovador`, `compras_comprador`, `compras_recebedor` + RLS por papel.
-
-### 2.13 Auditoria & LGPD
-- ✅ `purchase_audit_log` para quotations/receipts.
-- ⚠️ **Gap:** requests, orders e divergences não logam diff completo.
-- 🔧 **Melhoria:** generalizar trigger `fn_purchase_audit` para todas as tabelas, gravando `before/after` jsonb.
-
-### 2.14 IA & Sugestões
-- ❌ Sem uso de Lovable AI.
-- 🔧 **Melhoria (Fase 4):** edge function `compras-ai-suggest` (model: `google/gemini-2.5-flash`):
-  - sugerir conta contábil + centro de custo a partir da descrição;
-  - resumir comparativo de cotações (preço × prazo × condição);
-  - detectar anomalias (preço acima da média histórica do fornecedor).
+E garantir que as queries em `useCompras` usem essas keys.
 
 ---
 
-## 3. Plano de melhorias em ondas
+## 3. Wizard "Completar cadastro TI" pós-recebimento de ativo
 
-### Onda A — Integridade financeira (alta prioridade)
-1. Materialização MECE: trigger receipt → atualiza cashflow (realizado) e respeita contract_id.
-2. Rateio multi-centro de custo do PO para cashflow.
-3. Cálculo de retenções tributárias para serviços.
-4. Validação de período fiscal e de DV da chave NF-e.
+Hoje o `fn_po_after_confirm` cria um `it_equipment` cru para `ativo_imobilizado`. Vamos transformar isso em um fluxo guiado:
 
-### Onda B — Workflow e UX operacional
-5. Criação automática de `request_tasks` (confirmar recebimento, resolver divergência).
-6. Divergência automática quando NF ≠ pedido (valor/CNPJ).
-7. Realtime nas abas Pedidos/Recebimentos/Divergências.
-8. Wizard "Completar cadastro TI" pós-criação de equipamento.
-
-### Onda C — Conexões ampliadas
-9. FK opcional `opportunity_id` (CRM) e `employee_id` no item (DP).
-10. Tipo `beneficio_colaborador` + integração com `employee_benefits`.
-11. Pedido consolidado da Holding com rateio entre subsidiárias.
-12. Roles granulares (`compras_*`) + RLS.
-
-### Onda D — Inteligência e fiscal avançado
-13. Edge function `compras-ai-suggest` (classificação + anomalias + resumo cotações).
-14. ETL ingestão XML NF-e via `etl_pipeline_core`.
-15. (Opcional) Estoque/almoxarifado básico (kardex).
+- Trigger atualizado: ao criar `it_equipment` originado de Compras, marcar `pending_wizard=true` (nova coluna boolean, default false).
+- Criar `request_tasks` "Completar cadastro TI: <equipamento>" com `link_url='/ti?equipment=<id>&wizard=open'`, `assigned_to` = responsável TI (de `system_settings.it_responsible_user_id` ou fallback admin).
+- No `/ti`, ao abrir com `?wizard=open&equipment=<id>`, montar automaticamente o [TI Equipment Wizard](mem://features/ti-equipment-wizard) em **modo "completar existente"**, pré-preenchido com fornecedor, valor, data — usuário só preenche tipo/specs/atribuição.
+- Ao concluir o wizard, `pending_wizard=false` e a tarefa é fechada.
 
 ---
 
-## 4. Detalhes técnicos relevantes
+## 4. Divergência automática refinada sobre NF
 
-- **Idempotência:** todas as novas materializações devem usar chave estável (`source='compras'`, `source_ref='po:<id>'` / `receipt:<id>'`) para suportar reprocessamento sem duplicar — alinhado a [Materialization MECE](mem://logic/financeiro-materialization-mece) e [MECE Philosophy](mem://logic/mece-integrity-philosophy).
-- **Cache:** invalidar `dashboard_snapshots` via `bump_org_data_version` em `purchase_receipts` e `purchase_divergences` (ainda não cobertos).
-- **Realtime:** `ALTER PUBLICATION supabase_realtime ADD TABLE public.purchase_orders, public.purchase_receipts, public.purchase_divergences;`.
-- **Segurança:** novos campos `employee_id` e `opportunity_id` precisam de cross-table RLS ([Cross Table RLS](mem://security/cross-table-rls-validation)).
-- **AI:** usar `LOVABLE_API_KEY` já provisionada; nada de novo segredo.
+Onda A já gera divergência quando: chave NF-e inválida, CNPJ ≠ fornecedor, valor da NF ≠ pedido. Onda B amplia:
 
----
+- **Quantidade recebida ≠ pedida** por item → divergência `tipo='quantidade'`.
+- **Data de emissão da NF posterior à entrega** → divergência `tipo='prazo'` severity=low.
+- **Fornecedor sem cadastro fiscal completo** (sem CNPJ ou IE) ao receber NF → divergência `tipo='cadastro'` apontando para o fornecedor.
 
-## 5. O que NÃO entra agora
-- Substituir contratos pelo módulo de compras (responsabilidades distintas).
-- Estoque completo com lotes/validade (escopo de Fase 5+).
-- Integração com bancos (boleto/Pix de fornecedor) — fica para módulo Financeiro AP.
-
-Após aprovação, sugiro começar pela **Onda A** porque endereça os riscos de duplicação financeira (MECE) e fecha o ciclo "PO → Recebimento → AP realizado → DRE".
+Tudo no mesmo `trg_pr_validate_nf` estendido, idempotente por `(receipt_id, tipo)`.
 
 ---
 
-## 6. ✅ Onda A — IMPLEMENTADA
+## 5. UX nas abas
 
-**Migration:** `20260511_compras_onda_a.sql`
+- **OrdersTab:** badge "🔴 X divergências" e "📋 tarefa pendente" por linha (join leve via hook).
+- **DivergencesTab:** botão "Resolver" agora também fecha a tarefa associada (já automático via trigger).
+- **ReceiptsTab:** após salvar com NF, toast "Validação fiscal OK" ou "Divergência aberta automaticamente — ver aba Divergências".
+- **ComprasDashboard:** novo card "Tarefas de Compras pendentes" (count de `request_tasks` com `source='compras'` e `status<>'concluida'`).
 
-- `purchase_receipts`: novos campos `nf_chave`, `nf_cnpj`, `nf_valor`.
-- `purchase_orders` + `cashflow_entries`: `cost_center_allocations` (jsonb, validado 100%) e `tax_retentions` (jsonb).
-- Função `validate_nfe_chave(text)` — DV módulo 11 dos 44 dígitos.
-- Função `compute_purchase_tax_retentions(tipo, valor)` — IRRF 1,5% / INSS 11% / ISS 5% / PIS 0,65% / COFINS 3% / CSLL 1% para serviço/manutenção/obra.
-- Trigger `trg_pr_validate_nf` — abre divergência automática quando chave inválida, CNPJ ≠ fornecedor ou valor da NF ≠ pedido.
-- Trigger `trg_pr_materialize_cashflow` — quando recebimento fica `total`, atualiza o lançamento provisório para `a_pagar` com valor da NF, vencimento por `condicao_pagamento` (regex de dias), competência, retenções e rateio. Idempotente via `source_ref = purchase_order:<id>`.
-- `purchase_order_to_cashflow` agora **ignora pedidos com `contract_id`** (parcela do contrato é a fonte da verdade — MECE).
-- Trigger `trg_po_check_fiscal_period` — bloqueia confirmação/envio de PO em competência fechada.
-- Auditoria de cotações/recebimentos corrigida (colunas `entity_type/entity_id/action/new_value`).
-- Realtime + REPLICA IDENTITY FULL para `purchase_receipts`, `purchase_divergences`, `purchase_quotations`.
-- `bump_org_data_version` em `purchase_receipts` e `purchase_divergences` → invalida `dashboard_snapshots`.
+---
 
-**Frontend:** `ReceiptsTab` ganhou inputs de Chave NF-e, CNPJ emissor e valor total da NF.
+## 6. Arquivos afetados
 
-**Próximo:** Onda B (tarefas automáticas, divergência sobre NF, realtime nas abas, wizard TI).
+```text
+supabase/migrations/<ts>_compras_onda_b.sql      ← novo
+src/pages/Compras.tsx                            ← useRealtimeSync
+src/hooks/useCompras.ts                          ← keys consistentes + count tasks
+src/components/compras/OrdersTab.tsx             ← badges divergência/tarefa
+src/components/compras/DivergencesTab.tsx        ← UX/feedback
+src/components/compras/ReceiptsTab.tsx           ← toast pós-validação
+src/components/compras/ComprasDashboard.tsx      ← card tarefas
+src/pages/TI.tsx                                 ← suporte ?wizard=open&equipment=
+src/components/ti/EquipmentWizard.tsx (existente) ← modo "completar existente"
+.lovable/plan.md                                 ← registrar Onda B
+mem://features/compras-mece-integration          ← atualizar com Onda B
+```
+
+---
+
+## 7. Não entra agora (fica para Onda C/D)
+
+- `employee_id`/`opportunity_id` (DP/CRM) — Onda C
+- Pedido consolidado da Holding — Onda C
+- Roles granulares `compras_*` — Onda C
+- IA de sugestão / ETL XML NF-e — Onda D
+
+---
+
+## 8. Critérios de pronto
+
+- Confirmar um PO cria automaticamente a tarefa de recebimento em /tarefas.
+- Receber NF com CNPJ errado abre divergência **e** tarefa "Resolver divergência" sem ação manual.
+- Outra aba aberta vê o pedido mudar de status sem F5.
+- Comprar um notebook gera tarefa "Completar cadastro TI" que leva direto ao wizard pré-preenchido.
+- Nenhuma duplicação de tarefa em re-execuções (idempotência por `source_ref`).
