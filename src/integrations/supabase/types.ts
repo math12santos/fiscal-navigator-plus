@@ -10926,6 +10926,10 @@ export type Database = {
         Args: { p_benefit_id: string }
         Returns: Json
       }
+      propagate_modules_to_subsidiaries: {
+        Args: { p_holding_id: string; p_overwrite?: boolean }
+        Returns: Json
+      }
       purge_old_audit_logs: { Args: { _days?: number }; Returns: number }
       recompute_all_health_scores: { Args: never; Returns: number }
       recompute_dashboard_snapshot: {
