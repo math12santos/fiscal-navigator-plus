@@ -671,3 +671,123 @@ export const STATUS_DIVERGENCIA: Record<string, { label: string; variant: "defau
   resolvida: { label: "Resolvida", variant: "default" },
   escalada: { label: "Escalada", variant: "destructive" },
 };
+
+// ========== RECURRENCES (Fase 3) ==========
+export function usePurchaseRecurrences() {
+  const { user } = useAuth();
+  const { currentOrg } = useOrganization();
+  const orgId = currentOrg?.id;
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const k = ["compras", "recurrences", orgId];
+
+  const { data: recurrences = [], isLoading } = useQuery({
+    queryKey: k,
+    enabled: !!user && !!orgId,
+    ...cachePresets.operational,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_recurrences" as any)
+        .select("*, supplier:suppliers(razao_social)")
+        .eq("organization_id", orgId!)
+        .order("proxima_geracao", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const upsert = useMutation({
+    mutationFn: async (input: any) => {
+      const payload = { ...input, organization_id: orgId, created_by: input.created_by || user!.id };
+      const { data, error } = input.id
+        ? await supabase.from("purchase_recurrences" as any).update(payload).eq("id", input.id).select("*").single()
+        : await supabase.from("purchase_recurrences" as any).insert(payload).select("*").single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: k }); toast({ title: "Recorrência salva" }); },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("purchase_recurrences" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: k }); toast({ title: "Recorrência excluída" }); },
+  });
+
+  const toggleActive = useMutation({
+    mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
+      const { error } = await supabase.from("purchase_recurrences" as any).update({ ativo }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: k }),
+  });
+
+  const generateNow = useMutation({
+    mutationFn: async (horizonteDias: number = 30) => {
+      const { data, error } = await (supabase.rpc as any)("fn_generate_recurring_purchases", {
+        _org: orgId, _horizonte_dias: horizonteDias,
+      });
+      if (error) throw error;
+      return data as any[];
+    },
+    onSuccess: (data: any[]) => {
+      qc.invalidateQueries({ queryKey: k });
+      qc.invalidateQueries({ queryKey: ["compras", "requests", orgId] });
+      toast({ title: `${data?.length ?? 0} solicitações geradas` });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  return { recurrences, isLoading, upsert, remove, toggleActive, generateNow };
+}
+
+// ========== SETTINGS (Fase 3) ==========
+export function usePurchaseSettings() {
+  const { user } = useAuth();
+  const { currentOrg } = useOrganization();
+  const orgId = currentOrg?.id;
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const k = ["compras", "settings", orgId];
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: k,
+    enabled: !!user && !!orgId,
+    ...cachePresets.reference,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_settings" as any)
+        .select("*")
+        .eq("organization_id", orgId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+
+  const save = useMutation({
+    mutationFn: async (input: any) => {
+      const payload = { ...input, organization_id: orgId };
+      const { data, error } = input.id
+        ? await supabase.from("purchase_settings" as any).update(payload).eq("id", input.id).select("*").single()
+        : await supabase.from("purchase_settings" as any).insert(payload).select("*").single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: k }); toast({ title: "Configurações salvas" }); },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  return { settings, isLoading, save };
+}
+
+export const PERIODICIDADES = [
+  { value: "mensal", label: "Mensal" },
+  { value: "bimestral", label: "Bimestral" },
+  { value: "trimestral", label: "Trimestral" },
+  { value: "semestral", label: "Semestral" },
+  { value: "anual", label: "Anual" },
+];
