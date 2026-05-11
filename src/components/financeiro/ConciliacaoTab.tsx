@@ -301,6 +301,8 @@ export function ConciliacaoTab() {
 
       <ReconciliationRulesDialog open={rulesOpen} onOpenChange={setRulesOpen} />
 
+      <StatementResolutionPanel open={resolutionOpen} onOpenChange={setResolutionOpen} />
+
       <ClassifyAndReconcileDialog
         open={!!classifyEntry}
         onOpenChange={(o) => !o && setClassifyEntry(null)}
