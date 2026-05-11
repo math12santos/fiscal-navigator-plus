@@ -465,7 +465,7 @@ export function ContasBancariasTab() {
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7"
-                          title="Inserir saldo manualmente"
+                          title="Inserir saldo manualmente (usado em relatório PDF)"
                           onClick={() => {
                             setBalanceAccount(acc);
                             setBalanceValue(String(acc.saldo_atual));
@@ -476,9 +476,54 @@ export function ContasBancariasTab() {
                       </div>
                       {acc.saldo_atualizado_em && (
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {format(new Date(acc.saldo_atualizado_em), "dd/MM/yy HH:mm", { locale: ptBR })}
+                          manual: {format(new Date(acc.saldo_atualizado_em), "dd/MM/yy HH:mm", { locale: ptBR })}
                         </p>
                       )}
+                      {(() => {
+                        if (acc.saldo_ofx == null) {
+                          return (
+                            <Badge variant="outline" className="mt-1 text-[10px]">
+                              Sem OFX
+                            </Badge>
+                          );
+                        }
+                        const delta = (acc.saldo_ofx ?? 0) - (acc.saldo_atual || 0);
+                        const conciliado = Math.abs(delta) < 0.01;
+                        return (
+                          <div className="mt-1 flex flex-col items-end gap-0.5">
+                            <p className="font-mono text-[11px] text-muted-foreground">
+                              OFX: {fmt(acc.saldo_ofx)}
+                              {acc.saldo_ofx_data && (
+                                <span className="ml-1 text-[10px]">
+                                  · {format(new Date(acc.saldo_ofx_data + "T00:00:00"), "dd/MM/yy")}
+                                </span>
+                              )}
+                            </p>
+                            <div className="flex items-center gap-1">
+                              {conciliado ? (
+                                <Badge className="text-[10px] bg-success/15 text-success border-success/30 hover:bg-success/15">
+                                  Conciliado
+                                </Badge>
+                              ) : (
+                                <>
+                                  <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                    A conciliar {delta > 0 ? "+" : ""}{fmt(delta)}
+                                  </Badge>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    title="Adotar saldo do OFX como saldo manual"
+                                    onClick={() => handleAdotarOfx(acc)}
+                                  >
+                                    <ArrowDownToLine className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
