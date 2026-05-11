@@ -28,6 +28,10 @@ export interface BankAccount {
   limite_vencimento: string | null;
   limite_atualizado_em: string | null;
   limite_atualizado_por: string | null;
+  saldo_ofx: number | null;
+  saldo_ofx_data: string | null;
+  saldo_ofx_atualizado_em: string | null;
+  saldo_ofx_import_id: string | null;
 }
 
 export function useBankAccounts() {
