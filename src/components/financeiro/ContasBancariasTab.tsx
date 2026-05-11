@@ -251,7 +251,7 @@ export function ContasBancariasTab() {
   return (
     <div className="space-y-4">
       {/* KPIs de capital de giro */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
