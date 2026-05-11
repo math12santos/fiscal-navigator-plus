@@ -74,6 +74,9 @@ export function KPICard({ title, value, change, subtitle, icon, groupShare, onCl
               )}
             </div>
           )}
+          {change === undefined && subtitle && (
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
+          )}
           {groupShare != null && groupShare > 0 && (
             <div className="w-full bg-muted/50 rounded-full h-1 mt-1.5">
               <div
