@@ -40,6 +40,10 @@ export interface CashFlowEntry {
   reference_month?: string | null;
   /** Sub-category from DP projections (e.g. salario_liquido, vr, va, vt). */
   dp_sub_category?: string | null;
+  /** Estorno (anti-lançamento). When true, abate o original na visão Realizado. */
+  is_estorno?: boolean | null;
+  /** True quando o lançamento foi confirmado pelo extrato bancário (conciliado). */
+  is_realizado_caixa?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -80,7 +84,31 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     placeholderData: keepPreviousData,
   });
 
-  // Contract projections (virtual) — recurrent contracts
+  // Bank statement reconciliations — used to mark which cashflow entries
+  // are Realizado-de-caixa (conciliados com extrato), em oposição a apenas "marcado como pago".
+  const reconciledQuery = useQuery({
+    queryKey: ["bank_statement_reconciled", holdingMode ? activeOrgIds : orgId, rangeFrom?.toISOString(), rangeTo?.toISOString()],
+    queryFn: async () => {
+      let q = supabase
+        .from("bank_statement_entries" as any)
+        .select("cashflow_entry_id")
+        .not("cashflow_entry_id", "is", null);
+      if (holdingMode && activeOrgIds.length > 0) {
+        q = q.in("organization_id", activeOrgIds);
+      } else if (orgId) {
+        q = q.eq("organization_id", orgId);
+      }
+      if (rangeFrom) q = q.gte("data", format(rangeFrom, "yyyy-MM-dd"));
+      if (rangeTo) q = q.lte("data", format(rangeTo, "yyyy-MM-dd"));
+      const { data, error } = await q;
+      if (error) throw error;
+      return new Set<string>((data ?? []).map((r: any) => r.cashflow_entry_id).filter(Boolean));
+    },
+    enabled: !!user && !!orgId,
+    placeholderData: keepPreviousData,
+  });
+
+
   const { contracts } = useContracts();
 
   // Installments for all non-recurring contracts (merchandise, assets, one-off services, etc.)
@@ -209,9 +237,11 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
   const { filterByScope } = useUserDataScope();
 
   // Merge materialized + projected + payroll, applying registry-based dedup.
+  // Annotate `is_realizado_caixa` based on bank statement reconciliations.
   const allEntries = useMemo(() => {
     const materialized = entriesQuery.data ?? [];
     const materializedRefs = buildMaterializedRefs(materialized);
+    const reconciledIds = reconciledQuery.data ?? new Set<string>();
 
     // Dedup payroll projections against materialized DP entries by source_ref.
     const payrollDeduped = (payrollProjections as any[]).filter((p) => {
@@ -221,21 +251,78 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
 
     const merged = [...materialized, ...projectedEntries as any[], ...payrollDeduped, ...crmProjections];
     merged.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
-    return filterByScope(merged as CashFlowEntry[]);
-  }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections, filterByScope]);
 
-  // KPIs (consolidated across realized + projected, no double counting).
-  // Provisões acumuladas (passivo trabalhista) NÃO impactam o caixa.
-  const totals = useMemo(() => {
+    // MECE: realizado-de-caixa só quando o lançamento veio do extrato OU foi conciliado.
+    const annotated = merged.map((e: any) => ({
+      ...e,
+      is_realizado_caixa:
+        e.source === "extrato_bancario" ||
+        (typeof e.id === "string" && !e.id.startsWith("proj-") && reconciledIds.has(e.id)),
+    })) as CashFlowEntry[];
+
+    return filterByScope(annotated);
+  }, [entriesQuery.data, projectedEntries, payrollProjections, crmProjections, filterByScope, reconciledQuery.data]);
+
+  const isTransfer = (e: CashFlowEntry) => (e.categoria ?? "") === "transferencia_interna";
+
+  const realizadoEntries = useMemo(
+    () => allEntries.filter((e) => e.is_realizado_caixa && !isTransfer(e)),
+    [allEntries],
+  );
+
+  const previstoEntries = useMemo(
+    () => allEntries.filter((e) => !e.is_realizado_caixa && !isTransfer(e)),
+    [allEntries],
+  );
+
+  const transferEntries = useMemo(
+    () => allEntries.filter((e) => isTransfer(e)),
+    [allEntries],
+  );
+
+  // Lançamentos marcados como pagos/recebidos mas SEM conciliação (suspeitos).
+  const paidNotReconciledEntries = useMemo(
+    () =>
+      allEntries.filter(
+        (e) =>
+          !e.is_realizado_caixa &&
+          !isTransfer(e) &&
+          (e.status === "pago" || e.status === "recebido") &&
+          typeof e.id === "string" &&
+          !e.id.startsWith("proj-"),
+      ),
+    [allEntries],
+  );
+
+  const sumByTipo = (rows: CashFlowEntry[], useRealized: boolean) => {
     let entradas = 0, saidas = 0;
-    for (const e of allEntries) {
+    for (const e of rows) {
       if ((e as any).dp_sub_category === "provisao_acumulada") continue;
-      const val = e.valor_realizado ?? e.valor_previsto;
-      if (e.tipo === "entrada") entradas += Number(val);
-      else saidas += Number(val);
+      const sign = e.is_estorno ? -1 : 1;
+      const val = useRealized
+        ? Number(e.valor_realizado ?? e.valor_previsto)
+        : Number(e.valor_previsto);
+      if (e.tipo === "entrada") entradas += sign * val;
+      else saidas += sign * val;
     }
     return { entradas, saidas, saldo: entradas - saidas };
-  }, [allEntries]);
+  };
+
+  const totalsRealizado = useMemo(() => sumByTipo(realizadoEntries, true), [realizadoEntries]);
+  const totalsPrevisto = useMemo(() => sumByTipo(previstoEntries, false), [previstoEntries]);
+
+  // Backwards-compatible totals: realizado + previsto (no double counting because they're disjoint).
+  const totals = useMemo(
+    () => ({
+      entradas: totalsRealizado.entradas + totalsPrevisto.entradas,
+      saidas: totalsRealizado.saidas + totalsPrevisto.saidas,
+      saldo:
+        totalsRealizado.entradas + totalsPrevisto.entradas -
+        (totalsRealizado.saidas + totalsPrevisto.saidas),
+    }),
+    [totalsRealizado, totalsPrevisto],
+  );
+
 
   // Mutations for materialized entries
   const create = useMutation({
@@ -327,7 +414,13 @@ export function useCashFlow(rangeFrom?: Date, rangeTo?: Date) {
     entries: allEntries,
     materializedEntries: entriesQuery.data ?? [],
     projectedEntries,
+    realizadoEntries,
+    previstoEntries,
+    transferEntries,
+    paidNotReconciledEntries,
     totals,
+    totalsRealizado,
+    totalsPrevisto,
     isLoading: entriesQuery.isLoading,
     create,
     update,
