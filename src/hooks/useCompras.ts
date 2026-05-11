@@ -11,6 +11,9 @@ const T = (orgId?: string) => ({
   approvals: ["compras", "approvals", orgId],
   orders: ["compras", "orders", orgId],
   rules: ["compras", "rules", orgId],
+  quotations: ["compras", "quotations", orgId],
+  receipts: ["compras", "receipts", orgId],
+  divergences: ["compras", "divergences", orgId],
 });
 
 // ========== SUPPLIERS ==========
@@ -406,4 +409,265 @@ export const STATUS_ORDER: Record<string, { label: string; variant: "default" | 
   enviado_ap: { label: "Enviado ao AP", variant: "default" },
   cancelado: { label: "Cancelado", variant: "destructive" },
   concluido: { label: "Concluído", variant: "default" },
+};
+
+// ========== QUOTATIONS (Fase 2) ==========
+export function usePurchaseQuotations(requestId?: string) {
+  const { user } = useAuth();
+  const { currentOrg } = useOrganization();
+  const orgId = currentOrg?.id;
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const k = [...T(orgId).quotations, requestId ?? "all"];
+
+  const { data: quotations = [], isLoading } = useQuery({
+    queryKey: k,
+    enabled: !!user && !!orgId,
+    ...cachePresets.operational,
+    queryFn: async () => {
+      let q = supabase
+        .from("purchase_quotations" as any)
+        .select("*, supplier:suppliers(razao_social, nome_fantasia), request:purchase_requests(codigo, titulo), items:purchase_quotation_items(*)")
+        .eq("organization_id", orgId!)
+        .order("created_at", { ascending: false });
+      if (requestId) q = q.eq("request_id", requestId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const upsert = useMutation({
+    mutationFn: async ({ items, ...input }: any) => {
+      const payload = { ...input, organization_id: orgId, created_by: input.created_by || user!.id };
+      const { data: quot, error } = input.id
+        ? await supabase.from("purchase_quotations" as any).update(payload).eq("id", input.id).select("*").single()
+        : await supabase.from("purchase_quotations" as any).insert(payload).select("*").single();
+      if (error) throw error;
+      const quotId = (quot as any).id;
+      if (Array.isArray(items)) {
+        await supabase.from("purchase_quotation_items" as any).delete().eq("quotation_id", quotId);
+        if (items.length) {
+          await supabase.from("purchase_quotation_items" as any).insert(
+            items.map((it: any, i: number) => ({
+              quotation_id: quotId,
+              ordem: i + 1,
+              nome: it.nome,
+              quantidade: it.quantidade ?? 1,
+              unidade: it.unidade ?? "un",
+              valor_unitario: it.valor_unitario ?? 0,
+              valor_total: (it.quantidade ?? 1) * (it.valor_unitario ?? 0),
+              observacao: it.observacao,
+              request_item_id: it.request_item_id ?? null,
+            })),
+          );
+        }
+      }
+      return quot;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: T(orgId).quotations });
+      qc.invalidateQueries({ queryKey: T(orgId).requests });
+      toast({ title: "Cotação salva" });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const choose = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("purchase_quotations" as any)
+        .update({ status: "escolhida", decided_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: T(orgId).quotations });
+      qc.invalidateQueries({ queryKey: T(orgId).requests });
+      toast({ title: "Cotação escolhida" });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("purchase_quotations" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: T(orgId).quotations }); toast({ title: "Cotação excluída" }); },
+  });
+
+  return { quotations, isLoading, upsert, choose, remove };
+}
+
+// ========== RECEIPTS (Fase 2) ==========
+export function usePurchaseReceipts(orderId?: string) {
+  const { user } = useAuth();
+  const { currentOrg } = useOrganization();
+  const orgId = currentOrg?.id;
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const k = [...T(orgId).receipts, orderId ?? "all"];
+
+  const { data: receipts = [], isLoading } = useQuery({
+    queryKey: k,
+    enabled: !!user && !!orgId,
+    ...cachePresets.operational,
+    queryFn: async () => {
+      let q = supabase
+        .from("purchase_receipts" as any)
+        .select("*, order:purchase_orders(codigo, supplier:suppliers(razao_social)), items:purchase_receipt_items(*)")
+        .eq("organization_id", orgId!)
+        .order("created_at", { ascending: false });
+      if (orderId) q = q.eq("order_id", orderId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const upsert = useMutation({
+    mutationFn: async ({ items, ...input }: any) => {
+      const payload = { ...input, organization_id: orgId, created_by: input.created_by || user!.id, recebido_por: input.recebido_por || user!.id };
+      const { data: rec, error } = input.id
+        ? await supabase.from("purchase_receipts" as any).update(payload).eq("id", input.id).select("*").single()
+        : await supabase.from("purchase_receipts" as any).insert(payload).select("*").single();
+      if (error) throw error;
+      const recId = (rec as any).id;
+      if (Array.isArray(items)) {
+        await supabase.from("purchase_receipt_items" as any).delete().eq("receipt_id", recId);
+        if (items.length) {
+          await supabase.from("purchase_receipt_items" as any).insert(
+            items.map((it: any, i: number) => ({
+              receipt_id: recId,
+              order_item_id: it.order_item_id ?? null,
+              ordem: i + 1,
+              nome: it.nome,
+              quantidade_pedida: it.quantidade_pedida ?? 0,
+              quantidade_recebida: it.quantidade_recebida ?? 0,
+              unidade: it.unidade ?? "un",
+              valor_unitario: it.valor_unitario ?? 0,
+              valor_total: (it.quantidade_recebida ?? 0) * (it.valor_unitario ?? 0),
+              status_item: it.status_item ?? "ok",
+              observacao: it.observacao,
+            })),
+          );
+        }
+      }
+      return rec;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: T(orgId).receipts });
+      qc.invalidateQueries({ queryKey: T(orgId).orders });
+      toast({ title: "Recebimento salvo" });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("purchase_receipts" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: T(orgId).receipts });
+      qc.invalidateQueries({ queryKey: T(orgId).orders });
+      toast({ title: "Recebimento excluído" });
+    },
+  });
+
+  return { receipts, isLoading, upsert, remove };
+}
+
+// ========== DIVERGENCES (Fase 2) ==========
+export function usePurchaseDivergences(receiptId?: string) {
+  const { user } = useAuth();
+  const { currentOrg } = useOrganization();
+  const orgId = currentOrg?.id;
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const k = [...T(orgId).divergences, receiptId ?? "all"];
+
+  const { data: divergences = [], isLoading } = useQuery({
+    queryKey: k,
+    enabled: !!user && !!orgId,
+    ...cachePresets.operational,
+    queryFn: async () => {
+      let q = supabase
+        .from("purchase_divergences" as any)
+        .select("*, receipt:purchase_receipts(codigo), order:purchase_orders(codigo)")
+        .eq("organization_id", orgId!)
+        .order("created_at", { ascending: false });
+      if (receiptId) q = q.eq("receipt_id", receiptId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const upsert = useMutation({
+    mutationFn: async (input: any) => {
+      const payload = { ...input, organization_id: orgId, created_by: input.created_by || user!.id };
+      const { data, error } = input.id
+        ? await supabase.from("purchase_divergences" as any).update(payload).eq("id", input.id).select("*").single()
+        : await supabase.from("purchase_divergences" as any).insert(payload).select("*").single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: T(orgId).divergences });
+      qc.invalidateQueries({ queryKey: T(orgId).orders });
+      toast({ title: "Divergência salva" });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const resolve = useMutation({
+    mutationFn: async ({ id, acao_corretiva }: { id: string; acao_corretiva?: string }) => {
+      const { error } = await supabase
+        .from("purchase_divergences" as any)
+        .update({ status: "resolvida", resolvida_em: new Date().toISOString(), resolvida_por: user!.id, acao_corretiva })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: T(orgId).divergences });
+      qc.invalidateQueries({ queryKey: T(orgId).orders });
+      toast({ title: "Divergência resolvida" });
+    },
+  });
+
+  return { divergences, isLoading, upsert, resolve };
+}
+
+export const STATUS_QUOTATION: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  em_analise: { label: "Em análise", variant: "secondary" },
+  recebida: { label: "Recebida", variant: "secondary" },
+  escolhida: { label: "Escolhida", variant: "default" },
+  descartada: { label: "Descartada", variant: "outline" },
+  expirada: { label: "Expirada", variant: "destructive" },
+};
+
+export const STATUS_RECEIPT: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  parcial: { label: "Parcial", variant: "outline" },
+  total: { label: "Total", variant: "default" },
+  divergente: { label: "Divergente", variant: "destructive" },
+  rejeitado: { label: "Rejeitado", variant: "destructive" },
+};
+
+export const TIPOS_DIVERGENCIA = [
+  { value: "quantidade", label: "Quantidade" },
+  { value: "preco", label: "Preço" },
+  { value: "qualidade", label: "Qualidade" },
+  { value: "atraso", label: "Atraso" },
+  { value: "item_errado", label: "Item errado" },
+  { value: "nf_divergente", label: "NF divergente" },
+  { value: "outro", label: "Outro" },
+];
+
+export const STATUS_DIVERGENCIA: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  aberta: { label: "Aberta", variant: "destructive" },
+  em_negociacao: { label: "Em negociação", variant: "secondary" },
+  resolvida: { label: "Resolvida", variant: "default" },
+  escalada: { label: "Escalada", variant: "destructive" },
 };
