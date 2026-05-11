@@ -562,7 +562,7 @@ export function useBankStatementImport() {
       setError("Erro: " + (e instanceof Error ? e.message : "desconhecido"));
       setStep("preview");
     }
-  }, [user, currentOrg, bankAccountId, parsedRows, excludedRows, fileName, queryClient, toast, sourceFormat]);
+  }, [user, currentOrg, bankAccountId, parsedRows, excludedRows, fileName, queryClient, toast, sourceFormat, ofxClosingBalance]);
 
   const downloadFailedRowsCSV = useCallback(() => {
     if (failedRows.length === 0) return;
