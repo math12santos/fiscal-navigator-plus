@@ -395,21 +395,25 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onUndoIssued, onD
       <Dialog open={!!payEntry} onOpenChange={() => setPayEntry(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{tipo === "entrada" ? "Confirmar Recebimento" : "Confirmar Pagamento"}</DialogTitle>
+            <DialogTitle>{tipo === "entrada" ? "Registrar recebimento esperado" : "Registrar pagamento emitido"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-xs text-amber-700">
+              Esta ação registra apenas a <strong>intenção / emissão</strong>.
+              O lançamento só vira <strong>realizado</strong> quando confirmado pelo extrato bancário.
+            </div>
             <div className="space-y-2">
-              <Label>Valor Realizado (R$)</Label>
+              <Label>Valor previsto (R$)</Label>
               <Input type="number" value={payValue} onChange={(e) => setPayValue(Number(e.target.value))} />
             </div>
             <div className="space-y-2">
-              <Label>{tipo === "entrada" ? "Data Recebimento" : "Data Pagamento"}</Label>
+              <Label>{tipo === "entrada" ? "Data prevista do recebimento" : "Data de emissão do pagamento"}</Label>
               <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayEntry(null)}>Cancelar</Button>
-            <Button onClick={confirmPay}>Confirmar</Button>
+            <Button onClick={confirmPay}>Registrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
