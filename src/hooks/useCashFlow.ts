@@ -40,6 +40,10 @@ export interface CashFlowEntry {
   reference_month?: string | null;
   /** Sub-category from DP projections (e.g. salario_liquido, vr, va, vt). */
   dp_sub_category?: string | null;
+  /** Estorno (anti-lançamento). When true, abate o original na visão Realizado. */
+  is_estorno?: boolean | null;
+  /** True quando o lançamento foi confirmado pelo extrato bancário (conciliado). */
+  is_realizado_caixa?: boolean;
   created_at: string;
   updated_at: string;
 }
