@@ -117,7 +117,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onUndoIssued, onD
     }
   };
 
-  const actionLabel = tipo === "entrada" ? "Receber" : "Pagar";
+  const actionLabel = tipo === "entrada" ? "Registrar recebimento" : "Registrar pagamento";
 
   if (entries.length === 0) {
     return (
