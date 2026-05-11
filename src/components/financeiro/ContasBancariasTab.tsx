@@ -321,15 +321,48 @@ export function ContasBancariasTab() {
             </p>
           </CardContent>
         </Card>
+        <Card className={contasAConciliar > 0 ? "border-warning/50" : "border-success/40"}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <ScaleIcon className="h-3.5 w-3.5" /> Divergência (OFX − Manual)
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Soma de (saldo OFX − saldo manual) entre as contas com extrato importado.
+                      O saldo OFX é a referência; o manual permanece para emissão de relatórios manuais.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <p className={`text-lg font-bold mt-1 ${Math.abs(divergenciaTotal) >= 0.01 ? "text-warning" : "text-success"}`}>
+              {ofxAccounts.length === 0 ? "—" : fmt(divergenciaTotal)}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {ofxAccounts.length === 0
+                ? "Nenhum OFX importado"
+                : `${contasAConciliar} a conciliar · ${ofxAccounts.length - contasAConciliar} ok`}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
           {allBankAccounts.length} conta(s) bancária(s) cadastrada(s)
         </p>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Nova Conta
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleEmitirPdf} disabled={allBankAccounts.length === 0}>
+            <FileDown className="h-4 w-4 mr-1" /> Emitir Relatório PDF
+          </Button>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nova Conta
+          </Button>
+        </div>
       </div>
 
       <Card>
