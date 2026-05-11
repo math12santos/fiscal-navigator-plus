@@ -148,15 +148,18 @@ export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccou
               >
                 <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
                 <p className="text-sm font-medium">
-                  {imp.bankAccountId ? "Arraste um arquivo CSV ou XLSX aqui" : "Selecione uma conta bancária acima"}
+                  {imp.bankAccountId ? "Arraste o extrato (XLSX, CSV, OFX ou PDF)" : "Selecione uma conta bancária acima"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {imp.bankAccountId ? "ou clique para selecionar" : "Depois você poderá enviar o extrato"}
                 </p>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Recomendado: <strong>OFX</strong> (mais fiel) ou <strong>XLSX</strong>. PDF é melhor esforço — PDFs digitalizados (imagem) não são suportados.
+                </p>
                 <input
                   ref={fileRef}
                   type="file"
-                  accept=".csv,.xlsx,.xls"
+                  accept=".csv,.xlsx,.xls,.ofx,.qfx,.pdf"
                   className="hidden"
                   onChange={(e) => handleFile(e.target.files?.[0])}
                 />
