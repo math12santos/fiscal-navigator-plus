@@ -55,7 +55,27 @@ export function ConciliacaoTab() {
 
   return (
     <div className="space-y-6">
+      {unresolvedCount > 0 && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2 text-sm">
+            <Inbox className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <strong>{unresolvedCount}</strong> linha{unresolvedCount > 1 ? "s" : ""} de extrato{" "}
+              aguardando resolução. Toda movimentação precisa virar lançamento, vínculo ou descarte.
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setResolutionOpen(true)}>
+            Resolver agora
+          </Button>
+        </div>
+      )}
+
       <div className="flex flex-wrap justify-end gap-2">
+        {unresolvedCount > 0 && (
+          <Button size="sm" variant="outline" onClick={() => setResolutionOpen(true)}>
+            <Inbox className="h-3.5 w-3.5 mr-1.5" /> Resolver ({unresolvedCount})
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={() => setRulesOpen(true)} title="Gerenciar regras de classificação automática">
           <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Regras
         </Button>
