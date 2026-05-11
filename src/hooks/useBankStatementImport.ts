@@ -195,6 +195,7 @@ export function useBankStatementImport() {
         }
         headers = [...result.headers];
         rows = result.rows;
+        setOfxClosingBalance(result.closingBalance ?? null);
         // OFX always uses ISO date and dot-decimal numbers
         dateFmt = "dd/MM/yyyy"; // not used (data is already ISO)
       } else if (ext === "pdf") {
