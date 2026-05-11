@@ -132,6 +132,7 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onUndoIssued, onD
     const sc = statusConfig[e.status] ?? statusConfig.previsto;
     const Icon = sc.icon;
     const isPending = e.status === "previsto" || e.status === "confirmado";
+    const isIssued = e.status === "pagamento_emitido" || e.status === "recebimento_esperado";
     const isManual = e.source === "manual";
 
     return (
@@ -170,6 +171,12 @@ export function FinanceiroTable({ entries, tipo, onMarkAsPaid, onUndoIssued, onD
               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => openPay(e)}>
                 <Banknote size={14} />
                 {actionLabel}
+              </Button>
+            )}
+            {isIssued && onUndoIssued && !isProjected && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-amber-700"
+                title="Aguardando confirmação no extrato" onClick={() => onUndoIssued(e.id)}>
+                Desfazer emissão
               </Button>
             )}
             {isManual && !isProjected && onEdit && (
