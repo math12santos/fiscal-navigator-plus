@@ -16,7 +16,6 @@ export default function Compras() {
       <PageHeader
         title="Compras"
         description="Governança da jornada de compra: solicitação → aprovação → pedido → contas a pagar."
-        icon={ShoppingCart}
       />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="bg-muted/40 border p-1 h-auto flex flex-wrap">

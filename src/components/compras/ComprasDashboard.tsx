@@ -24,11 +24,11 @@ export function ComprasDashboard() {
   return (
     <SectionCard title="Visão Geral de Compras" description="Indicadores do mês corrente.">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KPICard title="Solicitado no mês" value={fmtBRL(kpis.totalSolicitado)} icon={ShoppingCart} />
-        <KPICard title="Pendente aprovação" value={fmtBRL(kpis.totalPendente)} icon={Clock} />
-        <KPICard title="Aprovado" value={fmtBRL(kpis.totalAprovado)} icon={FileCheck} />
-        <KPICard title="Pedidos emitidos" value={fmtBRL(kpis.totalPedidos)} icon={ShoppingCart} />
-        <KPICard title="Fora do orçamento" value={String(kpis.foraOrcamento)} icon={AlertTriangle} />
+        <KPICard title="Solicitado no mês" value={fmtBRL(kpis.totalSolicitado)} icon={<ShoppingCart className="h-4 w-4" />} />
+        <KPICard title="Pendente aprovação" value={fmtBRL(kpis.totalPendente)} icon={<Clock className="h-4 w-4" />} />
+        <KPICard title="Aprovado" value={fmtBRL(kpis.totalAprovado)} icon={<FileCheck className="h-4 w-4" />} />
+        <KPICard title="Pedidos emitidos" value={fmtBRL(kpis.totalPedidos)} icon={<ShoppingCart className="h-4 w-4" />} />
+        <KPICard title="Fora do orçamento" value={String(kpis.foraOrcamento)} icon={<AlertTriangle className="h-4 w-4" />} />
       </div>
     </SectionCard>
   );
