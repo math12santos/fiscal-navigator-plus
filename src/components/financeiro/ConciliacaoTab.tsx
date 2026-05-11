@@ -79,7 +79,7 @@ export function ConciliacaoTab() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
         <div className="glass-card p-5">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Taxa de Conciliação</p>
           <p className="text-2xl font-bold text-success mt-1">{stats.taxa.toFixed(0)}%</p>
@@ -96,7 +96,20 @@ export function ConciliacaoTab() {
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pendentes</p>
           <p className="text-2xl font-bold text-warning mt-1">{stats.pendentes}</p>
         </div>
+        <div className="glass-card p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Não Previstos</p>
+          <p className="text-2xl font-bold text-destructive mt-1">{stats.naoPrevistos}</p>
+        </div>
       </div>
+
+      {stats.naoPrevistos > 0 && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 flex items-start gap-2 text-sm">
+          <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+          <div>
+            <strong>{stats.naoPrevistos}</strong> lançamento{stats.naoPrevistos > 1 ? "s" : ""} no extrato não estava{stats.naoPrevistos > 1 ? "m" : ""} no plano. Classifique antes de conciliar para manter o caixa real.
+          </div>
+        </div>
+      )}
 
       <div className="glass-card p-4 space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
