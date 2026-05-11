@@ -120,8 +120,10 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
       { key: "pedidos", label: "Pedidos" },
       { key: "recebimentos", label: "Recebimentos" },
       { key: "divergencias", label: "Divergências" },
+      { key: "recorrencias", label: "Recorrências" },
       { key: "fornecedores", label: "Fornecedores" },
       { key: "regras", label: "Regras" },
+      { key: "config", label: "Configurações" },
     ],
   },
   {
