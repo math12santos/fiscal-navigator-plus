@@ -1,129 +1,100 @@
-## Objetivo
 
-Disponibilizar o botão **Solicitar Despesa / Reembolso** apenas nos módulos onde colaboradores efetivamente geram gastos operacionais — **DP, Jurídico, TI, CRM (Comercial), Financeiro e Cadastros (futuro Compras)** — e centralizar a triagem em uma nova aba **"Solicitações"** dentro do Financeiro, onde o time financeiro aprova, classifica e provisiona automaticamente no fluxo de caixa.
+# Módulo de Compras — FinCore
 
----
+Camada de governança da jornada de compra que conecta necessidade operacional → orçamento → contas a pagar → fluxo de caixa. Não é cadastro: é controle de **caixa futuro** antes de virar obrigação.
 
-## 1. Componente unificado de solicitação
-
-Generalizar o atual `ExpenseRequestButton` (hoje específico do Financeiro) em um componente reutilizável:
-
-- Novo: `src/components/requests/RequestExpenseButton.tsx`
-  - Props: `sourceModule` (`dp` | `juridico` | `ti` | `crm` | `financeiro` | `cadastros`), `defaultCostCenterId?`, `variant?`, `size?`, `label?`.
-  - Tabs internas no Dialog: **Despesa** e **Reembolso**.
-    - Reembolso adiciona campos: `data_gasto`, `forma_pagamento_pessoal` (cartão pessoal / dinheiro / pix), e marca `subtype = 'reimbursement'` no payload.
-  - Mantém anexos (PDF/XML/imagens), sugestão por fornecedor, competência, vencimento, CC, conta contábil, prioridade, justificativa.
-  - Persiste `reference_module = sourceModule` para rastreabilidade da origem.
-- Deprecação suave: `ExpenseRequestButton.tsx` passa a re-exportar `RequestExpenseButton` com `sourceModule="financeiro"` para não quebrar `ContasAPagar`.
+Entrega em **3 fases**, com nova tabela `suppliers` dedicada e validação orçamentária **híbrida** (puxa de Planejamento; se não houver, marca "Sem orçamento" + exige justificativa).
 
 ---
 
-## 2. Inserção do botão por módulo
+## Fase 1 — MVP funcional
 
-Adicionar `<RequestExpenseButton sourceModule="..." />` no slot `children` do `PageHeader`:
+### Backend (migration única)
 
-- `src/pages/DepartamentoPessoal.tsx` → `dp` (despesas/reembolsos do RH)
-- `src/pages/Juridico.tsx` → `juridico`
-- `src/pages/TI.tsx` → `ti`
-- `src/pages/CRM.tsx` → `crm` (Departamento Comercial — viagens, brindes, eventos)
-- `src/pages/Financeiro.tsx` → `financeiro` (despesas e reembolsos do próprio time)
-- `src/pages/Cadastros.tsx` → `cadastros` (futuro Compras)
+**Tabelas novas:**
+- `suppliers` — fornecedores dedicados de Compras (separado de `entities`, mas com `entity_id` opcional para reuso). Campos: razão social, nome fantasia, CNPJ/CPF, IE/IM, tipo, categorias atendidas (text[]), contato, e-mail, telefone, endereço, dados bancários, condições comerciais, prazo médio entrega, status (`ativo|inativo|bloqueado|em_homologacao`), avaliação (1-5), observações.
+- `purchase_requests` — solicitação. Campos: código auto (`SOL-AAAA-NNNN`), org, empresa, departamento, cost_center_id, projeto, solicitante (user_id), data_solicitacao, data_desejada_entrega, tipo_compra (enum 11 valores), categoria, account_id (plano de contas), descrição, justificativa, prioridade, valor_estimado, status (rascunho→enviada→em_analise→aprovada/reprovada/ajuste→em_cotacao→pedido_gerado→cancelada→concluida), fora_orcamento (bool), justificativa_extra, anexos (jsonb).
+- `purchase_request_items` — itens (nome, descrição, qtd, unidade, valor unit, total, categoria).
+- `purchase_approvals` — fluxo de aprovação. Campos: request_id, approver_id, ordem, status (pendente|aprovado|reprovado|ajuste_solicitado|delegado), comentário, decided_at.
+- `purchase_approval_rules` — regras configuráveis por org. Campos: nome, escopo (valor/cc/empresa/categoria/tipo/fora_orc/emergencial), faixa_min/max, approver_role ou approver_user_id, ordem, ativo.
+- `purchase_orders` — pedido. Campos: código auto (`PED-AAAA-NNNN`), request_id, supplier_id, empresa, cost_center_id, account_id, valor_total, condicao_pagamento, forma_pagamento, data_prevista_entrega, data_prevista_pagamento, responsavel, status (emitido→enviado→confirmado→…→concluido), observações.
+- `purchase_order_items` — itens do pedido.
+- `purchase_audit_log` — log de toda alteração relevante (request, approval, order, cancel).
 
-Nada em Contratos, Planejamento, Tarefas, Dashboard ou BackOffice.
+**Extensões:**
+- `cashflow_entries`: já tem `expense_request_id`. Adicionar `purchase_order_id uuid` (FK opcional) + status `previsto_por_pedido`.
+- Storage bucket `purchases/` com isolamento por org prefix.
 
----
+**Funções/Triggers:**
+- `generate_purchase_code(prefix)` — sequencial por org/ano.
+- Trigger em `purchase_requests`: ao status `aprovada`, materializa cadeia de aprovação a partir das `purchase_approval_rules`.
+- Trigger em `purchase_orders`: ao status `emitido`, cria `cashflow_entry` previsto (status=`previsto_por_pedido`, vinculado ao pedido + solicitação + contrato se houver).
+- Trigger em `cashflow_entries` (NF recebida): muda de previsto→confirmado.
+- RPC `check_budget_availability(cost_center_id, account_id, competencia, valor)` → retorna `{planejado, realizado, comprometido, saldo, situacao}`. Lê de `financial_planning`/`budget_items` (Planejamento). Se não encontrar, retorna `situacao='sem_orcamento'`.
+- RLS: org-scoped padrão; aprovador vê o que é dele; solicitante vê suas solicitações; financeiro/diretoria vê tudo.
 
-## 3. Nova aba "Solicitações" no Financeiro
+### Frontend
 
-Adicionar aba dedicada em `src/pages/Financeiro.tsx`:
+Rota `/compras` no menu lateral (ícone ShoppingCart) com `Tabs` no padrão SectionCard:
 
-- Nova entrada em `ALL_TABS`: `{ key: "solicitacoes", label: "Solicitações" }` posicionada logo após **Dashboard**, com badge de contagem de pendentes.
-- Novo componente: `src/components/financeiro/SolicitacoesTab.tsx` no padrão `SectionCard` (DP-style).
+1. **Dashboard** (cards principais + gráficos básicos: por CC, por categoria, evolução mensal, aprovado vs orçamento).
+2. **Solicitações** — lista filtrável + wizard focado (Accordion: Identificação → Itens → Classificação financeira → Validação orçamentária → Anexos → Revisão). Badge de status. `BudgetIndicator` mostra planejado/realizado/comprometido/saldo com cor (verde/amarelo/vermelho/cinza).
+3. **Aprovações** — fila do usuário aprovador com botões Aprovar/Reprovar/Ajustar/Delegar/Comentar e impacto no caixa.
+4. **Pedidos de Compra** — gerar pedido a partir de solicitação aprovada; PDF do pedido (jspdf+autotable, padrão Cash Position PDF); botão "Enviar ao Financeiro".
+5. **Fornecedores** — CRUD `suppliers` com avaliação e indicadores básicos (total comprado, nº pedidos).
+6. **Configurações** — tipos, categorias, unidades, regras de aprovação (alçadas).
 
-Estrutura interna (sub-tabs):
+Hooks: `usePurchaseRequests`, `usePurchaseApprovals`, `usePurchaseOrders`, `useSuppliers`, `useApprovalRules`, `useBudgetCheck`. Usar `cachePresets.operational` + realtime em `purchase_requests`/`purchase_approvals`.
 
-1. **Pendentes** — fila a aprovar (status `aberta` / `em_revisao`).
-2. **Aprovadas** — já provisionadas, com link para a entrada no fluxo de caixa.
-3. **Rejeitadas** — histórico.
-4. **Todas** — visão completa com filtros (módulo origem, prioridade, período, solicitante, subtipo despesa/reembolso).
-5. SLAs - configuração de SLAs para cada novo tipo de solicitação e sessão para cadastrar políticas de despesas e reembolsos (SLAs para cada tipo de despesa Reembolso permitida) para manter transparência no processo. 
-
-Cada linha exibe: título, solicitante, módulo de origem (badge colorido), subtipo (Despesa/Reembolso), valor estimado, vencimento, competência, prioridade, anexos.
-
-Ações por solicitação pendente:
-
-- **Visualizar** (Drawer): detalhes completos, comentários, anexos, histórico de status.
-- **Aprovar e Provisionar** (CTA principal): abre wizard compacto.
-- **Solicitar ajuste** (devolve ao solicitante com comentário, status `em_revisao`).
-- **Rejeitar** (motivo obrigatório).
-
-A `PendingExpenseRequests` em `ContasAPagar` continua existindo como atalho rápido, mas ganha link "Ver todas" para a nova aba.
-
----
-
-## 4. Wizard "Aprovar e Provisionar"
-
-Componente `src/components/financeiro/ApproveRequestDialog.tsx`:
-
-- Pré-preenche com dados da solicitação (fornecedor, conta, CC, valor estimado, vencimento, competência, anexos).
-- Permite ajustes finais: valor confirmado, parcelamento (1x ou Nx), forma de pagamento, conta bancária prevista, observações.
-- Para **reembolso**: força `entity_id` do colaborador (busca em `employees`/cria entidade `funcionario`) e fixa categoria contábil de reembolso.
-- Ao confirmar:
-  1. Cria `cashflow_entries` (status `provisionado`, `direction='out'`, `source='request'`, `source_ref='request:<id>'`).
-  2. Move/vincula anexos do bucket `request-attachments` para `cashflow-attachments`.
-  3. Atualiza `requests`: `status='aprovada'`, `cashflow_entry_id`, `classified_by`, `classified_at`.
-  4. Cria comentário/auditoria + notificação ao solicitante.
-  5. Trigger `bump_org_data_version` em `cashflow_entries` invalida snapshots/Aging List em tempo real.
+Permissões via `useUserPermissions` (módulo `compras`, abas: solicitar, aprovar, comprar, financeiro, diretoria, admin).
 
 ---
 
-## 5. Notificações & Realtime
+## Fase 2 — Cotações, Recebimentos, Divergências
 
-- Solicitante recebe notificação em cada transição: `aprovada`, `rejeitada`, `em_revisao`.
-- Time financeiro (papel `financeiro`/`admin`/`master`) recebe notificação em toda nova solicitação `aberta`.
-- `requests` já está em `useRealtimeSync`; adicionar invalidação da queryKey `requests-financeiro`.
-
----
-
-## 6. Permissões
-
-- Sem migração nova; reaproveita RLS de `requests` (multi-tenant por `organization_id`).
-- Aba "Solicitações" visível para quem tem acesso a `financeiro`. Aprovar/rejeitar exige papel `admin`/`financeiro`/`master` (validado no front via `useUserPermissions` + RLS no backend).
-- Botão em cada módulo respeita `useUserPermissions` do módulo de origem (ocultado para perfis somente-leitura).
+- `purchase_quotations` + `purchase_quotation_suppliers` (múltiplos fornecedores por cotação) + `purchase_quotation_items`. Cálculo de economia (maior proposta − escolhida).
+- `purchase_receipts` (produto: qtd recebida, conformidade; serviço: período, aceite, avaliação) + status (recebido_total/parcial/divergencia/recusado).
+- `purchase_divergences` (qtd, valor, atraso, qualidade) com workflow de tratativa.
+- Aba "Cotações" e "Recebimentos" no menu Compras.
+- Indicadores no Dashboard: economia obtida, divergências por fornecedor, prazo médio.
 
 ---
 
-## 7. Detalhes técnicos
+## Fase 3 — Recorrência, Contratos, Ativos, Notificações
 
-- Nenhuma mudança de schema — `requests`, `request_attachments`, `request_comments` já têm os campos necessários (`reference_module`, `cashflow_entry_id`, `entity_id`, `account_id`, `competencia`, `data_vencimento`, `justificativa`).
-- Subtipo despesa vs. reembolso vai no campo `description` (JSON já usado): `{ subtype: 'expense' | 'reimbursement', text, estimated_value, ... }`. Helper `parseRequestDescription` centraliza leitura.
-- Provisionamento usa `cashflow_entries.status = 'provisionado'` e marca `source = 'request'` para rastreabilidade MECE.
-- Memória `mem://features/financial-expense-requests` será atualizada: origem multi-módulo (DP/Jurídico/TI/CRM/Financeiro/Cadastros), aba dedicada, wizard de provisionamento, suporte a reembolso.
+- Compra recorrente: `purchase_recurrences` (periodicidade, vigência, reajuste) que materializa novas solicitações automáticas.
+- Vínculo com **Contratos**: ao escolher tipo "Vinculada a contrato", puxar fornecedor/vigência/saldo do `contracts`. Pedido consome `contract_installments`.
+- Vínculo com **Ativos**: tipo "Ativo imobilizado" cria registro em `assets` (já existe?) ou gera lançamento de depreciação no Financeiro (60/48m, padrão TI).
+- Notificações via `notifications` + Slack (Edge Function existente): solicitação pendente, fora do orçamento, emergencial, atraso, NF pendente.
+- Configurações avançadas: motivos de reprovação, motivos de emergencial, critérios de homologação, integrações.
 
 ---
 
-## Entregáveis
+## Detalhes técnicos
 
 ```text
-Novo
-  src/components/requests/RequestExpenseButton.tsx
-  src/components/financeiro/SolicitacoesTab.tsx
-  src/components/financeiro/ApproveRequestDialog.tsx
-  src/components/financeiro/RequestDetailDrawer.tsx
-
-Editado
-  src/components/financeiro/ExpenseRequestButton.tsx  (re-export do novo)
-  src/components/financeiro/ContasAPagar.tsx          (link "Ver todas")
-  src/pages/Financeiro.tsx                            (nova aba + botão header)
-  src/pages/DepartamentoPessoal.tsx                   (botão)
-  src/pages/Juridico.tsx                              (botão)
-  src/pages/TI.tsx                                    (botão)
-  src/pages/CRM.tsx                                   (botão)
-  src/pages/Cadastros.tsx                             (botão)
-  src/hooks/useRequests.ts                            (filtro reference_module)
-  src/hooks/useRealtimeSync.ts                        (queryKey nova)
-  .lovable/memory/features/financial-expense-requests.md
-  .lovable/plan.md
+purchase_requests ──┬──> purchase_approvals (cadeia)
+                    │
+                    └──> purchase_orders ──> cashflow_entries (previsto→confirmado)
+                                          └─ PDF do pedido
+suppliers <──────── purchase_orders / purchase_quotations
+purchase_approval_rules ──> motor de aprovação por valor/CC/categoria/tipo
+RPC check_budget_availability ──> Planejamento (financial_planning) ou "sem_orcamento"
 ```
 
-Aprovar para eu implementar?
+**Padrões a seguir** (já vigentes no projeto):
+- SectionCard + Tabs com `bg-muted/40 border p-1 h-auto`.
+- Focused Wizard (Accordion único aberto).
+- CurrencyInput (já existe).
+- Códigos sequenciais por org/ano (padrão `generate_*_code`).
+- MECE: pedido→cashflow_entry idempotente via `source_ref='purchase_order:<id>'`.
+- Sem `console.error` em produção; CORS whitelist nas Edge Functions.
+- Storage isolado por prefix da org.
+- Realtime via `useRealtimeSync` nas tabelas operacionais.
+
+## Fora de escopo (mesmo na Fase 3)
+- Integração com módulos de Estoque/BI/Telegram/IA de classificação automática (mencionados como "evoluções" no documento, não MVP).
+- Importação em massa de fornecedores via XLSX (pode ficar para depois).
+
+## Próximo passo
+Aprovar o plano para iniciar a **Fase 1** (migration + UI completa de Solicitação → Aprovação → Pedido → integração com Contas a Pagar + Fornecedores + Dashboard básico).
