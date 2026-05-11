@@ -549,6 +549,7 @@ export type Database = {
           conta_contabil_ref: string | null
           contract_id: string | null
           contract_installment_id: string | null
+          cost_center_allocations: Json | null
           cost_center_id: string | null
           created_at: string
           data_prevista: string
@@ -575,6 +576,7 @@ export type Database = {
           source_ref: string | null
           status: string
           subcategoria_id: string | null
+          tax_retentions: Json | null
           tipo: string
           tipo_despesa: string | null
           tipo_documento: string | null
@@ -597,6 +599,7 @@ export type Database = {
           conta_contabil_ref?: string | null
           contract_id?: string | null
           contract_installment_id?: string | null
+          cost_center_allocations?: Json | null
           cost_center_id?: string | null
           created_at?: string
           data_prevista: string
@@ -623,6 +626,7 @@ export type Database = {
           source_ref?: string | null
           status?: string
           subcategoria_id?: string | null
+          tax_retentions?: Json | null
           tipo?: string
           tipo_despesa?: string | null
           tipo_documento?: string | null
@@ -645,6 +649,7 @@ export type Database = {
           conta_contabil_ref?: string | null
           contract_id?: string | null
           contract_installment_id?: string | null
+          cost_center_allocations?: Json | null
           cost_center_id?: string | null
           created_at?: string
           data_prevista?: string
@@ -671,6 +676,7 @@ export type Database = {
           source_ref?: string | null
           status?: string
           subcategoria_id?: string | null
+          tax_retentions?: Json | null
           tipo?: string
           tipo_despesa?: string | null
           tipo_documento?: string | null
@@ -8362,6 +8368,7 @@ export type Database = {
           codigo: string | null
           condicao_pagamento: string | null
           contract_id: string | null
+          cost_center_allocations: Json | null
           cost_center_id: string | null
           created_at: string
           created_by: string | null
@@ -8378,6 +8385,7 @@ export type Database = {
           responsavel_user_id: string | null
           status: string
           supplier_id: string | null
+          tax_retentions: Json | null
           updated_at: string
           valor_total: number
         }
@@ -8386,6 +8394,7 @@ export type Database = {
           codigo?: string | null
           condicao_pagamento?: string | null
           contract_id?: string | null
+          cost_center_allocations?: Json | null
           cost_center_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -8402,6 +8411,7 @@ export type Database = {
           responsavel_user_id?: string | null
           status?: string
           supplier_id?: string | null
+          tax_retentions?: Json | null
           updated_at?: string
           valor_total?: number
         }
@@ -8410,6 +8420,7 @@ export type Database = {
           codigo?: string | null
           condicao_pagamento?: string | null
           contract_id?: string | null
+          cost_center_allocations?: Json | null
           cost_center_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -8426,6 +8437,7 @@ export type Database = {
           responsavel_user_id?: string | null
           status?: string
           supplier_id?: string | null
+          tax_retentions?: Json | null
           updated_at?: string
           valor_total?: number
         }
@@ -8691,6 +8703,9 @@ export type Database = {
           data_emissao_nf: string | null
           data_recebimento: string
           id: string
+          nf_chave: string | null
+          nf_cnpj: string | null
+          nf_valor: number | null
           numero_nf: string | null
           observacao: string | null
           order_id: string
@@ -8708,6 +8723,9 @@ export type Database = {
           data_emissao_nf?: string | null
           data_recebimento?: string
           id?: string
+          nf_chave?: string | null
+          nf_cnpj?: string | null
+          nf_valor?: number | null
           numero_nf?: string | null
           observacao?: string | null
           order_id: string
@@ -8725,6 +8743,9 @@ export type Database = {
           data_emissao_nf?: string | null
           data_recebimento?: string
           id?: string
+          nf_chave?: string | null
+          nf_cnpj?: string | null
+          nf_valor?: number | null
           numero_nf?: string | null
           observacao?: string | null
           order_id?: string
@@ -10635,6 +10656,10 @@ export type Database = {
         Returns: Json
       }
       compute_health_score: { Args: { _org_id: string }; Returns: number }
+      compute_purchase_tax_retentions: {
+        Args: { _tipo: string; _valor: number }
+        Returns: Json
+      }
       crm_generate_contract_from_opportunity: {
         Args: { p_opportunity_id: string }
         Returns: string
@@ -10917,6 +10942,7 @@ export type Database = {
         Args: { p_statement_id: string }
         Returns: undefined
       }
+      validate_nfe_chave: { Args: { _chave: string }; Returns: boolean }
     }
     Enums: {
       app_role: "master" | "admin" | "user"
