@@ -219,6 +219,15 @@ export function useFinanceiro(tipo: "saida" | "entrada") {
 
     for (const e of allEntries) {
       if ((e as any).dp_sub_category === "provisao_acumulada") continue;
+      // MECE: transferências internas não são receita/despesa
+      if ((e as any).categoria === "transferencia_interna") continue;
+      // MECE: estornos anulam o original — somam negativo no realizado
+      if ((e as any).is_estorno) {
+        const v = Number(e.valor_realizado ?? e.valor_previsto);
+        total_previsto -= v;
+        total_realizado -= v;
+        continue;
+      }
       const isRealized = e.status === "pago" || e.status === "recebido";
       const isIssued = e.status === "pagamento_emitido" || e.status === "recebimento_esperado";
       const isPending = e.status === "previsto" || e.status === "confirmado";
