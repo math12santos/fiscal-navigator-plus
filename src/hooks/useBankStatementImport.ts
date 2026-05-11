@@ -154,6 +154,7 @@ export function useBankStatementImport() {
     setSourceFormat(null);
     setCoverage(null);
     setLastImportId(null);
+    setOfxClosingBalance(null);
   }, []);
 
   const setDateFormat = useCallback((fmt: "dd/MM/yyyy" | "MM/dd/yyyy") => {
