@@ -21,6 +21,7 @@ import {
   UserCog,
   Monitor,
   Scale,
+  ShoppingCart,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,7 @@ const navItems: Array<{
   { path: "/cadastros", label: "Cadastros", icon: BookUser, module: "cadastro", prefetch: "cadastros" },
   { path: "/ti", label: "TI & Ativos", icon: Monitor, module: "ti", prefetch: "ti" },
   { path: "/juridico", label: "Jurídico", icon: Scale, module: "juridico", prefetch: "juridico" },
+  { path: "/compras", label: "Compras", icon: ShoppingCart, module: "compras", prefetch: "compras" },
   { path: "/tarefas", label: "Tarefas", icon: CheckSquare, module: "tarefas", prefetch: "tarefas" },
   { path: "/integracoes", label: "Integrações", icon: Plug, module: "integracoes", prefetch: "integracoes" },
   { path: "/ia", label: "IA Financeira", icon: Brain, module: "ia", prefetch: "ia" },

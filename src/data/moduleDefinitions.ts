@@ -110,6 +110,18 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     ],
   },
   {
+    key: "compras",
+    label: "Compras",
+    tabs: [
+      { key: "dashboard", label: "Dashboard" },
+      { key: "solicitacoes", label: "Solicitações" },
+      { key: "aprovacoes", label: "Aprovações" },
+      { key: "pedidos", label: "Pedidos" },
+      { key: "fornecedores", label: "Fornecedores" },
+      { key: "regras", label: "Regras" },
+    ],
+  },
+  {
     key: "juridico",
     label: "Jurídico",
     tabs: [

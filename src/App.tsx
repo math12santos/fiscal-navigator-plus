@@ -57,6 +57,7 @@ export const pageFactories = {
   ti: () => import("@/pages/TI"),
   juridico: () => import("@/pages/Juridico"),
   etlOps: () => import("@/pages/EtlOps"),
+  compras: () => import("@/pages/Compras"),
 } as const;
 
 // Lazy-loaded pages
@@ -78,6 +79,7 @@ const OnboardingGuiado = lazyRetry(pageFactories.onboardingGuiado);
 const TI = lazyRetry(pageFactories.ti);
 const Juridico = lazyRetry(pageFactories.juridico);
 const EtlOps = lazyRetry(pageFactories.etlOps);
+const Compras = lazyRetry(pageFactories.compras);
 const CreateOrganization = lazyRetry(() => import("@/pages/CreateOrganization"));
 const Onboarding = lazyRetry(() => import("@/pages/Onboarding"));
 const BackofficeDashboard = lazyRetry(() => import("@/pages/BackofficeDashboard"));
@@ -192,6 +194,7 @@ function ProtectedRoutes() {
           <Route path="/ti" element={<RouteShell skeleton={<GenericPageSkeleton title="TI & Ativos" />}><ModuleMaintenanceGuard moduleKey="ti"><TI /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/juridico" element={<RouteShell skeleton={<GenericPageSkeleton title="Jurídico" />}><ModuleMaintenanceGuard moduleKey="juridico"><Juridico /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="/etl-ops" element={<RouteShell skeleton={<GenericPageSkeleton title="ETL Ops" />}><EtlOps /></RouteShell>} />
+          <Route path="/compras" element={<RouteShell skeleton={<GenericPageSkeleton title="Compras" />}><ModuleMaintenanceGuard moduleKey="compras"><Compras /></ModuleMaintenanceGuard></RouteShell>} />
           <Route path="*" element={<RouteShell skeleton={<GenericPageSkeleton />}><NotFound /></RouteShell>} />
         </Routes>
       </AppLayout>
