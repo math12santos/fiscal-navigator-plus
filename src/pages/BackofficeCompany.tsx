@@ -1174,6 +1174,47 @@ function OrgModulesTab({ orgId }: { orgId: string }) {
   const { modules: orgModules, isLoading: loadingOrg } = useOrgModules(orgId);
   const upsertOrgModule = useUpsertOrgModule();
   const { toast } = useToast();
+  const qc = useQueryClient();
+  const [propagating, setPropagating] = useState(false);
+  const [overwrite, setOverwrite] = useState(true);
+
+  // Check if this org is a Holding (has subsidiaries)
+  const { data: subsidiaries = [] } = useQuery({
+    queryKey: ["holding_subs_for_modules", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("organization_holdings" as any)
+        .select("subsidiary_id")
+        .eq("holding_id", orgId);
+      if (error) throw error;
+      return (data ?? []) as { subsidiary_id: string }[];
+    },
+    enabled: !!orgId,
+  });
+  const isHolding = subsidiaries.length > 0;
+
+  const handlePropagate = async () => {
+    setPropagating(true);
+    try {
+      const { data, error } = await supabase.rpc(
+        "propagate_modules_to_subsidiaries" as any,
+        { p_holding_id: orgId, p_overwrite: overwrite }
+      );
+      if (error) throw error;
+      const r = data as any;
+      toast({
+        title: "Configuração propagada",
+        description: `${r?.subsidiaries ?? 0} filiada(s) · ${r?.inserted ?? 0} inseridos · ${r?.updated ?? 0} atualizados · ${r?.skipped ?? 0} ignorados`,
+      });
+      subsidiaries.forEach((s) => {
+        qc.invalidateQueries({ queryKey: ["organization_modules", s.subsidiary_id] });
+      });
+    } catch (err: any) {
+      toast({ title: "Erro ao propagar", description: err.message, variant: "destructive" });
+    } finally {
+      setPropagating(false);
+    }
+  };
 
   if (loadingSystem || loadingOrg) {
     return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
