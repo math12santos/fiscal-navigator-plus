@@ -135,6 +135,7 @@ export function useBankStatementImport() {
   const [coverage, setCoverage] = useState<CoverageResult | null>(null);
   const [coverageLoading, setCoverageLoading] = useState(false);
   const [lastImportId, setLastImportId] = useState<string | null>(null);
+  const [ofxClosingBalance, setOfxClosingBalance] = useState<{ value: number; asOf: string | null } | null>(null);
 
   const reset = useCallback(() => {
     setStep("upload");
