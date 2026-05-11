@@ -503,6 +503,36 @@ export function useBankStatementImport() {
       setFailedRows(failed);
       setLastImportId(importId);
       setStep("done");
+
+      // Atualiza saldo OFX (LEDGERBAL) na conta — referência de conciliação.
+      // Idempotente: só sobrescreve se o DTASOF for mais recente que o atual.
+      if (ofxClosingBalance && bankAccountId) {
+        try {
+          const { data: existingAcc } = await supabase
+            .from("bank_accounts")
+            .select("saldo_ofx_data")
+            .eq("id", bankAccountId)
+            .maybeSingle();
+          const newAsOf = ofxClosingBalance.asOf;
+          const currentAsOf = (existingAcc as any)?.saldo_ofx_data ?? null;
+          const shouldUpdate = !currentAsOf || (newAsOf && newAsOf >= currentAsOf);
+          if (shouldUpdate) {
+            await supabase
+              .from("bank_accounts")
+              .update({
+                saldo_ofx: ofxClosingBalance.value,
+                saldo_ofx_data: newAsOf,
+                saldo_ofx_atualizado_em: new Date().toISOString(),
+                saldo_ofx_import_id: importId,
+              } as any)
+              .eq("id", bankAccountId);
+            queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+          }
+        } catch (e) {
+          if (import.meta.env.DEV) console.warn("Falha ao atualizar saldo OFX da conta:", e);
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ["bank-statement-entries", currentOrg.id] });
 
       // Run coverage classification (matches each new line against expected cashflow)
