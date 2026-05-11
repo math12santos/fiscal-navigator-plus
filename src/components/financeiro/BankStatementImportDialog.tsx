@@ -56,7 +56,7 @@ export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccou
   const handleFile = (file: File | undefined) => {
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!["csv", "xlsx", "xls"].includes(ext || "")) return;
+    if (!["csv", "xlsx", "xls", "ofx", "qfx", "pdf"].includes(ext || "")) return;
     if (!imp.bankAccountId) return;
     imp.parseFile(file);
   };
@@ -81,7 +81,7 @@ export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccou
             </h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Importe linhas do extrato (CSV ou XLSX) para conciliar com lançamentos do fluxo de caixa
+            Importe linhas do extrato (XLSX, CSV, OFX/QFX ou PDF) para conciliar com o fluxo de caixa
           </p>
 
           <div className="flex items-center gap-1 text-xs text-muted-foreground mt-3">
@@ -148,15 +148,18 @@ export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccou
               >
                 <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
                 <p className="text-sm font-medium">
-                  {imp.bankAccountId ? "Arraste um arquivo CSV ou XLSX aqui" : "Selecione uma conta bancária acima"}
+                  {imp.bankAccountId ? "Arraste o extrato (XLSX, CSV, OFX ou PDF)" : "Selecione uma conta bancária acima"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {imp.bankAccountId ? "ou clique para selecionar" : "Depois você poderá enviar o extrato"}
                 </p>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Recomendado: <strong>OFX</strong> (mais fiel) ou <strong>XLSX</strong>. PDF é melhor esforço — PDFs digitalizados (imagem) não são suportados.
+                </p>
                 <input
                   ref={fileRef}
                   type="file"
-                  accept=".csv,.xlsx,.xls"
+                  accept=".csv,.xlsx,.xls,.ofx,.qfx,.pdf"
                   className="hidden"
                   onChange={(e) => handleFile(e.target.files?.[0])}
                 />
@@ -470,10 +473,41 @@ export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccou
                 </div>
               )}
 
+              {imp.coverageLoading && (
+                <div className="w-full rounded-md border bg-muted/30 p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Analisando cobertura contra lançamentos previstos...
+                </div>
+              )}
+
+              {imp.coverage && (
+                <div className="w-full rounded-md border p-3 space-y-2">
+                  <p className="text-sm font-medium">Resultado da pré-conciliação</p>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded border bg-emerald-500/10 p-2">
+                      <div className="text-xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{imp.coverage.casado}</div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Casados (auto)</div>
+                    </div>
+                    <div className="rounded border bg-amber-500/10 p-2">
+                      <div className="text-xl font-bold tabular-nums text-amber-700 dark:text-amber-400">{imp.coverage.sugestao}</div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Sugestões</div>
+                    </div>
+                    <div className="rounded border bg-destructive/10 p-2">
+                      <div className="text-xl font-bold tabular-nums text-destructive">{imp.coverage.nao_previsto}</div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Não previstos</div>
+                    </div>
+                  </div>
+                  {imp.coverage.nao_previsto > 0 && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Linhas <strong>não previstas</strong> precisam ser classificadas (conta contábil + centro de custo) antes de conciliar — isso garante que o caixa real reflita o banco.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <p className="text-xs text-muted-foreground max-w-md text-center">
-                Agora vá para a tela de Conciliação para vincular as linhas importadas aos lançamentos do fluxo de caixa.
+                Vá para a Conciliação para revisar sugestões e classificar lançamentos não previstos.
               </p>
-              <Button size="sm" onClick={() => handleClose(false)} className="mt-2">Fechar</Button>
+              <Button size="sm" onClick={() => handleClose(false)} className="mt-2">Ir para Conciliação</Button>
             </div>
           )}
         </div>

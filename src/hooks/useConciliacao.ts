@@ -18,6 +18,8 @@ export interface BankStatementEntry {
   cashflow_entry_id: string | null;
   reconciled_at: string | null;
   created_at: string;
+  match_score?: number | null;
+  match_bucket?: string | null;
   bank_accounts?: { nome: string; banco: string | null } | null;
 }
 
@@ -74,8 +76,11 @@ export function useConciliacao(filters: ConciliacaoFilters = {}) {
     const conciliados = list.filter((e) => e.status === "conciliado").length;
     const divergentes = list.filter((e) => e.status === "divergente").length;
     const pendentes = list.filter((e) => e.status === "pendente").length;
+    const naoPrevistos = list.filter(
+      (e) => e.status === "pendente" && (e.match_bucket === "nao_previsto" || (e.match_score ?? 0) < 0.5)
+    ).length;
     const taxa = total > 0 ? (conciliados / total) * 100 : 0;
-    return { total, conciliados, divergentes, pendentes, taxa };
+    return { total, conciliados, divergentes, pendentes, naoPrevistos, taxa };
   })();
 
   const fetchCandidates = async (statementId: string): Promise<CashflowCandidate[]> => {

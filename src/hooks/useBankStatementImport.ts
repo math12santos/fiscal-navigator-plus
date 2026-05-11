@@ -5,6 +5,17 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import { parseOfx } from "@/lib/parsers/ofxParser";
+import { parsePdfStatement } from "@/lib/parsers/pdfStatementParser";
+
+export type StatementSourceFormat = "csv" | "xlsx" | "ofx" | "pdf";
+
+export interface CoverageResult {
+  total: number;
+  casado: number;
+  sugestao: number;
+  nao_previsto: number;
+}
 
 export type StatementImportStep = "upload" | "detecting" | "mapping" | "preview" | "importing" | "done";
 
@@ -120,6 +131,10 @@ export function useBankStatementImport() {
   const [failedRows, setFailedRows] = useState<{ rowIndex: number; raw: Record<string, string>; error: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [excludedRows, setExcludedRows] = useState<Set<number>>(new Set());
+  const [sourceFormat, setSourceFormat] = useState<StatementSourceFormat | null>(null);
+  const [coverage, setCoverage] = useState<CoverageResult | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(false);
+  const [lastImportId, setLastImportId] = useState<string | null>(null);
 
   const reset = useCallback(() => {
     setStep("upload");
@@ -135,6 +150,9 @@ export function useBankStatementImport() {
     setFailedRows([]);
     setError(null);
     setExcludedRows(new Set());
+    setSourceFormat(null);
+    setCoverage(null);
+    setLastImportId(null);
   }, []);
 
   const setDateFormat = useCallback((fmt: "dd/MM/yyyy" | "MM/dd/yyyy") => {
@@ -151,8 +169,12 @@ export function useBankStatementImport() {
     try {
       let headers: string[] = [];
       let rows: string[][] = [];
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      let format: StatementSourceFormat = "csv";
+      let dateFmt: "dd/MM/yyyy" | "MM/dd/yyyy" = "dd/MM/yyyy";
 
-      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      if (ext === "xlsx" || ext === "xls") {
+        format = "xlsx";
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -161,7 +183,31 @@ export function useBankStatementImport() {
           headers = data[0].map((h) => String(h ?? "").trim());
           rows = data.slice(1).filter((r) => r.some((c) => c != null && String(c).trim() !== ""));
         }
+      } else if (ext === "ofx" || ext === "qfx") {
+        format = "ofx";
+        const text = await file.text();
+        const result = parseOfx(text);
+        if (result.rows.length === 0) {
+          setError("OFX vazio ou inválido. Nenhum lançamento (<STMTTRN>) encontrado.");
+          return;
+        }
+        headers = [...result.headers];
+        rows = result.rows;
+        // OFX always uses ISO date and dot-decimal numbers
+        dateFmt = "dd/MM/yyyy"; // not used (data is already ISO)
+      } else if (ext === "pdf") {
+        format = "pdf";
+        const result = await parsePdfStatement(file);
+        if (result.rows.length === 0) {
+          setError(
+            "Não foi possível extrair lançamentos do PDF. PDFs digitalizados (imagem) não são suportados — use OFX ou XLSX quando possível."
+          );
+          return;
+        }
+        headers = [...result.headers];
+        rows = result.rows;
       } else {
+        format = "csv";
         const text = await file.text();
         const firstLine = text.split("\n")[0] || "";
         const sep = firstLine.includes(";") ? ";" : firstLine.includes("\t") ? "\t" : ",";
@@ -177,15 +223,29 @@ export function useBankStatementImport() {
         return;
       }
 
+      setSourceFormat(format);
       setRawHeaders(headers);
       setRawRows(rows);
+      // For OFX/PDF the parser already produces ISO dates and dot-decimal numbers
+      const isPreParsed = format === "ofx" || format === "pdf";
       setDetectedFormat({
         separator: ";",
-        date_format: "dd/MM/yyyy",
-        number_format: "br",
+        date_format: isPreParsed ? "yyyy-MM-dd" : dateFmt,
+        number_format: isPreParsed ? "us" : "br",
         mappings: [],
       });
-      setMappings(autoMapHeaders(headers));
+      // For OFX/PDF, headers already match target field names → identity mapping
+      if (isPreParsed) {
+        setMappings(
+          STATEMENT_TARGET_FIELDS.map((f) => ({
+            target_field: f.value,
+            source_column: headers.includes(f.value) ? f.value : null,
+            confidence: headers.includes(f.value) ? ("high" as const) : null,
+          }))
+        );
+      } else {
+        setMappings(autoMapHeaders(headers));
+      }
       setStep("mapping");
     } catch (e) {
       if (import.meta.env.DEV) console.error("Parse error:", e);
@@ -289,8 +349,8 @@ export function useBankStatementImport() {
           organization_id: currentOrg.id,
           user_id: user.id,
           file_name: fileName,
-          source_type: "csv_xlsx",
-          column_mapping: { module: "extrato_bancario", bankAccountId } as any,
+          source_type: sourceFormat ?? "csv_xlsx",
+          column_mapping: { module: "extrato_bancario", bankAccountId, format: sourceFormat } as any,
           row_count: validRows.length,
           status: "processing",
         })
@@ -388,8 +448,23 @@ export function useBankStatementImport() {
       setImportCount(imported);
       setSkippedCount(skipped);
       setFailedRows(failed);
+      setLastImportId(importId);
       setStep("done");
       queryClient.invalidateQueries({ queryKey: ["bank-statement-entries", currentOrg.id] });
+
+      // Run coverage classification (matches each new line against expected cashflow)
+      if (imported > 0) {
+        setCoverageLoading(true);
+        try {
+          const { data: cov, error: covErr } = await supabase.rpc(
+            "classify_statement_coverage" as any,
+            { p_org_id: currentOrg.id, p_import_id: importId }
+          );
+          if (!covErr && cov) setCoverage(cov as unknown as CoverageResult);
+        } finally {
+          setCoverageLoading(false);
+        }
+      }
 
       const parts = [`${imported} importados`];
       if (skipped > 0) parts.push(`${skipped} duplicatas puladas`);
@@ -404,7 +479,7 @@ export function useBankStatementImport() {
       setError("Erro: " + (e instanceof Error ? e.message : "desconhecido"));
       setStep("preview");
     }
-  }, [user, currentOrg, bankAccountId, parsedRows, excludedRows, fileName, queryClient, toast]);
+  }, [user, currentOrg, bankAccountId, parsedRows, excludedRows, fileName, queryClient, toast, sourceFormat]);
 
   const downloadFailedRowsCSV = useCallback(() => {
     if (failedRows.length === 0) return;
@@ -450,5 +525,9 @@ export function useBankStatementImport() {
     setDateFormat,
     setNumberFormat,
     downloadFailedRowsCSV,
+    sourceFormat,
+    coverage,
+    coverageLoading,
+    lastImportId,
   };
 }

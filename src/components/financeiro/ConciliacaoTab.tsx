@@ -4,12 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2, Wand2, Camera, Settings2 } from "lucide-react";
+import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2, Wand2, Camera, Settings2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConciliacao, type StatementStatus, type CashflowCandidate } from "@/hooks/useConciliacao";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { BankStatementImportDialog } from "@/components/financeiro/BankStatementImportDialog";
 import { ReconciliationRulesDialog } from "@/components/financeiro/ReconciliationRulesDialog";
+import { ClassifyAndReconcileDialog } from "@/components/financeiro/ClassifyAndReconcileDialog";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
@@ -26,6 +27,7 @@ export function ConciliacaoTab() {
   const [statusFilter, setStatusFilter] = useState<StatementStatus | "all">("all");
   const [importOpen, setImportOpen] = useState(false);
   const [matchEntry, setMatchEntry] = useState<{ id: string; descricao: string; valor: number } | null>(null);
+  const [classifyEntry, setClassifyEntry] = useState<{ id: string; descricao: string; valor: number; data: string; bank_account_id: string } | null>(null);
   const [candidates, setCandidates] = useState<CashflowCandidate[]>([]);
   const [loadingCands, setLoadingCands] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -77,7 +79,7 @@ export function ConciliacaoTab() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
         <div className="glass-card p-5">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Taxa de Conciliação</p>
           <p className="text-2xl font-bold text-success mt-1">{stats.taxa.toFixed(0)}%</p>
@@ -94,7 +96,20 @@ export function ConciliacaoTab() {
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pendentes</p>
           <p className="text-2xl font-bold text-warning mt-1">{stats.pendentes}</p>
         </div>
+        <div className="glass-card p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Não Previstos</p>
+          <p className="text-2xl font-bold text-destructive mt-1">{stats.naoPrevistos}</p>
+        </div>
       </div>
+
+      {stats.naoPrevistos > 0 && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 flex items-start gap-2 text-sm">
+          <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+          <div>
+            <strong>{stats.naoPrevistos}</strong> lançamento{stats.naoPrevistos > 1 ? "s" : ""} no extrato não estava{stats.naoPrevistos > 1 ? "m" : ""} no plano. Classifique antes de conciliar para manter o caixa real.
+          </div>
+        </div>
+      )}
 
       <div className="glass-card p-4 space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
@@ -171,10 +186,23 @@ export function ConciliacaoTab() {
                           </Button>
                         ) : (
                           <>
-                            <Button size="sm" variant="outline" className="h-7 text-xs"
-                              onClick={() => openMatch({ id: e.id, descricao: e.descricao, valor: Number(e.valor) })}>
-                              <Link2 className="h-3 w-3 mr-1" /> Conciliar
-                            </Button>
+                            {(e.match_bucket === "nao_previsto" || (e.match_score ?? 1) < 0.5) ? (
+                              <Button size="sm" variant="default" className="h-7 text-xs"
+                                onClick={() => setClassifyEntry({
+                                  id: e.id, descricao: e.descricao, valor: Number(e.valor),
+                                  data: e.data, bank_account_id: e.bank_account_id,
+                                })}>
+                                <Sparkles className="h-3 w-3 mr-1" /> Classificar
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" className="h-7 text-xs"
+                                onClick={() => openMatch({ id: e.id, descricao: e.descricao, valor: Number(e.valor) })}>
+                                <Link2 className="h-3 w-3 mr-1" /> Conciliar
+                                {typeof e.match_score === "number" && e.match_score > 0 && (
+                                  <Badge variant="outline" className="ml-1.5 text-[9px] px-1 py-0">{(e.match_score * 100).toFixed(0)}%</Badge>
+                                )}
+                              </Button>
+                            )}
                             {e.status !== "ignorado" && (
                               <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground"
                                 onClick={() => updateStatus.mutate({ statementId: e.id, status: "ignorado" })}>
@@ -247,6 +275,12 @@ export function ConciliacaoTab() {
       />
 
       <ReconciliationRulesDialog open={rulesOpen} onOpenChange={setRulesOpen} />
+
+      <ClassifyAndReconcileDialog
+        open={!!classifyEntry}
+        onOpenChange={(o) => !o && setClassifyEntry(null)}
+        entry={classifyEntry}
+      />
     </div>
   );
 }
