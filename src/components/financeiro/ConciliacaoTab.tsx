@@ -186,10 +186,23 @@ export function ConciliacaoTab() {
                           </Button>
                         ) : (
                           <>
-                            <Button size="sm" variant="outline" className="h-7 text-xs"
-                              onClick={() => openMatch({ id: e.id, descricao: e.descricao, valor: Number(e.valor) })}>
-                              <Link2 className="h-3 w-3 mr-1" /> Conciliar
-                            </Button>
+                            {(e.match_bucket === "nao_previsto" || (e.match_score ?? 1) < 0.5) ? (
+                              <Button size="sm" variant="default" className="h-7 text-xs"
+                                onClick={() => setClassifyEntry({
+                                  id: e.id, descricao: e.descricao, valor: Number(e.valor),
+                                  data: e.data, bank_account_id: e.bank_account_id,
+                                })}>
+                                <Sparkles className="h-3 w-3 mr-1" /> Classificar
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" className="h-7 text-xs"
+                                onClick={() => openMatch({ id: e.id, descricao: e.descricao, valor: Number(e.valor) })}>
+                                <Link2 className="h-3 w-3 mr-1" /> Conciliar
+                                {typeof e.match_score === "number" && e.match_score > 0 && (
+                                  <Badge variant="outline" className="ml-1.5 text-[9px] px-1 py-0">{(e.match_score * 100).toFixed(0)}%</Badge>
+                                )}
+                              </Button>
+                            )}
                             {e.status !== "ignorado" && (
                               <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground"
                                 onClick={() => updateStatus.mutate({ statementId: e.id, status: "ignorado" })}>
