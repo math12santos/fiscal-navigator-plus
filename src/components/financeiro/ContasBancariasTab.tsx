@@ -324,7 +324,7 @@ export function ContasBancariasTab() {
         <Card className={contasAConciliar > 0 ? "border-warning/50" : "border-success/40"}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <ScaleIcon className="h-3.5 w-3.5" /> Divergência (OFX − Manual)
+              <Scale className="h-3.5 w-3.5" /> Divergência (OFX − Manual)
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
