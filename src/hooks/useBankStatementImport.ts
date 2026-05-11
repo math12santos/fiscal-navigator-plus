@@ -383,11 +383,36 @@ export function useBankStatementImport() {
         });
       }
 
+      // Persist EVERY parsed row (valid + invalid + excluded) into staging.
+      // Nothing is silently dropped.
+      const stagingPayload = parsedRows.map((r, idx) => {
+        const isExcluded = excludedRows.has(idx);
+        const errs = [...r.errors];
+        if (isExcluded) errs.push("Excluída pelo usuário no preview");
+        return {
+          organization_id: currentOrg.id,
+          user_id: user.id,
+          bank_account_id: bankAccountId,
+          import_id: importId,
+          row_index: idx,
+          raw: r.raw,
+          parsed: r.mapped,
+          errors: errs,
+          status: errs.length > 0 ? "erro_validacao" : "pendente",
+        };
+      });
+      const { data: stagingInserted } = await supabase
+        .from("bank_statement_staging" as any)
+        .insert(stagingPayload as any)
+        .select("id, row_index");
+      const stagingIdByIdx = new Map<number, string>();
+      (stagingInserted ?? []).forEach((s: any) => stagingIdByIdx.set(s.row_index, s.id));
+
       const intraSeen = new Set<string>();
       let skipped = 0;
       let imported = 0;
       const failed: { rowIndex: number; raw: Record<string, string>; error: string }[] = [];
-      const eligible: { idx: number; raw: Record<string, string>; payload: any }[] = [];
+      const eligible: { idx: number; raw: Record<string, string>; payload: any; stagingId?: string }[] = [];
 
       for (const { row, idx } of validRows) {
         const data = row.mapped.data;
@@ -401,6 +426,7 @@ export function useBankStatementImport() {
         eligible.push({
           idx,
           raw: row.raw,
+          stagingId: stagingIdByIdx.get(idx),
           payload: {
             organization_id: currentOrg.id,
             user_id: user.id,
@@ -418,23 +444,47 @@ export function useBankStatementImport() {
       }
 
       const batchSize = 50;
+      const insertedByIdx = new Map<number, string>();
       for (let i = 0; i < eligible.length; i += batchSize) {
         const batch = eligible.slice(i, i + batchSize);
         const { data: inserted, error: batchErr } = await supabase
           .from("bank_statement_entries")
           .upsert(batch.map((b) => b.payload), {
             onConflict: "organization_id,bank_account_id,source_ref",
-            ignoreDuplicates: true,
+            ignoreDuplicates: false,
           })
-          .select("id");
+          .select("id, source_ref");
         if (batchErr) {
           batch.forEach((b) => failed.push({ rowIndex: b.idx + 1, raw: b.raw, error: batchErr.message }));
           continue;
         }
-        const insertedCount = inserted?.length ?? 0;
-        imported += insertedCount;
-        const ignored = batch.length - insertedCount;
-        if (ignored > 0) skipped += ignored;
+        const bySrc = new Map((inserted ?? []).map((x: any) => [x.source_ref, x.id]));
+        batch.forEach((b) => {
+          const id = bySrc.get(b.payload.source_ref);
+          if (id) {
+            imported++;
+            insertedByIdx.set(b.idx, id);
+          } else {
+            skipped++;
+          }
+        });
+      }
+
+      // Marca staging como "importado" e vincula a bank_statement_entry para linhas que foram inseridas.
+      if (insertedByIdx.size > 0) {
+        const updates = Array.from(insertedByIdx.entries()).map(([idx, bseId]) => ({
+          idx,
+          stagingId: stagingIdByIdx.get(idx),
+          bseId,
+        })).filter((u) => u.stagingId);
+        await Promise.all(
+          updates.map((u) =>
+            supabase
+              .from("bank_statement_staging" as any)
+              .update({ status: "importado", bank_statement_entry_id: u.bseId } as any)
+              .eq("id", u.stagingId!)
+          )
+        );
       }
 
       await supabase

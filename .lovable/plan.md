@@ -1,110 +1,127 @@
-## Objetivo
+## Princípio (MECE)
 
-Transformar a aba **Financeiro → Conciliação** na **porta de entrada da realidade financeira**: importar extratos bancários em **XLSX, OFX e PDF**, casar automaticamente com lançamentos previstos, e **exigir classificação contábil de qualquer linha não-prevista antes de marcá-la como conciliada** — gerando assim um `cashflow_entry` real e mantendo o caixa fiel ao banco.
+Toda linha de um extrato (OFX/XLSX/CSV/PDF) **precisa** terminar em exatamente um destes destinos. Nenhuma linha pode ser descartada silenciosamente.
 
-## Estado atual
-
-Já existe:
-- `BankStatementImportDialog` (CSV/XLSX) → grava em `bank_statement_entries` com `status='pendente'`.
-- RPC `match_statement_to_cashflow_v2` (similaridade textual + ±valor/data) e `auto_reconcile_statement_batch` (score ≥ 0.95).
-- `ConciliacaoTab` com auto-conciliar, regras (`reconciliation_rules`) e snapshot de saldo.
-
-Faltam:
-1. Suporte a **OFX** e **PDF** no importador.
-2. Fluxo de **classificação obrigatória** antes de conciliar linhas sem candidato.
-3. Visual claro do **funil**: previstas casadas / divergentes / não-previstas.
-
-## Escopo
-
-### 1. Parsers adicionais no `useBankStatementImport`
-
-- **OFX** (`.ofx`, `.qfx`): parser próprio em TS lendo blocos `<STMTTRN>` (DTPOSTED, TRNAMT, MEMO, NAME, FITID, CHECKNUM). FITID vira `documento` e participa da deduplicação. Detecta cabeçalho SGML/OFX 1.x e XML 2.x.
-- **PDF** (`.pdf`): extração textual via `pdfjs-dist` no cliente. Heurística por linha: `dd/mm/aaaa  descrição  valor (D/C)`. Como PDFs variam por banco, oferecer **revisão manual obrigatória** no passo "mapeamento" — usuário confirma colunas detectadas/edita, mesmo fluxo do XLSX. Mostrar aviso "PDF é melhor esforço; recomendamos OFX/XLSX quando disponível".
-- Reutilizar o resto do pipeline (preview, deduplicação, `bank_statement_entries`).
-
-Aceitar arquivos: `.csv,.xlsx,.xls,.ofx,.qfx,.pdf`.
-
-### 2. Motor "Pré-conciliação" após importar
-
-Ao concluir a importação, executar automaticamente uma **análise de cobertura** que classifica cada linha nova em três baldes via `match_statement_to_cashflow_v2`:
-
-```text
-┌──────────────────────────┬───────────────────────────────────────────┐
-│ casado_alto (≥ 0.85)     │ Auto-concilia em background.              │
-│ casado_baixo (0.50–0.85) │ Aparece como "Sugestão" (1 clique).       │
-│ nao_previsto (< 0.50 ou  │ Bloqueia conciliar até o usuário          │
-│  sem candidato)          │ classificar contabilmente (ver passo 3).  │
-└──────────────────────────┴───────────────────────────────────────────┘
+```
+linha do arquivo
+   ├─ Importada e conciliada (auto-match alto)            ← já existe
+   ├─ Importada e sugerida (match parcial, 1 clique)      ← já existe
+   ├─ Importada e classificada como realizado              ← já existe (ClassifyAndReconcile)
+   ├─ Vinculada a um previsto ainda não conciliado          ← NOVO
+   ├─ Vinculada a um previsto JÁ conciliado (corrigindo histórico)  ← NOVO
+   └─ Descartada com motivo (audit log)                    ← NOVO
 ```
 
-Implementação: nova RPC `classify_statement_coverage(p_org_id, p_import_id)` que retorna contagens + lista. Dispara após `executeImport` e abre um painel-resumo "Resultado da importação" no próprio Dialog (passo `done`):
+Hoje, 49/49 falhas viram um botão "Baixar CSV das falhas" — isso quebra o princípio.
 
-- ✅ `X` linhas casadas com lançamentos previstos
-- ⚠ `Y` linhas com sugestões (revisar)
-- 🚨 `Z` linhas **não previstas** — exigem classificação
+---
 
-### 3. Classificação obrigatória de não-previstos
+## Diagnóstico do caso 49/49 (OFX)
 
-Nova ação na `ConciliacaoTab` para linhas pendentes sem candidato: botão **"Classificar e conciliar"** (substitui "Conciliar" quando `match_score < 0.5` ou nenhum candidato). Abre um `Dialog` enxuto reaproveitando os campos do `ClassificacaoDialog` existente:
+Antes de implementar, instrumentar o parser para reportar **por linha** o que falhou. Hipóteses prováveis:
+- OFX do banco usa tags fora do padrão (ex.: `<TRNAMT>` com vírgula decimal, `<DTPOSTED>` em formato local) — `ofxParser.ts` hoje só aceita yyyymmdd e ponto decimal.
+- `parseBRDate` é aplicada por engano em ISO se o `detectedFormat` foi alterado pelo usuário.
+- RLS/unique-constraint rejeitando o batch inteiro em `bank_statement_entries`.
 
-Campos obrigatórios:
-- Tipo (`receita` ou `despesa`, pré-preenchido pelo sinal do valor)
-- Conta contábil (`chart_of_accounts`, 4 níveis)
-- Centro de custo (ou rateio)
-- Entidade/fornecedor (opcional, com sugestão se descrição bater com `entities`)
-- Competência (default = mês da `data` do extrato)
-- Observação (default = descrição do extrato)
+Robustez no `parseOfx`:
+- Aceitar `TRNAMT` com vírgula (`1.234,56`) e sinal posfixado.
+- Aceitar `DTPOSTED` curto/longo e com timezone.
+- Se `STMTTRN` não for encontrado, tentar `BANKTRANLIST` solto.
+- Sempre devolver as linhas brutas mesmo quando algum campo falhar (validação fica no staging).
 
-Ao confirmar, RPC `materialize_unplanned_statement_entry(p_statement_id, p_classification jsonb)`:
-1. Cria `cashflow_entries` com `status='realizado'`, `data_realizada=data do extrato`, `valor_realizado=valor`, `source='conciliacao'`, `source_ref='statement:<id>'`.
-2. Aplica RLS/cost-center splits se houver rateio (mesma lógica do `FinanceiroEntryDialog`).
-3. Vincula `bank_statement_entries.cashflow_entry_id` e marca `status='conciliado'`.
-4. Opcional: salva regra (`reconciliation_rules`) "se descrição contém X → usar conta Y / CC Z" para automatizar próximas importações.
+---
 
-Bloquear no front: para linhas marcadas `nao_previsto`, o botão "Conciliar" simples fica oculto — só aparece "Classificar e conciliar" ou "Ignorar".
+## Backend
 
-### 4. UX da Conciliação
+**Nova tabela `bank_statement_staging`** (toda linha do arquivo é persistida, inclusive inválidas):
 
-- Adicionar 1 KPI extra: **"Não previstos"** (count de pendentes sem candidato) com cor `destructive`.
-- Filtro extra no Select de status: `"nao_previsto"`, `"sugestao"`, `"casado"`.
-- Coluna `Match` na tabela mostrando badge de score ou "Sem candidato".
-- Banner topo se `nao_previsto > 0`: "X lançamentos não estavam no plano. Classifique antes de conciliar para manter o caixa real."
+| coluna | tipo |
+|---|---|
+| id | uuid |
+| organization_id | uuid |
+| bank_account_id | uuid |
+| import_id | uuid (FK `data_imports`) |
+| row_index | int |
+| raw | jsonb |
+| parsed | jsonb |
+| errors | text[] |
+| status | enum: `pendente`, `importado`, `vinculado`, `descartado`, `erro_validacao` |
+| resolution | jsonb (cashflow_entry_id, motivo, flag `previa_conciliacao_substituida`) |
+| bank_statement_entry_id | uuid |
+| resolved_by / resolved_at | uuid / timestamptz |
 
-### 5. Realtime e cache
+RLS por `organization_id`. Trigger `bump_org_data_version`.
 
-- `useRealtimeSync(['bank_statement_entries','cashflow_entries'])` na aba (já parcialmente).
-- Invalidar `cashflow-entries`, `dashboard_snapshots`, `cash-position` após materializar.
+**RPCs novas (SECURITY DEFINER):**
+- `resolve_link_to_cashflow(p_staging_id, p_cashflow_entry_id, p_force_relink boolean default false)` — vincula a um previsto. Comportamento:
+  - Se o cashflow estiver `previsto`/`atrasado`: marca como `realizado`, copia data/valor reais, vincula `bank_statement_entry_id`, staging → `vinculado`.
+  - Se o cashflow já estiver `realizado` e tiver outro `bank_statement_entry_id` conciliado: exige `p_force_relink=true`. Aí desvincula o anterior (volta `bank_statement_entries.status` da linha antiga para `pendente` e marca `resolution.previa_conciliacao_substituida=true` no staging anterior, se houver), vincula a nova, ajusta valor/data se diferente, registra em `audit_log` (categoria `reconciliation_override`).
+- `resolve_discard(p_staging_id, p_category, p_reason)` — exige texto não vazio, status `descartado`, audit.
+- `resolve_correct_and_retry(p_staging_id, p_data, p_valor, p_descricao, p_documento)` — revalida e faz upsert em `bank_statement_entries`.
+- `list_unresolved_statement_lines(p_org)` — alimenta o banner.
+- `search_cashflow_for_link(p_org, p_bank_account, p_data, p_valor, p_include_already_reconciled boolean)` — retorna candidatos com `match_score`, `status_atual`, `ja_conciliado_com` (descricao + id da linha bancária anterior, se houver).
 
-## Arquivos
+---
 
-**Novos**
-- `src/lib/parsers/ofxParser.ts`
-- `src/lib/parsers/pdfStatementParser.ts` (usa `pdfjs-dist`)
-- `src/components/financeiro/ClassifyAndReconcileDialog.tsx`
-- Migração SQL com:
-  - RPC `classify_statement_coverage`
-  - RPC `materialize_unplanned_statement_entry`
-  - Coluna `match_score numeric` e `match_bucket text` em `bank_statement_entries` (preenchida no import + auto-reconcile)
+## Frontend
 
-**Editados**
-- `src/hooks/useBankStatementImport.ts` (rotear por extensão; aceitar OFX/PDF; rodar `classify_statement_coverage` ao final)
-- `src/components/financeiro/BankStatementImportDialog.tsx` (extensões aceitas, banner PDF, painel resultado)
-- `src/components/financeiro/ConciliacaoTab.tsx` (KPI, filtro, badge match, botão "Classificar e conciliar", banner)
-- `src/hooks/useConciliacao.ts` (mutações `materializeUnplanned`, filtros por bucket)
-- `package.json`: adicionar `pdfjs-dist`
+### 1. Persistência total no `executeImport`
+- Inserir **todas** as linhas (válidas e inválidas) em `bank_statement_staging`.
+- Apenas as válidas seguem para `bank_statement_entries`; falha de batch marca staging como `erro_validacao`.
 
-## Critérios de aceite
+### 2. Tela `Resolver Extrato` (substitui o "done" simples)
+Acessada ao final da importação **e** via banner permanente em `/financeiro?tab=conciliacao`.
 
-1. Importar `.ofx` real e ver linhas em `bank_statement_entries` com `documento=FITID`.
-2. Importar `.pdf` de extrato e revisar/ajustar mapeamento antes de salvar.
-3. Após importar, abrir painel "Resultado" mostrando casados/sugestões/não-previstos.
-4. Linha "não-prevista" não pode ser marcada conciliado sem passar pelo dialog de classificação.
-5. Ao classificar, um `cashflow_entry` realizado é criado com a mesma data/valor e a linha vira `conciliado`.
-6. Saldo da conta (cash position) reflete imediatamente o novo realizado.
-7. Re-importar o mesmo arquivo não duplica linhas (deduplicação por `source_ref`/FITID já existente).
+Tabs (toda linha do arquivo aparece em alguma):
+- **A resolver** (`pendente` + `erro_validacao` + `nao_previsto`)
+- **Importados OK**
+- **Resolvidos** (vinculados normais + vinculados por substituição + descartados, com chip distintivo)
 
-## Fora de escopo (próxima onda)
+Ações inline por linha "A resolver":
+1. **Corrigir** — popover com 4 inputs → `resolve_correct_and_retry`.
+2. **Vincular a previsto** — abre `LinkToPlannedDialog`.
+3. **Criar realizado** — reusa `ClassifyAndReconcileDialog`.
+4. **Descartar** — popover com categoria obrigatória + motivo → `resolve_discard`.
 
-- Parsing PDF por banco específico com templates (Itaú, Bradesco, BB) — fica como melhoria iterativa.
-- Conciliação de cartão de crédito (fatura ≠ extrato).
-- Importação direta via Open Finance API.
+### 3. `LinkToPlannedDialog` (novo) — com toggle "incluir já conciliados"
+- Topo: switch "**Mostrar também previstos já conciliados**" (default off).
+- Lista candidatos via `search_cashflow_for_link`. Cada item mostra:
+  - data prevista, descrição, valor, conta contábil, centro de custo;
+  - chip de status: `Previsto` | `Atrasado` | **`Já conciliado`** (amber).
+  - Se "Já conciliado": linha extra "Conciliado anteriormente com: <descricao da linha bancária antiga> em <data>".
+- Confirmar em "Já conciliado":
+  - Modal de confirmação **dupla**: "Isso vai substituir a conciliação anterior. A linha bancária anterior voltará para o status 'pendente' e precisará ser resolvida. Confirma?"
+  - Chama `resolve_link_to_cashflow(..., p_force_relink=true)`.
+  - Após sucesso, exibe toast com link "Ver linha que voltou a pendente".
+
+### 4. Banner global em Conciliação
+`UnresolvedStatementBanner` no topo de `ConciliacaoTab`:
+> "23 linhas de extrato aguardam resolução — [Abrir tela de resolução]"
+
+### 5. Pré-validação do OFX
+Se >40% das linhas vierem sem `data` ou `valor` no parse, mostrar bloco amarelo no mapeamento e oferecer "Tratar como tabela manual".
+
+---
+
+## Critério de aceitação
+
+- Importar um OFX problemático cria N linhas em `bank_statement_staging` (nenhuma some).
+- Tela "A resolver" lista todas com chip de erro.
+- Para cada linha é possível: corrigir, vincular a previsto **não conciliado**, vincular a previsto **já conciliado** (com confirmação dupla), criar realizado, ou descartar com motivo.
+- Substituir conciliação devolve a linha bancária anterior ao estado `pendente` e a coloca de volta na tela de resolução.
+- Audit log registra cada ação (`reconciliation_override` quando aplicável).
+- Banner some quando staging fica zerado.
+
+---
+
+## Arquivos afetados
+
+- `supabase/migrations/<new>.sql` — tabela `bank_statement_staging`, 5 RPCs, RLS, trigger.
+- `src/lib/parsers/ofxParser.ts` — robustez de tags/formatos.
+- `src/hooks/useBankStatementImport.ts` — gravar staging antes do insert.
+- `src/components/financeiro/BankStatementImportDialog.tsx` — passo "done" abre a tela de resolução.
+- `src/components/financeiro/StatementResolutionPanel.tsx` (novo) — 3 tabs + 4 ações.
+- `src/components/financeiro/LinkToPlannedDialog.tsx` (novo) — toggle "incluir já conciliados" + confirmação dupla.
+- `src/components/financeiro/UnresolvedStatementBanner.tsx` (novo).
+- `src/components/financeiro/ConciliacaoTab.tsx` — banner.
+- `src/hooks/useStatementResolution.ts` (novo) — wrappers das RPCs.

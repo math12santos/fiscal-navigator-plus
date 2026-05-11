@@ -4,13 +4,15 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2, Wand2, Camera, Settings2, Sparkles } from "lucide-react";
+import { CheckCircle, AlertTriangle, Clock, Upload, Link2, Unlink, EyeOff, Loader2, Wand2, Camera, Settings2, Sparkles, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConciliacao, type StatementStatus, type CashflowCandidate } from "@/hooks/useConciliacao";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { BankStatementImportDialog } from "@/components/financeiro/BankStatementImportDialog";
 import { ReconciliationRulesDialog } from "@/components/financeiro/ReconciliationRulesDialog";
 import { ClassifyAndReconcileDialog } from "@/components/financeiro/ClassifyAndReconcileDialog";
+import { StatementResolutionPanel } from "@/components/financeiro/StatementResolutionPanel";
+import { useStatementResolution } from "@/hooks/useStatementResolution";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
@@ -31,6 +33,9 @@ export function ConciliacaoTab() {
   const [candidates, setCandidates] = useState<CashflowCandidate[]>([]);
   const [loadingCands, setLoadingCands] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [resolutionOpen, setResolutionOpen] = useState(false);
+  const { unresolved } = useStatementResolution();
+  const unresolvedCount = unresolved.data?.length ?? 0;
 
   const { bankAccounts } = useBankAccounts();
   const { entries, isLoading, stats, fetchCandidates, reconcile, unreconcile, updateStatus, autoReconcileBatch, snapshotBalances } = useConciliacao({
@@ -50,7 +55,27 @@ export function ConciliacaoTab() {
 
   return (
     <div className="space-y-6">
+      {unresolvedCount > 0 && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2 text-sm">
+            <Inbox className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <strong>{unresolvedCount}</strong> linha{unresolvedCount > 1 ? "s" : ""} de extrato{" "}
+              aguardando resolução. Toda movimentação precisa virar lançamento, vínculo ou descarte.
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setResolutionOpen(true)}>
+            Resolver agora
+          </Button>
+        </div>
+      )}
+
       <div className="flex flex-wrap justify-end gap-2">
+        {unresolvedCount > 0 && (
+          <Button size="sm" variant="outline" onClick={() => setResolutionOpen(true)}>
+            <Inbox className="h-3.5 w-3.5 mr-1.5" /> Resolver ({unresolvedCount})
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={() => setRulesOpen(true)} title="Gerenciar regras de classificação automática">
           <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Regras
         </Button>
@@ -275,6 +300,8 @@ export function ConciliacaoTab() {
       />
 
       <ReconciliationRulesDialog open={rulesOpen} onOpenChange={setRulesOpen} />
+
+      <StatementResolutionPanel open={resolutionOpen} onOpenChange={setResolutionOpen} />
 
       <ClassifyAndReconcileDialog
         open={!!classifyEntry}

@@ -506,6 +506,8 @@ export function BankStatementImportDialog({ open, onOpenChange, defaultBankAccou
 
               <p className="text-xs text-muted-foreground max-w-md text-center">
                 Vá para a Conciliação para revisar sugestões e classificar lançamentos não previstos.
+                Linhas com erro ou excluídas ficam disponíveis no banner "Resolver" da Conciliação —
+                toda linha vira algo no sistema (lançamento, vínculo ou descarte auditado).
               </p>
               <Button size="sm" onClick={() => handleClose(false)} className="mt-2">Ir para Conciliação</Button>
             </div>
