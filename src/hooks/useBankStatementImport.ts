@@ -383,11 +383,36 @@ export function useBankStatementImport() {
         });
       }
 
+      // Persist EVERY parsed row (valid + invalid + excluded) into staging.
+      // Nothing is silently dropped.
+      const stagingPayload = parsedRows.map((r, idx) => {
+        const isExcluded = excludedRows.has(idx);
+        const errs = [...r.errors];
+        if (isExcluded) errs.push("Excluída pelo usuário no preview");
+        return {
+          organization_id: currentOrg.id,
+          user_id: user.id,
+          bank_account_id: bankAccountId,
+          import_id: importId,
+          row_index: idx,
+          raw: r.raw,
+          parsed: r.mapped,
+          errors: errs,
+          status: errs.length > 0 ? "erro_validacao" : "pendente",
+        };
+      });
+      const { data: stagingInserted } = await supabase
+        .from("bank_statement_staging" as any)
+        .insert(stagingPayload as any)
+        .select("id, row_index");
+      const stagingIdByIdx = new Map<number, string>();
+      (stagingInserted ?? []).forEach((s: any) => stagingIdByIdx.set(s.row_index, s.id));
+
       const intraSeen = new Set<string>();
       let skipped = 0;
       let imported = 0;
       const failed: { rowIndex: number; raw: Record<string, string>; error: string }[] = [];
-      const eligible: { idx: number; raw: Record<string, string>; payload: any }[] = [];
+      const eligible: { idx: number; raw: Record<string, string>; payload: any; stagingId?: string }[] = [];
 
       for (const { row, idx } of validRows) {
         const data = row.mapped.data;
