@@ -17,6 +17,7 @@ import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
 import { SolicitacoesTab } from "@/components/financeiro/SolicitacoesTab";
 import { MonthClosingReadinessCard } from "@/components/financeiro/MonthClosingReadinessCard";
 import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
+import { FinanceiroMonthProvider } from "@/contexts/FinanceiroMonthContext";
 
 const ALL_TABS = [
   { key: "dashboard", label: "Dashboard" },
