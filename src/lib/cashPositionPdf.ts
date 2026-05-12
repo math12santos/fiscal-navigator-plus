@@ -172,17 +172,21 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     autoTable(doc, {
       startY: cursorY + 2,
       margin: { left: marginX, right: marginX },
-      head: [["Conta", "Banco", "Tipo", "Saldo", "Limite", "Disponível"]],
+      head: [["Conta", "Banco", "Tipo", "Saldo", "Limite disp.", "Liquidez"]],
       body: [
-        ...org.accounts.map((a) => [
-          a.nome, a.banco ?? "—", a.tipo_conta,
-          fmt(a.saldo_atual), fmt(a.limite_credito), fmt(a.saldo_atual + a.limite_credito),
-        ]),
+        ...org.accounts.map((a) => {
+          const limDisp = a.limite_disponivel ?? a.limite_credito;
+          const liq = a.liquidez ?? (Math.max(0, a.saldo_atual) + Math.max(0, limDisp));
+          return [
+            a.nome, a.banco ?? "—", a.tipo_conta,
+            fmt(a.saldo_atual), fmt(limDisp), fmt(liq),
+          ];
+        }),
         [
           { content: "Total", colSpan: 3, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } },
           { content: fmt(org.saldo), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
           { content: fmt(org.limite), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
-          { content: fmt(org.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
+          { content: fmt(org.liquidez ?? org.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [36, 214, 196] } },
         ] as any,
       ],
       styles: { fontSize: 8, cellPadding: 2 },
