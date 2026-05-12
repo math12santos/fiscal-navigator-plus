@@ -19,6 +19,7 @@ import { useGroupingRules } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
 import { buildHierarchy } from "@/lib/groupingHierarchy";
 import { generateCashPositionPdf, type CashPositionByOrg, type AuditDivergenceRow, type WeekPaymentRow } from "@/lib/cashPositionPdf";
+import { calculateAvailability } from "@/lib/overdraftCalculations";
 import { startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 
 const fmt = (v: number) =>
@@ -104,11 +105,28 @@ export function AgingListTab() {
     };
   }, [entradaEntries, today]);
 
+  // Helper: liquidez real de UMA conta — capital de giro disponível para pagamento.
+  // Convenção MECE: contas negativas não reduzem o caixa do consolidado (podem permanecer negativas);
+  // o limite disponível ainda contribui.
+  const computeAccountLiquidity = (b: any) => {
+    const av = calculateAvailability({
+      saldoAtual: Number(b.saldo_atual ?? 0),
+      limiteTotal: Number(b.limite_credito ?? 0),
+      limiteUtilizado: Number(b.limite_utilizado ?? 0),
+      limiteTipo: (b.limite_tipo || "cheque_especial") as any,
+    });
+    return {
+      limiteDisponivel: av.limiteDisponivel,
+      liquidez: Math.max(0, av.capitalGiroDisponivel),
+    };
+  };
+
   // ── Bank balances ──
   const bankTotals = useMemo(() => {
     const saldoTotal = bankAccounts.reduce((s, b) => s + Number(b.saldo_atual ?? 0), 0);
     const limiteTotal = bankAccounts.reduce((s, b) => s + Number(b.limite_credito ?? 0), 0);
-    return { saldoTotal, limiteTotal, disponibilidadeTotal: saldoTotal + limiteTotal };
+    const liquidezTotal = bankAccounts.reduce((s, b) => s + computeAccountLiquidity(b).liquidez, 0);
+    return { saldoTotal, limiteTotal, disponibilidadeTotal: saldoTotal + limiteTotal, liquidezTotal };
   }, [bankAccounts]);
 
   // ── Cash position grouped per organization (for clickable cards & PDF) ──
@@ -131,20 +149,27 @@ export function AgingListTab() {
     for (const [orgId, accounts] of byOrg.entries()) {
       const saldo = accounts.reduce((s, b) => s + Number(b.saldo_atual ?? 0), 0);
       const limite = accounts.reduce((s, b) => s + Number(b.limite_credito ?? 0), 0);
+      const liquidez = accounts.reduce((s, b) => s + computeAccountLiquidity(b).liquidez, 0);
       result.push({
         orgId,
         orgName: orgNames.get(orgId) ?? "Organização",
-        accounts: accounts.map((a) => ({
-          nome: a.nome,
-          banco: a.banco,
-          tipo_conta: a.tipo_conta,
-          saldo_atual: Number(a.saldo_atual ?? 0),
-          limite_credito: Number(a.limite_credito ?? 0),
-          organization_id: a.organization_id,
-        })),
+        accounts: accounts.map((a) => {
+          const av = computeAccountLiquidity(a);
+          return {
+            nome: a.nome,
+            banco: a.banco,
+            tipo_conta: a.tipo_conta,
+            saldo_atual: Number(a.saldo_atual ?? 0),
+            limite_credito: Number(a.limite_credito ?? 0),
+            limite_disponivel: av.limiteDisponivel,
+            liquidez: av.liquidez,
+            organization_id: a.organization_id,
+          };
+        }),
         saldo,
         limite,
         disponibilidade: saldo + limite,
+        liquidez,
       });
     }
     return result.sort((a, b) => a.orgName.localeCompare(b.orgName, "pt-BR"));
@@ -445,6 +470,7 @@ export function AgingListTab() {
           saldo: bankTotals.saldoTotal,
           limite: bankTotals.limiteTotal,
           disponibilidade: bankTotals.disponibilidadeTotal,
+          liquidez: bankTotals.liquidezTotal,
           apOverdue: totalOverdue,
           apDue30: totalDue,
           arNext30: arBuckets.ar7.total + arBuckets.ar15.total + arBuckets.ar30.total,
@@ -501,11 +527,11 @@ export function AgingListTab() {
           onClick={() => setCashDetailOpen(true)}
         />
         <KPICard
-          title="Disponibilidade Total"
-          value={fmtAcc(bankTotals.disponibilidadeTotal)}
-          valueClassName={bankTotals.disponibilidadeTotal < 0 ? "text-destructive" : ""}
+          title="Liquidez (capital de giro)"
+          value={fmtAcc(bankTotals.liquidezTotal)}
+          valueClassName={bankTotals.liquidezTotal < 0 ? "text-destructive" : "text-primary"}
           icon={<Wallet size={20} />}
-          subtitle="Saldo + Limite"
+          subtitle="Saldos positivos + limite disponível"
           onClick={() => setCashDetailOpen(true)}
         />
         <KPICard title="Entradas Previstas" value={fmt(arBuckets.totalAR)} icon={<TrendingUp size={20} />} subtitle={`${entradaEntries.filter(e => (e.status === "previsto" || e.status === "confirmado") && differenceInDays(parseISO((e as any).data_vencimento || e.data_prevista), today) >= 0).length} título(s)`} />
@@ -536,7 +562,7 @@ export function AgingListTab() {
                     <TableHead className="text-center">Contas</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
                     <TableHead className="text-right">Limite</TableHead>
-                    <TableHead className="text-right">Disponível</TableHead>
+                    <TableHead className="text-right">Liquidez</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -553,7 +579,7 @@ export function AgingListTab() {
                       </TableCell>
                       <TableCell className="text-right"><AccVal v={org.saldo} /></TableCell>
                       <TableCell className="text-right text-muted-foreground"><AccVal v={org.limite} /></TableCell>
-                      <TableCell className={`text-right font-bold ${org.disponibilidade < 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(org.disponibilidade)}</TableCell>
+                      <TableCell className={`text-right font-bold ${(org.liquidez ?? 0) <= 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(org.liquidez ?? 0)}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/50 font-bold">
@@ -561,13 +587,13 @@ export function AgingListTab() {
                     <TableCell className="text-center">{bankAccounts.length}</TableCell>
                     <TableCell className="text-right"><AccVal v={bankTotals.saldoTotal} /></TableCell>
                     <TableCell className="text-right"><AccVal v={bankTotals.limiteTotal} /></TableCell>
-                    <TableCell className={`text-right ${bankTotals.disponibilidadeTotal < 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(bankTotals.disponibilidadeTotal)}</TableCell>
+                    <TableCell className={`text-right ${bankTotals.liquidezTotal <= 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(bankTotals.liquidezTotal)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
               <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-                ⚠️ Os saldos exibidos são manualmente atualizados em <strong>Contas Bancárias</strong> e podem não refletir
-                lançamentos pagos/recebidos ainda não conciliados. Para uma posição de caixa precisa, faça a conciliação bancária na aba <strong>Conciliação</strong>.
+                <strong>Liquidez</strong> = soma por conta de <em>max(0, saldo) + limite disponível</em>. Contas negativas
+                não reduzem o caixa do consolidado — podem permanecer negativas enquanto outras contas têm liquidez.
               </p>
             </div>
           )}
@@ -635,26 +661,29 @@ export function AgingListTab() {
                   <TableHead>Banco</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Saldo</TableHead>
-                  <TableHead className="text-right">Limite</TableHead>
-                  <TableHead className="text-right">Disponível</TableHead>
+                  <TableHead className="text-right">Limite disp.</TableHead>
+                  <TableHead className="text-right">Liquidez</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {bankAccounts.map((ba) => (
-                  <TableRow key={ba.id}>
-                    <TableCell className="font-medium">{ba.nome}</TableCell>
-                    <TableCell>{ba.banco ?? "—"}</TableCell>
-                    <TableCell><Badge variant="secondary" className="text-xs capitalize">{ba.tipo_conta}</Badge></TableCell>
-                    <TableCell className="text-right font-medium"><AccVal v={Number(ba.saldo_atual ?? 0)} /></TableCell>
-                    <TableCell className="text-right"><AccVal v={Number(ba.limite_credito ?? 0)} /></TableCell>
-                    <TableCell className={`text-right font-bold ${Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0) < 0 ? "text-destructive" : ""}`}>{fmtAcc(Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0))}</TableCell>
-                  </TableRow>
-                ))}
+                {bankAccounts.map((ba) => {
+                  const av = computeAccountLiquidity(ba);
+                  return (
+                    <TableRow key={ba.id}>
+                      <TableCell className="font-medium">{ba.nome}</TableCell>
+                      <TableCell>{ba.banco ?? "—"}</TableCell>
+                      <TableCell><Badge variant="secondary" className="text-xs capitalize">{ba.tipo_conta}</Badge></TableCell>
+                      <TableCell className="text-right font-medium"><AccVal v={Number(ba.saldo_atual ?? 0)} /></TableCell>
+                      <TableCell className="text-right"><AccVal v={av.limiteDisponivel} /></TableCell>
+                      <TableCell className={`text-right font-bold ${av.liquidez <= 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(av.liquidez)}</TableCell>
+                    </TableRow>
+                  );
+                })}
                 <TableRow className="bg-muted/50 font-bold">
                   <TableCell colSpan={3}>Total</TableCell>
                   <TableCell className="text-right"><AccVal v={bankTotals.saldoTotal} /></TableCell>
                   <TableCell className="text-right"><AccVal v={bankTotals.limiteTotal} /></TableCell>
-                  <TableCell className="text-right"><AccVal v={bankTotals.disponibilidadeTotal} /></TableCell>
+                  <TableCell className={`text-right ${bankTotals.liquidezTotal <= 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(bankTotals.liquidezTotal)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

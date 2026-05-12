@@ -25,6 +25,14 @@ export interface CashPositionAccount {
   tipo_conta: string;
   saldo_atual: number;
   limite_credito: number;
+  /** Limite ainda disponível para uso (limite_credito - usado). */
+  limite_disponivel?: number;
+  /**
+   * Liquidez REAL desta conta para pagamento (capital de giro).
+   * Convenção: contas com saldo negativo contribuem 0 para o consolidado
+   * (a conta pode permanecer negativa); o limite disponível ainda conta.
+   */
+  liquidez?: number;
   organization_id: string | null;
 }
 
@@ -32,9 +40,14 @@ export interface CashPositionByOrg {
   orgId: string;
   orgName: string;
   accounts: CashPositionAccount[];
+  /** Soma bruta dos saldos (pode ser inferior à liquidez quando há contas negativas). */
   saldo: number;
+  /** Limite de crédito total contratado. */
   limite: number;
+  /** Soma bruta saldo+limite (mantido por compatibilidade). */
   disponibilidade: number;
+  /** Liquidez consolidada — capital de giro disponível para pagamento. */
+  liquidez?: number;
 }
 
 export interface AuditDivergenceRow {
@@ -60,6 +73,8 @@ export interface CashPositionPdfInput {
     saldo: number;
     limite: number;
     disponibilidade: number;
+    /** Liquidez total consolidada (capital de giro disponível para pagamento). */
+    liquidez?: number;
     apOverdue: number;
     apDue30: number;
     arNext30: number;
@@ -123,9 +138,9 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     theme: "plain",
     styles: { fontSize: 9, cellPadding: 2 },
     body: [
-      ["Saldo em Contas", fmt(input.totals.saldo)],
-      ["Limite de Crédito Disponível", fmt(input.totals.limite)],
-      [{ content: "Disponibilidade Total (Saldo + Limite)", styles: { fontStyle: "bold" } }, { content: fmt(input.totals.disponibilidade), styles: { fontStyle: "bold" } }],
+      [{ content: "Liquidez Total (capital de giro disponível)", styles: { fontStyle: "bold" } }, { content: fmt(input.totals.liquidez ?? input.totals.disponibilidade), styles: { fontStyle: "bold" } }],
+      ["Saldo bruto em contas (informativo)", fmt(input.totals.saldo)],
+      ["Limite de crédito disponível", fmt(input.totals.limite)],
       ["Contas a Pagar — Vencidas", fmt(input.totals.apOverdue)],
       ["Contas a Pagar — Próx. 30 dias", fmt(input.totals.apDue30)],
       ["Contas a Receber — Próx. 30 dias", fmt(input.totals.arNext30)],
@@ -134,7 +149,15 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     didParseCell: colorNegatives,
   });
 
-  let cursorY = (doc as any).lastAutoTable.finalY + 8;
+  let cursorY = (doc as any).lastAutoTable.finalY + 4;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(140, 140, 140);
+  doc.text(
+    "Liquidez = Σ por conta de max(0, saldo) + limite disponível. Contas negativas não reduzem o caixa do consolidado.",
+    marginX, cursorY + 3, { maxWidth: pageWidth - marginX * 2 },
+  );
+  cursorY += 10;
 
   // ===== Per-Org section =====
   for (const org of input.perOrg) {
@@ -149,17 +172,21 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     autoTable(doc, {
       startY: cursorY + 2,
       margin: { left: marginX, right: marginX },
-      head: [["Conta", "Banco", "Tipo", "Saldo", "Limite", "Disponível"]],
+      head: [["Conta", "Banco", "Tipo", "Saldo", "Limite disp.", "Liquidez"]],
       body: [
-        ...org.accounts.map((a) => [
-          a.nome, a.banco ?? "—", a.tipo_conta,
-          fmt(a.saldo_atual), fmt(a.limite_credito), fmt(a.saldo_atual + a.limite_credito),
-        ]),
+        ...org.accounts.map((a) => {
+          const limDisp = a.limite_disponivel ?? a.limite_credito;
+          const liq = a.liquidez ?? (Math.max(0, a.saldo_atual) + Math.max(0, limDisp));
+          return [
+            a.nome, a.banco ?? "—", a.tipo_conta,
+            fmt(a.saldo_atual), fmt(limDisp), fmt(liq),
+          ];
+        }),
         [
           { content: "Total", colSpan: 3, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } },
           { content: fmt(org.saldo), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
           { content: fmt(org.limite), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
-          { content: fmt(org.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
+          { content: fmt(org.liquidez ?? org.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [36, 214, 196] } },
         ] as any,
       ],
       styles: { fontSize: 8, cellPadding: 2 },
