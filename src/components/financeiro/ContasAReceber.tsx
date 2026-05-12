@@ -16,7 +16,11 @@ const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
 
 export function ContasAReceber() {
-  const { entries, totals, isLoading, create, update, markAsPaid, undoPaymentIssued, remove } = useFinanceiro("entrada");
+  const { entries: allEntries, totals: allTotals, isLoading, create, update, markAsPaid, undoPaymentIssued, remove } = useFinanceiro("entrada");
+  const entries = useFinanceiroMonthFilter(allEntries);
+  const filteredTotals = useMemo(() => computeFinanceiroTotals(entries), [entries]);
+  const totals = entries.length === allEntries.length ? allTotals : filteredTotals;
+  const monthClosed = useWorkingMonthClosed();
   const duplicates = useDuplicateDetection(entries);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
