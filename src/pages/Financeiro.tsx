@@ -69,6 +69,7 @@ export default function Financeiro() {
   }
 
   return (
+    <FinanceiroMonthProvider>
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Financeiro"
@@ -79,7 +80,7 @@ export default function Financeiro() {
 
       <SectorOnboardingBar sector="financeiro" onTabChange={handleMaturityTabChange} />
 
-      <MonthClosingReadinessCard />
+      <MonthClosingReadinessCard onNavigateTab={(t) => setActiveTab(t)} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
