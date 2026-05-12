@@ -81,3 +81,10 @@ Já existe a checagem por `fiscal_periods` no backend (memória "Governance Peri
 2. Em mês fechado, o banner mostra **Fechado** e os botões de criar/editar ficam desabilitados, com opção de "Reabrir mês".
 3. Clicar nos cartões Extrato/AP/AR do card abre a aba correspondente já filtrada.
 4. "Limpar filtro" volta à visão completa atual; trocar de organização zera o filtro.
+
+
+---
+## ✅ Implementado: Mês de trabalho Financeiro (sessão de fechamento)
+
+`FinanceiroMonthContext` compartilha o `workingMonth` entre o `MonthClosingReadinessCard` e as abas AP/AR/Conciliação/Contas Bancárias. `WorkingMonthBanner` exibe o mês selecionado com badge Aberto/Fechado e botão "Reabrir mês". `useFinanceiroMonthFilter`+`computeFinanceiroTotals` recalculam KPIs por mês. Cartões de prontidão no card são clicáveis e navegam para a aba já filtrada. Ações de criação ficam desabilitadas quando o mês está fechado.
+
