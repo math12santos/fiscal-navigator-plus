@@ -661,26 +661,29 @@ export function AgingListTab() {
                   <TableHead>Banco</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Saldo</TableHead>
-                  <TableHead className="text-right">Limite</TableHead>
-                  <TableHead className="text-right">Disponível</TableHead>
+                  <TableHead className="text-right">Limite disp.</TableHead>
+                  <TableHead className="text-right">Liquidez</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {bankAccounts.map((ba) => (
-                  <TableRow key={ba.id}>
-                    <TableCell className="font-medium">{ba.nome}</TableCell>
-                    <TableCell>{ba.banco ?? "—"}</TableCell>
-                    <TableCell><Badge variant="secondary" className="text-xs capitalize">{ba.tipo_conta}</Badge></TableCell>
-                    <TableCell className="text-right font-medium"><AccVal v={Number(ba.saldo_atual ?? 0)} /></TableCell>
-                    <TableCell className="text-right"><AccVal v={Number(ba.limite_credito ?? 0)} /></TableCell>
-                    <TableCell className={`text-right font-bold ${Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0) < 0 ? "text-destructive" : ""}`}>{fmtAcc(Number(ba.saldo_atual ?? 0) + Number(ba.limite_credito ?? 0))}</TableCell>
-                  </TableRow>
-                ))}
+                {bankAccounts.map((ba) => {
+                  const av = computeAccountLiquidity(ba);
+                  return (
+                    <TableRow key={ba.id}>
+                      <TableCell className="font-medium">{ba.nome}</TableCell>
+                      <TableCell>{ba.banco ?? "—"}</TableCell>
+                      <TableCell><Badge variant="secondary" className="text-xs capitalize">{ba.tipo_conta}</Badge></TableCell>
+                      <TableCell className="text-right font-medium"><AccVal v={Number(ba.saldo_atual ?? 0)} /></TableCell>
+                      <TableCell className="text-right"><AccVal v={av.limiteDisponivel} /></TableCell>
+                      <TableCell className={`text-right font-bold ${av.liquidez <= 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(av.liquidez)}</TableCell>
+                    </TableRow>
+                  );
+                })}
                 <TableRow className="bg-muted/50 font-bold">
                   <TableCell colSpan={3}>Total</TableCell>
                   <TableCell className="text-right"><AccVal v={bankTotals.saldoTotal} /></TableCell>
                   <TableCell className="text-right"><AccVal v={bankTotals.limiteTotal} /></TableCell>
-                  <TableCell className="text-right"><AccVal v={bankTotals.disponibilidadeTotal} /></TableCell>
+                  <TableCell className={`text-right ${bankTotals.liquidezTotal <= 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(bankTotals.liquidezTotal)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
