@@ -73,6 +73,8 @@ export interface CashPositionPdfInput {
     saldo: number;
     limite: number;
     disponibilidade: number;
+    /** Liquidez total consolidada (capital de giro disponível para pagamento). */
+    liquidez?: number;
     apOverdue: number;
     apDue30: number;
     arNext30: number;
