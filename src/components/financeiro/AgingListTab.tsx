@@ -527,11 +527,11 @@ export function AgingListTab() {
           onClick={() => setCashDetailOpen(true)}
         />
         <KPICard
-          title="Disponibilidade Total"
-          value={fmtAcc(bankTotals.disponibilidadeTotal)}
-          valueClassName={bankTotals.disponibilidadeTotal < 0 ? "text-destructive" : ""}
+          title="Liquidez (capital de giro)"
+          value={fmtAcc(bankTotals.liquidezTotal)}
+          valueClassName={bankTotals.liquidezTotal < 0 ? "text-destructive" : "text-primary"}
           icon={<Wallet size={20} />}
-          subtitle="Saldo + Limite"
+          subtitle="Saldos positivos + limite disponível"
           onClick={() => setCashDetailOpen(true)}
         />
         <KPICard title="Entradas Previstas" value={fmt(arBuckets.totalAR)} icon={<TrendingUp size={20} />} subtitle={`${entradaEntries.filter(e => (e.status === "previsto" || e.status === "confirmado") && differenceInDays(parseISO((e as any).data_vencimento || e.data_prevista), today) >= 0).length} título(s)`} />
