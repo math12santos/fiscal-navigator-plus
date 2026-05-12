@@ -19,6 +19,7 @@ import { useGroupingRules } from "@/hooks/useGroupingRules";
 import { useGroupingMacrogroups } from "@/hooks/useGroupingMacrogroups";
 import { buildHierarchy } from "@/lib/groupingHierarchy";
 import { generateCashPositionPdf, type CashPositionByOrg, type AuditDivergenceRow, type WeekPaymentRow } from "@/lib/cashPositionPdf";
+import { calculateAvailability } from "@/lib/overdraftCalculations";
 import { startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 
 const fmt = (v: number) =>
