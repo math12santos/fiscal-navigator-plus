@@ -23,7 +23,11 @@ const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
 
 export function ContasAPagar() {
-  const { entries, totals, isLoading, create, markAsPaid, undoPaymentIssued, remove } = useFinanceiro("saida");
+  const { entries: allEntries, totals: allTotals, isLoading, create, markAsPaid, undoPaymentIssued, remove } = useFinanceiro("saida");
+  const entries = useFinanceiroMonthFilter(allEntries);
+  const filteredTotals = useMemo(() => computeFinanceiroTotals(entries), [entries]);
+  const totals = entries.length === allEntries.length ? allTotals : filteredTotals;
+  const monthClosed = useWorkingMonthClosed();
   const duplicates = useDuplicateDetection(entries);
   const updateRequest = useUpdateRequest();
   const { user } = useAuth();
