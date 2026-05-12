@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFinanceiro, FinanceiroInput, FinanceiroEntry } from "@/hooks/useFinanceiro";
+import { useFinanceiroMonthFilter, computeFinanceiroTotals } from "@/hooks/useFinanceiroMonthFilter";
+import { WorkingMonthBanner, useWorkingMonthClosed } from "./WorkingMonthBanner";
 import { useDuplicateDetection } from "@/hooks/useDuplicateDetection";
 import { KPICard } from "@/components/KPICard";
 import { Button } from "@/components/ui/button";
