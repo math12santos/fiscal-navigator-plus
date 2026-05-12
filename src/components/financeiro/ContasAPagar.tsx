@@ -179,10 +179,10 @@ export function ContasAPagar() {
       {/* Actions */}
       <div className="flex justify-end gap-2">
         <ExpenseRequestButton />
-        <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
+        <Button size="sm" variant="outline" onClick={() => setShowImport(true)} disabled={monthClosed} title={monthClosed ? "Mês fechado — reabra para editar" : undefined}>
           <FileUp className="h-4 w-4 mr-1" /> Importar CSV/XLSX
         </Button>
-        <Button size="sm" onClick={() => { setPrefill(undefined); setShowCreate(true); }}>
+        <Button size="sm" onClick={() => { setPrefill(undefined); setShowCreate(true); }} disabled={monthClosed} title={monthClosed ? "Mês fechado — reabra para editar" : undefined}>
           <Plus className="h-4 w-4 mr-1" /> Nova Despesa
         </Button>
       </div>
