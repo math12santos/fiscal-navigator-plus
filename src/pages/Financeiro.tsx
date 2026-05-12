@@ -120,5 +120,6 @@ export default function Financeiro() {
         )}
       </Tabs>
     </div>
+    </FinanceiroMonthProvider>
   );
 }
