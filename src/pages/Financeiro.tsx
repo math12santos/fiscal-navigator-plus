@@ -17,6 +17,7 @@ import { FinanceiroSkeleton } from "@/components/skeletons/FinanceiroSkeleton";
 import { SolicitacoesTab } from "@/components/financeiro/SolicitacoesTab";
 import { MonthClosingReadinessCard } from "@/components/financeiro/MonthClosingReadinessCard";
 import { RequestExpenseButton } from "@/components/requests/RequestExpenseButton";
+import { FinanceiroMonthProvider } from "@/contexts/FinanceiroMonthContext";
 
 const ALL_TABS = [
   { key: "dashboard", label: "Dashboard" },
@@ -68,6 +69,7 @@ export default function Financeiro() {
   }
 
   return (
+    <FinanceiroMonthProvider>
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Financeiro"
@@ -78,7 +80,7 @@ export default function Financeiro() {
 
       <SectorOnboardingBar sector="financeiro" onTabChange={handleMaturityTabChange} />
 
-      <MonthClosingReadinessCard />
+      <MonthClosingReadinessCard onNavigateTab={(t) => setActiveTab(t)} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex-wrap bg-muted/40 border border-border p-1 h-auto">
@@ -118,5 +120,6 @@ export default function Financeiro() {
         )}
       </Tabs>
     </div>
+    </FinanceiroMonthProvider>
   );
 }

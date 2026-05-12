@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFinanceiro, FinanceiroInput, FinanceiroEntry } from "@/hooks/useFinanceiro";
+import { useFinanceiroMonthFilter, computeFinanceiroTotals } from "@/hooks/useFinanceiroMonthFilter";
+import { WorkingMonthBanner, useWorkingMonthClosed } from "./WorkingMonthBanner";
 import { useDuplicateDetection } from "@/hooks/useDuplicateDetection";
 import { KPICard } from "@/components/KPICard";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,11 @@ const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(v);
 
 export function ContasAPagar() {
-  const { entries, totals, isLoading, create, markAsPaid, undoPaymentIssued, remove } = useFinanceiro("saida");
+  const { entries: allEntries, totals: allTotals, isLoading, create, markAsPaid, undoPaymentIssued, remove } = useFinanceiro("saida");
+  const entries = useFinanceiroMonthFilter(allEntries);
+  const filteredTotals = useMemo(() => computeFinanceiroTotals(entries), [entries]);
+  const totals = entries.length === allEntries.length ? allTotals : filteredTotals;
+  const monthClosed = useWorkingMonthClosed();
   const duplicates = useDuplicateDetection(entries);
   const updateRequest = useUpdateRequest();
   const { user } = useAuth();
@@ -152,6 +158,7 @@ export function ContasAPagar() {
 
   return (
     <div className="space-y-4">
+      <WorkingMonthBanner />
       {/* KPIs MECE: Previsto · Em pagamento · Pago · PMP */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard title="Previsto" value={`${fmt(totals.pendente)} (${totals.count_pendente})`} icon={<Clock size={20} />} />
@@ -172,10 +179,10 @@ export function ContasAPagar() {
       {/* Actions */}
       <div className="flex justify-end gap-2">
         <ExpenseRequestButton />
-        <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
+        <Button size="sm" variant="outline" onClick={() => setShowImport(true)} disabled={monthClosed} title={monthClosed ? "Mês fechado — reabra para editar" : undefined}>
           <FileUp className="h-4 w-4 mr-1" /> Importar CSV/XLSX
         </Button>
-        <Button size="sm" onClick={() => { setPrefill(undefined); setShowCreate(true); }}>
+        <Button size="sm" onClick={() => { setPrefill(undefined); setShowCreate(true); }} disabled={monthClosed} title={monthClosed ? "Mês fechado — reabra para editar" : undefined}>
           <Plus className="h-4 w-4 mr-1" /> Nova Despesa
         </Button>
       </div>

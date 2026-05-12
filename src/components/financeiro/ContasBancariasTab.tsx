@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useBankAccounts, BankAccount } from "@/hooks/useBankAccounts";
+import { WorkingMonthBanner } from "./WorkingMonthBanner";
 import { BankAccountFormDialog } from "./BankAccountFormDialog";
 import { OverdraftValidationDialog } from "./OverdraftValidationDialog";
 import { Button } from "@/components/ui/button";
@@ -250,6 +251,7 @@ export function ContasBancariasTab() {
 
   return (
     <div className="space-y-4">
+      <WorkingMonthBanner />
       {/* KPIs de capital de giro */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card>

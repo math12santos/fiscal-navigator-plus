@@ -13,6 +13,9 @@ import { ReconciliationRulesDialog } from "@/components/financeiro/Reconciliatio
 import { ClassifyAndReconcileDialog } from "@/components/financeiro/ClassifyAndReconcileDialog";
 import { StatementResolutionPanel } from "@/components/financeiro/StatementResolutionPanel";
 import { useStatementResolution } from "@/hooks/useStatementResolution";
+import { WorkingMonthBanner } from "./WorkingMonthBanner";
+import { useFinanceiroMonth } from "@/contexts/FinanceiroMonthContext";
+import { endOfMonth, format, parse, startOfMonth } from "date-fns";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
@@ -37,10 +40,19 @@ export function ConciliacaoTab() {
   const { unresolved } = useStatementResolution();
   const unresolvedCount = unresolved.data?.length ?? 0;
 
+  const { workingMonth } = useFinanceiroMonth();
+  const monthRange = workingMonth
+    ? (() => {
+        const d = parse(workingMonth, "yyyy-MM", new Date());
+        return { from: format(startOfMonth(d), "yyyy-MM-dd"), to: format(endOfMonth(d), "yyyy-MM-dd") };
+      })()
+    : {};
+
   const { bankAccounts } = useBankAccounts();
   const { entries, isLoading, stats, fetchCandidates, reconcile, unreconcile, updateStatus, autoReconcileBatch, snapshotBalances } = useConciliacao({
     bankAccountId: bankFilter === "__all__" ? undefined : bankFilter,
     status: statusFilter,
+    ...monthRange,
   });
 
   const openMatch = async (e: { id: string; descricao: string; valor: number }) => {
@@ -55,6 +67,7 @@ export function ConciliacaoTab() {
 
   return (
     <div className="space-y-6">
+      <WorkingMonthBanner />
       {unresolvedCount > 0 && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 flex items-center justify-between gap-3">
           <div className="flex items-start gap-2 text-sm">
