@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useBankAccounts, BankAccount } from "@/hooks/useBankAccounts";
+import { WorkingMonthBanner } from "./WorkingMonthBanner";
 import { BankAccountFormDialog } from "./BankAccountFormDialog";
 import { OverdraftValidationDialog } from "./OverdraftValidationDialog";
 import { Button } from "@/components/ui/button";
