@@ -138,9 +138,9 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     theme: "plain",
     styles: { fontSize: 9, cellPadding: 2 },
     body: [
-      ["Saldo em Contas", fmt(input.totals.saldo)],
-      ["Limite de Crédito Disponível", fmt(input.totals.limite)],
-      [{ content: "Disponibilidade Total (Saldo + Limite)", styles: { fontStyle: "bold" } }, { content: fmt(input.totals.disponibilidade), styles: { fontStyle: "bold" } }],
+      [{ content: "Liquidez Total (capital de giro disponível)", styles: { fontStyle: "bold" } }, { content: fmt(input.totals.liquidez ?? input.totals.disponibilidade), styles: { fontStyle: "bold" } }],
+      ["Saldo bruto em contas (informativo)", fmt(input.totals.saldo)],
+      ["Limite de crédito disponível", fmt(input.totals.limite)],
       ["Contas a Pagar — Vencidas", fmt(input.totals.apOverdue)],
       ["Contas a Pagar — Próx. 30 dias", fmt(input.totals.apDue30)],
       ["Contas a Receber — Próx. 30 dias", fmt(input.totals.arNext30)],
@@ -149,7 +149,15 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     didParseCell: colorNegatives,
   });
 
-  let cursorY = (doc as any).lastAutoTable.finalY + 8;
+  let cursorY = (doc as any).lastAutoTable.finalY + 4;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(140, 140, 140);
+  doc.text(
+    "Liquidez = Σ por conta de max(0, saldo) + limite disponível. Contas negativas não reduzem o caixa do consolidado.",
+    marginX, cursorY + 3, { maxWidth: pageWidth - marginX * 2 },
+  );
+  cursorY += 10;
 
   // ===== Per-Org section =====
   for (const org of input.perOrg) {
