@@ -470,6 +470,7 @@ export function AgingListTab() {
           saldo: bankTotals.saldoTotal,
           limite: bankTotals.limiteTotal,
           disponibilidade: bankTotals.disponibilidadeTotal,
+          liquidez: bankTotals.liquidezTotal,
           apOverdue: totalOverdue,
           apDue30: totalDue,
           arNext30: arBuckets.ar7.total + arBuckets.ar15.total + arBuckets.ar30.total,
