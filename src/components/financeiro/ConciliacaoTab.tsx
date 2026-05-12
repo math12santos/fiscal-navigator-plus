@@ -13,6 +13,9 @@ import { ReconciliationRulesDialog } from "@/components/financeiro/Reconciliatio
 import { ClassifyAndReconcileDialog } from "@/components/financeiro/ClassifyAndReconcileDialog";
 import { StatementResolutionPanel } from "@/components/financeiro/StatementResolutionPanel";
 import { useStatementResolution } from "@/hooks/useStatementResolution";
+import { WorkingMonthBanner } from "./WorkingMonthBanner";
+import { useFinanceiroMonth } from "@/contexts/FinanceiroMonthContext";
+import { endOfMonth, format, parse, startOfMonth } from "date-fns";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
