@@ -40,10 +40,19 @@ export function ConciliacaoTab() {
   const { unresolved } = useStatementResolution();
   const unresolvedCount = unresolved.data?.length ?? 0;
 
+  const { workingMonth } = useFinanceiroMonth();
+  const monthRange = workingMonth
+    ? (() => {
+        const d = parse(workingMonth, "yyyy-MM", new Date());
+        return { from: format(startOfMonth(d), "yyyy-MM-dd"), to: format(endOfMonth(d), "yyyy-MM-dd") };
+      })()
+    : {};
+
   const { bankAccounts } = useBankAccounts();
   const { entries, isLoading, stats, fetchCandidates, reconcile, unreconcile, updateStatus, autoReconcileBatch, snapshotBalances } = useConciliacao({
     bankAccountId: bankFilter === "__all__" ? undefined : bankFilter,
     status: statusFilter,
+    ...monthRange,
   });
 
   const openMatch = async (e: { id: string; descricao: string; valor: number }) => {
