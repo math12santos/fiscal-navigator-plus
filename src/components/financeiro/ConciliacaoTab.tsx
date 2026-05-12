@@ -67,6 +67,7 @@ export function ConciliacaoTab() {
 
   return (
     <div className="space-y-6">
+      <WorkingMonthBanner />
       {unresolvedCount > 0 && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 flex items-center justify-between gap-3">
           <div className="flex items-start gap-2 text-sm">
