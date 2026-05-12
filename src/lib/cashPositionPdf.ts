@@ -25,6 +25,14 @@ export interface CashPositionAccount {
   tipo_conta: string;
   saldo_atual: number;
   limite_credito: number;
+  /** Limite ainda disponível para uso (limite_credito - usado). */
+  limite_disponivel?: number;
+  /**
+   * Liquidez REAL desta conta para pagamento (capital de giro).
+   * Convenção: contas com saldo negativo contribuem 0 para o consolidado
+   * (a conta pode permanecer negativa); o limite disponível ainda conta.
+   */
+  liquidez?: number;
   organization_id: string | null;
 }
 
@@ -32,9 +40,14 @@ export interface CashPositionByOrg {
   orgId: string;
   orgName: string;
   accounts: CashPositionAccount[];
+  /** Soma bruta dos saldos (pode ser inferior à liquidez quando há contas negativas). */
   saldo: number;
+  /** Limite de crédito total contratado. */
   limite: number;
+  /** Soma bruta saldo+limite (mantido por compatibilidade). */
   disponibilidade: number;
+  /** Liquidez consolidada — capital de giro disponível para pagamento. */
+  liquidez?: number;
 }
 
 export interface AuditDivergenceRow {
