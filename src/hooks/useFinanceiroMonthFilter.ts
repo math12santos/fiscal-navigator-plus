@@ -21,3 +21,50 @@ export function useFinanceiroMonthFilter<T extends FinanceiroEntry>(entries: T[]
     return entries.filter((e) => entryMonth(e) === workingMonth);
   }, [entries, workingMonth]);
 }
+
+/** Recalcula os totais MECE (mesma fórmula de useFinanceiro) para uma lista filtrada. */
+export function computeFinanceiroTotals(entries: FinanceiroEntry[]) {
+  let total_previsto = 0;
+  let total_realizado = 0;
+  let em_pagamento = 0;
+  let count_em_pagamento = 0;
+  let pendente = 0;
+  let count_pendente = 0;
+
+  for (const e of entries) {
+    if ((e as any).dp_sub_category === "provisao_acumulada") continue;
+    if ((e as any).categoria === "transferencia_interna") continue;
+    if ((e as any).is_estorno) {
+      const v = Number(e.valor_realizado ?? e.valor_previsto);
+      total_previsto -= v;
+      total_realizado -= v;
+      continue;
+    }
+    const isRealized = e.status === "pago" || e.status === "recebido";
+    const isIssued = e.status === "pagamento_emitido" || e.status === "recebimento_esperado";
+    const isPending = e.status === "previsto" || e.status === "confirmado";
+    const valorRef = isRealized
+      ? Number(e.valor_realizado ?? e.valor_previsto)
+      : Number(e.valor_previsto);
+    total_previsto += valorRef;
+    if (isRealized) {
+      total_realizado += Number(e.valor_realizado ?? e.valor_previsto);
+    } else if (isIssued) {
+      em_pagamento += Number(e.valor_previsto);
+      count_em_pagamento++;
+    } else if (isPending) {
+      pendente += Number(e.valor_previsto);
+      count_pendente++;
+    }
+  }
+
+  return {
+    total_previsto,
+    total_realizado,
+    em_pagamento,
+    count_em_pagamento,
+    pendente,
+    count_pendente,
+    total: entries.length,
+  };
+}
