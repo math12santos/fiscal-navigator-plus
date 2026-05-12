@@ -105,11 +105,28 @@ export function AgingListTab() {
     };
   }, [entradaEntries, today]);
 
+  // Helper: liquidez real de UMA conta — capital de giro disponível para pagamento.
+  // Convenção MECE: contas negativas não reduzem o caixa do consolidado (podem permanecer negativas);
+  // o limite disponível ainda contribui.
+  const computeAccountLiquidity = (b: any) => {
+    const av = calculateAvailability({
+      saldoAtual: Number(b.saldo_atual ?? 0),
+      limiteTotal: Number(b.limite_credito ?? 0),
+      limiteUtilizado: Number(b.limite_utilizado ?? 0),
+      limiteTipo: (b.limite_tipo || "cheque_especial") as any,
+    });
+    return {
+      limiteDisponivel: av.limiteDisponivel,
+      liquidez: Math.max(0, av.capitalGiroDisponivel),
+    };
+  };
+
   // ── Bank balances ──
   const bankTotals = useMemo(() => {
     const saldoTotal = bankAccounts.reduce((s, b) => s + Number(b.saldo_atual ?? 0), 0);
     const limiteTotal = bankAccounts.reduce((s, b) => s + Number(b.limite_credito ?? 0), 0);
-    return { saldoTotal, limiteTotal, disponibilidadeTotal: saldoTotal + limiteTotal };
+    const liquidezTotal = bankAccounts.reduce((s, b) => s + computeAccountLiquidity(b).liquidez, 0);
+    return { saldoTotal, limiteTotal, disponibilidadeTotal: saldoTotal + limiteTotal, liquidezTotal };
   }, [bankAccounts]);
 
   // ── Cash position grouped per organization (for clickable cards & PDF) ──
@@ -132,20 +149,27 @@ export function AgingListTab() {
     for (const [orgId, accounts] of byOrg.entries()) {
       const saldo = accounts.reduce((s, b) => s + Number(b.saldo_atual ?? 0), 0);
       const limite = accounts.reduce((s, b) => s + Number(b.limite_credito ?? 0), 0);
+      const liquidez = accounts.reduce((s, b) => s + computeAccountLiquidity(b).liquidez, 0);
       result.push({
         orgId,
         orgName: orgNames.get(orgId) ?? "Organização",
-        accounts: accounts.map((a) => ({
-          nome: a.nome,
-          banco: a.banco,
-          tipo_conta: a.tipo_conta,
-          saldo_atual: Number(a.saldo_atual ?? 0),
-          limite_credito: Number(a.limite_credito ?? 0),
-          organization_id: a.organization_id,
-        })),
+        accounts: accounts.map((a) => {
+          const av = computeAccountLiquidity(a);
+          return {
+            nome: a.nome,
+            banco: a.banco,
+            tipo_conta: a.tipo_conta,
+            saldo_atual: Number(a.saldo_atual ?? 0),
+            limite_credito: Number(a.limite_credito ?? 0),
+            limite_disponivel: av.limiteDisponivel,
+            liquidez: av.liquidez,
+            organization_id: a.organization_id,
+          };
+        }),
         saldo,
         limite,
         disponibilidade: saldo + limite,
+        liquidez,
       });
     }
     return result.sort((a, b) => a.orgName.localeCompare(b.orgName, "pt-BR"));
