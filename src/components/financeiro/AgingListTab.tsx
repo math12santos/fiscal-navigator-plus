@@ -562,7 +562,7 @@ export function AgingListTab() {
                     <TableHead className="text-center">Contas</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
                     <TableHead className="text-right">Limite</TableHead>
-                    <TableHead className="text-right">Disponível</TableHead>
+                    <TableHead className="text-right">Liquidez</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -579,7 +579,7 @@ export function AgingListTab() {
                       </TableCell>
                       <TableCell className="text-right"><AccVal v={org.saldo} /></TableCell>
                       <TableCell className="text-right text-muted-foreground"><AccVal v={org.limite} /></TableCell>
-                      <TableCell className={`text-right font-bold ${org.disponibilidade < 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(org.disponibilidade)}</TableCell>
+                      <TableCell className={`text-right font-bold ${(org.liquidez ?? 0) <= 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(org.liquidez ?? 0)}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/50 font-bold">
@@ -587,13 +587,13 @@ export function AgingListTab() {
                     <TableCell className="text-center">{bankAccounts.length}</TableCell>
                     <TableCell className="text-right"><AccVal v={bankTotals.saldoTotal} /></TableCell>
                     <TableCell className="text-right"><AccVal v={bankTotals.limiteTotal} /></TableCell>
-                    <TableCell className={`text-right ${bankTotals.disponibilidadeTotal < 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(bankTotals.disponibilidadeTotal)}</TableCell>
+                    <TableCell className={`text-right ${bankTotals.liquidezTotal <= 0 ? "text-destructive" : "text-primary"}`}>{fmtAcc(bankTotals.liquidezTotal)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
               <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-                ⚠️ Os saldos exibidos são manualmente atualizados em <strong>Contas Bancárias</strong> e podem não refletir
-                lançamentos pagos/recebidos ainda não conciliados. Para uma posição de caixa precisa, faça a conciliação bancária na aba <strong>Conciliação</strong>.
+                <strong>Liquidez</strong> = soma por conta de <em>max(0, saldo) + limite disponível</em>. Contas negativas
+                não reduzem o caixa do consolidado — podem permanecer negativas enquanto outras contas têm liquidez.
               </p>
             </div>
           )}
