@@ -158,6 +158,7 @@ export function ContasAPagar() {
 
   return (
     <div className="space-y-4">
+      <WorkingMonthBanner />
       {/* KPIs MECE: Previsto · Em pagamento · Pago · PMP */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard title="Previsto" value={`${fmt(totals.pendente)} (${totals.count_pendente})`} icon={<Clock size={20} />} />
