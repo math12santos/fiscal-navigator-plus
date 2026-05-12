@@ -1,83 +1,83 @@
-
-# Contas Bancárias: Saldo Manual × Saldo OFX + Relatório PDF
-
 ## Objetivo
 
-- Manter o **saldo manual** como hoje (campo livre, usado para emissão de relatório).
-- Tratar o **saldo do OFX** como **referência** (verdade) e mostrar a **divergência** ao lado do manual, para o gestor ver o que falta conciliar.
-- Adicionar botão **"Emitir Relatório PDF"** com o mesmo padrão visual do `cashPositionPdf` (header + resumo + tabelas + carimbo de rastreabilidade).
+Permitir que o usuário troque o mês no card "Fechamento de mês" e que essa seleção propague para as abas **Contas a Pagar**, **Contas a Receber**, **Conciliação** e **Contas Bancárias / Extrato**, possibilitando ajustes em qualquer mês ainda em aberto sem sair da sessão.
 
-## Mudanças
+## Fluxo desejado
 
-### 1. Banco — guardar saldo OFX por conta
+1. No topo de `/financeiro`, o card de fechamento mostra o seletor de mês (já existe).
+2. Ao trocar o mês:
+   - O card recalcula prontidão para o mês escolhido.
+   - Um badge ao lado do seletor mostra **Aberto** ou **Fechado** (a partir de `fiscal_periods`). Se Fechado, exibe aviso "ajustes bloqueados — reabra para editar".
+   - Os 3 itens (Extrato / AP / AR) viram **atalhos clicáveis** que abrem a aba correspondente já filtrada pelo mês selecionado.
+3. Em cada aba financeira filtrada por mês, um cabeçalho discreto exibe:
+   `Mês de trabalho: 2026-04 [Aberto] [Limpar filtro]`
+   — clicar em "Limpar filtro" volta para a visão completa (comportamento atual).
+4. Ao mudar de organização ou recarregar, o mês de trabalho reseta para o mês corrente.
 
-Migration adiciona em `bank_accounts`:
-- `saldo_ofx numeric` — último saldo `<LEDGERBAL><BALAMT>` lido do OFX.
-- `saldo_ofx_data date` — `DTASOF` do mesmo OFX.
-- `saldo_ofx_atualizado_em timestamptz`.
-- `saldo_ofx_import_id uuid` (referência ao import que carregou o saldo, para auditoria).
+## Mudanças técnicas
 
-Sem nova RLS — herda das policies existentes.
+### 1. Estado compartilhado — novo `FinanceiroMonthContext`
 
-### 2. Parser OFX — extrair LEDGERBAL
+Arquivo novo `src/contexts/FinanceiroMonthContext.tsx`:
+- Provider colocado em `src/pages/Financeiro.tsx` envolvendo todo o conteúdo da página.
+- Estado: `workingMonth: string | null` (formato `yyyy-MM`, default = mês corrente), setter `setWorkingMonth`, e helper `clearWorkingMonth` (define como `null` = "sem filtro").
+- Reset automático quando `currentOrg.id` muda.
 
-`src/lib/parsers/ofxParser.ts`:
-- Adicionar bloco `<LEDGERBAL>` → expor `closingBalance: { value: number; asOf: string | null } | null` no `OfxParseResult`.
-- Mantém compat (campos atuais inalterados).
+### 2. `MonthClosingReadinessCard.tsx`
+- Substituir o `useState` local pelo contexto.
+- Adicionar badge **Aberto / Fechado** (usando `useFiscalPeriods().isMonthClosed`).
+- Tornar os 3 cartões `ReadinessItem` clicáveis: ao clicar, chamar uma callback que troca a aba ativa de `Financeiro.tsx` (via `setSearchParams({ tab: 'pagar' | 'receber' | 'conciliacao' })`) mantendo o `workingMonth`.
 
-### 3. Hook de import — gravar saldo OFX
+### 3. Hook de filtro reutilizável — `useFinanceiroMonthFilter.ts`
 
-`src/hooks/useBankStatementImport.ts`:
-- Após parse OFX, se `closingBalance` presente e a conta destino for conhecida, atualizar `bank_accounts.saldo_ofx*` na finalização do import (idempotente — sempre sobrescreve com o OFX mais recente comparando `saldo_ofx_data`).
+Novo hook que recebe a lista de `FinanceiroEntry[]` e retorna a lista filtrada pelo `workingMonth` do contexto. Critério:
+- Considerar a entry "do mês" se `data_realizada` (quando existir) cair no mês; senão, `data_prevista`/`data_vencimento`.
+- Quando `workingMonth === null`, retorna a lista intacta.
 
-### 4. UI da aba Contas Bancárias
+### 4. Aplicação do filtro nas abas
 
-`ContasBancariasTab.tsx`:
+Sem alterar `useFinanceiro` (continua trazendo o universo completo, importante para projeções e KPIs globais). O filtro é aplicado no nível de apresentação:
 
-a) **KPIs**: novo card "Divergência de Conciliação" mostrando soma absoluta de `saldo_ofx − saldo_atual` entre contas com OFX importado, com tooltip explicando.
+- `ContasAPagar.tsx` e `ContasAReceber.tsx`:
+  - Renderizar um `<WorkingMonthBanner />` (componente novo) acima dos KPIs.
+  - Aplicar `useFinanceiroMonthFilter(entries)` antes de passar para `FinanceiroTable`, `PendenciasPanel`, `DuplicateAlerts`, e recomputar os totais exibidos nos `KPICard` a partir da lista filtrada (mesma fórmula simples já usada). KPIs continuam respeitando o `is_estorno` / `transferencia_interna` conforme regras MECE.
+- `ConciliacaoTab.tsx`: aplicar o mesmo banner e passar o `workingMonth` como filtro adicional para o `StatementResolutionPanel` (filtrar `bank_statement_entries.data` pelo mês).
+- `ContasBancariasTab.tsx`: o banner aparece e, no sub-bloco de extratos por conta, filtra as linhas pelo mês. Os saldos manuais/OFX continuam sendo "snapshot atual" (não dependem de mês).
+- `FluxoCaixaTab.tsx`: **fora do escopo** desta entrega — já tem seu próprio range/MonthPicker; não tocar.
+- `AgingListTab.tsx`: **fora do escopo** (aging é por hoje, não por mês de competência).
 
-b) **Tabela**: a coluna "Saldo Atual" vira **"Saldo (Manual / OFX)"** com:
-- Linha 1: saldo manual (mantém botão de inserir).
-- Linha 2 (subtítulo, monoespaçada): `OFX: R$ x · dd/MM/aa` ou `OFX: —`.
-- Badge à direita:
-  - `Conciliado` (sucesso) se `|manual − ofx| < 0.01`.
-  - `A conciliar +R$ Δ` (warning) se há diferença.
-  - `Sem OFX` (outline) se nunca houve import.
-- Ação "Adotar OFX" no menu da linha → seta `saldo_atual = saldo_ofx`, registra timestamp.
+### 5. `WorkingMonthBanner.tsx` (novo)
+Pequeno componente reutilizável: mostra "Mês de trabalho: AAAA-MM", badge Aberto/Fechado, botão "Limpar filtro". Esconde-se quando `workingMonth` é o mês corrente sem ter sido alterado manualmente (pra não poluir).
 
-c) **Botão de cabeçalho**: `Emitir Relatório PDF` (ao lado de "Nova Conta"), abre o relatório direto (sem dialog extra; já temos contexto org).
+### 6. Bloqueio de escrita em mês fechado
+Já existe a checagem por `fiscal_periods` no backend (memória "Governance Periods"). O front apenas:
+- Desabilita ações de criação/edição nas tabelas quando o mês de trabalho está **Fechado**, com tooltip "Reabra o mês para editar".
+- Mostra link "Reabrir mês" no banner (chama `useFiscalPeriods().reopenPeriod`) — visível apenas para perfis que já tinham permissão de fechar.
 
-### 5. Relatório PDF — `bankBalancesPdf.ts`
-
-Novo módulo `src/lib/bankBalancesPdf.ts`, **exatamente no mesmo padrão visual** de `cashPositionPdf`:
-
-- Header: título "Relatório de Saldos Bancários", contexto (org / Holding), emissor, timestamp.
-- Resumo: total saldo manual, total saldo OFX, divergência total, contas conciliadas vs a conciliar.
-- Tabela única (ou por organização em modo Holding) com colunas:
-  `Conta | Banco | Tipo | Saldo Manual | Saldo OFX | Δ | Última conciliação`
-- Linhas com Δ ≠ 0 marcadas em vermelho via `colorNegatives` (usar formato contábil `(xxx)`).
-- Rodapé com paginação + carimbo SHA-256 + emissor (idêntico ao cashPosition).
-- Salva como `saldos-bancarios-YYYYMMDD-HHMM.pdf`.
-
-Reusa helpers (`fmt`, `colorNegatives`, `sha256Hex`) — copiados ou extraídos para um util compartilhado pequeno (`src/lib/pdfShared.ts`) se virar 3+ usos. Por ora, copiar para evitar refator amplo.
-
-### 6. Integração no botão
-
-`ContasBancariasTab` chama `generateBankBalancesPdf({...})` com:
-- `contextName = currentOrg.name` (ou "Consolidado" em Holding).
-- `accounts` = `allBankAccounts` mapeadas + nome da org.
-- `issuer = { name: user metadata, email, id: user.id }`.
+## O que NÃO muda
+- Estrutura de dados, RLS, RPCs.
+- `useFinanceiro` (universo continua completo; filtro é só de exibição).
+- `FluxoCaixaTab` e `AgingListTab`.
+- Lógica de projeções virtuais (`proj-`), MECE, materialização.
 
 ## Arquivos
 
-- `supabase/migrations/<novo>_bank_accounts_saldo_ofx.sql` (migration)
-- `src/lib/parsers/ofxParser.ts` (extrair LEDGERBAL)
-- `src/hooks/useBankStatementImport.ts` (gravar saldo OFX no fim do import)
-- `src/components/financeiro/ContasBancariasTab.tsx` (KPI Divergência, coluna dupla, botão PDF, ação "Adotar OFX")
-- `src/lib/bankBalancesPdf.ts` (novo)
+**Novos**
+- `src/contexts/FinanceiroMonthContext.tsx`
+- `src/hooks/useFinanceiroMonthFilter.ts`
+- `src/components/financeiro/WorkingMonthBanner.tsx`
 
-## Fora de escopo
+**Editados**
+- `src/pages/Financeiro.tsx` (provider + roteamento de aba a partir do card)
+- `src/components/financeiro/MonthClosingReadinessCard.tsx` (consome contexto, badge, itens clicáveis)
+- `src/components/financeiro/ContasAPagar.tsx`
+- `src/components/financeiro/ContasAReceber.tsx`
+- `src/components/financeiro/ConciliacaoTab.tsx`
+- `src/components/financeiro/ContasBancariasTab.tsx`
+- `.lovable/plan.md` (registrar mudança)
 
-- Reescrever conciliação ou matching automático.
-- Substituir o saldo manual: continua editável (CFO precisa para fechamento manual sem OFX disponível).
-- Versionamento histórico de saldo OFX (mantemos só o último; histórico fica nos `bank_statement_entries`).
+## Critérios de aceite
+1. Trocar o mês no card altera os totais e listas das abas AP, AR, Conciliação e Extrato.
+2. Em mês fechado, o banner mostra **Fechado** e os botões de criar/editar ficam desabilitados, com opção de "Reabrir mês".
+3. Clicar nos cartões Extrato/AP/AR do card abre a aba correspondente já filtrada.
+4. "Limpar filtro" volta à visão completa atual; trocar de organização zera o filtro.
