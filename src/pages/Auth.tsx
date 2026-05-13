@@ -10,7 +10,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, UserPlus } from "lucide-react";
+import { LogIn, UserPlus, TrendingUp, FileText, BarChart3, Briefcase } from "lucide-react";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
