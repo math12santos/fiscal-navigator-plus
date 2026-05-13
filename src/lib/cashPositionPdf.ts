@@ -157,7 +157,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
   doc.setFontSize(7);
   doc.setTextColor(140, 140, 140);
   doc.text(
-    "Liquidez = Σ por conta de max(0, saldo) + limite disponível. Contas negativas não reduzem o caixa do consolidado.",
+    "Capital de Giro = Σ por conta de max(0, saldo) + limite disponível. Saldos negativos não reduzem a liquidez do consolidado — uma conta ou empresa devedora não consome o caixa de outra.",
     marginX, cursorY + 3, { maxWidth: pageWidth - marginX * 2 },
   );
   cursorY += 10;
