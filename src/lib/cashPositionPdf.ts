@@ -175,22 +175,27 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     autoTable(doc, {
       startY: cursorY + 2,
       margin: { left: marginX, right: marginX },
-      head: [["Conta", "Banco", "Tipo", "Saldo", "Limite disp.", "Liquidez"]],
+      head: [["Conta", "Banco", "Tipo", "Saldo", "Limite disp.", "Capital de Giro"]],
       body: [
         ...org.accounts.map((a) => {
           const limDisp = a.limite_disponivel ?? a.limite_credito;
-          const liq = a.liquidez ?? (Math.max(0, a.saldo_atual) + Math.max(0, limDisp));
+          const liq = a.liquidez ?? Math.max(0, a.saldo_atual + Math.max(0, limDisp));
           return [
             a.nome, a.banco ?? "—", a.tipo_conta,
             fmt(a.saldo_atual), fmt(limDisp), fmt(liq),
           ];
         }),
-        [
-          { content: "Total", colSpan: 3, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } },
-          { content: fmt(org.saldo), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
-          { content: fmt(org.limite), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
-          { content: fmt(org.liquidez ?? org.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [36, 214, 196] } },
-        ] as any,
+        (() => {
+          const limDispTotal = org.accounts.reduce(
+            (s, a) => s + (a.limite_disponivel ?? a.limite_credito ?? 0), 0,
+          );
+          return [
+            { content: "Total", colSpan: 3, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } },
+            { content: fmt(org.saldo), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
+            { content: fmt(limDispTotal), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
+            { content: fmt(org.liquidez ?? org.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [36, 214, 196] } },
+          ] as any;
+        })(),
       ],
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [36, 214, 196], textColor: 0 },
