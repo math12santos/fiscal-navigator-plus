@@ -138,9 +138,12 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     theme: "plain",
     styles: { fontSize: 9, cellPadding: 2 },
     body: [
-      [{ content: "Liquidez Total (capital de giro disponível)", styles: { fontStyle: "bold" } }, { content: fmt(input.totals.liquidez ?? input.totals.disponibilidade), styles: { fontStyle: "bold" } }],
-      ["Saldo bruto em contas (informativo)", fmt(input.totals.saldo)],
-      ["Limite de crédito disponível", fmt(input.totals.limite)],
+      ["Saldo em contas", fmt(input.totals.saldo)],
+      ["Limite de crédito contratado", fmt(input.totals.limite)],
+      [
+        { content: "Capital de Giro Disponível", styles: { fontStyle: "bold", fillColor: [232, 251, 248] } },
+        { content: fmt(input.totals.liquidez ?? input.totals.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [232, 251, 248] } },
+      ],
       ["Contas a Pagar — Vencidas", fmt(input.totals.apOverdue)],
       ["Contas a Pagar — Próx. 30 dias", fmt(input.totals.apDue30)],
       ["Contas a Receber — Próx. 30 dias", fmt(input.totals.arNext30)],
