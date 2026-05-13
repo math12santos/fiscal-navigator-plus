@@ -179,7 +179,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
       body: [
         ...org.accounts.map((a) => {
           const limDisp = a.limite_disponivel ?? a.limite_credito;
-          const liq = a.liquidez ?? Math.max(0, a.saldo_atual + Math.max(0, limDisp));
+          const liq = a.liquidez ?? (Math.max(0, a.saldo_atual) + Math.max(0, limDisp));
           return [
             a.nome, a.banco ?? "—", a.tipo_conta,
             fmt(a.saldo_atual), fmt(limDisp), fmt(liq),
