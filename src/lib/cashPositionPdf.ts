@@ -138,9 +138,12 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     theme: "plain",
     styles: { fontSize: 9, cellPadding: 2 },
     body: [
-      [{ content: "Liquidez Total (capital de giro disponível)", styles: { fontStyle: "bold" } }, { content: fmt(input.totals.liquidez ?? input.totals.disponibilidade), styles: { fontStyle: "bold" } }],
-      ["Saldo bruto em contas (informativo)", fmt(input.totals.saldo)],
-      ["Limite de crédito disponível", fmt(input.totals.limite)],
+      ["Saldo em contas", fmt(input.totals.saldo)],
+      ["Limite de crédito contratado", fmt(input.totals.limite)],
+      [
+        { content: "Capital de Giro Disponível", styles: { fontStyle: "bold", fillColor: [232, 251, 248] } },
+        { content: fmt(input.totals.liquidez ?? input.totals.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [232, 251, 248] } },
+      ],
       ["Contas a Pagar — Vencidas", fmt(input.totals.apOverdue)],
       ["Contas a Pagar — Próx. 30 dias", fmt(input.totals.apDue30)],
       ["Contas a Receber — Próx. 30 dias", fmt(input.totals.arNext30)],
@@ -154,7 +157,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
   doc.setFontSize(7);
   doc.setTextColor(140, 140, 140);
   doc.text(
-    "Liquidez = Σ por conta de max(0, saldo) + limite disponível. Contas negativas não reduzem o caixa do consolidado.",
+    "Capital de Giro = Σ por conta de max(0, saldo) + limite disponível. Saldos negativos não reduzem a liquidez do consolidado — uma conta ou empresa devedora não consome o caixa de outra.",
     marginX, cursorY + 3, { maxWidth: pageWidth - marginX * 2 },
   );
   cursorY += 10;
@@ -172,7 +175,7 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
     autoTable(doc, {
       startY: cursorY + 2,
       margin: { left: marginX, right: marginX },
-      head: [["Conta", "Banco", "Tipo", "Saldo", "Limite disp.", "Liquidez"]],
+      head: [["Conta", "Banco", "Tipo", "Saldo", "Limite disp.", "Capital de Giro"]],
       body: [
         ...org.accounts.map((a) => {
           const limDisp = a.limite_disponivel ?? a.limite_credito;
@@ -182,12 +185,17 @@ export async function generateCashPositionPdf(input: CashPositionPdfInput) {
             fmt(a.saldo_atual), fmt(limDisp), fmt(liq),
           ];
         }),
-        [
-          { content: "Total", colSpan: 3, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } },
-          { content: fmt(org.saldo), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
-          { content: fmt(org.limite), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
-          { content: fmt(org.liquidez ?? org.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [36, 214, 196] } },
-        ] as any,
+        (() => {
+          const limDispTotal = org.accounts.reduce(
+            (s, a) => s + (a.limite_disponivel ?? a.limite_credito ?? 0), 0,
+          );
+          return [
+            { content: "Total", colSpan: 3, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } },
+            { content: fmt(org.saldo), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
+            { content: fmt(limDispTotal), styles: { fontStyle: "bold", halign: "right", fillColor: [240, 240, 240] } },
+            { content: fmt(org.liquidez ?? org.disponibilidade), styles: { fontStyle: "bold", halign: "right", fillColor: [36, 214, 196] } },
+          ] as any;
+        })(),
       ],
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [36, 214, 196], textColor: 0 },
