@@ -221,6 +221,9 @@ export function ContasBancariasTab() {
       saldo_manual_em: a.saldo_atualizado_em,
       saldo_ofx: a.saldo_ofx,
       saldo_ofx_data: a.saldo_ofx_data,
+      limite_credito: a.limite_credito ?? 0,
+      limite_utilizado: a.limite_utilizado ?? 0,
+      limite_tipo: (a.limite_tipo as any) ?? "outros",
     }));
     if (rows.length === 0) {
       toast({ title: "Sem contas bancárias para o relatório", variant: "destructive" });
