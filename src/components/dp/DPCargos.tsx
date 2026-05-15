@@ -3,15 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Edit2, Trash2, ChevronRight, ChevronDown } from "lucide-react";
 import { usePositions, useMutatePosition, useRoutines, useMutateRoutine } from "@/hooks/useDP";
 import { useCostCenters } from "@/hooks/useCostCenters";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 const PERIODICITIES = ["diaria", "semanal", "quinzenal", "mensal", "trimestral", "anual"];
 
@@ -19,12 +22,14 @@ export default function DPCargos() {
   const { data: positions = [] } = usePositions();
   const { costCenters = [] } = useCostCenters();
   const { create: createPos, update: updatePos, remove: removePos } = useMutatePosition();
-  const { toast } = useToast();
 
   const [posDialogOpen, setPosDialogOpen] = useState(false);
   const [editingPos, setEditingPos] = useState<any>(null);
   const [posForm, setPosForm] = useState({ name: "", level_hierarchy: "1", parent_id: "", cost_center_id: "", salary_min: "", salary_max: "", responsibilities: "" });
   const [expandedPos, setExpandedPos] = useState<string | null>(null);
+  const [deletingPos, setDeletingPos] = useState<any>(null);
+
+  const isSaving = createPos.isPending || updatePos.isPending;
 
   const posTree = useMemo(() => {
     const roots = positions.filter((p: any) => !p.parent_id);
@@ -53,8 +58,9 @@ export default function DPCargos() {
   };
 
   const handleSavePos = () => {
+    if (isSaving) return; // guard against double-click
     const payload = {
-      name: posForm.name,
+      name: posForm.name.trim(),
       level_hierarchy: Number(posForm.level_hierarchy) || 1,
       parent_id: posForm.parent_id || null,
       cost_center_id: posForm.cost_center_id || null,
@@ -62,16 +68,31 @@ export default function DPCargos() {
       salary_max: Number(posForm.salary_max) || 0,
       responsibilities: posForm.responsibilities || null,
     };
+    if (!payload.name) return;
     if (editingPos) {
-      updatePos.mutate({ id: editingPos.id, ...payload }, { onSuccess: () => { toast({ title: "Cargo atualizado" }); setPosDialogOpen(false); } });
+      updatePos.mutate({ id: editingPos.id, ...payload }, {
+        onSuccess: () => { toast.success("Cargo atualizado"); setPosDialogOpen(false); },
+        onError: (e: any) => toast.error(e?.message || "Erro ao atualizar cargo"),
+      });
     } else {
-      createPos.mutate(payload, { onSuccess: () => { toast({ title: "Cargo criado" }); setPosDialogOpen(false); } });
+      createPos.mutate(payload, {
+        onSuccess: () => { toast.success("Cargo criado"); setPosDialogOpen(false); },
+        onError: (e: any) => toast.error(e?.message || "Erro ao criar cargo"),
+      });
     }
+  };
+
+  const confirmDelete = () => {
+    if (!deletingPos) return;
+    const id = deletingPos.id;
+    removePos.mutate(id, {
+      onSuccess: () => { toast.success("Cargo excluído"); setDeletingPos(null); },
+      onError: (e: any) => { toast.error(e?.message || "Erro ao excluir cargo"); setDeletingPos(null); },
+    });
   };
 
   return (
     <div className="space-y-6">
-      {/* Organograma / Lista */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-sm">Organograma de Cargos</CardTitle>
@@ -94,7 +115,7 @@ export default function DPCargos() {
                     <Badge variant="outline" className="text-[10px] ml-1">Nível {p.level_hierarchy}</Badge>
                     <div className="ml-auto flex items-center gap-1">
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); openEditPos(p); }}><Edit2 size={11} /></Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={(e) => { e.stopPropagation(); removePos.mutate(p.id); }}><Trash2 size={11} /></Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={(e) => { e.stopPropagation(); setDeletingPos(p); }}><Trash2 size={11} /></Button>
                     </div>
                   </div>
                   {expandedPos === p.id && <RoutinesPanel positionId={p.id} />}
@@ -106,7 +127,7 @@ export default function DPCargos() {
       </Card>
 
       {/* Position Dialog */}
-      <Dialog open={posDialogOpen} onOpenChange={setPosDialogOpen}>
+      <Dialog open={posDialogOpen} onOpenChange={(o) => { if (!isSaving) setPosDialogOpen(o); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{editingPos ? "Editar Cargo" : "Novo Cargo"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
@@ -139,11 +160,31 @@ export default function DPCargos() {
             <div className="space-y-1"><Label>Responsabilidades</Label><Textarea value={posForm.responsibilities} onChange={(e) => setPosForm({ ...posForm, responsibilities: e.target.value })} rows={3} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPosDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSavePos} disabled={!posForm.name}>{editingPos ? "Salvar" : "Criar"}</Button>
+            <Button variant="outline" onClick={() => setPosDialogOpen(false)} disabled={isSaving}>Cancelar</Button>
+            <Button onClick={handleSavePos} disabled={!posForm.name.trim() || isSaving}>
+              {isSaving ? "Salvando…" : editingPos ? "Salvar" : "Criar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deletingPos} onOpenChange={(o) => { if (!o && !removePos.isPending) setDeletingPos(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir cargo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é permanente. {deletingPos?.name && <>O cargo <strong>{deletingPos.name}</strong> será removido junto com suas rotinas.</>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removePos.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} disabled={removePos.isPending}>
+              {removePos.isPending ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -151,13 +192,25 @@ export default function DPCargos() {
 function RoutinesPanel({ positionId }: { positionId: string }) {
   const { data: routines = [] } = useRoutines(positionId);
   const { create, remove } = useMutateRoutine();
-  const { toast } = useToast();
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({ name: "", objective: "", periodicity: "mensal", sla_days: "1", checklist: "" });
 
   const handleAdd = () => {
+    if (create.isPending || !form.name.trim()) return;
     create.mutate({ ...form, sla_days: Number(form.sla_days), position_id: positionId }, {
-      onSuccess: () => { toast({ title: "Rotina adicionada" }); setAddOpen(false); setForm({ name: "", objective: "", periodicity: "mensal", sla_days: "1", checklist: "" }); },
+      onSuccess: () => {
+        toast.success("Rotina adicionada");
+        setAddOpen(false);
+        setForm({ name: "", objective: "", periodicity: "mensal", sla_days: "1", checklist: "" });
+      },
+      onError: (e: any) => toast.error(e?.message || "Erro ao adicionar rotina"),
+    });
+  };
+
+  const handleRemove = (id: string) => {
+    remove.mutate(id, {
+      onSuccess: () => toast.success("Rotina excluída"),
+      onError: (e: any) => toast.error(e?.message || "Erro ao excluir rotina"),
     });
   };
 
@@ -177,7 +230,7 @@ function RoutinesPanel({ positionId }: { positionId: string }) {
               <Badge variant="outline" className="ml-2 text-[9px]">{r.periodicity}</Badge>
               {r.sla_days && <span className="text-muted-foreground ml-2">SLA: {r.sla_days}d</span>}
             </div>
-            <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => remove.mutate(r.id)}><Trash2 size={10} /></Button>
+            <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleRemove(r.id)}><Trash2 size={10} /></Button>
           </div>
         ))
       )}
@@ -193,8 +246,10 @@ function RoutinesPanel({ positionId }: { positionId: string }) {
             <Input type="number" placeholder="SLA (dias)" value={form.sla_days} onChange={(e) => setForm({ ...form, sla_days: e.target.value })} className="h-8 text-xs w-24" />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" className="h-7 text-xs" onClick={handleAdd} disabled={!form.name}>Salvar</Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddOpen(false)}>Cancelar</Button>
+            <Button size="sm" className="h-7 text-xs" onClick={handleAdd} disabled={!form.name.trim() || create.isPending}>
+              {create.isPending ? "Salvando…" : "Salvar"}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddOpen(false)} disabled={create.isPending}>Cancelar</Button>
           </div>
         </div>
       )}

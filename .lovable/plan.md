@@ -1,90 +1,50 @@
-## Objetivo
+## Diagnóstico
 
-Permitir que o usuário troque o mês no card "Fechamento de mês" e que essa seleção propague para as abas **Contas a Pagar**, **Contas a Receber**, **Conciliação** e **Contas Bancárias / Extrato**, possibilitando ajustes em qualquer mês ainda em aberto sem sair da sessão.
+Confirmei dois bugs no módulo **DP → Cargos** (`src/components/dp/DPCargos.tsx` + `src/hooks/useDP.ts` + RLS de `public.positions`):
 
-## Fluxo desejado
+### Bug 1 — Salvar cria vários cargos iguais
+O botão "Criar/Salvar" não fica desabilitado durante a mutation, e o `Dialog` só fecha no `onSuccess` (assíncrono). Cada clique extra dispara um novo `INSERT` em `positions`, gerando duplicatas. Mesmo padrão no painel de Rotinas.
 
-1. No topo de `/financeiro`, o card de fechamento mostra o seletor de mês (já existe).
-2. Ao trocar o mês:
-   - O card recalcula prontidão para o mês escolhido.
-   - Um badge ao lado do seletor mostra **Aberto** ou **Fechado** (a partir de `fiscal_periods`). Se Fechado, exibe aviso "ajustes bloqueados — reabra para editar".
-   - Os 3 itens (Extrato / AP / AR) viram **atalhos clicáveis** que abrem a aba correspondente já filtrada pelo mês selecionado.
-3. Em cada aba financeira filtrada por mês, um cabeçalho discreto exibe:
-   `Mês de trabalho: 2026-04 [Aberto] [Limpar filtro]`
-   — clicar em "Limpar filtro" volta para a visão completa (comportamento atual).
-4. Ao mudar de organização ou recarregar, o mês de trabalho reseta para o mês corrente.
+### Bug 2 — Excluir cargo não remove nada
+Causas combinadas:
+1. **RLS bloqueia silenciosamente.** A política de DELETE em `public.positions` exige papel `owner` ou `admin`:
+   ```
+   has_org_role(auth.uid(), organization_id, ARRAY['owner','admin'])
+   ```
+   Membros comuns conseguem criar/editar mas o `DELETE` afeta 0 linhas (Supabase não retorna erro nesse caso).
+2. **UI sem feedback nem confirmação.** O botão de lixeira chama `removePos.mutate(p.id)` direto, sem `AlertDialog` e sem toast de sucesso/erro — o usuário clica, nada acontece, e o cargo continua na lista.
 
-## Mudanças técnicas
+## Plano de correção
 
-### 1. Estado compartilhado — novo `FinanceiroMonthContext`
+### 1. Frontend — `src/components/dp/DPCargos.tsx`
+- Desabilitar o botão "Criar/Salvar" enquanto `createPos.isPending` ou `updatePos.isPending`, com label "Salvando…".
+- Guardar `handleSavePos` contra duplo clique (early return se já houver mutation pendente).
+- Adicionar `onError` em criar/editar/excluir mostrando toast de erro.
+- Trocar a exclusão direta por `AlertDialog` de confirmação ("Excluir cargo? Esta ação é permanente.").
+- Mostrar toast de sucesso na exclusão e, se a mutation indicar 0 linhas afetadas, exibir "Sem permissão para excluir este cargo".
+- Aplicar o mesmo tratamento (loading + toast + confirmação) no painel de Rotinas (criar e excluir).
 
-Arquivo novo `src/contexts/FinanceiroMonthContext.tsx`:
-- Provider colocado em `src/pages/Financeiro.tsx` envolvendo todo o conteúdo da página.
-- Estado: `workingMonth: string | null` (formato `yyyy-MM`, default = mês corrente), setter `setWorkingMonth`, e helper `clearWorkingMonth` (define como `null` = "sem filtro").
-- Reset automático quando `currentOrg.id` muda.
+### 2. Hook — `src/hooks/useDP.ts`
+- Em `useMutatePosition.remove`, usar `.delete().eq("id", id).select("id")`. Se o array vier vazio, lançar erro tratável pelo `onError` (detecta RLS silencioso).
+- Mesmo ajuste em `useMutateRoutine.remove`.
 
-### 2. `MonthClosingReadinessCard.tsx`
-- Substituir o `useState` local pelo contexto.
-- Adicionar badge **Aberto / Fechado** (usando `useFiscalPeriods().isMonthClosed`).
-- Tornar os 3 cartões `ReadinessItem` clicáveis: ao clicar, chamar uma callback que troca a aba ativa de `Financeiro.tsx` (via `setSearchParams({ tab: 'pagar' | 'receber' | 'conciliacao' })`) mantendo o `workingMonth`.
+### 3. RLS — migração em `public.positions` (e `public.position_routines` por consistência)
+Substituir a política de DELETE para permitir exclusão por:
+- `owner` ou `admin` da organização **OU**
+- o próprio usuário que criou o cargo (`auth.uid() = user_id`).
 
-### 3. Hook de filtro reutilizável — `useFinanceiroMonthFilter.ts`
+```sql
+DROP POLICY "Org admins can delete positions" ON public.positions;
+CREATE POLICY "Admins or creator can delete positions"
+  ON public.positions FOR DELETE
+  USING (
+    has_org_role(auth.uid(), organization_id, ARRAY['owner','admin'])
+    OR auth.uid() = user_id
+  );
+```
 
-Novo hook que recebe a lista de `FinanceiroEntry[]` e retorna a lista filtrada pelo `workingMonth` do contexto. Critério:
-- Considerar a entry "do mês" se `data_realizada` (quando existir) cair no mês; senão, `data_prevista`/`data_vencimento`.
-- Quando `workingMonth === null`, retorna a lista intacta.
+### 4. Limpeza dos cargos duplicados da usuária
+Após confirmação, gerar um `DELETE` one-shot que mantenha 1 registro por `(organization_id, name)` e remova os demais (preservando o mais antigo).
 
-### 4. Aplicação do filtro nas abas
-
-Sem alterar `useFinanceiro` (continua trazendo o universo completo, importante para projeções e KPIs globais). O filtro é aplicado no nível de apresentação:
-
-- `ContasAPagar.tsx` e `ContasAReceber.tsx`:
-  - Renderizar um `<WorkingMonthBanner />` (componente novo) acima dos KPIs.
-  - Aplicar `useFinanceiroMonthFilter(entries)` antes de passar para `FinanceiroTable`, `PendenciasPanel`, `DuplicateAlerts`, e recomputar os totais exibidos nos `KPICard` a partir da lista filtrada (mesma fórmula simples já usada). KPIs continuam respeitando o `is_estorno` / `transferencia_interna` conforme regras MECE.
-- `ConciliacaoTab.tsx`: aplicar o mesmo banner e passar o `workingMonth` como filtro adicional para o `StatementResolutionPanel` (filtrar `bank_statement_entries.data` pelo mês).
-- `ContasBancariasTab.tsx`: o banner aparece e, no sub-bloco de extratos por conta, filtra as linhas pelo mês. Os saldos manuais/OFX continuam sendo "snapshot atual" (não dependem de mês).
-- `FluxoCaixaTab.tsx`: **fora do escopo** desta entrega — já tem seu próprio range/MonthPicker; não tocar.
-- `AgingListTab.tsx`: **fora do escopo** (aging é por hoje, não por mês de competência).
-
-### 5. `WorkingMonthBanner.tsx` (novo)
-Pequeno componente reutilizável: mostra "Mês de trabalho: AAAA-MM", badge Aberto/Fechado, botão "Limpar filtro". Esconde-se quando `workingMonth` é o mês corrente sem ter sido alterado manualmente (pra não poluir).
-
-### 6. Bloqueio de escrita em mês fechado
-Já existe a checagem por `fiscal_periods` no backend (memória "Governance Periods"). O front apenas:
-- Desabilita ações de criação/edição nas tabelas quando o mês de trabalho está **Fechado**, com tooltip "Reabra o mês para editar".
-- Mostra link "Reabrir mês" no banner (chama `useFiscalPeriods().reopenPeriod`) — visível apenas para perfis que já tinham permissão de fechar.
-
-## O que NÃO muda
-- Estrutura de dados, RLS, RPCs.
-- `useFinanceiro` (universo continua completo; filtro é só de exibição).
-- `FluxoCaixaTab` e `AgingListTab`.
-- Lógica de projeções virtuais (`proj-`), MECE, materialização.
-
-## Arquivos
-
-**Novos**
-- `src/contexts/FinanceiroMonthContext.tsx`
-- `src/hooks/useFinanceiroMonthFilter.ts`
-- `src/components/financeiro/WorkingMonthBanner.tsx`
-
-**Editados**
-- `src/pages/Financeiro.tsx` (provider + roteamento de aba a partir do card)
-- `src/components/financeiro/MonthClosingReadinessCard.tsx` (consome contexto, badge, itens clicáveis)
-- `src/components/financeiro/ContasAPagar.tsx`
-- `src/components/financeiro/ContasAReceber.tsx`
-- `src/components/financeiro/ConciliacaoTab.tsx`
-- `src/components/financeiro/ContasBancariasTab.tsx`
-- `.lovable/plan.md` (registrar mudança)
-
-## Critérios de aceite
-1. Trocar o mês no card altera os totais e listas das abas AP, AR, Conciliação e Extrato.
-2. Em mês fechado, o banner mostra **Fechado** e os botões de criar/editar ficam desabilitados, com opção de "Reabrir mês".
-3. Clicar nos cartões Extrato/AP/AR do card abre a aba correspondente já filtrada.
-4. "Limpar filtro" volta à visão completa atual; trocar de organização zera o filtro.
-
-
----
-## ✅ Implementado: Mês de trabalho Financeiro (sessão de fechamento)
-
-`FinanceiroMonthContext` compartilha o `workingMonth` entre o `MonthClosingReadinessCard` e as abas AP/AR/Conciliação/Contas Bancárias. `WorkingMonthBanner` exibe o mês selecionado com badge Aberto/Fechado e botão "Reabrir mês". `useFinanceiroMonthFilter`+`computeFinanceiroTotals` recalculam KPIs por mês. Cartões de prontidão no card são clicáveis e navegam para a aba já filtrada. Ações de criação ficam desabilitadas quando o mês está fechado.
-
+## Próximo passo
+Se aprovar este plano, implemento na ordem: RLS → hook → UI → limpeza dos duplicados.
