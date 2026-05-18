@@ -194,6 +194,7 @@ function RoutinesPanel({ positionId }: { positionId: string }) {
   const { create, remove } = useMutateRoutine();
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({ name: "", objective: "", periodicity: "mensal", sla_days: "1", checklist: "" });
+  const [deletingRoutine, setDeletingRoutine] = useState<{ id: string; name: string } | null>(null);
 
   const handleAdd = () => {
     if (create.isPending || !form.name.trim()) return;
@@ -207,10 +208,12 @@ function RoutinesPanel({ positionId }: { positionId: string }) {
     });
   };
 
-  const handleRemove = (id: string) => {
-    remove.mutate(id, {
+  const confirmRemove = () => {
+    if (!deletingRoutine || remove.isPending) return;
+    remove.mutate(deletingRoutine.id, {
       onSuccess: () => toast.success("Rotina excluída"),
       onError: (e: any) => toast.error(e?.message || "Erro ao excluir rotina"),
+      onSettled: () => setDeletingRoutine(null),
     });
   };
 
@@ -230,7 +233,15 @@ function RoutinesPanel({ positionId }: { positionId: string }) {
               <Badge variant="outline" className="ml-2 text-[9px]">{r.periodicity}</Badge>
               {r.sla_days && <span className="text-muted-foreground ml-2">SLA: {r.sla_days}d</span>}
             </div>
-            <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleRemove(r.id)}><Trash2 size={10} /></Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 text-destructive"
+              disabled={remove.isPending}
+              onClick={() => setDeletingRoutine({ id: r.id, name: r.name })}
+            >
+              <Trash2 size={10} />
+            </Button>
           </div>
         ))
       )}
@@ -253,6 +264,23 @@ function RoutinesPanel({ positionId }: { positionId: string }) {
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!deletingRoutine} onOpenChange={(open) => !open && !remove.isPending && setDeletingRoutine(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir rotina?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A rotina <strong>{deletingRoutine?.name}</strong> será removida permanentemente. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={remove.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemove} disabled={remove.isPending}>
+              {remove.isPending ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
