@@ -216,8 +216,15 @@ export function useMutateRoutine() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("position_routines").delete().eq("id", id);
+      const { data, error } = await supabase
+        .from("position_routines")
+        .delete()
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Sem permissão para excluir esta rotina ou ela já foi removida.");
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["routines"] }),
   });

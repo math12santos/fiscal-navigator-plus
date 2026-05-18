@@ -1,50 +1,55 @@
-## Diagnóstico
+# Validação do painel de Rotinas (DP → Cargos → Rotinas)
 
-Confirmei dois bugs no módulo **DP → Cargos** (`src/components/dp/DPCargos.tsx` + `src/hooks/useDP.ts` + RLS de `public.positions`):
+## O que está OK hoje
 
-### Bug 1 — Salvar cria vários cargos iguais
-O botão "Criar/Salvar" não fica desabilitado durante a mutation, e o `Dialog` só fecha no `onSuccess` (assíncrono). Cada clique extra dispara um novo `INSERT` em `positions`, gerando duplicatas. Mesmo padrão no painel de Rotinas.
+**1. Duplicidade ao salvar — já protegido.**
+Em `src/components/dp/DPCargos.tsx` (`RoutinesPanel.handleAdd`):
+- Há early-return: `if (create.isPending || !form.name.trim()) return;`
+- O botão "Salvar" fica `disabled={!form.name.trim() || create.isPending}` e troca o label para "Salvando…".
+- O formulário só é resetado no `onSuccess`.
+Resultado: cliques repetidos não geram INSERTs duplicados.
 
-### Bug 2 — Excluir cargo não remove nada
-Causas combinadas:
-1. **RLS bloqueia silenciosamente.** A política de DELETE em `public.positions` exige papel `owner` ou `admin`:
-   ```
-   has_org_role(auth.uid(), organization_id, ARRAY['owner','admin'])
-   ```
-   Membros comuns conseguem criar/editar mas o `DELETE` afeta 0 linhas (Supabase não retorna erro nesse caso).
-2. **UI sem feedback nem confirmação.** O botão de lixeira chama `removePos.mutate(p.id)` direto, sem `AlertDialog` e sem toast de sucesso/erro — o usuário clica, nada acontece, e o cargo continua na lista.
+**2. Exclusão via RLS — não é silenciosamente bloqueada.**
+A policy de DELETE em `public.position_routines` é:
+```
+USING (is_org_member(auth.uid(), organization_id))
+```
+Ou seja, qualquer membro da organização pode excluir uma rotina — não há o mesmo problema de RLS silencioso que existia em `positions`. O `onError` + toast já estão ligados no `handleRemove`.
 
-## Plano de correção
+## O que ainda merece ajuste (consistência com Cargos)
 
-### 1. Frontend — `src/components/dp/DPCargos.tsx`
-- Desabilitar o botão "Criar/Salvar" enquanto `createPos.isPending` ou `updatePos.isPending`, com label "Salvando…".
-- Guardar `handleSavePos` contra duplo clique (early return se já houver mutation pendente).
-- Adicionar `onError` em criar/editar/excluir mostrando toast de erro.
-- Trocar a exclusão direta por `AlertDialog` de confirmação ("Excluir cargo? Esta ação é permanente.").
-- Mostrar toast de sucesso na exclusão e, se a mutation indicar 0 linhas afetadas, exibir "Sem permissão para excluir este cargo".
-- Aplicar o mesmo tratamento (loading + toast + confirmação) no painel de Rotinas (criar e excluir).
+**A. Confirmação de exclusão.**
+Hoje o botão de lixeira da rotina chama `remove.mutate(id)` direto, sem `AlertDialog`. Como rotinas geram tarefas/notificações em cascata, faz sentido exigir confirmação igual à de Cargos.
 
-### 2. Hook — `src/hooks/useDP.ts`
-- Em `useMutatePosition.remove`, usar `.delete().eq("id", id).select("id")`. Se o array vier vazio, lançar erro tratável pelo `onError` (detecta RLS silencioso).
-- Mesmo ajuste em `useMutateRoutine.remove`.
+**B. Detecção de delete silencioso (defensivo).**
+Mesmo a policy estando aberta, padronizar a mutation com `.delete().eq("id", id).select("id")` e lançar erro quando 0 linhas voltarem deixa o hook resiliente a futuras mudanças de RLS. Aplicar também em `useMutatePosition.remove` (já feito) e em `useMutateRoutine.remove`.
 
-### 3. RLS — migração em `public.positions` (e `public.position_routines` por consistência)
-Substituir a política de DELETE para permitir exclusão por:
-- `owner` ou `admin` da organização **OU**
-- o próprio usuário que criou o cargo (`auth.uid() = user_id`).
+**C. Guarda contra duplo clique na lixeira.**
+Desabilitar o botão de lixeira da rotina enquanto `remove.isPending` (hoje só o de Cargos faz isso via AlertDialog).
 
-```sql
-DROP POLICY "Org admins can delete positions" ON public.positions;
-CREATE POLICY "Admins or creator can delete positions"
-  ON public.positions FOR DELETE
-  USING (
-    has_org_role(auth.uid(), organization_id, ARRAY['owner','admin'])
-    OR auth.uid() = user_id
-  );
+## Plano de ajuste
+
+### 1. `src/hooks/useDP.ts` — `useMutateRoutine.remove`
+Trocar para:
+```ts
+const { data, error } = await supabase
+  .from("position_routines")
+  .delete()
+  .eq("id", id)
+  .select("id");
+if (error) throw error;
+if (!data || data.length === 0) {
+  throw new Error("Sem permissão para excluir esta rotina ou ela já foi removida.");
+}
 ```
 
-### 4. Limpeza dos cargos duplicados da usuária
-Após confirmação, gerar um `DELETE` one-shot que mantenha 1 registro por `(organization_id, name)` e remova os demais (preservando o mais antigo).
+### 2. `src/components/dp/DPCargos.tsx` — `RoutinesPanel`
+- Adicionar estado `deletingRoutine: { id, name } | null`.
+- Substituir o `onClick` do botão de lixeira por `setDeletingRoutine({ id: r.id, name: r.name })`.
+- Renderizar um `AlertDialog` ao final do componente (título: "Excluir rotina?", descrição com o nome) com `confirmDelete` chamando `remove.mutate(deletingRoutine.id, { onSuccess, onError, onSettled: () => setDeletingRoutine(null) })`.
+- Botões com `disabled={remove.isPending}` e label "Excluindo…".
 
-## Próximo passo
-Se aprovar este plano, implemento na ordem: RLS → hook → UI → limpeza dos duplicados.
+## Fora de escopo
+- Não mexer na RLS de `position_routines` (já está adequada).
+- Não alterar lógica de criação de rotinas (já está protegida contra duplicidade).
+- Nenhuma mudança em `useRoutineCalendar` / geração de tarefas.
