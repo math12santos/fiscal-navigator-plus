@@ -67,4 +67,5 @@ export const SECTOR_META: Record<SectorKey, { label: string; route: string }> = 
   planejamento: { label: "Planejamento", route: "/planejamento" },
   juridico: { label: "Jurídico", route: "/juridico" },
   ti: { label: "TI & Patrimônio", route: "/ti" },
+  compras: { label: "Compras", route: "/compras" },
 };
