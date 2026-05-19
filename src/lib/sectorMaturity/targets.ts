@@ -91,6 +91,12 @@ export function fieldsForSector(sector: SectorKey): (keyof SectorMaturityTargets
       "warranty_alert_days",
     ];
   }
+  if (sector === "compras") {
+    return [
+      "routines_target_pct",
+      "routines_overdue_tolerance_pct",
+    ];
+  }
   // financeiro
   return [
     "routines_target_pct",

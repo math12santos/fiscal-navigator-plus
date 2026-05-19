@@ -14,6 +14,7 @@ import { evaluateDP } from "@/lib/sectorMaturity/dp";
 import { evaluateFinanceiro } from "@/lib/sectorMaturity/financeiro";
 import { evaluateJuridico } from "@/lib/sectorMaturity/juridico";
 import { evaluateTI } from "@/lib/sectorMaturity/ti";
+import { evaluateCompras } from "@/lib/sectorMaturity/compras";
 import { SectorKey, SectorMaturityResult } from "@/lib/sectorMaturity/types";
 import { useSectorMaturityTargets } from "@/hooks/useSectorMaturityTargets";
 
@@ -37,6 +38,7 @@ export function useSectorOnboarding(
   const isFin = sector === "financeiro";
   const isJur = sector === "juridico";
   const isTi = sector === "ti";
+  const isCompras = sector === "compras";
 
   // Metas configuráveis (com fallback aos defaults quando não houver registro)
   const { targets } = useSectorMaturityTargets(sector);
@@ -334,6 +336,351 @@ export function useSectorOnboarding(
     enabled: !!orgId && isFin,
   });
 
+  // ============== Datasets Jurídico ==============
+  const jurConfigQ = useQuery({
+    queryKey: ["jur-config-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_config" as any).select("*").eq("organization_id", orgId!).maybeSingle();
+      if (error) throw error;
+      return (data as any) ?? null;
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurProcessesQ = useQuery({
+    queryKey: ["jur-processes-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_processes" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurMovementsQ = useQuery({
+    queryKey: ["jur-movements-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_movements" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurSettlementsQ = useQuery({
+    queryKey: ["jur-settlements-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_settlements" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurInstallmentsQ = useQuery({
+    queryKey: ["jur-installments-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_settlement_installments" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurDocumentsQ = useQuery({
+    queryKey: ["jur-documents-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_documents" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurExpensesQ = useQuery({
+    queryKey: ["jur-expenses-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_expenses" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurCashflowCountQ = useQuery({
+    queryKey: ["jur-cashflow-count-maturity", orgId, competencia],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("cashflow_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId!)
+        .eq("source", "juridico")
+        .gte("data_prevista", monthStart)
+        .lte("data_prevista", monthEnd);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurRequestsQ = useQuery({
+    queryKey: ["jur-requests-maturity", orgId, competencia],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("requests")
+        .select("id, status, due_date")
+        .eq("organization_id", orgId!)
+        .eq("type", "rotina_juridico")
+        .eq("competencia", competencia);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId && isJur,
+  });
+
+  // ============== Datasets TI ==============
+  const tiConfigQ = useQuery({
+    queryKey: ["ti-config-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_config" as any).select("*").eq("organization_id", orgId!).maybeSingle();
+      if (error) throw error;
+      return (data as any) ?? null;
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiEquipmentQ = useQuery({
+    queryKey: ["ti-equipment-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_equipment" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiSystemsQ = useQuery({
+    queryKey: ["ti-systems-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_systems" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiTelecomQ = useQuery({
+    queryKey: ["ti-telecom-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_telecom" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiTicketsQ = useQuery({
+    queryKey: ["ti-tickets-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_tickets" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiIncidentsQ = useQuery({
+    queryKey: ["ti-incidents-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_incidents" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiDeprParamsQ = useQuery({
+    queryKey: ["ti-depr-params-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_depreciation_params" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiDeprScheduleQ = useQuery({
+    queryKey: ["ti-depr-schedule-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_depreciation_schedule" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiMovementsQ = useQuery({
+    queryKey: ["ti-movements-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_equipment_movements" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiSlaQ = useQuery({
+    queryKey: ["ti-sla-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_sla_policies" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiAttachmentsQ = useQuery({
+    queryKey: ["ti-attachments-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_equipment_attachments" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiRequestsQ = useQuery({
+    queryKey: ["ti-requests-maturity", orgId, competencia],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("requests")
+        .select("id, status, due_date")
+        .eq("organization_id", orgId!)
+        .eq("type", "rotina_ti")
+        .eq("competencia", competencia);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId && isTi,
+  });
+
+  // ============== Datasets Compras ==============
+  const compSettingsQ = useQuery({
+    queryKey: ["comp-settings-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_settings" as any).select("*").eq("organization_id", orgId!).maybeSingle();
+      if (error) throw error;
+      return (data as any) ?? null;
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compRulesQ = useQuery({
+    queryKey: ["comp-rules-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("approval_rules" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compSuppliersQ = useQuery({
+    queryKey: ["comp-suppliers-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suppliers" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compRequestsQ = useQuery({
+    queryKey: ["comp-requests-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_requests" as any)
+        .select("*, items:purchase_request_items(id)")
+        .eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compApprovalsQ = useQuery({
+    queryKey: ["comp-approvals-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_approvals" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compOrdersQ = useQuery({
+    queryKey: ["comp-orders-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_orders" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compQuotationsQ = useQuery({
+    queryKey: ["comp-quotations-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_quotations" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compReceiptsQ = useQuery({
+    queryKey: ["comp-receipts-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_receipts" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compDivergencesQ = useQuery({
+    queryKey: ["comp-divergences-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_divergences" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compRecurrencesQ = useQuery({
+    queryKey: ["comp-recurrences-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_recurrences" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compRequestsRoutinesQ = useQuery({
+    queryKey: ["comp-routines-maturity", orgId, competencia],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("requests")
+        .select("id, status, due_date")
+        .eq("organization_id", orgId!)
+        .eq("type", "rotina_compras")
+        .eq("competencia", competencia);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId && isCompras,
+  });
+
   // ============== Cálculo ==============
   const result: SectorMaturityResult | null = useMemo(() => {
     if (!orgId) return null;
@@ -404,9 +751,89 @@ export function useSectorOnboarding(
       });
     }
 
+    if (isJur) {
+      const reqs = jurRequestsQ.data ?? [];
+      const generated = reqs.length;
+      const completed = reqs.filter((r: any) => r.status === "concluida" || r.status === "concluído").length;
+      const overdue = reqs.filter(
+        (r: any) => r.due_date && new Date(r.due_date) < today &&
+          !(r.status === "concluida" || r.status === "concluído" || r.status === "cancelada")
+      ).length;
+      return evaluateJuridico({
+        targets,
+        config: jurConfigQ.data ?? null,
+        processes: jurProcessesQ.data ?? [],
+        movements: jurMovementsQ.data ?? [],
+        settlements: jurSettlementsQ.data ?? [],
+        installments: jurInstallmentsQ.data ?? [],
+        documents: jurDocumentsQ.data ?? [],
+        expenses: jurExpensesQ.data ?? [],
+        routinesGenerated: generated,
+        routinesCompleted: completed,
+        routinesOverdue: overdue,
+        cashflowJurMonth: jurCashflowCountQ.data ?? 0,
+        refDate: today,
+      });
+    }
+
+    if (isTi) {
+      const reqs = tiRequestsQ.data ?? [];
+      const generated = reqs.length;
+      const completed = reqs.filter((r: any) => r.status === "concluida" || r.status === "concluído").length;
+      const overdue = reqs.filter(
+        (r: any) => r.due_date && new Date(r.due_date) < today &&
+          !(r.status === "concluida" || r.status === "concluído" || r.status === "cancelada")
+      ).length;
+      return evaluateTI({
+        targets,
+        config: tiConfigQ.data ?? null,
+        equipment: tiEquipmentQ.data ?? [],
+        systems: tiSystemsQ.data ?? [],
+        telecom: tiTelecomQ.data ?? [],
+        tickets: tiTicketsQ.data ?? [],
+        incidents: tiIncidentsQ.data ?? [],
+        depreciationParams: tiDeprParamsQ.data ?? [],
+        depreciationSchedule: tiDeprScheduleQ.data ?? [],
+        movements: tiMovementsQ.data ?? [],
+        slaPolicies: tiSlaQ.data ?? [],
+        attachments: tiAttachmentsQ.data ?? [],
+        routinesGenerated: generated,
+        routinesCompleted: completed,
+        routinesOverdue: overdue,
+        refDate: today,
+      });
+    }
+
+    if (isCompras) {
+      const reqs = compRequestsRoutinesQ.data ?? [];
+      const generated = reqs.length;
+      const completed = reqs.filter((r: any) => r.status === "concluida" || r.status === "concluído").length;
+      const overdue = reqs.filter(
+        (r: any) => r.due_date && new Date(r.due_date) < today &&
+          !(r.status === "concluida" || r.status === "concluído" || r.status === "cancelada")
+      ).length;
+      return evaluateCompras({
+        targets,
+        settings: compSettingsQ.data ?? null,
+        approvalRules: compRulesQ.data ?? [],
+        suppliers: compSuppliersQ.data ?? [],
+        requests: compRequestsQ.data ?? [],
+        approvals: compApprovalsQ.data ?? [],
+        orders: compOrdersQ.data ?? [],
+        quotations: compQuotationsQ.data ?? [],
+        receipts: compReceiptsQ.data ?? [],
+        divergences: compDivergencesQ.data ?? [],
+        recurrences: compRecurrencesQ.data ?? [],
+        routinesGenerated: generated,
+        routinesCompleted: completed,
+        routinesOverdue: overdue,
+        refDate: today,
+      });
+    }
+
     return null;
   }, [
-    orgId, isDP, isFin, today,
+    orgId, isDP, isFin, isJur, isTi, isCompras, today,
     // DP deps
     dpConfig, businessDaysQ.data, positionsQ.data, employees, benefits,
     employeeBenefits, documentsQ.data, payrollRuns, compensationsQ.data,
@@ -416,6 +843,18 @@ export function useSectorOnboarding(
     finGroupingMacrosQ.data, finGroupingGroupsQ.data, finGroupingRulesQ.data,
     finContractsQ.data, finCashflowMonthQ.data, finCashflowPrevQ.data,
     finOverdueQ.data, finPeriodQ.data, finRequestsQ.data,
+    // Jurídico deps
+    jurConfigQ.data, jurProcessesQ.data, jurMovementsQ.data, jurSettlementsQ.data,
+    jurInstallmentsQ.data, jurDocumentsQ.data, jurExpensesQ.data,
+    jurCashflowCountQ.data, jurRequestsQ.data,
+    // TI deps
+    tiConfigQ.data, tiEquipmentQ.data, tiSystemsQ.data, tiTelecomQ.data,
+    tiTicketsQ.data, tiIncidentsQ.data, tiDeprParamsQ.data, tiDeprScheduleQ.data,
+    tiMovementsQ.data, tiSlaQ.data, tiAttachmentsQ.data, tiRequestsQ.data,
+    // Compras deps
+    compSettingsQ.data, compRulesQ.data, compSuppliersQ.data, compRequestsQ.data,
+    compApprovalsQ.data, compOrdersQ.data, compQuotationsQ.data, compReceiptsQ.data,
+    compDivergencesQ.data, compRecurrencesQ.data, compRequestsRoutinesQ.data,
     // Targets
     targets,
   ]);
@@ -429,6 +868,20 @@ export function useSectorOnboarding(
        finEntitiesQ.isLoading || finGroupingMacrosQ.isLoading || finGroupingGroupsQ.isLoading ||
        finGroupingRulesQ.isLoading || finContractsQ.isLoading || finCashflowMonthQ.isLoading ||
        finCashflowPrevQ.isLoading || finOverdueQ.isLoading || finPeriodQ.isLoading || finRequestsQ.isLoading)
+    : isJur
+    ? (jurConfigQ.isLoading || jurProcessesQ.isLoading || jurMovementsQ.isLoading ||
+       jurSettlementsQ.isLoading || jurInstallmentsQ.isLoading || jurDocumentsQ.isLoading ||
+       jurExpensesQ.isLoading || jurCashflowCountQ.isLoading || jurRequestsQ.isLoading)
+    : isTi
+    ? (tiConfigQ.isLoading || tiEquipmentQ.isLoading || tiSystemsQ.isLoading ||
+       tiTelecomQ.isLoading || tiTicketsQ.isLoading || tiIncidentsQ.isLoading ||
+       tiDeprParamsQ.isLoading || tiDeprScheduleQ.isLoading || tiMovementsQ.isLoading ||
+       tiSlaQ.isLoading || tiAttachmentsQ.isLoading || tiRequestsQ.isLoading)
+    : isCompras
+    ? (compSettingsQ.isLoading || compRulesQ.isLoading || compSuppliersQ.isLoading ||
+       compRequestsQ.isLoading || compApprovalsQ.isLoading || compOrdersQ.isLoading ||
+       compQuotationsQ.isLoading || compReceiptsQ.isLoading || compDivergencesQ.isLoading ||
+       compRecurrencesQ.isLoading || compRequestsRoutinesQ.isLoading)
     : false;
 
   // ============== Cache na tabela sector_onboarding ==============
@@ -496,6 +949,23 @@ export function useSectorOnboarding(
       qc.invalidateQueries({ queryKey: ["fin-overdue-maturity"] });
       qc.invalidateQueries({ queryKey: ["fin-period-maturity"] });
       qc.invalidateQueries({ queryKey: ["fin-requests-maturity"] });
+      // Jurídico
+      ["jur-config-maturity","jur-processes-maturity","jur-movements-maturity",
+       "jur-settlements-maturity","jur-installments-maturity","jur-documents-maturity",
+       "jur-expenses-maturity","jur-cashflow-count-maturity","jur-requests-maturity"]
+        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      // TI
+      ["ti-config-maturity","ti-equipment-maturity","ti-systems-maturity","ti-telecom-maturity",
+       "ti-tickets-maturity","ti-incidents-maturity","ti-depr-params-maturity",
+       "ti-depr-schedule-maturity","ti-movements-maturity","ti-sla-maturity",
+       "ti-attachments-maturity","ti-requests-maturity"]
+        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      // Compras
+      ["comp-settings-maturity","comp-rules-maturity","comp-suppliers-maturity",
+       "comp-requests-maturity","comp-approvals-maturity","comp-orders-maturity",
+       "comp-quotations-maturity","comp-receipts-maturity","comp-divergences-maturity",
+       "comp-recurrences-maturity","comp-routines-maturity"]
+        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
     },
     persist: (r: SectorMaturityResult) => persist.mutateAsync(r),
   };

@@ -1,55 +1,46 @@
-# Validação do painel de Rotinas (DP → Cargos → Rotinas)
+## Objetivo
 
-## O que está OK hoje
+Estender o card **Maturidade dos Departamentos** do Dashboard para mostrar também **TI & Ativos**, **Jurídico** e **Compras**, hoje só DP e Financeiro são exibidos. O score consolidado passa a considerar os 5 setores.
 
-**1. Duplicidade ao salvar — já protegido.**
-Em `src/components/dp/DPCargos.tsx` (`RoutinesPanel.handleAdd`):
-- Há early-return: `if (create.isPending || !form.name.trim()) return;`
-- O botão "Salvar" fica `disabled={!form.name.trim() || create.isPending}` e troca o label para "Salvando…".
-- O formulário só é resetado no `onSuccess`.
-Resultado: cliques repetidos não geram INSERTs duplicados.
+## Diagnóstico
 
-**2. Exclusão via RLS — não é silenciosamente bloqueada.**
-A policy de DELETE em `public.position_routines` é:
-```
-USING (is_org_member(auth.uid(), organization_id))
-```
-Ou seja, qualquer membro da organização pode excluir uma rotina — não há o mesmo problema de RLS silencioso que existia em `positions`. O `onError` + toast já estão ligados no `handleRemove`.
+- `MaturityOverviewSection` já lista `dp / financeiro / juridico / ti` como suportados, **mas** o hook `useSectorOnboarding` só calcula resultado quando `sector === "dp"` ou `"financeiro"`. Para Jurídico e TI ele retorna `null` → o card fica em estado de skeleton para sempre e não aparece com dados.
+- Os avaliadores `evaluateJuridico` e `evaluateTI` já existem em `src/lib/sectorMaturity/` — falta apenas alimentá-los.
+- Não existe avaliador de **Compras**. Precisa ser criado seguindo a mesma rubrica (50 completude / 25 atualização / 25 rotinas).
+- A constraint `sector_maturity_targets_sector_check` só permite `dp / financeiro`. Precisa aceitar `juridico / ti / compras` para o módulo de metas funcionar.
 
-## O que ainda merece ajuste (consistência com Cargos)
+## Mudanças
 
-**A. Confirmação de exclusão.**
-Hoje o botão de lixeira da rotina chama `remove.mutate(id)` direto, sem `AlertDialog`. Como rotinas geram tarefas/notificações em cascata, faz sentido exigir confirmação igual à de Cargos.
+### 1. Compras: novo setor de maturidade
+- `src/lib/sectorMaturity/types.ts` — adicionar `"compras"` em `SectorKey` e em `SECTOR_META` (rota `/compras`).
+- `src/lib/sectorMaturity/compras.ts` (novo) — `evaluateCompras` com checklist baseada nas tabelas já consumidas por `useCompras.ts`:
+  - **Completude (50):** configurações de compras preenchidas, regras de aprovação ativas, fornecedores ativos com CNPJ/razão social, cobertura de tipo de compra, recorrências cadastradas, % de SCs com itens e centro de custo.
+  - **Atualização (25):** SCs com cotação em andamento dentro do prazo, pedidos pendentes sem atraso, recebimentos sem divergência aberta, fornecedores revisados nos últimos 12 meses.
+  - **Rotinas (25):** % de aprovações dentro do SLA, fechamento de SCs do mês, recebimentos conciliados com pedidos.
+- `src/lib/sectorMaturity/targets.ts` — adicionar entrada `compras` em `fieldsForSector` (reusa `routines_target_pct` e `routines_overdue_tolerance_pct`).
 
-**B. Detecção de delete silencioso (defensivo).**
-Mesmo a policy estando aberta, padronizar a mutation com `.delete().eq("id", id).select("id")` e lançar erro quando 0 linhas voltarem deixa o hook resiliente a futuras mudanças de RLS. Aplicar também em `useMutatePosition.remove` (já feito) e em `useMutateRoutine.remove`.
+### 2. Hook `useSectorOnboarding` — ativar Jurídico, TI e Compras
+- Adicionar `isJur / isTi / isCompras` e os datasets necessários atrás de `enabled: !!orgId && isXxx` para não pagar custo nos outros casos.
+- **Jurídico:** `juridico_config`, `juridico_processes`, `juridico_movements`, `juridico_settlements`, `juridico_settlement_installments`, `juridico_documents`, `juridico_expenses`, e `count` de `cashflow_entries` com `source = 'juridico'` no mês.
+- **TI:** `it_config`, `it_equipment`, `it_systems`, `it_telecom`, `it_tickets`, `it_incidents`, `it_depreciation_params`, `it_depreciation_schedule`, `it_equipment_movements`, `it_sla_policies`, `it_equipment_attachments`.
+- **Compras:** `purchase_settings`, `approval_rules`, `suppliers`, `purchase_requests (+items)`, `purchase_approvals`, `purchase_orders`, `purchase_quotations`, `purchase_receipts`, `purchase_divergences`, `purchase_recurrences`.
+- Em todos: ler `requests` com `type IN ('rotina_juridico'|'rotina_ti'|'rotina_compras')` e `competencia = mês atual` para alimentar `routinesGenerated / Completed / Overdue`.
+- Estender o `useMemo` de `result` com os ramos `isJur → evaluateJuridico(...)`, `isTi → evaluateTI(...)`, `isCompras → evaluateCompras(...)`.
+- Estender `isLoading` e o `refresh()` (invalida as novas query keys).
 
-**C. Guarda contra duplo clique na lixeira.**
-Desabilitar o botão de lixeira da rotina enquanto `remove.isPending` (hoje só o de Cargos faz isso via AlertDialog).
+### 3. Dashboard
+- `src/components/dashboard/MaturityOverviewSection.tsx` — adicionar `"compras"` em `SUPPORTED_SECTORS`. O grid já é responsivo (`md:grid-cols-2`), continua bom em 5 cards.
 
-## Plano de ajuste
+### 4. Banco
+- Migration única: `ALTER TABLE public.sector_maturity_targets DROP CONSTRAINT sector_maturity_targets_sector_check; ADD CONSTRAINT ... CHECK (sector = ANY (ARRAY['dp','financeiro','juridico','ti','compras']));`
+- Nenhuma outra alteração — `sector_onboarding`, `sector_onboarding_history` e RLS já são genéricos por organização.
 
-### 1. `src/hooks/useDP.ts` — `useMutateRoutine.remove`
-Trocar para:
-```ts
-const { data, error } = await supabase
-  .from("position_routines")
-  .delete()
-  .eq("id", id)
-  .select("id");
-if (error) throw error;
-if (!data || data.length === 0) {
-  throw new Error("Sem permissão para excluir esta rotina ou ela já foi removida.");
-}
-```
+## Fora do escopo
 
-### 2. `src/components/dp/DPCargos.tsx` — `RoutinesPanel`
-- Adicionar estado `deletingRoutine: { id, name } | null`.
-- Substituir o `onClick` do botão de lixeira por `setDeletingRoutine({ id: r.id, name: r.name })`.
-- Renderizar um `AlertDialog` ao final do componente (título: "Excluir rotina?", descrição com o nome) com `confirmDelete` chamando `remove.mutate(deletingRoutine.id, { onSuccess, onError, onSettled: () => setDeletingRoutine(null) })`.
-- Botões com `disabled={remove.isPending}` e label "Excluindo…".
+- Não mexer no Backoffice de maturidade nem nos snapshots mensais (a edge function `sector-maturity-snapshot` já é genérica por setor).
+- Não criar trilha de melhoria automática para Compras agora — só o termômetro + checklist.
+- Sem mudanças visuais na barra dentro de cada módulo (`SectorOnboardingBar`).
 
-## Fora de escopo
-- Não mexer na RLS de `position_routines` (já está adequada).
-- Não alterar lógica de criação de rotinas (já está protegida contra duplicidade).
-- Nenhuma mudança em `useRoutineCalendar` / geração de tarefas.
+## Como o usuário vai perceber
+
+No Dashboard, o bloco "Maturidade dos Departamentos" passa a mostrar 5 cards (DP, Financeiro, Jurídico, TI & Ativos, Compras), cada um com score 0-100, badge de nível, mini-barras de Completude/Atualização/Rotinas e botão "Abrir setor". O score consolidado no header passa a refletir a média dos 5.
