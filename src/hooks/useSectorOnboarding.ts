@@ -949,6 +949,23 @@ export function useSectorOnboarding(
       qc.invalidateQueries({ queryKey: ["fin-overdue-maturity"] });
       qc.invalidateQueries({ queryKey: ["fin-period-maturity"] });
       qc.invalidateQueries({ queryKey: ["fin-requests-maturity"] });
+      // Jurídico
+      ["jur-config-maturity","jur-processes-maturity","jur-movements-maturity",
+       "jur-settlements-maturity","jur-installments-maturity","jur-documents-maturity",
+       "jur-expenses-maturity","jur-cashflow-count-maturity","jur-requests-maturity"]
+        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      // TI
+      ["ti-config-maturity","ti-equipment-maturity","ti-systems-maturity","ti-telecom-maturity",
+       "ti-tickets-maturity","ti-incidents-maturity","ti-depr-params-maturity",
+       "ti-depr-schedule-maturity","ti-movements-maturity","ti-sla-maturity",
+       "ti-attachments-maturity","ti-requests-maturity"]
+        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      // Compras
+      ["comp-settings-maturity","comp-rules-maturity","comp-suppliers-maturity",
+       "comp-requests-maturity","comp-approvals-maturity","comp-orders-maturity",
+       "comp-quotations-maturity","comp-receipts-maturity","comp-divergences-maturity",
+       "comp-recurrences-maturity","comp-routines-maturity"]
+        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
     },
     persist: (r: SectorMaturityResult) => persist.mutateAsync(r),
   };
