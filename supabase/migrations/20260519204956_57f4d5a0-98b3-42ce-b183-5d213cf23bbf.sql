@@ -1,0 +1,2 @@
+ALTER TABLE public.sector_maturity_targets DROP CONSTRAINT IF EXISTS sector_maturity_targets_sector_check;
+ALTER TABLE public.sector_maturity_targets ADD CONSTRAINT sector_maturity_targets_sector_check CHECK (sector = ANY (ARRAY['dp'::text, 'financeiro'::text, 'juridico'::text, 'ti'::text, 'compras'::text]));
