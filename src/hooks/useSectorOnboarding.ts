@@ -14,6 +14,7 @@ import { evaluateDP } from "@/lib/sectorMaturity/dp";
 import { evaluateFinanceiro } from "@/lib/sectorMaturity/financeiro";
 import { evaluateJuridico } from "@/lib/sectorMaturity/juridico";
 import { evaluateTI } from "@/lib/sectorMaturity/ti";
+import { evaluateCompras } from "@/lib/sectorMaturity/compras";
 import { SectorKey, SectorMaturityResult } from "@/lib/sectorMaturity/types";
 import { useSectorMaturityTargets } from "@/hooks/useSectorMaturityTargets";
 
