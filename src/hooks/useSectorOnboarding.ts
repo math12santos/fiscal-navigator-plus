@@ -751,9 +751,89 @@ export function useSectorOnboarding(
       });
     }
 
+    if (isJur) {
+      const reqs = jurRequestsQ.data ?? [];
+      const generated = reqs.length;
+      const completed = reqs.filter((r: any) => r.status === "concluida" || r.status === "concluído").length;
+      const overdue = reqs.filter(
+        (r: any) => r.due_date && new Date(r.due_date) < today &&
+          !(r.status === "concluida" || r.status === "concluído" || r.status === "cancelada")
+      ).length;
+      return evaluateJuridico({
+        targets,
+        config: jurConfigQ.data ?? null,
+        processes: jurProcessesQ.data ?? [],
+        movements: jurMovementsQ.data ?? [],
+        settlements: jurSettlementsQ.data ?? [],
+        installments: jurInstallmentsQ.data ?? [],
+        documents: jurDocumentsQ.data ?? [],
+        expenses: jurExpensesQ.data ?? [],
+        routinesGenerated: generated,
+        routinesCompleted: completed,
+        routinesOverdue: overdue,
+        cashflowJurMonth: jurCashflowCountQ.data ?? 0,
+        refDate: today,
+      });
+    }
+
+    if (isTi) {
+      const reqs = tiRequestsQ.data ?? [];
+      const generated = reqs.length;
+      const completed = reqs.filter((r: any) => r.status === "concluida" || r.status === "concluído").length;
+      const overdue = reqs.filter(
+        (r: any) => r.due_date && new Date(r.due_date) < today &&
+          !(r.status === "concluida" || r.status === "concluído" || r.status === "cancelada")
+      ).length;
+      return evaluateTI({
+        targets,
+        config: tiConfigQ.data ?? null,
+        equipment: tiEquipmentQ.data ?? [],
+        systems: tiSystemsQ.data ?? [],
+        telecom: tiTelecomQ.data ?? [],
+        tickets: tiTicketsQ.data ?? [],
+        incidents: tiIncidentsQ.data ?? [],
+        depreciationParams: tiDeprParamsQ.data ?? [],
+        depreciationSchedule: tiDeprScheduleQ.data ?? [],
+        movements: tiMovementsQ.data ?? [],
+        slaPolicies: tiSlaQ.data ?? [],
+        attachments: tiAttachmentsQ.data ?? [],
+        routinesGenerated: generated,
+        routinesCompleted: completed,
+        routinesOverdue: overdue,
+        refDate: today,
+      });
+    }
+
+    if (isCompras) {
+      const reqs = compRequestsRoutinesQ.data ?? [];
+      const generated = reqs.length;
+      const completed = reqs.filter((r: any) => r.status === "concluida" || r.status === "concluído").length;
+      const overdue = reqs.filter(
+        (r: any) => r.due_date && new Date(r.due_date) < today &&
+          !(r.status === "concluida" || r.status === "concluído" || r.status === "cancelada")
+      ).length;
+      return evaluateCompras({
+        targets,
+        settings: compSettingsQ.data ?? null,
+        approvalRules: compRulesQ.data ?? [],
+        suppliers: compSuppliersQ.data ?? [],
+        requests: compRequestsQ.data ?? [],
+        approvals: compApprovalsQ.data ?? [],
+        orders: compOrdersQ.data ?? [],
+        quotations: compQuotationsQ.data ?? [],
+        receipts: compReceiptsQ.data ?? [],
+        divergences: compDivergencesQ.data ?? [],
+        recurrences: compRecurrencesQ.data ?? [],
+        routinesGenerated: generated,
+        routinesCompleted: completed,
+        routinesOverdue: overdue,
+        refDate: today,
+      });
+    }
+
     return null;
   }, [
-    orgId, isDP, isFin, today,
+    orgId, isDP, isFin, isJur, isTi, isCompras, today,
     // DP deps
     dpConfig, businessDaysQ.data, positionsQ.data, employees, benefits,
     employeeBenefits, documentsQ.data, payrollRuns, compensationsQ.data,
@@ -763,6 +843,18 @@ export function useSectorOnboarding(
     finGroupingMacrosQ.data, finGroupingGroupsQ.data, finGroupingRulesQ.data,
     finContractsQ.data, finCashflowMonthQ.data, finCashflowPrevQ.data,
     finOverdueQ.data, finPeriodQ.data, finRequestsQ.data,
+    // Jurídico deps
+    jurConfigQ.data, jurProcessesQ.data, jurMovementsQ.data, jurSettlementsQ.data,
+    jurInstallmentsQ.data, jurDocumentsQ.data, jurExpensesQ.data,
+    jurCashflowCountQ.data, jurRequestsQ.data,
+    // TI deps
+    tiConfigQ.data, tiEquipmentQ.data, tiSystemsQ.data, tiTelecomQ.data,
+    tiTicketsQ.data, tiIncidentsQ.data, tiDeprParamsQ.data, tiDeprScheduleQ.data,
+    tiMovementsQ.data, tiSlaQ.data, tiAttachmentsQ.data, tiRequestsQ.data,
+    // Compras deps
+    compSettingsQ.data, compRulesQ.data, compSuppliersQ.data, compRequestsQ.data,
+    compApprovalsQ.data, compOrdersQ.data, compQuotationsQ.data, compReceiptsQ.data,
+    compDivergencesQ.data, compRecurrencesQ.data, compRequestsRoutinesQ.data,
     // Targets
     targets,
   ]);
@@ -776,6 +868,20 @@ export function useSectorOnboarding(
        finEntitiesQ.isLoading || finGroupingMacrosQ.isLoading || finGroupingGroupsQ.isLoading ||
        finGroupingRulesQ.isLoading || finContractsQ.isLoading || finCashflowMonthQ.isLoading ||
        finCashflowPrevQ.isLoading || finOverdueQ.isLoading || finPeriodQ.isLoading || finRequestsQ.isLoading)
+    : isJur
+    ? (jurConfigQ.isLoading || jurProcessesQ.isLoading || jurMovementsQ.isLoading ||
+       jurSettlementsQ.isLoading || jurInstallmentsQ.isLoading || jurDocumentsQ.isLoading ||
+       jurExpensesQ.isLoading || jurCashflowCountQ.isLoading || jurRequestsQ.isLoading)
+    : isTi
+    ? (tiConfigQ.isLoading || tiEquipmentQ.isLoading || tiSystemsQ.isLoading ||
+       tiTelecomQ.isLoading || tiTicketsQ.isLoading || tiIncidentsQ.isLoading ||
+       tiDeprParamsQ.isLoading || tiDeprScheduleQ.isLoading || tiMovementsQ.isLoading ||
+       tiSlaQ.isLoading || tiAttachmentsQ.isLoading || tiRequestsQ.isLoading)
+    : isCompras
+    ? (compSettingsQ.isLoading || compRulesQ.isLoading || compSuppliersQ.isLoading ||
+       compRequestsQ.isLoading || compApprovalsQ.isLoading || compOrdersQ.isLoading ||
+       compQuotationsQ.isLoading || compReceiptsQ.isLoading || compDivergencesQ.isLoading ||
+       compRecurrencesQ.isLoading || compRequestsRoutinesQ.isLoading)
     : false;
 
   // ============== Cache na tabela sector_onboarding ==============
