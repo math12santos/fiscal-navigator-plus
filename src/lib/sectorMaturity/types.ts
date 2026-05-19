@@ -2,7 +2,7 @@
 // Cada setor (DP, Financeiro, CRM, ...) define seus próprios checks
 // e a forma de avaliação, mas todos retornam um SectorMaturityResult.
 
-export type SectorKey = "dp" | "financeiro" | "crm" | "contratos" | "planejamento" | "juridico" | "ti";
+export type SectorKey = "dp" | "financeiro" | "crm" | "contratos" | "planejamento" | "juridico" | "ti" | "compras";
 
 export type MaturityCategory = "completude" | "atualizacao" | "rotinas";
 
