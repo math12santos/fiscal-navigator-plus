@@ -336,6 +336,351 @@ export function useSectorOnboarding(
     enabled: !!orgId && isFin,
   });
 
+  // ============== Datasets Jurídico ==============
+  const jurConfigQ = useQuery({
+    queryKey: ["jur-config-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_config" as any).select("*").eq("organization_id", orgId!).maybeSingle();
+      if (error) throw error;
+      return (data as any) ?? null;
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurProcessesQ = useQuery({
+    queryKey: ["jur-processes-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_processes" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurMovementsQ = useQuery({
+    queryKey: ["jur-movements-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_movements" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurSettlementsQ = useQuery({
+    queryKey: ["jur-settlements-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_settlements" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurInstallmentsQ = useQuery({
+    queryKey: ["jur-installments-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_settlement_installments" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurDocumentsQ = useQuery({
+    queryKey: ["jur-documents-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_documents" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurExpensesQ = useQuery({
+    queryKey: ["jur-expenses-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("juridico_expenses" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurCashflowCountQ = useQuery({
+    queryKey: ["jur-cashflow-count-maturity", orgId, competencia],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("cashflow_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId!)
+        .eq("source", "juridico")
+        .gte("data_prevista", monthStart)
+        .lte("data_prevista", monthEnd);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!orgId && isJur,
+  });
+  const jurRequestsQ = useQuery({
+    queryKey: ["jur-requests-maturity", orgId, competencia],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("requests")
+        .select("id, status, due_date")
+        .eq("organization_id", orgId!)
+        .eq("type", "rotina_juridico")
+        .eq("competencia", competencia);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId && isJur,
+  });
+
+  // ============== Datasets TI ==============
+  const tiConfigQ = useQuery({
+    queryKey: ["ti-config-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_config" as any).select("*").eq("organization_id", orgId!).maybeSingle();
+      if (error) throw error;
+      return (data as any) ?? null;
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiEquipmentQ = useQuery({
+    queryKey: ["ti-equipment-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_equipment" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiSystemsQ = useQuery({
+    queryKey: ["ti-systems-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_systems" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiTelecomQ = useQuery({
+    queryKey: ["ti-telecom-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_telecom" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiTicketsQ = useQuery({
+    queryKey: ["ti-tickets-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_tickets" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiIncidentsQ = useQuery({
+    queryKey: ["ti-incidents-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_incidents" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiDeprParamsQ = useQuery({
+    queryKey: ["ti-depr-params-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_depreciation_params" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiDeprScheduleQ = useQuery({
+    queryKey: ["ti-depr-schedule-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_depreciation_schedule" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiMovementsQ = useQuery({
+    queryKey: ["ti-movements-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_equipment_movements" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiSlaQ = useQuery({
+    queryKey: ["ti-sla-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_sla_policies" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiAttachmentsQ = useQuery({
+    queryKey: ["ti-attachments-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("it_equipment_attachments" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isTi,
+  });
+  const tiRequestsQ = useQuery({
+    queryKey: ["ti-requests-maturity", orgId, competencia],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("requests")
+        .select("id, status, due_date")
+        .eq("organization_id", orgId!)
+        .eq("type", "rotina_ti")
+        .eq("competencia", competencia);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId && isTi,
+  });
+
+  // ============== Datasets Compras ==============
+  const compSettingsQ = useQuery({
+    queryKey: ["comp-settings-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_settings" as any).select("*").eq("organization_id", orgId!).maybeSingle();
+      if (error) throw error;
+      return (data as any) ?? null;
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compRulesQ = useQuery({
+    queryKey: ["comp-rules-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("approval_rules" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compSuppliersQ = useQuery({
+    queryKey: ["comp-suppliers-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suppliers" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compRequestsQ = useQuery({
+    queryKey: ["comp-requests-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_requests" as any)
+        .select("*, items:purchase_request_items(id)")
+        .eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compApprovalsQ = useQuery({
+    queryKey: ["comp-approvals-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_approvals" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compOrdersQ = useQuery({
+    queryKey: ["comp-orders-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_orders" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compQuotationsQ = useQuery({
+    queryKey: ["comp-quotations-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_quotations" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compReceiptsQ = useQuery({
+    queryKey: ["comp-receipts-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_receipts" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compDivergencesQ = useQuery({
+    queryKey: ["comp-divergences-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_divergences" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compRecurrencesQ = useQuery({
+    queryKey: ["comp-recurrences-maturity", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_recurrences" as any).select("*").eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!orgId && isCompras,
+  });
+  const compRequestsRoutinesQ = useQuery({
+    queryKey: ["comp-routines-maturity", orgId, competencia],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("requests")
+        .select("id, status, due_date")
+        .eq("organization_id", orgId!)
+        .eq("type", "rotina_compras")
+        .eq("competencia", competencia);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId && isCompras,
+  });
+
   // ============== Cálculo ==============
   const result: SectorMaturityResult | null = useMemo(() => {
     if (!orgId) return null;
