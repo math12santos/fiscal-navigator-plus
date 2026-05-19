@@ -38,6 +38,7 @@ export function useSectorOnboarding(
   const isFin = sector === "financeiro";
   const isJur = sector === "juridico";
   const isTi = sector === "ti";
+  const isCompras = sector === "compras";
 
   // Metas configuráveis (com fallback aos defaults quando não houver registro)
   const { targets } = useSectorMaturityTargets(sector);
